@@ -1,0 +1,14 @@
+[Unit]
+Description=Millennium Tools Daemon
+After=remap-sink.service
+Requires=remap-sink.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/bash -c "/home/matzen/millennium/tools/daemon DEBUG"
+ExecStartPre=/bin/bash -c 'until ping -c1 -W1 8.8.8.8; do sleep 1; done'
+Restart=on-failure
+WorkingDirectory=/home/matzen/millennium/tools
+
+[Install]
+WantedBy=default.target
