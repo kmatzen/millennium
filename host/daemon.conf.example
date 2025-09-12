@@ -1,0 +1,25 @@
+# Millennium Daemon Configuration File
+# Copy this file to /etc/millennium/daemon.conf and modify as needed
+
+# SIP Configuration
+sip.username=+12067371343
+sip.password=supersecret123A
+sip.domain=matzen-test.sip.twilio.com
+sip.uri=sip:+12067371343@matzen-test.sip.twilio.com;auth_user=+12067371343;auth_pass=supersecret123A;transport=tls
+
+# Hardware Configuration
+hardware.display_device=/dev/serial/by-id/usb-Arduino_LLC_Millennium_Beta-if00
+hardware.baud_rate=9600
+
+# Call Configuration
+call.cost_cents=50
+call.timeout_seconds=300
+
+# Logging Configuration
+logging.level=INFO
+logging.file=/var/log/millennium/daemon.log
+logging.to_file=true
+
+# System Configuration
+system.update_interval_ms=33
+system.max_retries=3
