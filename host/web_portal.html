@@ -554,12 +554,6 @@
             <div class="card config-panel">
                 <h2>System Configuration</h2>
                 <div class="config-section">
-                    <h3>SIP Configuration</h3>
-                    <div class="config-grid" id="sip-config">
-                        <div class="loading">Loading configuration...</div>
-                    </div>
-                </div>
-                <div class="config-section">
                     <h3>Hardware Configuration</h3>
                     <div class="config-grid" id="hardware-config">
                         <div class="loading">Loading configuration...</div>
@@ -786,23 +780,6 @@
             try {
                 const response = await fetch('/api/config');
                 const data = await response.json();
-                
-                // SIP Configuration
-                const sipConfig = document.getElementById('sip-config');
-                sipConfig.innerHTML = `
-                    <div class="config-item">
-                        <div class="config-label">Username</div>
-                        <div class="config-value">${data.sip.username || 'Not configured'}</div>
-                    </div>
-                    <div class="config-item">
-                        <div class="config-label">Domain</div>
-                        <div class="config-value">${data.sip.domain || 'Not configured'}</div>
-                    </div>
-                    <div class="config-item">
-                        <div class="config-label">URI</div>
-                        <div class="config-value">${data.sip.uri || 'Not configured'}</div>
-                    </div>
-                `;
                 
                 // Hardware Configuration
                 const hardwareConfig = document.getElementById('hardware-config');
