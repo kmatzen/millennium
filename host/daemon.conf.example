@@ -15,7 +15,7 @@ hardware.baud_rate=9600
 call.cost_cents=50
 call.timeout_seconds=300
 
-# Logging Configuration
+# Logging Configuration - BALANCED for audio performance
 logging.level=INFO
 logging.file=/var/log/millennium/daemon.log
 logging.to_file=true
@@ -23,3 +23,35 @@ logging.to_file=true
 # System Configuration
 system.update_interval_ms=33
 system.max_retries=3
+
+# Metrics Server Configuration - DISABLED for single-core optimization
+# Metrics are now collected in the main loop instead of a separate thread
+metrics_server.enabled=false
+metrics_server.port=8080
+metrics_server.disable_during_audio=true
+
+# Web Server Configuration - NO AUDIO INTERFERENCE
+web_server.enabled=true
+web_server.port=8081
+# No audio protection (let baresip handle audio without interference)
+web_server.disable_completely_during_audio=false
+web_server.disable_during_calls=false
+web_server.disable_during_handset_up=false
+web_server.emergency_audio_mode=false
+web_server.poll_delay_ms=1
+web_server.call_poll_delay_ms=1
+# Server-side rate limiting (minimal)
+web_server.rate_limit_normal=100
+web_server.rate_limit_high_priority=50
+
+# Main Loop Configuration - CONSERVATIVE AUDIO PROTECTION
+main_loop.delay_ms=1
+main_loop.audio_delay_ms=1
+main_loop.call_delay_ms=1
+# Panic mode for extreme audio protection (Pi Zero 2W)
+main_loop.panic_mode=false
+# Reduce hardware polling during audio to give baresip threads priority
+main_loop.audio_polling_divisor=1
+
+# Logging Configuration
+logging.disable_during_audio=false

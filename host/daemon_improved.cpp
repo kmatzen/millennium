@@ -2,6 +2,8 @@
 #include "logger.h"
 #include "health_monitor.h"
 #include "metrics.h"
+#include "metrics_server.h"
+#include "web_server.h"
 #include "millennium_sdk.h"
 #include <atomic>
 #include <csignal>
@@ -16,6 +18,8 @@
 #include <vector>
 #include <thread>
 #include <chrono>
+#include <fstream>
+#include <filesystem>
 
 #define EVENT_CATEGORIES 3
 
@@ -47,10 +51,50 @@ public:
     }
 };
 
+// Forward declarations
+class EventProcessor;
+
 // Global instances
 std::atomic<bool> running(true);
 std::unique_ptr<DaemonState> daemon_state;
 std::unique_ptr<MillenniumClient> client;
+std::unique_ptr<MetricsServer> metrics_server;
+std::unique_ptr<WebServer> web_server;
+std::unique_ptr<EventProcessor> event_processor;
+
+// Daemon start time for uptime calculation
+std::chrono::steady_clock::time_point daemon_start_time;
+
+// Function to get daemon state info for web server
+struct DaemonStateInfo {
+    int current_state;
+    int inserted_cents;
+    std::string keypad_buffer;
+    std::chrono::steady_clock::time_point last_activity;
+};
+
+DaemonStateInfo getDaemonStateInfo() {
+    DaemonStateInfo info;
+    if (daemon_state) {
+        info.current_state = static_cast<int>(daemon_state->current_state);
+        info.inserted_cents = daemon_state->inserted_cents;
+        info.keypad_buffer = std::string(daemon_state->keypad_buffer.begin(), daemon_state->keypad_buffer.end());
+        info.last_activity = daemon_state->last_activity;
+    } else {
+        info.current_state = 0;
+        info.inserted_cents = 0;
+        info.keypad_buffer = "";
+        info.last_activity = std::chrono::steady_clock::now();
+    }
+    return info;
+}
+
+std::chrono::steady_clock::time_point getDaemonStartTime() {
+    return daemon_start_time;
+}
+
+// Forward declaration - will be implemented after function declarations
+bool sendControlCommand(const std::string& action);
 Config& config = Config::getInstance();
 MillenniumLogger& logger = MillenniumLogger::getInstance();
 HealthMonitor& health_monitor = HealthMonitor::getInstance();
@@ -165,6 +209,17 @@ void handle_call_state_event(const std::shared_ptr<CallStateEvent> &call_state_e
         
         client->writeToCoinValidator('f');
         client->writeToCoinValidator('z');
+    } else if (call_state_event->get_state() == CALL_ACTIVE) {
+        // Handle call established (when baresip reports CALL_ESTABLISHED)
+        logger.info("Call", "Call established - audio should be working");
+        metrics.incrementCounter("calls_established");
+        
+        line1 = "Call active";
+        line2 = "Audio connected";
+        client->setDisplay(generateDisplayBytes());
+        
+        daemon_state->current_state = DaemonState::CALL_ACTIVE;
+        daemon_state->updateActivity();
     }
 }
 
@@ -285,6 +340,21 @@ public:
             logger.warn("EventProcessor", "Unhandled event type: " + event->name());
             metrics.incrementCounter("unhandled_events");
         }
+        
+        // Always check side effects after processing any event
+        check_side_effects();
+    }
+    
+private:
+    void check_side_effects() {
+        // Check if we should initiate a call
+        check_and_call();
+        
+        // Could add other side effects here in the future:
+        // - Update display
+        // - Send notifications
+        // - Log state changes
+        // - etc.
     }
     
 private:
@@ -312,6 +382,167 @@ private:
         };
     }
 };
+
+// Implementation of sendControlCommand (moved here to access display functions)
+bool sendControlCommand(const std::string& action) {
+    if (!daemon_state) {
+        MillenniumLogger::getInstance().error("Control", "Daemon state is null");
+        return false;
+    }
+    
+    if (!event_processor) {
+        MillenniumLogger::getInstance().error("Control", "Event processor is null");
+        return false;
+    }
+    
+    try {
+        MillenniumLogger::getInstance().info("Control", "Received control command: " + action);
+        std::cout << "[CONTROL] Received command: " << action << std::endl;
+        
+        // Parse command and arguments
+        size_t colon_pos = action.find(':');
+        std::string command = (colon_pos != std::string::npos) ? action.substr(0, colon_pos) : action;
+        std::string arg = (colon_pos != std::string::npos) ? action.substr(colon_pos + 1) : "";
+        if (command == "start_call") {
+            // Simulate starting a call by changing state
+            daemon_state->current_state = DaemonState::CALL_INCOMING;
+            daemon_state->updateActivity();
+            Metrics::getInstance().setGauge("current_state", static_cast<double>(daemon_state->current_state));
+            Metrics::getInstance().incrementCounter("calls_initiated");
+            MillenniumLogger::getInstance().info("Control", "Call initiation requested via web portal");
+            return true;
+            
+        } else if (command == "reset_system") {
+            // Reset the system state
+            daemon_state->reset();
+            Metrics::getInstance().setGauge("current_state", static_cast<double>(daemon_state->current_state));
+            Metrics::getInstance().setGauge("inserted_cents", 0.0);
+            Metrics::getInstance().incrementCounter("system_resets");
+            MillenniumLogger::getInstance().info("Control", "System reset requested via web portal");
+            return true;
+            
+        } else if (command == "emergency_stop") {
+            // Emergency stop - set to invalid state and stop running
+            daemon_state->current_state = DaemonState::INVALID;
+            daemon_state->updateActivity();
+            Metrics::getInstance().setGauge("current_state", static_cast<double>(daemon_state->current_state));
+            Metrics::getInstance().incrementCounter("emergency_stops");
+            MillenniumLogger::getInstance().warn("Control", "Emergency stop activated via web portal");
+            // Note: We don't actually stop the daemon, just set it to invalid state
+            return true;
+        } else if (command == "keypad_press") {
+            // Extract key from argument and inject as keypad event
+            std::string key = arg;
+            if (std::isdigit(key[0])) {
+                auto keypad_event = std::make_shared<KeypadEvent>(key[0]);
+                event_processor->process_event(keypad_event);
+                MillenniumLogger::getInstance().info("Control", "Keypad key '" + key + "' pressed via web portal");
+                return true;
+            } else {
+                MillenniumLogger::getInstance().warn("Control", "Invalid keypad key: " + key);
+                return false;
+            }
+        } else if (command == "keypad_clear") {
+            // Only allow clear when handset is up (same as physical keypad logic)
+            if (daemon_state->current_state == DaemonState::IDLE_UP) {
+                daemon_state->keypad_buffer.clear();
+                daemon_state->updateActivity();
+                Metrics::getInstance().incrementCounter("keypad_clears");
+                MillenniumLogger::getInstance().info("Control", "Keypad cleared via web portal");
+                
+                // Update physical display
+                line1 = format_number(daemon_state->keypad_buffer);
+                line2 = generate_message(daemon_state->inserted_cents);
+                client->setDisplay(generateDisplayBytes());
+                
+                return true;
+            } else {
+                MillenniumLogger::getInstance().warn("Control", "Keypad clear ignored - handset down");
+                return false;
+            }
+        } else if (command == "keypad_backspace") {
+            // Only allow backspace when handset is up and buffer is not empty
+            if (daemon_state->current_state == DaemonState::IDLE_UP && !daemon_state->keypad_buffer.empty()) {
+                daemon_state->keypad_buffer.pop_back();
+                daemon_state->updateActivity();
+                Metrics::getInstance().incrementCounter("keypad_backspaces");
+                MillenniumLogger::getInstance().info("Control", "Keypad backspace via web portal");
+                
+                // Update physical display
+                line1 = format_number(daemon_state->keypad_buffer);
+                line2 = generate_message(daemon_state->inserted_cents);
+                client->setDisplay(generateDisplayBytes());
+                
+                return true;
+            } else {
+                MillenniumLogger::getInstance().warn("Control", "Keypad backspace ignored - handset down or buffer empty");
+                return false;
+            }
+        } else if (command == "coin_insert") {
+            // Extract cents from argument and inject as coin event
+            std::string cents_str = arg;
+            MillenniumLogger::getInstance().info("Control", "Extracted cents string: '" + cents_str + "'");
+            std::cout << "[CONTROL] Extracted cents: '" << cents_str << "'" << std::endl;
+            
+            try {
+                int cents = std::stoi(cents_str);
+                
+                // Map cents to coin codes (same as physical coin reader)
+                uint8_t coin_code;
+                if (cents == 5) {
+                    coin_code = 0x36; // COIN_6
+                } else if (cents == 10) {
+                    coin_code = 0x37; // COIN_7
+                } else if (cents == 25) {
+                    coin_code = 0x38; // COIN_8
+                } else {
+                    MillenniumLogger::getInstance().warn("Control", "Invalid coin value: " + cents_str + "¢");
+                    return false;
+                }
+                
+                auto coin_event = std::make_shared<CoinEvent>(coin_code);
+                event_processor->process_event(coin_event);
+                MillenniumLogger::getInstance().info("Control", "Coin inserted: " + cents_str + "¢ via web portal");
+                std::cout << "[CONTROL] Coin inserted successfully: " << cents << "¢" << std::endl;
+                
+                return true;
+            } catch (const std::exception& e) {
+                MillenniumLogger::getInstance().error("Control", "Failed to parse cents: " + std::string(e.what()));
+                std::cout << "[CONTROL] ERROR: Failed to parse cents: " << e.what() << std::endl;
+                return false;
+            }
+        } else if (command == "coin_return") {
+            daemon_state->inserted_cents = 0;
+            daemon_state->updateActivity();
+            Metrics::getInstance().setGauge("inserted_cents", 0.0);
+            Metrics::getInstance().incrementCounter("coin_returns");
+            MillenniumLogger::getInstance().info("Control", "Coins returned via web portal");
+            
+            // Update physical display
+            line1 = format_number(daemon_state->keypad_buffer);
+            line2 = generate_message(daemon_state->inserted_cents);
+            client->setDisplay(generateDisplayBytes());
+            
+            return true;
+        } else if (command == "handset_up") {
+            // Inject as hook event
+            auto hook_event = std::make_shared<HookStateChangeEvent>('U');
+            event_processor->process_event(hook_event);
+            MillenniumLogger::getInstance().info("Control", "Handset lifted via web portal");
+            return true;
+        } else if (command == "handset_down") {
+            // Inject as hook event
+            auto hook_event = std::make_shared<HookStateChangeEvent>('D');
+            event_processor->process_event(hook_event);
+            MillenniumLogger::getInstance().info("Control", "Handset placed down via web portal");
+            return true;
+        }
+    } catch (const std::exception& e) {
+        MillenniumLogger::getInstance().error("Control", "Error executing control command: " + std::string(e.what()));
+    }
+    
+    return false;
+}
 
 // Signal handler
 void signal_handler(int signal) {
@@ -353,6 +584,13 @@ HealthMonitor::Status checkDaemonActivity() {
 // Metrics collection thread
 void metrics_collection_thread() {
     while (running) {
+        // Skip metrics collection during audio activity to save CPU
+        if (daemon_state && daemon_state->current_state >= 2) {
+            // During audio activity, sleep longer and skip metrics
+            std::this_thread::sleep_for(std::chrono::seconds(30));
+            continue;
+        }
+        
         // Update system metrics
         metrics.setGauge("daemon_uptime_seconds", 
             std::chrono::duration_cast<std::chrono::seconds>(
@@ -368,6 +606,9 @@ void metrics_collection_thread() {
 
 int main(int argc, char *argv[]) {
     try {
+        // Record daemon start time for uptime calculation
+        daemon_start_time = std::chrono::steady_clock::now();
+        
         // Setup signal handlers
         std::signal(SIGINT, signal_handler);
         std::signal(SIGTERM, signal_handler);
@@ -417,8 +658,41 @@ int main(int argc, char *argv[]) {
         health_monitor.registerCheck("daemon_activity", checkDaemonActivity, std::chrono::seconds(120));
         health_monitor.startMonitoring();
         
-        // Start metrics collection thread
-        std::thread metrics_thread(metrics_collection_thread);
+        // Start metrics server if enabled
+        if (config.getMetricsServerEnabled()) {
+            metrics_server = std::make_unique<MetricsServer>(config.getMetricsServerPort());
+            metrics_server->start();
+            logger.info("Daemon", "Metrics server started on port " + 
+                       std::to_string(config.getMetricsServerPort()));
+        } else {
+            logger.info("Daemon", "Metrics server disabled");
+        }
+        
+        // Start web server if enabled
+        if (config.getWebServerEnabled()) {
+            web_server = std::make_unique<WebServer>(config.getWebServerPort());
+            
+            // Add the web portal as a static route
+            std::ifstream portal_file("web_portal.html");
+            if (portal_file.is_open()) {
+                std::string portal_content((std::istreambuf_iterator<char>(portal_file)),
+                                         std::istreambuf_iterator<char>());
+                web_server->addStaticRoute("/", portal_content, "text/html");
+                portal_file.close();
+            } else {
+                logger.warn("WebServer", "Could not load web_portal.html, serving basic interface");
+                web_server->addStaticRoute("/", "<h1>Millennium System Portal</h1><p>Web portal not available</p>", "text/html");
+            }
+            
+            web_server->start();
+            logger.info("Daemon", "Web server started on port " + 
+                       std::to_string(config.getWebServerPort()));
+        } else {
+            logger.info("Daemon", "Web server disabled");
+        }
+        
+        // Start metrics collection thread (disabled for single-core optimization)
+        // std::thread metrics_thread(metrics_collection_thread);
         
         // Initialize display
         line1 = format_number(daemon_state->keypad_buffer);
@@ -426,7 +700,7 @@ int main(int argc, char *argv[]) {
         client->setDisplay(generateDisplayBytes());
         
         // Initialize event processor
-        EventProcessor processor;
+        event_processor = std::make_unique<EventProcessor>();
         
         logger.info("Daemon", "Daemon initialized successfully");
         
@@ -434,34 +708,80 @@ int main(int argc, char *argv[]) {
         int loop_count = 0;
         while (running) {
             try {
-                client->update();
-                auto event = client->nextEvent();
-                if (event) {
-                    processor.process_event(event);
-                    check_and_call();
+                // During audio activity, reduce polling frequency to give audio threads priority
+                bool is_audio_active = daemon_state && daemon_state->current_state >= 2;
+                
+                if (!is_audio_active) {
+                    // Normal operation: poll frequently for hardware events
+                    client->update();
+                } else {
+                    // Audio active: poll less frequently to avoid competing with audio threads
+                    int polling_divisor = Config::getInstance().getMainLoopAudioPollingDivisor();
+                    if (loop_count % polling_divisor == 0) { // Only poll every Nth iteration during audio
+                        client->update();
+                    }
                 }
                 
-                // Log metrics every 1000 loops (about every 1 second)
+                auto event = client->nextEvent();
+                if (event) {
+                    event_processor->process_event(event);
+                    // check_and_call() is now called automatically by EventProcessor
+                }
+                
+                // Update metrics in main loop (every 1000 loops = ~1 second)
                 if (++loop_count % 1000 == 0) {
-                    logger.info("Metrics", "=== Current Statistics ===");
+                    // Update system metrics (moved from separate thread)
+                    metrics.setGauge("daemon_uptime_seconds", 
+                        std::chrono::duration_cast<std::chrono::seconds>(
+                            std::chrono::steady_clock::now() - daemon_start_time).count());
                     
-                    // Log counters
+                    if (daemon_state) {
+                        metrics.setGauge("current_state", static_cast<double>(daemon_state->current_state));
+                        metrics.setGauge("inserted_cents", static_cast<double>(daemon_state->inserted_cents));
+                        metrics.setGauge("keypad_buffer_size", static_cast<double>(daemon_state->keypad_buffer.size()));
+                    }
+                }
+                
+                // Log metrics summary every 10000 loops (about every 10 seconds) at DEBUG level
+                if (loop_count % 10000 == 0) {
+                    logger.debug("Metrics", "=== Metrics Summary ===");
+                    
+                    // Log only significant counters (non-zero)
                     auto counters = metrics.getAllCounters();
+                    int active_counters = 0;
                     for (const auto& pair : counters) {
-                        if (pair.second > 0) { // Only log non-zero counters
-                            logger.info("Metrics", "Counter " + pair.first + ": " + std::to_string(pair.second));
+                        if (pair.second > 0) {
+                            active_counters++;
                         }
                     }
                     
-                    // Log gauges
+                    if (active_counters > 0) {
+                        logger.debug("Metrics", "Active counters: " + std::to_string(active_counters));
+                    }
+                    
+                    // Log current state gauge
                     auto gauges = metrics.getAllGauges();
-                    for (const auto& pair : gauges) {
-                        logger.info("Metrics", "Gauge " + pair.first + ": " + std::to_string(pair.second));
+                    auto state_it = gauges.find("current_state");
+                    if (state_it != gauges.end()) {
+                        logger.debug("Metrics", "Current state: " + std::to_string(state_it->second));
                     }
                 }
                 
-                // Small delay to prevent busy waiting
-                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                // Audio-aware delay: longer delays during audio activity
+                int delay_ms = Config::getInstance().getMainLoopDelayMs(); // Default delay
+                if (daemon_state && daemon_state->current_state >= 2) {
+                    // During audio activity (handset up, ringing, or calls), use longer delays
+                    delay_ms = daemon_state->current_state >= 3 ? 
+                        Config::getInstance().getMainLoopCallDelayMs() : 
+                        Config::getInstance().getMainLoopAudioDelayMs();
+                }
+                
+                // Panic mode: extreme delays during audio for maximum CPU yield
+                if (Config::getInstance().getMainLoopPanicMode() && daemon_state && daemon_state->current_state >= 3) {
+                    delay_ms = 50; // 50ms sleep during calls in panic mode
+                }
+                
+                std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
                 
             } catch (const std::exception& e) {
                 logger.error("Daemon", "Error in main loop: " + std::string(e.what()));
@@ -475,8 +795,13 @@ int main(int argc, char *argv[]) {
         // Cleanup
         logger.info("Daemon", "Shutting down daemon");
         
-        // Stop metrics thread
-        metrics_thread.join();
+        // Stop metrics server
+        if (metrics_server) {
+            metrics_server->stop();
+        }
+        
+        // Stop metrics thread (disabled for single-core optimization)
+        // metrics_thread.join();
         
         // Stop health monitoring
         health_monitor.stopMonitoring();

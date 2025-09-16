@@ -133,6 +133,9 @@ void Config::setDefaultValues() {
     
     config_["system.update_interval_ms"] = "33";
     config_["system.max_retries"] = "3";
+    
+    config_["metrics_server.enabled"] = "false";
+    config_["metrics_server.port"] = "8080";
 }
 
 std::string Config::trim(const std::string& str) const {
