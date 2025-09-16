@@ -175,33 +175,6 @@ void WebServer::serverLoop() {
     fcntl(server_fd, F_SETFL, flags | O_NONBLOCK);
     
     while (!should_stop_.load()) {
-        // Check if web server is paused
-        if (paused_.load()) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-            continue;
-        }
-        
-        // Complete disable mode: completely stop web server during audio
-        if (Config::getInstance().getWebServerDisableCompletelyDuringAudio() && isAudioActive()) {
-            // During audio activity, sleep very long and don't accept any connections
-            std::this_thread::sleep_for(std::chrono::milliseconds(5000)); // 5 second sleep
-            continue;
-        }
-        
-        // Emergency audio mode: completely disable web server during any audio activity
-        if (Config::getInstance().getWebServerEmergencyAudioMode() && isAudioActive()) {
-            // During any audio activity (handset up, ringing, or calls), sleep much longer
-            std::this_thread::sleep_for(std::chrono::milliseconds(2000)); // 2 second sleep
-            continue;
-        }
-        
-        // Regular disable mode: still accept connections but with longer delays
-        if (Config::getInstance().getWebServerDisableDuringCalls() && isHighPriorityState()) {
-            // During calls/ringing, sleep longer and don't accept connections
-            std::this_thread::sleep_for(std::chrono::milliseconds(500));
-            continue;
-        }
-        
         struct sockaddr_in client_addr;
         socklen_t client_len = sizeof(client_addr);
         
@@ -215,12 +188,6 @@ void WebServer::serverLoop() {
             MillenniumLogger::getInstance().error("WebServer", 
                 "Accept failed with error: " + std::to_string(errno));
         }
-        
-        // Audio-aware delay: longer delay during high-priority states to reduce CPU usage
-        int delay_ms = isHighPriorityState() ? 
-            Config::getInstance().getWebServerCallPollDelayMs() : 
-            Config::getInstance().getWebServerPollDelayMs();
-        std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
     }
     
     close(server_fd);
@@ -782,30 +749,6 @@ bool WebServer::checkRateLimit(const std::string& client_ip, const std::string& 
     
     // Check rate limit
     auto& info = rate_limit_map_[key];
-    
-    // Different limits based on system state
-    int max_requests;
-    std::chrono::milliseconds window;
-    
-    if (isHighPriorityState()) {
-        // Very restrictive during calls/ringing
-        max_requests = Config::getInstance().getWebServerRateLimitHighPriority();
-        window = std::chrono::seconds(10);
-    } else {
-        // Normal limits during idle
-        max_requests = Config::getInstance().getWebServerRateLimitNormal();
-        window = std::chrono::seconds(5);
-    }
-    
-    // Reset counter if window has passed
-    if (now - info.last_request > window) {
-        info.request_count = 0;
-    }
-    
-    // Check if limit exceeded
-    if (info.request_count >= max_requests) {
-        return false; // Rate limited
-    }
     
     // Update counters
     info.request_count++;

@@ -701,19 +701,7 @@ int main(int argc, char *argv[]) {
         int loop_count = 0;
         while (running) {
             try {
-                // During audio activity, reduce polling frequency to give audio threads priority
-                bool is_audio_active = daemon_state && daemon_state->current_state >= 2;
-                
-                if (!is_audio_active) {
-                    // Normal operation: poll frequently for hardware events
-                    client->update();
-                } else {
-                    // Audio active: poll less frequently to avoid competing with audio threads
-                    int polling_divisor = Config::getInstance().getMainLoopAudioPollingDivisor();
-                    if (loop_count % polling_divisor == 0) { // Only poll every Nth iteration during audio
-                        client->update();
-                    }
-                }
+	    	client->update();
                 
                 auto event = client->nextEvent();
                 if (event) {
@@ -759,23 +747,6 @@ int main(int argc, char *argv[]) {
                         logger.debug("Metrics", "Current state: " + std::to_string(state_it->second));
                     }
                 }
-                
-                // Audio-aware delay: longer delays during audio activity
-                int delay_ms = Config::getInstance().getMainLoopDelayMs(); // Default delay
-                if (daemon_state && daemon_state->current_state >= 2) {
-                    // During audio activity (handset up, ringing, or calls), use longer delays
-                    delay_ms = daemon_state->current_state >= 3 ? 
-                        Config::getInstance().getMainLoopCallDelayMs() : 
-                        Config::getInstance().getMainLoopAudioDelayMs();
-                }
-                
-                // Panic mode: extreme delays during audio for maximum CPU yield
-                if (Config::getInstance().getMainLoopPanicMode() && daemon_state && daemon_state->current_state >= 3) {
-                    delay_ms = 50; // 50ms sleep during calls in panic mode
-                }
-                
-                std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
-                
             } catch (const std::exception& e) {
                 logger.error("Daemon", "Error in main loop: " + std::string(e.what()));
                 metrics.incrementCounter("main_loop_errors");

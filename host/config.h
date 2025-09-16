@@ -44,22 +44,6 @@ public:
     // Web Server Configuration
     bool getWebServerEnabled() const { return getBool("web_server.enabled", true); }
     int getWebServerPort() const { return getInt("web_server.port", 8081); }
-    bool getWebServerDisableDuringCalls() const { return getBool("web_server.disable_during_calls", true); }
-    int getWebServerPollDelayMs() const { return getInt("web_server.poll_delay_ms", 10); }
-    int getWebServerCallPollDelayMs() const { return getInt("web_server.call_poll_delay_ms", 100); }
-    int getWebServerRateLimitNormal() const { return getInt("web_server.rate_limit_normal", 10); }
-    int getWebServerRateLimitHighPriority() const { return getInt("web_server.rate_limit_high_priority", 2); }
-    bool getWebServerEmergencyAudioMode() const { return getBool("web_server.emergency_audio_mode", true); }
-    bool getWebServerDisableDuringHandsetUp() const { return getBool("web_server.disable_during_handset_up", false); }
-    bool getWebServerDisableCompletelyDuringAudio() const { return getBool("web_server.disable_completely_during_audio", false); }
-    
-    // Main Loop Configuration
-    int getMainLoopDelayMs() const { return getInt("main_loop.delay_ms", 1); }
-    int getMainLoopAudioDelayMs() const { return getInt("main_loop.audio_delay_ms", 5); }
-    int getMainLoopCallDelayMs() const { return getInt("main_loop.call_delay_ms", 10); }
-    bool getMainLoopPanicMode() const { return getBool("main_loop.panic_mode", false); }
-    bool getLoggingDisableDuringAudio() const { return getBool("logging.disable_during_audio", false); }
-    int getMainLoopAudioPollingDivisor() const { return getInt("main_loop.audio_polling_divisor", 10); }
     
     // Validation
     bool validate() const;
