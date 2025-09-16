@@ -138,24 +138,6 @@ MillenniumClient::MillenniumClient() : display_fd_(-1), is_open_(false) {
     throw std::runtime_error("ua_init failed");
   }
 
-  std::string sip_uri =
-      "sip:+<phonenumber>@matzen-test.sip.twilio.com"
-      ";auth_user=+1<phonenumber>;auth_pass=<yourpasswordgoeshere>;transport=tls";
-
-  err = ua_alloc(&ua_, sip_uri.c_str());
-  if (err) {
-    Logger::log(Logger::ERROR, "Failed to allocate SIP account");
-    throw std::runtime_error("ua_alloc failed");
-  }
-
-  err = ua_register(ua_);
-  if (err) {
-    Logger::log(Logger::ERROR, "Failed to register SIP account");
-    throw std::runtime_error("ua_register failed");
-  }
-
-  Logger::log(Logger::INFO, "SIP account registered successfully");
-
   Logger::log(Logger::DEBUG, "conf_modules");
   err = conf_modules();
   if (err) {
