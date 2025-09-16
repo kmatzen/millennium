@@ -533,11 +533,6 @@ WebServer::HttpResponse WebServer::handleApiConfig(const HttpRequest& request) {
     
     std::ostringstream json;
     json << "{";
-    json << "\"sip\":{";
-    json << "\"username\":\"" << config.getSipUsername() << "\",";
-    json << "\"domain\":\"" << config.getSipDomain() << "\",";
-    json << "\"uri\":\"" << config.getSipUri() << "\"";
-    json << "},";
     json << "\"hardware\":{";
     json << "\"display_device\":\"" << config.getDisplayDevice() << "\",";
     json << "\"baud_rate\":" << config.getBaudRate();

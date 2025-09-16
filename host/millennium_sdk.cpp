@@ -172,23 +172,6 @@ void MillenniumClient::close() {
   }
 }
 
-void MillenniumClient::setupSIP(const std::string &username,
-                                const std::string &password,
-                                const std::string &domain) {
-  std::ostringstream uri;
-  uri << "sip:" << username << "@" << domain;
-
-  std::string account_line =
-      uri.str() + ";auth_user=" + username + ";auth_pass=" + password;
-
-  if (ua_alloc(nullptr, account_line.c_str()) != 0) {
-    Logger::log(Logger::ERROR, "Failed to configure SIP account.");
-    throw std::runtime_error("Failed to configure SIP account.");
-  }
-
-  Logger::log(Logger::INFO, "SIP account configured successfully.");
-}
-
 void MillenniumClient::call(const std::string &number) {
   std::ostringstream target;
   target << "sip:+1" << number << "@matzen-test.sip.twilio.com";

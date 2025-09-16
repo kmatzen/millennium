@@ -645,13 +645,6 @@ int main(int argc, char *argv[]) {
         // Initialize client
         client = std::make_unique<MillenniumClient>();
         
-        // Setup SIP if configured
-        if (!config.getSipUsername().empty()) {
-            client->setupSIP(config.getSipUsername(), 
-                           config.getSipPassword(), 
-                           config.getSipDomain());
-        }
-        
         // Initialize health monitoring
         health_monitor.registerCheck("serial_connection", checkSerialConnection, std::chrono::seconds(30));
         health_monitor.registerCheck("sip_connection", checkSipConnection, std::chrono::seconds(60));

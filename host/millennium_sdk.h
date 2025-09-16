@@ -197,8 +197,6 @@ public:
   std::shared_ptr<Event> nextEvent();
   void close();
 
-  void setupSIP(const std::string &username, const std::string &password,
-                const std::string &domain);
   void call(const std::string &number);
   void answerCall();
   void hangup();

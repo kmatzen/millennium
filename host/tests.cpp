@@ -26,8 +26,6 @@ TEST_FUNCTION(test_config_environment) {
     Config& config = Config::getInstance();
     config.loadFromEnvironment();
     
-    ASSERT_EQUAL("test_user", config.getSipUsername(), "SIP username should be loaded from environment");
-    ASSERT_EQUAL("test_pass", config.getSipPassword(), "SIP password should be loaded from environment");
     ASSERT_EQUAL("DEBUG", config.getLogLevel(), "Log level should be loaded from environment");
     
     // Clean up
@@ -43,7 +41,6 @@ TEST_FUNCTION(test_config_file) {
     std::ofstream config_file("test_config.conf");
     config_file << "call.cost_cents=75\n";
     config_file << "logging.level=WARN\n";
-    config_file << "sip.username=file_user\n";
     config_file.close();
     
     Config& config = Config::getInstance();
@@ -52,7 +49,6 @@ TEST_FUNCTION(test_config_file) {
     ASSERT_TRUE(loaded, "Config file should load successfully");
     ASSERT_EQUAL_INT(75, config.getCallCostCents(), "Call cost should be loaded from file");
     ASSERT_EQUAL("WARN", config.getLogLevel(), "Log level should be loaded from file");
-    ASSERT_EQUAL("file_user", config.getSipUsername(), "SIP username should be loaded from file");
     
     // Clean up
     std::remove("test_config.conf");

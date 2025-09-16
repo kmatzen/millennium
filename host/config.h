@@ -17,12 +17,6 @@ public:
     int getInt(const std::string& key, int defaultValue = 0) const;
     bool getBool(const std::string& key, bool defaultValue = false) const;
     
-    // SIP Configuration
-    std::string getSipUsername() const { return getString("sip.username"); }
-    std::string getSipPassword() const { return getString("sip.password"); }
-    std::string getSipDomain() const { return getString("sip.domain"); }
-    std::string getSipUri() const { return getString("sip.uri"); }
-    
     // Hardware Configuration
     std::string getDisplayDevice() const { 
         return getString("hardware.display_device", "/dev/serial/by-id/usb-Arduino_LLC_Millennium_Beta-if00"); 

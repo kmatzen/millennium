@@ -45,20 +45,6 @@ bool Config::loadFromFile(const std::string& configPath) {
 bool Config::loadFromEnvironment() {
     setDefaultValues();
     
-    // Load SIP configuration from environment variables
-    if (const char* username = std::getenv("MILLENNIUM_SIP_USERNAME")) {
-        config_["sip.username"] = username;
-    }
-    if (const char* password = std::getenv("MILLENNIUM_SIP_PASSWORD")) {
-        config_["sip.password"] = password;
-    }
-    if (const char* domain = std::getenv("MILLENNIUM_SIP_DOMAIN")) {
-        config_["sip.domain"] = domain;
-    }
-    if (const char* uri = std::getenv("MILLENNIUM_SIP_URI")) {
-        config_["sip.uri"] = uri;
-    }
-    
     // Load logging configuration
     if (const char* logLevel = std::getenv("MILLENNIUM_LOG_LEVEL")) {
         config_["logging.level"] = logLevel;
@@ -98,11 +84,6 @@ bool Config::getBool(const std::string& key, bool defaultValue) const {
 }
 
 bool Config::validate() const {
-    // Check required SIP configuration
-    if (getSipUsername().empty() || getSipPassword().empty() || getSipDomain().empty()) {
-        return false;
-    }
-    
     // Validate numeric values
     if (getCallCostCents() <= 0) {
         return false;
@@ -116,11 +97,6 @@ bool Config::validate() const {
 }
 
 void Config::setDefaultValues() {
-    config_["sip.username"] = "";
-    config_["sip.password"] = "";
-    config_["sip.domain"] = "";
-    config_["sip.uri"] = "";
-    
     config_["hardware.display_device"] = "/dev/serial/by-id/usb-Arduino_LLC_Millennium_Beta-if00";
     config_["hardware.baud_rate"] = "9600";
     
