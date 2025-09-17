@@ -174,11 +174,39 @@ void MillenniumClient::close() {
 
 void MillenniumClient::call(const std::string &number) {
   std::ostringstream target;
-  target << "sip:+1" << number << "@matzen-test.sip.twilio.com";
+  target << "+1" << number; // Pass just the number, like the CLI does
 
   Logger::log(Logger::DEBUG, "ua: " + std::to_string((intptr_t)ua_));
-  int err =
-      ua_connect(ua_, nullptr, nullptr, target.str().c_str(), VIDMODE_OFF);
+  Logger::log(Logger::INFO, "Initiating call to: " + target.str());
+  
+  // Find the appropriate UA for this request URI (like the CLI does)
+  struct pl pluri;
+  pl_set_str(&pluri, target.str().c_str());
+  struct ua *ua = uag_find_requri_pl(&pluri);
+  
+  if (!ua) {
+    Logger::log(Logger::ERROR, "Could not find UA for: " + target.str());
+    throw std::runtime_error("Could not find UA for call");
+  }
+  
+  // Complete the URI (like the CLI does)
+  char *uric = nullptr;
+  int err = account_uri_complete_strdup(ua_account(ua), &uric, &pluri);
+  if (err != 0) {
+    Logger::log(Logger::ERROR, "Failed to complete URI: " + target.str() + " " + std::to_string(err));
+    throw std::runtime_error("Failed to complete URI");
+  }
+  
+  Logger::log(Logger::INFO, "Using UA: " + std::string(account_aor(ua_account(ua))));
+  Logger::log(Logger::INFO, "Completed URI: " + std::string(uric));
+  
+  // Make the call (like the CLI does)
+  struct call *call = nullptr;
+  err = ua_connect(ua, &call, nullptr, uric, VIDMODE_OFF);
+  
+  // Clean up the completed URI
+  mem_deref(uric);
+  
   if (err != 0) {
     Logger::log(Logger::ERROR, "Failed to initiate call to: " + target.str() +
                                    " " + std::to_string(err));
