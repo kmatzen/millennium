@@ -847,7 +847,7 @@
         // Update logs
         async function updateLogs() {
             try {
-                const response = await fetch('/api/logs?level=INFO');
+                const response = await fetch('/api/logs?level=INFO&max_entries=15');
                 const data = await response.json();
                 
                 const logsContainer = document.getElementById('logs-container');

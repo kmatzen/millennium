@@ -14,6 +14,7 @@
 #include <regex>
 #include <fstream>
 #include <filesystem>
+#include <iomanip>
 
 // External references to daemon state (will be set by daemon)
 extern std::unique_ptr<class DaemonState> daemon_state;
@@ -666,23 +667,142 @@ WebServer::HttpResponse WebServer::handleApiLogs(const HttpRequest& request) {
         level = level_it->second;
     }
     
-    // Use static timestamps that don't change
-    static auto base_time = std::chrono::system_clock::now();
-    static auto time_t_base = std::chrono::system_clock::to_time_t(base_time);
+    // Get max entries parameter (default to 20, max 50)
+    int max_entries = 20;
+    auto max_it = request.query_params.find("max_entries");
+    if (max_it != request.query_params.end()) {
+        try {
+            max_entries = std::stoi(max_it->second);
+            max_entries = std::min(max_entries, 50); // Cap at 50 entries
+            max_entries = std::max(max_entries, 1);  // Minimum 1 entry
+        } catch (const std::exception&) {
+            max_entries = 20; // Use default if parsing fails
+        }
+    }
+    
+    // Get log file path from config
+    Config& config = Config::getInstance();
+    std::string log_file = config.getLogFile();
     
     std::ostringstream json;
     json << "{";
     json << "\"logs\":[";
     
-    // Generate log entries with fixed timestamps relative to base time
-    json << "{\"timestamp\":" << time_t_base << ",\"level\":\"INFO\",\"message\":\"System running normally\"},";
-    json << "{\"timestamp\":" << (time_t_base - 30) << ",\"level\":\"DEBUG\",\"message\":\"Health check completed successfully\"},";
-    json << "{\"timestamp\":" << (time_t_base - 60) << ",\"level\":\"INFO\",\"message\":\"Web server started on port 8081\"},";
-    json << "{\"timestamp\":" << (time_t_base - 90) << ",\"level\":\"INFO\",\"message\":\"Metrics server started on port 8080\"},";
-    json << "{\"timestamp\":" << (time_t_base - 120) << ",\"level\":\"INFO\",\"message\":\"Daemon initialized successfully\"}";
+    std::vector<std::string> log_entries;
+    
+    // Try to read from log file if it exists and logging to file is enabled
+    if (config.getLogToFile() && !log_file.empty() && std::filesystem::exists(log_file)) {
+        try {
+            std::ifstream file(log_file);
+            if (file.is_open()) {
+                std::string line;
+                while (std::getline(file, line)) {
+                    if (!line.empty()) {
+                        log_entries.push_back(line);
+                    }
+                }
+                file.close();
+            }
+        } catch (const std::exception& e) {
+            MillenniumLogger::getInstance().warn("WebServer", 
+                "Failed to read log file: " + std::string(e.what()));
+        }
+    }
+    
+    // If no log file entries, return empty logs
+    if (log_entries.empty()) {
+        json << "],";
+        json << "\"total\":0";
+        json << "}";
+        response.body = json.str();
+        return response;
+    }
+    
+    // Parse and format log entries
+    bool first = true;
+    int total_count = 0;
+    const size_t MAX_RESPONSE_SIZE = 50000; // Limit response to ~50KB
+    
+    // Process entries in reverse order (newest first) and limit to last max_entries entries
+    int start_idx = std::max(0, static_cast<int>(log_entries.size()) - max_entries);
+    for (int i = static_cast<int>(log_entries.size()) - 1; i >= start_idx; --i) {
+        const std::string& entry = log_entries[i];
+        
+        // Parse log entry format: [timestamp] [level] [category] message
+        std::regex log_regex(R"(\[([^\]]+)\]\s+\[([^\]]+)\]\s+(?:\[([^\]]+)\]\s+)?(.+))");
+        std::smatch matches;
+        
+        if (std::regex_match(entry, matches, log_regex)) {
+            std::string timestamp_str = matches[1].str();
+            std::string level_str = matches[2].str();
+            std::string category = matches.size() > 3 ? matches[3].str() : "";
+            std::string message = matches.size() > 4 ? matches[4].str() : matches[3].str();
+            
+            // Convert timestamp to Unix timestamp
+            std::tm tm = {};
+            std::istringstream ss(timestamp_str);
+            ss >> std::get_time(&tm, "%Y-%m-%d %H:%M:%S");
+            if (ss.fail()) {
+                // Fallback to current time if parsing fails
+                auto now = std::chrono::system_clock::now();
+                auto time_t_now = std::chrono::system_clock::to_time_t(now);
+                tm = *std::localtime(&time_t_now);
+            }
+            auto time_t = std::mktime(&tm);
+            
+            // Filter by level if specified
+            if (level != "ALL") {
+                std::string upper_level = level;
+                std::transform(upper_level.begin(), upper_level.end(), upper_level.begin(), ::toupper);
+                std::string upper_entry_level = level_str;
+                std::transform(upper_entry_level.begin(), upper_entry_level.end(), upper_entry_level.begin(), ::toupper);
+                
+                if (upper_level != upper_entry_level && upper_level != "INFO") {
+                    continue;
+                }
+            }
+            
+            // Escape JSON special characters in message and truncate if too long
+            std::string escaped_message = message;
+            std::replace(escaped_message.begin(), escaped_message.end(), '"', '\'');
+            std::replace(escaped_message.begin(), escaped_message.end(), '\n', ' ');
+            std::replace(escaped_message.begin(), escaped_message.end(), '\r', ' ');
+            
+            // Truncate very long messages to prevent huge responses
+            if (escaped_message.length() > 500) {
+                escaped_message = escaped_message.substr(0, 497) + "...";
+            }
+            
+            // Check if adding this entry would exceed our size limit
+            std::ostringstream test_json;
+            test_json << (first ? "" : ",");
+            test_json << "{\"timestamp\":" << time_t << ",\"level\":\"" << level_str << "\"";
+            if (!category.empty()) {
+                test_json << ",\"category\":\"" << category << "\"";
+            }
+            test_json << ",\"message\":\"" << escaped_message << "\"}";
+            
+            if (json.str().length() + test_json.str().length() > MAX_RESPONSE_SIZE) {
+                break; // Stop adding entries if we'd exceed size limit
+            }
+            
+            json << (first ? "" : ",");
+            json << "{";
+            json << "\"timestamp\":" << time_t << ",";
+            json << "\"level\":\"" << level_str << "\",";
+            if (!category.empty()) {
+                json << "\"category\":\"" << category << "\",";
+            }
+            json << "\"message\":\"" << escaped_message << "\"";
+            json << "}";
+            
+            first = false;
+            total_count++;
+        }
+    }
     
     json << "],";
-    json << "\"total\":5";
+    json << "\"total\":" << total_count;
     json << "}";
     
     response.body = json.str();
