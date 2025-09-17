@@ -200,5 +200,6 @@ public:
   void call(const std::string &number);
   void answerCall();
   void hangup();
+  void setUA(struct ua *ua);
 };
 ;

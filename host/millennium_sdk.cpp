@@ -39,6 +39,15 @@ static void ua_event_handler(enum ua_event ev, bevent *event, void *client) {
   Logger::log(Logger::INFO, "UA event: " + std::string(uag_event_str(ev)));
   if (client) {
     struct call *call = bevent_get_call(event);
+    if (call) {
+      // For incoming calls, we need to set the UA pointer
+      if (ev == UA_EVENT_CALL_INCOMING) {
+        struct ua *ua = call_get_ua(call);
+        if (ua) {
+          ((MillenniumClient *)client)->setUA(ua);
+        }
+      }
+    }
     ((MillenniumClient *)client)
         ->createAndQueueEvent(std::make_shared<CallStateEvent>(ev, call));
   }
@@ -64,7 +73,7 @@ void list_audio_devices() {
   }
 }
 
-MillenniumClient::MillenniumClient() : display_fd_(-1), is_open_(false) {
+MillenniumClient::MillenniumClient() : display_fd_(-1), is_open_(false), ua_(nullptr) {
   const std::string display_device =
       "/dev/serial/by-id/usb-Arduino_LLC_Millennium_Beta-if00";
 
@@ -189,6 +198,9 @@ void MillenniumClient::call(const std::string &number) {
     throw std::runtime_error("Could not find UA for call");
   }
   
+  // Store the UA for later use in answer/hangup
+  ua_ = ua;
+  
   // Complete the URI (like the CLI does)
   char *uric = nullptr;
   int err = account_uri_complete_strdup(ua_account(ua), &uric, &pluri);
@@ -217,12 +229,36 @@ void MillenniumClient::call(const std::string &number) {
 }
 
 void MillenniumClient::answerCall() {
-  ua_answer(ua_, nullptr, VIDMODE_OFF);
+  if (!ua_) {
+    Logger::log(Logger::ERROR, "Cannot answer call: UA is null");
+    return;
+  }
+  
+  // Find the current call for this UA
+  struct call *call = ua_call(ua_);
+  if (!call) {
+    Logger::log(Logger::ERROR, "Cannot answer call: No active call found");
+    return;
+  }
+  
+  ua_answer(ua_, call, VIDMODE_OFF);
   Logger::log(Logger::INFO, "Call answered.");
 }
 
 void MillenniumClient::hangup() {
-  ua_hangup(ua_, nullptr, 0, "Call terminated");
+  if (!ua_) {
+    Logger::log(Logger::ERROR, "Cannot hangup call: UA is null");
+    return;
+  }
+  
+  // Find the current call for this UA
+  struct call *call = ua_call(ua_);
+  if (!call) {
+    Logger::log(Logger::WARN, "Cannot hangup call: No active call found");
+    return;
+  }
+  
+  ua_hangup(ua_, call, 0, "Call terminated");
   Logger::log(Logger::INFO, "Call terminated.");
 }
 
@@ -452,6 +488,11 @@ enum State CallStateEvent::get_state() const {
   default:
     return INVALID;
   }
+}
+
+void MillenniumClient::setUA(struct ua *ua) {
+  ua_ = ua;
+  Logger::log(Logger::DEBUG, "UA set to: " + std::to_string((intptr_t)ua_));
 }
 
 void MillenniumClient::writeCommand(uint8_t command,

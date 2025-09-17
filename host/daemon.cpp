@@ -167,6 +167,16 @@ std::string generate_message(int inserted) {
 }
 
 void handle_coin_event(const std::shared_ptr<CoinEvent> &coin_event) {
+    if (!coin_event) {
+        logger.error("Coin", "Received null coin event");
+        return;
+    }
+    
+    if (!client) {
+        logger.error("Coin", "Client is null, cannot handle coin event");
+        return;
+    }
+    
     const auto &code = coin_event->coin_code();
     int coin_value = 0;
     
@@ -195,6 +205,16 @@ void handle_coin_event(const std::shared_ptr<CoinEvent> &coin_event) {
 }
 
 void handle_call_state_event(const std::shared_ptr<CallStateEvent> &call_state_event) {
+    if (!call_state_event) {
+        logger.error("Call", "Received null call state event");
+        return;
+    }
+    
+    if (!client) {
+        logger.error("Call", "Client is null, cannot handle call state event");
+        return;
+    }
+    
     if (call_state_event->get_state() == CALL_INCOMING && 
         daemon_state->current_state == DaemonState::IDLE_DOWN) {
         
@@ -224,6 +244,16 @@ void handle_call_state_event(const std::shared_ptr<CallStateEvent> &call_state_e
 }
 
 void handle_hook_event(const std::shared_ptr<HookStateChangeEvent> &hook_event) {
+    if (!hook_event) {
+        logger.error("Hook", "Received null hook event");
+        return;
+    }
+    
+    if (!client) {
+        logger.error("Hook", "Client is null, cannot handle hook event");
+        return;
+    }
+    
     if (hook_event->get_direction() == 'U') {
         if (daemon_state->current_state == DaemonState::CALL_INCOMING) {
             logger.info("Call", "Call answered");
@@ -232,7 +262,12 @@ void handle_hook_event(const std::shared_ptr<HookStateChangeEvent> &hook_event) 
             daemon_state->current_state = DaemonState::CALL_ACTIVE;
             daemon_state->updateActivity();
             
-            client->answerCall();
+            try {
+                client->answerCall();
+            } catch (const std::exception& e) {
+                logger.error("Call", "Failed to answer call: " + std::string(e.what()));
+                metrics.incrementCounter("call_answer_errors");
+            }
         } else if (daemon_state->current_state == DaemonState::IDLE_DOWN) {
             logger.info("Hook", "Hook lifted, transitioning to IDLE_UP");
             metrics.incrementCounter("hook_lifted");
@@ -256,7 +291,13 @@ void handle_hook_event(const std::shared_ptr<HookStateChangeEvent> &hook_event) 
             metrics.incrementCounter("calls_ended");
         }
         
-        client->hangup();
+        try {
+            client->hangup();
+        } catch (const std::exception& e) {
+            logger.error("Call", "Failed to hangup call: " + std::string(e.what()));
+            metrics.incrementCounter("call_hangup_errors");
+        }
+        
         daemon_state->keypad_buffer.clear();
         daemon_state->inserted_cents = 0;
         
@@ -272,6 +313,16 @@ void handle_hook_event(const std::shared_ptr<HookStateChangeEvent> &hook_event) 
 }
 
 void handle_keypad_event(const std::shared_ptr<KeypadEvent> &keypad_event) {
+    if (!keypad_event) {
+        logger.error("Keypad", "Received null keypad event");
+        return;
+    }
+    
+    if (!client) {
+        logger.error("Keypad", "Client is null, cannot handle keypad event");
+        return;
+    }
+    
     if (daemon_state->keypad_buffer.size() < 10 && 
         daemon_state->current_state == DaemonState::IDLE_UP) {
         
@@ -291,6 +342,11 @@ void handle_keypad_event(const std::shared_ptr<KeypadEvent> &keypad_event) {
 }
 
 void check_and_call() {
+    if (!client) {
+        logger.error("Call", "Client is null, cannot initiate call");
+        return;
+    }
+    
     int cost_cents = config.getCallCostCents();
     
     if (daemon_state->keypad_buffer.size() == 10 && 
@@ -632,6 +688,7 @@ int main(int argc, char *argv[]) {
         // Setup logging
         logger.setLevel(MillenniumLogger::parseLevel(config.getLogLevel()));
         if (config.getLogToFile() && !config.getLogFile().empty()) {
+	    std::cerr << "Logging to " << config.getLogFile() << std::endl;
             logger.setLogFile(config.getLogFile());
             logger.setLogToFile(true);
         }
