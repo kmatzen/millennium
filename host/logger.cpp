@@ -94,6 +94,17 @@ void MillenniumLogger::writeLog(Level level, const std::string& category, const 
     
     std::string formattedMessage = logLine.str();
     
+    // Store in memory
+    {
+        std::lock_guard<std::mutex> memory_lock(memory_logs_mutex_);
+        memory_logs_.push_back(formattedMessage);
+        
+        // Keep only the most recent logs
+        if (memory_logs_.size() > MAX_MEMORY_LOGS) {
+            memory_logs_.erase(memory_logs_.begin(), memory_logs_.begin() + (memory_logs_.size() - MAX_MEMORY_LOGS));
+        }
+    }
+    
     if (log_to_console_) {
         if (level >= WARN) {
             std::cerr << formattedMessage << std::endl;
@@ -123,6 +134,19 @@ std::string MillenniumLogger::formatTimestamp() const {
 
 std::string MillenniumLogger::formatLevel(Level level) const {
     return levelToString(level);
+}
+
+std::vector<std::string> MillenniumLogger::getRecentLogs(int max_entries) const {
+    std::lock_guard<std::mutex> lock(memory_logs_mutex_);
+    
+    std::vector<std::string> result;
+    int start_idx = std::max(0, static_cast<int>(memory_logs_.size()) - max_entries);
+    
+    for (int i = start_idx; i < static_cast<int>(memory_logs_.size()); ++i) {
+        result.push_back(memory_logs_[i]);
+    }
+    
+    return result;
 }
 
 // LogEntry implementation

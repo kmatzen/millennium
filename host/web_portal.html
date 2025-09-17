@@ -627,9 +627,8 @@
                     }
                 });
                 
-                // Check if we're in a high-priority state and adjust refresh rate accordingly
-                const isHighPriority = currentState && currentState.current_state >= 3; // CALL_INCOMING or CALL_ACTIVE
-                const delay = isHighPriority ? 5000 : 1000; // 5s during calls/ringing, 1s normally
+                // Use a consistent refresh rate for now (1 second)
+                const delay = 1000; // 1 second refresh rate
                 refreshInterval = setTimeout(refreshWithDelay, delay);
             }
             refreshWithDelay();

@@ -15,6 +15,7 @@
 #include <fstream>
 #include <filesystem>
 #include <iomanip>
+#include <ctime>
 
 // External references to daemon state (will be set by daemon)
 extern std::unique_ptr<class DaemonState> daemon_state;
@@ -690,24 +691,8 @@ WebServer::HttpResponse WebServer::handleApiLogs(const HttpRequest& request) {
     
     std::vector<std::string> log_entries;
     
-    // Try to read from log file if it exists and logging to file is enabled
-    if (config.getLogToFile() && !log_file.empty() && std::filesystem::exists(log_file)) {
-        try {
-            std::ifstream file(log_file);
-            if (file.is_open()) {
-                std::string line;
-                while (std::getline(file, line)) {
-                    if (!line.empty()) {
-                        log_entries.push_back(line);
-                    }
-                }
-                file.close();
-            }
-        } catch (const std::exception& e) {
-            MillenniumLogger::getInstance().warn("WebServer", 
-                "Failed to read log file: " + std::string(e.what()));
-        }
-    }
+    // Always get logs from memory - they're always current and available
+    log_entries = MillenniumLogger::getInstance().getRecentLogs(max_entries);
     
     // If no log file entries, return empty logs
     if (log_entries.empty()) {

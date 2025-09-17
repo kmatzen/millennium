@@ -6,6 +6,7 @@
 #include <mutex>
 #include <chrono>
 #include <sstream>
+#include <vector>
 
 class MillenniumLogger {
 public:
@@ -46,6 +47,9 @@ public:
     static Level parseLevel(const std::string& level_str);
     static std::string levelToString(Level level);
     
+    // In-memory log storage
+    std::vector<std::string> getRecentLogs(int max_entries = 50) const;
+    
     // Structured logging
     class LogEntry {
     public:
@@ -83,6 +87,11 @@ private:
     bool log_to_file_ = false;
     std::unique_ptr<std::ofstream> file_stream_;
     std::mutex log_mutex_;
+    
+    // In-memory log storage
+    mutable std::mutex memory_logs_mutex_;
+    std::vector<std::string> memory_logs_;
+    static const size_t MAX_MEMORY_LOGS = 1000;
     
     void writeLog(Level level, const std::string& category, const std::string& message);
     std::string formatTimestamp() const;
