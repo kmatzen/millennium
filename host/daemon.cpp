@@ -5,6 +5,7 @@
 #include "metrics_server.h"
 #include "web_server.h"
 #include "millennium_sdk.h"
+#include "payphone_state_machine.h"
 #include <atomic>
 #include <csignal>
 #include <cstring>
@@ -23,40 +24,14 @@
 
 #define EVENT_CATEGORIES 3
 
-// Global state management
-class DaemonState {
-public:
-    enum State {
-        INVALID = 0,
-        IDLE_DOWN,
-        IDLE_UP,
-        CALL_INCOMING,
-        CALL_ACTIVE,
-    };
-    
-    State current_state = IDLE_DOWN;
-    std::vector<char> keypad_buffer;
-    int inserted_cents = 0;
-    std::chrono::steady_clock::time_point last_activity;
-    
-    void reset() {
-        current_state = IDLE_DOWN;
-        keypad_buffer.clear();
-        inserted_cents = 0;
-        last_activity = std::chrono::steady_clock::now();
-    }
-    
-    void updateActivity() {
-        last_activity = std::chrono::steady_clock::now();
-    }
-};
+// Global state management - now using PayPhoneStateMachine
 
 // Forward declarations
 class EventProcessor;
 
 // Global instances
 std::atomic<bool> running(true);
-std::unique_ptr<DaemonState> daemon_state;
+std::unique_ptr<PayPhoneStateMachine> state_machine;
 std::unique_ptr<MillenniumClient> client;
 std::unique_ptr<MetricsServer> metrics_server;
 std::unique_ptr<WebServer> web_server;
@@ -75,11 +50,12 @@ struct DaemonStateInfo {
 
 DaemonStateInfo getDaemonStateInfo() {
     DaemonStateInfo info;
-    if (daemon_state) {
-        info.current_state = static_cast<int>(daemon_state->current_state);
-        info.inserted_cents = daemon_state->inserted_cents;
-        info.keypad_buffer = std::string(daemon_state->keypad_buffer.begin(), daemon_state->keypad_buffer.end());
-        info.last_activity = daemon_state->last_activity;
+    if (state_machine) {
+        info.current_state = static_cast<int>(state_machine->getCurrentState());
+        const auto& state_data = state_machine->getStateData();
+        info.inserted_cents = state_data.inserted_cents;
+        info.keypad_buffer = std::string(state_data.keypad_buffer.begin(), state_data.keypad_buffer.end());
+        info.last_activity = state_data.last_activity;
     } else {
         info.current_state = 0;
         info.inserted_cents = 0;
@@ -172,8 +148,8 @@ void handle_coin_event(const std::shared_ptr<CoinEvent> &coin_event) {
         return;
     }
     
-    if (!client) {
-        logger.error("Coin", "Client is null, cannot handle coin event");
+    if (!client || !state_machine) {
+        logger.error("Coin", "Client or state machine is null, cannot handle coin event");
         return;
     }
     
@@ -188,19 +164,14 @@ void handle_coin_event(const std::shared_ptr<CoinEvent> &coin_event) {
         coin_value = 25;
     }
     
-    if (coin_value > 0 && daemon_state->current_state == DaemonState::IDLE_UP) {
-        daemon_state->inserted_cents += coin_value;
-        daemon_state->updateActivity();
+    if (coin_value > 0 && state_machine->getCurrentState() == PayPhoneStateMachine::State::IDLE_UP) {
+        // Let the state machine handle the coin event
+        state_machine->handleEvent(coin_event);
         
         metrics.incrementCounter("coins_inserted");
         metrics.incrementCounter("coins_value_cents", coin_value);
         
-        logger.info("Coin", "Coin inserted: " + code + ", value: " + std::to_string(coin_value) + 
-                   " cents, total: " + std::to_string(daemon_state->inserted_cents) + " cents");
-        
-        line1 = format_number(daemon_state->keypad_buffer);
-        line2 = generate_message(daemon_state->inserted_cents);
-        client->setDisplay(generateDisplayBytes());
+        // Display is now updated automatically by the state machine
     }
 }
 
@@ -210,36 +181,23 @@ void handle_call_state_event(const std::shared_ptr<CallStateEvent> &call_state_e
         return;
     }
     
-    if (!client) {
-        logger.error("Call", "Client is null, cannot handle call state event");
+    if (!client || !state_machine) {
+        logger.error("Call", "Client or state machine is null, cannot handle call state event");
         return;
     }
     
-    if (call_state_event->get_state() == CALL_INCOMING && 
-        daemon_state->current_state == DaemonState::IDLE_DOWN) {
-        
+    // Let the state machine handle the call state event
+    state_machine->handleEvent(call_state_event);
+    
+    if (call_state_event->get_state() == CALL_INCOMING) {
         logger.info("Call", "Incoming call received");
         metrics.incrementCounter("calls_incoming");
-        
-        line1 = "Call incoming...";
-        client->setDisplay(generateDisplayBytes());
-        
-        daemon_state->current_state = DaemonState::CALL_INCOMING;
-        daemon_state->updateActivity();
         
         client->writeToCoinValidator('f');
         client->writeToCoinValidator('z');
     } else if (call_state_event->get_state() == CALL_ACTIVE) {
-        // Handle call established (when baresip reports CALL_ESTABLISHED)
         logger.info("Call", "Call established - audio should be working");
         metrics.incrementCounter("calls_established");
-        
-        line1 = "Call active";
-        line2 = "Audio connected";
-        client->setDisplay(generateDisplayBytes());
-        
-        daemon_state->current_state = DaemonState::CALL_ACTIVE;
-        daemon_state->updateActivity();
     }
 }
 
@@ -249,66 +207,28 @@ void handle_hook_event(const std::shared_ptr<HookStateChangeEvent> &hook_event) 
         return;
     }
     
-    if (!client) {
-        logger.error("Hook", "Client is null, cannot handle hook event");
+    if (!client || !state_machine) {
+        logger.error("Hook", "Client or state machine is null, cannot handle hook event");
         return;
     }
     
+    // Let the state machine handle the hook event (including call actions)
+    state_machine->handleEvent(hook_event);
+    
+    // Handle coin validator commands based on hook direction
     if (hook_event->get_direction() == 'U') {
-        if (daemon_state->current_state == DaemonState::CALL_INCOMING) {
-            logger.info("Call", "Call answered");
-            metrics.incrementCounter("calls_answered");
-            
-            daemon_state->current_state = DaemonState::CALL_ACTIVE;
-            daemon_state->updateActivity();
-            
-            try {
-                client->answerCall();
-            } catch (const std::exception& e) {
-                logger.error("Call", "Failed to answer call: " + std::string(e.what()));
-                metrics.incrementCounter("call_answer_errors");
-            }
-        } else if (daemon_state->current_state == DaemonState::IDLE_DOWN) {
+        if (state_machine->getCurrentState() == PayPhoneStateMachine::State::IDLE_UP) {
             logger.info("Hook", "Hook lifted, transitioning to IDLE_UP");
             metrics.incrementCounter("hook_lifted");
-            
-            daemon_state->current_state = DaemonState::IDLE_UP;
-            daemon_state->updateActivity();
-            
             client->writeToCoinValidator('a');
-            daemon_state->inserted_cents = 0;
-            daemon_state->keypad_buffer.clear();
-            
-            line2 = generate_message(daemon_state->inserted_cents);
-            line1 = format_number(daemon_state->keypad_buffer);
-            client->setDisplay(generateDisplayBytes());
         }
     } else if (hook_event->get_direction() == 'D') {
-        logger.info("Hook", "Hook down, call ended");
+        logger.info("Hook", "Hook down");
         metrics.incrementCounter("hook_down");
         
-        if (daemon_state->current_state == DaemonState::CALL_ACTIVE) {
-            metrics.incrementCounter("calls_ended");
-        }
-        
-        try {
-            client->hangup();
-        } catch (const std::exception& e) {
-            logger.error("Call", "Failed to hangup call: " + std::string(e.what()));
-            metrics.incrementCounter("call_hangup_errors");
-        }
-        
-        daemon_state->keypad_buffer.clear();
-        daemon_state->inserted_cents = 0;
-        
-        line2 = generate_message(daemon_state->inserted_cents);
-        line1 = format_number(daemon_state->keypad_buffer);
-        client->setDisplay(generateDisplayBytes());
-        
-        client->writeToCoinValidator(daemon_state->current_state == DaemonState::IDLE_UP ? 'f' : 'c');
+        // Send appropriate coin validator command
+        client->writeToCoinValidator(state_machine->getCurrentState() == PayPhoneStateMachine::State::IDLE_UP ? 'f' : 'c');
         client->writeToCoinValidator('z');
-        daemon_state->current_state = DaemonState::IDLE_DOWN;
-        daemon_state->updateActivity();
     }
 }
 
@@ -318,59 +238,60 @@ void handle_keypad_event(const std::shared_ptr<KeypadEvent> &keypad_event) {
         return;
     }
     
-    if (!client) {
-        logger.error("Keypad", "Client is null, cannot handle keypad event");
+    if (!client || !state_machine) {
+        logger.error("Keypad", "Client or state machine is null, cannot handle keypad event");
         return;
     }
     
-    if (daemon_state->keypad_buffer.size() < 10 && 
-        daemon_state->current_state == DaemonState::IDLE_UP) {
+    // Let the state machine handle the keypad event
+    state_machine->handleEvent(keypad_event);
+    
+    const auto& state_data = state_machine->getStateData();
+    if (state_data.keypad_buffer.size() < 10 && 
+        state_machine->getCurrentState() == PayPhoneStateMachine::State::IDLE_UP) {
         
         char key = keypad_event->get_key();
         if (std::isdigit(key)) {
             logger.debug("Keypad", "Key pressed: " + std::string(1, key));
             metrics.incrementCounter("keypad_presses");
             
-            daemon_state->keypad_buffer.push_back(key);
-            daemon_state->updateActivity();
-            
-            line2 = generate_message(daemon_state->inserted_cents);
-            line1 = format_number(daemon_state->keypad_buffer);
-            client->setDisplay(generateDisplayBytes());
+            // Display is now updated automatically by the state machine
         }
     }
 }
 
 void check_and_call() {
-    if (!client) {
-        logger.error("Call", "Client is null, cannot initiate call");
+    if (!client || !state_machine) {
+        logger.error("Call", "Client or state machine is null, cannot initiate call");
         return;
     }
     
-    int cost_cents = config.getCallCostCents();
+    const auto& state_data = state_machine->getStateData();
     
-    if (daemon_state->keypad_buffer.size() == 10 && 
-        daemon_state->inserted_cents >= cost_cents &&
-        daemon_state->current_state == DaemonState::IDLE_UP) {
+    if (state_data.keypad_buffer.size() == 10 && 
+        state_data.inserted_cents >= 50 && // Use state machine's call cost
+        state_machine->getCurrentState() == PayPhoneStateMachine::State::IDLE_UP) {
         
-        std::string number = std::string(daemon_state->keypad_buffer.begin(), 
-                                        daemon_state->keypad_buffer.end());
+        std::string number = std::string(state_data.keypad_buffer.begin(), 
+                                        state_data.keypad_buffer.end());
         
         logger.info("Call", "Dialing number: " + number);
         metrics.incrementCounter("calls_initiated");
         
-        line2 = "Calling";
+        // Update display to show calling status
+        line1 = "Calling " + number;
+        line2 = "Connecting...";
         client->setDisplay(generateDisplayBytes());
         
         try {
             client->call(number);
-            daemon_state->current_state = DaemonState::CALL_ACTIVE;
-            daemon_state->updateActivity();
+            state_machine->transitionTo(PayPhoneStateMachine::State::CALL_ACTIVE);
         } catch (const std::exception& e) {
             logger.error("Call", "Failed to initiate call: " + std::string(e.what()));
             metrics.incrementCounter("call_errors");
             
-            line2 = "Call failed";
+            line1 = "Call failed";
+            line2 = "Try again";
             client->setDisplay(generateDisplayBytes());
         }
     }
@@ -383,18 +304,18 @@ public:
     }
     
     void process_event(const std::shared_ptr<Event> &event) {
-        auto it = dispatcher.find(typeid(*event));
-        if (it != dispatcher.end()) {
-            try {
-                it->second(event);
-                metrics.incrementCounter("events_processed");
-            } catch (const std::exception& e) {
-                logger.error("EventProcessor", "Error processing event: " + std::string(e.what()));
-                metrics.incrementCounter("event_errors");
-            }
-        } else {
-            logger.warn("EventProcessor", "Unhandled event type: " + event->name());
-            metrics.incrementCounter("unhandled_events");
+        if (!state_machine) {
+            logger.error("EventProcessor", "State machine is null, cannot process event");
+            return;
+        }
+        
+        try {
+            // Let the state machine handle the event
+            state_machine->handleEvent(event);
+            metrics.incrementCounter("events_processed");
+        } catch (const std::exception& e) {
+            logger.error("EventProcessor", "Error processing event: " + std::string(e.what()));
+            metrics.incrementCounter("event_errors");
         }
         
         // Always check side effects after processing any event
@@ -441,8 +362,8 @@ private:
 
 // Implementation of sendControlCommand (moved here to access display functions)
 bool sendControlCommand(const std::string& action) {
-    if (!daemon_state) {
-        MillenniumLogger::getInstance().error("Control", "Daemon state is null");
+    if (!state_machine) {
+        MillenniumLogger::getInstance().error("Control", "State machine is null");
         return false;
     }
     
@@ -461,17 +382,16 @@ bool sendControlCommand(const std::string& action) {
         std::string arg = (colon_pos != std::string::npos) ? action.substr(colon_pos + 1) : "";
         if (command == "start_call") {
             // Simulate starting a call by changing state
-            daemon_state->current_state = DaemonState::CALL_INCOMING;
-            daemon_state->updateActivity();
-            Metrics::getInstance().setGauge("current_state", static_cast<double>(daemon_state->current_state));
+            state_machine->transitionTo(PayPhoneStateMachine::State::CALL_INCOMING);
+            Metrics::getInstance().setGauge("current_state", static_cast<double>(state_machine->getCurrentState()));
             Metrics::getInstance().incrementCounter("calls_initiated");
             MillenniumLogger::getInstance().info("Control", "Call initiation requested via web portal");
             return true;
             
         } else if (command == "reset_system") {
             // Reset the system state
-            daemon_state->reset();
-            Metrics::getInstance().setGauge("current_state", static_cast<double>(daemon_state->current_state));
+            state_machine->reset();
+            Metrics::getInstance().setGauge("current_state", static_cast<double>(state_machine->getCurrentState()));
             Metrics::getInstance().setGauge("inserted_cents", 0.0);
             Metrics::getInstance().incrementCounter("system_resets");
             MillenniumLogger::getInstance().info("Control", "System reset requested via web portal");
@@ -479,9 +399,8 @@ bool sendControlCommand(const std::string& action) {
             
         } else if (command == "emergency_stop") {
             // Emergency stop - set to invalid state and stop running
-            daemon_state->current_state = DaemonState::INVALID;
-            daemon_state->updateActivity();
-            Metrics::getInstance().setGauge("current_state", static_cast<double>(daemon_state->current_state));
+            state_machine->transitionTo(PayPhoneStateMachine::State::INVALID);
+            Metrics::getInstance().setGauge("current_state", static_cast<double>(state_machine->getCurrentState()));
             Metrics::getInstance().incrementCounter("emergency_stops");
             MillenniumLogger::getInstance().warn("Control", "Emergency stop activated via web portal");
             // Note: We don't actually stop the daemon, just set it to invalid state
@@ -500,16 +419,14 @@ bool sendControlCommand(const std::string& action) {
             }
         } else if (command == "keypad_clear") {
             // Only allow clear when handset is up (same as physical keypad logic)
-            if (daemon_state->current_state == DaemonState::IDLE_UP) {
-                daemon_state->keypad_buffer.clear();
-                daemon_state->updateActivity();
+            if (state_machine->getCurrentState() == PayPhoneStateMachine::State::IDLE_UP) {
+                auto& state_data = state_machine->getStateData();
+                state_data.keypad_buffer.clear();
+                state_data.updateActivity();
                 Metrics::getInstance().incrementCounter("keypad_clears");
                 MillenniumLogger::getInstance().info("Control", "Keypad cleared via web portal");
                 
-                // Update physical display
-                line1 = format_number(daemon_state->keypad_buffer);
-                line2 = generate_message(daemon_state->inserted_cents);
-                client->setDisplay(generateDisplayBytes());
+                // Display is now updated automatically by the state machine
                 
                 return true;
             } else {
@@ -518,16 +435,14 @@ bool sendControlCommand(const std::string& action) {
             }
         } else if (command == "keypad_backspace") {
             // Only allow backspace when handset is up and buffer is not empty
-            if (daemon_state->current_state == DaemonState::IDLE_UP && !daemon_state->keypad_buffer.empty()) {
-                daemon_state->keypad_buffer.pop_back();
-                daemon_state->updateActivity();
+            auto& state_data = state_machine->getStateData();
+            if (state_machine->getCurrentState() == PayPhoneStateMachine::State::IDLE_UP && !state_data.keypad_buffer.empty()) {
+                state_data.keypad_buffer.pop_back();
+                state_data.updateActivity();
                 Metrics::getInstance().incrementCounter("keypad_backspaces");
                 MillenniumLogger::getInstance().info("Control", "Keypad backspace via web portal");
                 
-                // Update physical display
-                line1 = format_number(daemon_state->keypad_buffer);
-                line2 = generate_message(daemon_state->inserted_cents);
-                client->setDisplay(generateDisplayBytes());
+                // Display is now updated automatically by the state machine
                 
                 return true;
             } else {
@@ -568,15 +483,16 @@ bool sendControlCommand(const std::string& action) {
                 return false;
             }
         } else if (command == "coin_return") {
-            daemon_state->inserted_cents = 0;
-            daemon_state->updateActivity();
+            auto& state_data = state_machine->getStateData();
+            state_data.inserted_cents = 0;
+            state_data.updateActivity();
             Metrics::getInstance().setGauge("inserted_cents", 0.0);
             Metrics::getInstance().incrementCounter("coin_returns");
             MillenniumLogger::getInstance().info("Control", "Coins returned via web portal");
             
             // Update physical display
-            line1 = format_number(daemon_state->keypad_buffer);
-            line2 = generate_message(daemon_state->inserted_cents);
+            line1 = format_number(state_data.keypad_buffer);
+            line2 = generate_message(state_data.inserted_cents);
             client->setDisplay(generateDisplayBytes());
             
             return true;
@@ -622,13 +538,14 @@ HealthMonitor::Status checkSipConnection() {
 }
 
 HealthMonitor::Status checkDaemonActivity() {
-    if (!daemon_state) {
+    if (!state_machine) {
         return HealthMonitor::CRITICAL;
     }
     
     auto now = std::chrono::steady_clock::now();
+    const auto& state_data = state_machine->getStateData();
     auto time_since_activity = std::chrono::duration_cast<std::chrono::minutes>(
-        now - daemon_state->last_activity);
+        now - state_data.last_activity);
     
     if (time_since_activity.count() > 60) { // No activity for more than 1 hour
         return HealthMonitor::WARNING;
@@ -641,7 +558,7 @@ HealthMonitor::Status checkDaemonActivity() {
 void metrics_collection_thread() {
     while (running) {
         // Skip metrics collection during audio activity to save CPU
-        if (daemon_state && daemon_state->current_state >= 2) {
+        if (state_machine && state_machine->isInCall()) {
             // During audio activity, sleep longer and skip metrics
             std::this_thread::sleep_for(std::chrono::seconds(30));
             continue;
@@ -652,9 +569,12 @@ void metrics_collection_thread() {
             std::chrono::duration_cast<std::chrono::seconds>(
                 std::chrono::steady_clock::now().time_since_epoch()).count());
         
-        metrics.setGauge("current_state", static_cast<double>(daemon_state->current_state));
-        metrics.setGauge("inserted_cents", static_cast<double>(daemon_state->inserted_cents));
-        metrics.setGauge("keypad_buffer_size", static_cast<double>(daemon_state->keypad_buffer.size()));
+        if (state_machine) {
+            metrics.setGauge("current_state", static_cast<double>(state_machine->getCurrentState()));
+            const auto& state_data = state_machine->getStateData();
+            metrics.setGauge("inserted_cents", static_cast<double>(state_data.inserted_cents));
+            metrics.setGauge("keypad_buffer_size", static_cast<double>(state_data.keypad_buffer.size()));
+        }
         
         std::this_thread::sleep_for(std::chrono::seconds(10));
     }
@@ -695,9 +615,57 @@ int main(int argc, char *argv[]) {
         
         logger.info("Daemon", "Starting Millennium Daemon");
         
-        // Initialize daemon state
-        daemon_state = std::make_unique<DaemonState>();
-        daemon_state->reset();
+        // Initialize state machine
+        state_machine = std::make_unique<PayPhoneStateMachine>();
+        state_machine->setCallCostCents(config.getCallCostCents());
+        
+        // Set up state transition callback to handle display updates
+        state_machine->setStateTransitionCallback([](PayPhoneStateMachine::State /*from*/, 
+                                                    PayPhoneStateMachine::State /*to*/, 
+                                                    const PayPhoneStateMachine::StateData& data) {
+            if (client) {
+                line1 = data.display_line1;
+                line2 = data.display_line2;
+                client->setDisplay(generateDisplayBytes());
+            }
+        });
+        
+        // Set up display update callback for real-time updates (keypad, coins, etc.)
+        state_machine->setDisplayUpdateCallback([](const PayPhoneStateMachine::StateData& data) {
+            if (client) {
+                line1 = data.display_line1;
+                line2 = data.display_line2;
+                logger.debug("Display", "Real-time update - Line1: '" + line1 + "', Line2: '" + line2 + "'");
+                client->setDisplay(generateDisplayBytes());
+            }
+        });
+        
+        // Set up call action callbacks
+        state_machine->setAnswerCallCallback([]() {
+            if (client) {
+                try {
+                    client->answerCall();
+                    logger.info("Call", "Call answered via state machine");
+                    metrics.incrementCounter("calls_answered");
+                } catch (const std::exception& e) {
+                    logger.error("Call", "Failed to answer call: " + std::string(e.what()));
+                    metrics.incrementCounter("call_answer_errors");
+                }
+            }
+        });
+        
+        state_machine->setHangupCallCallback([]() {
+            if (client) {
+                try {
+                    client->hangup();
+                    logger.info("Call", "Call hung up via state machine");
+                    metrics.incrementCounter("calls_ended");
+                } catch (const std::exception& e) {
+                    logger.error("Call", "Failed to hangup call: " + std::string(e.what()));
+                    metrics.incrementCounter("call_hangup_errors");
+                }
+            }
+        });
         
         // Initialize client
         client = std::make_unique<MillenniumClient>();
@@ -744,9 +712,10 @@ int main(int argc, char *argv[]) {
         // Start metrics collection thread (disabled for single-core optimization)
         // std::thread metrics_thread(metrics_collection_thread);
         
-        // Initialize display
-        line1 = format_number(daemon_state->keypad_buffer);
-        line2 = generate_message(daemon_state->inserted_cents);
+        // Initialize display with state machine data
+        const auto& state_data = state_machine->getStateData();
+        line1 = state_data.display_line1;
+        line2 = state_data.display_line2;
         client->setDisplay(generateDisplayBytes());
         
         // Initialize event processor
@@ -754,11 +723,14 @@ int main(int argc, char *argv[]) {
         
         logger.info("Daemon", "Daemon initialized successfully");
         
-        // Main event loop
-        int loop_count = 0;
+        // Main event loop with proper sleep intervals
+        auto last_metrics_update = std::chrono::steady_clock::now();
+        auto last_debug_log = std::chrono::steady_clock::now();
+        
         while (running) {
             try {
-	    	client->update();
+                // Update client and process events
+                client->update();
                 
                 auto event = client->nextEvent();
                 if (event) {
@@ -766,22 +738,24 @@ int main(int argc, char *argv[]) {
                     // check_and_call() is now called automatically by EventProcessor
                 }
                 
-                // Update metrics in main loop (every 1000 loops = ~1 second)
-                if (++loop_count % 1000 == 0) {
-                    // Update system metrics (moved from separate thread)
+                // Update metrics every second
+                auto now = std::chrono::steady_clock::now();
+                if (std::chrono::duration_cast<std::chrono::seconds>(now - last_metrics_update).count() >= 1) {
                     metrics.setGauge("daemon_uptime_seconds", 
                         std::chrono::duration_cast<std::chrono::seconds>(
-                            std::chrono::steady_clock::now() - daemon_start_time).count());
+                            now - daemon_start_time).count());
                     
-                    if (daemon_state) {
-                        metrics.setGauge("current_state", static_cast<double>(daemon_state->current_state));
-                        metrics.setGauge("inserted_cents", static_cast<double>(daemon_state->inserted_cents));
-                        metrics.setGauge("keypad_buffer_size", static_cast<double>(daemon_state->keypad_buffer.size()));
+                    if (state_machine) {
+                        metrics.setGauge("current_state", static_cast<double>(state_machine->getCurrentState()));
+                        const auto& state_data = state_machine->getStateData();
+                        metrics.setGauge("inserted_cents", static_cast<double>(state_data.inserted_cents));
+                        metrics.setGauge("keypad_buffer_size", static_cast<double>(state_data.keypad_buffer.size()));
                     }
+                    last_metrics_update = now;
                 }
                 
-                // Log metrics summary every 10000 loops (about every 10 seconds) at DEBUG level
-                if (loop_count % 10000 == 0) {
+                // Log metrics summary every 10 seconds at DEBUG level
+                if (std::chrono::duration_cast<std::chrono::seconds>(now - last_debug_log).count() >= 10) {
                     logger.debug("Metrics", "=== Metrics Summary ===");
                     
                     // Log only significant counters (non-zero)
@@ -803,13 +777,24 @@ int main(int argc, char *argv[]) {
                     if (state_it != gauges.end()) {
                         logger.debug("Metrics", "Current state: " + std::to_string(state_it->second));
                     }
+                    last_debug_log = now;
                 }
+                
+                // Sleep to prevent busy waiting - adjust based on system state
+                if (state_machine && state_machine->isInCall()) {
+                    // During active calls, sleep longer to reduce CPU usage
+                    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+                } else {
+                    // Normal operation - shorter sleep for responsiveness
+                    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                }
+                
             } catch (const std::exception& e) {
                 logger.error("Daemon", "Error in main loop: " + std::string(e.what()));
                 metrics.incrementCounter("main_loop_errors");
                 
-                // Wait a bit before continuing to prevent rapid error loops
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                // Wait longer on errors to prevent rapid error loops
+                std::this_thread::sleep_for(std::chrono::milliseconds(500));
             }
         }
         

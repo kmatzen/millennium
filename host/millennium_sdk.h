@@ -167,6 +167,7 @@ public:
   std::string repr() const override;
   enum State get_state() const;
   struct call *get_call() const;
+  std::string get_caller_number() const;
 };
 
 class MillenniumClient {
@@ -178,6 +179,9 @@ class MillenniumClient {
   std::string displayMessage_;
   bool displayDirty_;
   std::chrono::steady_clock::time_point lastUpdateTime_;
+  std::chrono::steady_clock::time_point lastDisplayUpdate_;
+  std::string pendingDisplayMessage_;
+  bool hasPendingDisplayUpdate_;
   struct ua *ua_;
 
   void writeCommand(uint8_t command, const std::vector<uint8_t> &data);

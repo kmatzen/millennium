@@ -78,7 +78,9 @@ MillenniumClient::MillenniumClient() : display_fd_(-1), is_open_(false), ua_(nul
       "/dev/serial/by-id/usb-Arduino_LLC_Millennium_Beta-if00";
 
   lastUpdateTime_ = std::chrono::steady_clock::now();
+  lastDisplayUpdate_ = std::chrono::steady_clock::now();
   displayDirty_ = false;
+  hasPendingDisplayUpdate_ = false;
   display_fd_ = open(display_device.c_str(), O_RDWR | O_NOCTTY);
   if (display_fd_ == -1) {
     Logger::log(Logger::ERROR, "Failed to open display device.");
@@ -265,31 +267,50 @@ void MillenniumClient::hangup() {
 void MillenniumClient::update() {
   char buffer[1024]; // Optimized buffer size
   ssize_t bytes_read;
+  static int consecutive_errors = 0;
+  static const int MAX_CONSECUTIVE_ERRORS = 5;
 
   // Read directly from the file descriptor
   while ((bytes_read = read(display_fd_, buffer, sizeof(buffer))) > 0) {
     input_buffer_.append(buffer, bytes_read);
     processEventBuffer();
+    consecutive_errors = 0; // Reset error counter on successful read
   }
 
   if (bytes_read == -1 && errno != EAGAIN && errno != EWOULDBLOCK) {
-    // Log only if the error is not due to no data being available
+    consecutive_errors++;
     Logger::log(Logger::ERROR, "Error reading from display_fd_: " +
-                                   std::string(strerror(errno)));
+                                   std::string(strerror(errno)) + 
+                                   " (consecutive errors: " + std::to_string(consecutive_errors) + ")");
+    
+    // If we have too many consecutive errors, try to recover
+    if (consecutive_errors >= MAX_CONSECUTIVE_ERRORS) {
+      Logger::log(Logger::WARN, "Too many consecutive read errors, attempting recovery...");
+      // Could implement reconnection logic here
+      consecutive_errors = 0; // Reset to prevent spam
+    }
   }
 
   std::chrono::steady_clock::time_point currentTime =
       std::chrono::steady_clock::now();
   auto elapsedTime = std::chrono::duration_cast<std::chrono::milliseconds>(
       currentTime - lastUpdateTime_);
-  if (displayDirty_ && elapsedTime.count() > 33) {
+  
+  // Display debouncing - only update if enough time has passed since last update
+  const auto DISPLAY_DEBOUNCE_MS = 100; // 100ms debounce
+  auto displayElapsedTime = std::chrono::duration_cast<std::chrono::milliseconds>(
+      currentTime - lastDisplayUpdate_);
+  
+  if (displayDirty_ && displayElapsedTime.count() > DISPLAY_DEBOUNCE_MS) {
     writeToDisplay(displayMessage_);
-    lastUpdateTime_ = currentTime;
+    lastDisplayUpdate_ = currentTime;
     displayDirty_ = false;
-  } else {
-    if (displayDirty_) {
-      Logger::log(Logger::INFO, "waiting");
-    }
+    hasPendingDisplayUpdate_ = false;
+  } else if (displayDirty_) {
+    // Log at debug level to reduce noise
+    Logger::log(Logger::DEBUG, "Display update debounced, waiting " + 
+                               std::to_string(DISPLAY_DEBOUNCE_MS - displayElapsedTime.count()) + 
+                               "ms more");
   }
 }
 
@@ -406,47 +427,77 @@ void MillenniumClient::setDisplay(const std::string &message) {
   if (message == displayMessage_) {
     return;
   }
+  
+  // Store the pending message for debouncing
+  pendingDisplayMessage_ = message;
+  hasPendingDisplayUpdate_ = true;
   displayDirty_ = true;
   displayMessage_ = message;
 }
 
 void MillenniumClient::writeToDisplay(const std::string &message) {
   Logger::log(Logger::DEBUG, "Writing message to display: " + message);
+  static int write_errors = 0;
+  static const int MAX_WRITE_ERRORS = 3;
 
-  // Step 1: Write the command
-  writeCommand(0x02, {static_cast<uint8_t>(message.size())});
+  try {
+    // Step 1: Write the command
+    writeCommand(0x02, {static_cast<uint8_t>(message.size())});
 
-  // Step 2: Write the message in a loop to ensure all bytes are written
-  size_t total_bytes_written = 0;
-  size_t message_length = message.size();
-  const char *data_ptr = message.c_str();
+    // Step 2: Write the message in a loop to ensure all bytes are written
+    size_t total_bytes_written = 0;
+    size_t message_length = message.size();
+    const char *data_ptr = message.c_str();
+    int retry_count = 0;
+    const int MAX_RETRIES = 3;
 
-  while (total_bytes_written < message_length) {
-    ssize_t bytes_written = write(display_fd_, data_ptr + total_bytes_written,
-                                  message_length - total_bytes_written);
+    while (total_bytes_written < message_length && retry_count < MAX_RETRIES) {
+      ssize_t bytes_written = write(display_fd_, data_ptr + total_bytes_written,
+                                    message_length - total_bytes_written);
 
-    if (bytes_written > 0) {
-      total_bytes_written += bytes_written;
-    } else if (bytes_written == -1) {
-      if (errno == EINTR) {
-        // Interrupted by a signal, retry
-        continue;
-      } else if (errno == EAGAIN || errno == EWOULDBLOCK) {
-        // Non-blocking mode: handle or wait before retrying
-        usleep(200);
-        continue;
-      } else {
-        // Log other errors and exit
-        Logger::log(Logger::ERROR, "Error writing to display: " +
-                                       std::string(strerror(errno)));
-        return;
+      if (bytes_written > 0) {
+        total_bytes_written += bytes_written;
+        write_errors = 0; // Reset error counter on successful write
+      } else if (bytes_written == -1) {
+        if (errno == EINTR) {
+          // Interrupted by a signal, retry
+          continue;
+        } else if (errno == EAGAIN || errno == EWOULDBLOCK) {
+          // Non-blocking mode: wait before retrying
+          usleep(200);
+          retry_count++;
+          continue;
+        } else {
+          // Log other errors and handle gracefully
+          write_errors++;
+          Logger::log(Logger::ERROR, "Error writing to display: " +
+                                         std::string(strerror(errno)) + 
+                                         " (error count: " + std::to_string(write_errors) + ")");
+          
+          if (write_errors >= MAX_WRITE_ERRORS) {
+            Logger::log(Logger::ERROR, "Too many write errors, giving up on this message");
+            return;
+          }
+          
+          // Wait longer before retrying on error
+          usleep(1000);
+          retry_count++;
+        }
       }
     }
-  }
 
-  Logger::log(Logger::DEBUG, "Successfully wrote " +
-                                 std::to_string(total_bytes_written) +
-                                 " bytes to display.");
+    if (total_bytes_written == message_length) {
+      Logger::log(Logger::DEBUG, "Successfully wrote " +
+                                     std::to_string(total_bytes_written) +
+                                     " bytes to display.");
+    } else {
+      Logger::log(Logger::WARN, "Partial write to display: " + 
+                                   std::to_string(total_bytes_written) + 
+                                   "/" + std::to_string(message_length) + " bytes");
+    }
+  } catch (const std::exception& e) {
+    Logger::log(Logger::ERROR, "Exception in writeToDisplay: " + std::string(e.what()));
+  }
 }
 
 void MillenniumClient::writeToCoinValidator(uint8_t data) {
@@ -488,6 +539,31 @@ enum State CallStateEvent::get_state() const {
   default:
     return INVALID;
   }
+}
+
+std::string CallStateEvent::get_caller_number() const {
+  if (!call_) {
+    return "Unknown";
+  }
+  
+  // Try to get the remote URI from the call
+  const char *remote_uri = call_peeruri(call_);
+  if (remote_uri) {
+    std::string uri(remote_uri);
+    // Extract number from URI (e.g., "sip:+1234567890@example.com" -> "+1234567890")
+    size_t at_pos = uri.find('@');
+    if (at_pos != std::string::npos) {
+      std::string number = uri.substr(0, at_pos);
+      // Remove "sip:" prefix if present
+      if (number.substr(0, 4) == "sip:") {
+        number = number.substr(4);
+      }
+      return number;
+    }
+    return uri;
+  }
+  
+  return "Unknown";
 }
 
 void MillenniumClient::setUA(struct ua *ua) {

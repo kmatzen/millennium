@@ -26,15 +26,18 @@ test_framework.o: test_framework.cpp test_framework.h
 millennium_sdk.o: millennium_sdk.cpp millennium_sdk.h
 	g++ millennium_sdk.cpp -o millennium_sdk.o -c $(CXXFLAGS)
 
-daemon.o: daemon.cpp millennium_sdk.h config.h logger.h health_monitor.h metrics.h metrics_server.h web_server.h
+payphone_state_machine.o: payphone_state_machine.cpp payphone_state_machine.h millennium_sdk.h logger.h config.h
+	g++ payphone_state_machine.cpp -o payphone_state_machine.o -c $(CXXFLAGS)
+
+daemon.o: daemon.cpp millennium_sdk.h config.h logger.h health_monitor.h metrics.h metrics_server.h web_server.h payphone_state_machine.h
 	g++ daemon.cpp -o daemon.o -c $(CXXFLAGS)
 
 tests.o: tests.cpp test_framework.h config.h logger.h metrics.h
 	g++ tests.cpp -o tests.o -c $(CXXFLAGS)
 
 # Executables
-daemon: daemon.o millennium_sdk.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o
-	g++ daemon.o millennium_sdk.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o -o daemon $(LDFLAGS)
+daemon: daemon.o millennium_sdk.o payphone_state_machine.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o
+	g++ daemon.o millennium_sdk.o payphone_state_machine.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o -o daemon $(LDFLAGS)
 
 tests: tests.o test_framework.o config.o logger.o metrics.o
 	g++ tests.o test_framework.o config.o logger.o metrics.o -o tests $(LDFLAGS)
