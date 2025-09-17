@@ -1,16 +1,18 @@
 [Unit]
 Description=Millennium Tools Daemon
-After=remap-sink.service
-Requires=remap-sink.service
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/bash -c "/home/matzen/millennium/host/daemon"
-ExecStartPre=/bin/bash -c 'until ping -c1 -W1 8.8.8.8; do sleep 1; done'
+# Run the binary directly (no shell needed)
+ExecStart=/home/matzen/millennium/host/daemon --config /home/matzen/millennium/host/daemon.conf
+# Optional: wait for network before starting (use absolute path + correct bash)
+ExecStartPre=/bin/bash -c 'until /bin/ping -c1 -W1 8.8.8.8 >/dev/null; do sleep 1; done'
 Restart=on-failure
+RestartSec=2
 WorkingDirectory=/home/matzen/millennium/host
-User=matzen
-Group=matzen
 
 [Install]
 WantedBy=default.target
+
