@@ -10,6 +10,8 @@ extern "C" {
 }
 #include "web_server.h"
 #include "millennium_sdk.h"
+#include "events.h"
+#include "event_processor.h"
 #include <atomic>
 #include <csignal>
 #include <cstring>
@@ -150,6 +152,40 @@ std::string generate_message(int inserted) {
     return message.str();
 }
 
+void check_and_call() {
+    if (!client) {
+        logger_error_with_category("Call", "Client is null, cannot initiate call");
+        return;
+    }
+    
+    int cost_cents = config_get_call_cost_cents(config);
+    
+    if (daemon_state_get_keypad_length(daemon_state) == 10 && 
+        daemon_state->inserted_cents >= cost_cents &&
+        daemon_state->current_state == DAEMON_STATE_IDLE_UP) {
+        
+        std::string number = std::string(daemon_state->keypad_buffer);
+        
+        logger_info_with_category("Call", ("Dialing number: " + number).c_str());
+        metrics_increment_counter("calls_initiated", 1);
+        
+        line2 = "Calling";
+        client->setDisplay(generateDisplayBytes());
+        
+        try {
+            client->call(number);
+            daemon_state->current_state = DAEMON_STATE_CALL_ACTIVE;
+            daemon_state_update_activity(daemon_state);
+        } catch (const std::exception& e) {
+            logger_error_with_category("Call", ("Failed to initiate call: " + std::string(e.what())).c_str());
+            metrics_increment_counter("call_errors", 1);
+            
+            line2 = "Call failed";
+            client->setDisplay(generateDisplayBytes());
+        }
+    }
+}
+
 void handle_coin_event(const std::shared_ptr<CoinEvent> &coin_event) {
     if (!coin_event) {
         logger_error_with_category("Coin", "Received null coin event");
@@ -185,6 +221,9 @@ void handle_coin_event(const std::shared_ptr<CoinEvent> &coin_event) {
         line1 = format_number(daemon_state->keypad_buffer);
         line2 = generate_message(daemon_state->inserted_cents);
         client->setDisplay(generateDisplayBytes());
+        
+        // Check if we should initiate a call after coin insertion
+        check_and_call();
     }
 }
 
@@ -321,106 +360,15 @@ void handle_keypad_event(const std::shared_ptr<KeypadEvent> &keypad_event) {
             line2 = generate_message(daemon_state->inserted_cents);
             line1 = format_number(daemon_state->keypad_buffer);
             client->setDisplay(generateDisplayBytes());
-        }
-    }
-}
-
-void check_and_call() {
-    if (!client) {
-        logger_error_with_category("Call", "Client is null, cannot initiate call");
-        return;
-    }
-    
-    int cost_cents = config_get_call_cost_cents(config);
-    
-    if (daemon_state_get_keypad_length(daemon_state) == 10 && 
-        daemon_state->inserted_cents >= cost_cents &&
-        daemon_state->current_state == DAEMON_STATE_IDLE_UP) {
-        
-        std::string number = std::string(daemon_state->keypad_buffer);
-        
-        logger_info_with_category("Call", ("Dialing number: " + number).c_str());
-        metrics_increment_counter("calls_initiated", 1);
-        
-        line2 = "Calling";
-        client->setDisplay(generateDisplayBytes());
-        
-        try {
-            client->call(number);
-            daemon_state->current_state = DAEMON_STATE_CALL_ACTIVE;
-            daemon_state_update_activity(daemon_state);
-        } catch (const std::exception& e) {
-            logger_error_with_category("Call", ("Failed to initiate call: " + std::string(e.what())).c_str());
-            metrics_increment_counter("call_errors", 1);
             
-            line2 = "Call failed";
-            client->setDisplay(generateDisplayBytes());
+            // Check if we should initiate a call after keypad input
+            check_and_call();
         }
     }
 }
 
-class EventProcessor {
-public:
-    EventProcessor() {
-        setup_dispatcher();
-    }
-    
-    void process_event(const std::shared_ptr<Event> &event) {
-        auto it = dispatcher.find(typeid(*event));
-        if (it != dispatcher.end()) {
-            try {
-                it->second(event);
-                metrics_increment_counter("events_processed", 1);
-            } catch (const std::exception& e) {
-                logger_error_with_category("EventProcessor", ("Error processing event: " + std::string(e.what())).c_str());
-                metrics_increment_counter("event_errors", 1);
-            }
-        } else {
-            logger_warn_with_category("EventProcessor", ("Unhandled event type: " + event->name()).c_str());
-            metrics_increment_counter("unhandled_events", 1);
-        }
-        
-        // Always check side effects after processing any event
-        check_side_effects();
-    }
-    
-private:
-    void check_side_effects() {
-        // Check if we should initiate a call
-        check_and_call();
-        
-        // Could add other side effects here in the future:
-        // - Update display
-        // - Send notifications
-        // - Log state changes
-        // - etc.
-    }
-    
-private:
-    std::unordered_map<std::type_index, std::function<void(const std::shared_ptr<Event> &)>> dispatcher;
-    
-    void setup_dispatcher() {
-        dispatcher[typeid(CoinEvent)] = [&](const std::shared_ptr<Event> &e) {
-            auto coin_event = std::dynamic_pointer_cast<CoinEvent>(e);
-            handle_coin_event(coin_event);
-        };
-        
-        dispatcher[typeid(CallStateEvent)] = [&](const std::shared_ptr<Event> &e) {
-            auto call_state_event = std::dynamic_pointer_cast<CallStateEvent>(e);
-            handle_call_state_event(call_state_event);
-        };
-        
-        dispatcher[typeid(HookStateChangeEvent)] = [&](const std::shared_ptr<Event> &e) {
-            auto hook_event = std::dynamic_pointer_cast<HookStateChangeEvent>(e);
-            handle_hook_event(hook_event);
-        };
-        
-        dispatcher[typeid(KeypadEvent)] = [&](const std::shared_ptr<Event> &e) {
-            auto keypad_event = std::dynamic_pointer_cast<KeypadEvent>(e);
-            handle_keypad_event(keypad_event);
-        };
-    }
-};
+
+
 
 // Implementation of sendControlCommand (moved here to access display functions)
 bool sendControlCommand(const std::string& action) {
@@ -746,6 +694,12 @@ int main(int argc, char *argv[]) {
         // Initialize event processor
         event_processor = std::make_unique<EventProcessor>();
         
+        // Register event handlers
+        event_processor->register_coin_handler(handle_coin_event);
+        event_processor->register_call_state_handler(handle_call_state_event);
+        event_processor->register_hook_handler(handle_hook_event);
+        event_processor->register_keypad_handler(handle_keypad_event);
+        
         logger_info_with_category("Daemon", "Daemon initialized successfully");
         
         // Main event loop
@@ -757,7 +711,6 @@ int main(int argc, char *argv[]) {
                 auto event = client->nextEvent();
                 if (event) {
                     event_processor->process_event(event);
-                    // check_and_call() is now called automatically by EventProcessor
                 }
                 
                 // Update metrics in main loop (every 1000 loops = ~1 second)

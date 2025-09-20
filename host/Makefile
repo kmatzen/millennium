@@ -30,18 +30,24 @@ web_server.o: web_server.cpp web_server.h config.h logger.h metrics.h health_mon
 test_framework.o: test_framework.cpp test_framework.h
 	g++ test_framework.cpp -o test_framework.o -c $(CXXFLAGS)
 
-millennium_sdk.o: millennium_sdk.cpp millennium_sdk.h
+events.o: events.cpp events.h
+	g++ events.cpp -o events.o -c $(CXXFLAGS)
+
+event_processor.o: event_processor.cpp event_processor.h events.h
+	g++ event_processor.cpp -o event_processor.o -c $(CXXFLAGS)
+
+millennium_sdk.o: millennium_sdk.cpp millennium_sdk.h events.h
 	g++ millennium_sdk.cpp -o millennium_sdk.o -c $(CXXFLAGS)
 
-daemon.o: daemon.cpp millennium_sdk.h config.h logger.h health_monitor.h metrics.h metrics_server.h web_server.h
+daemon.o: daemon.cpp millennium_sdk.h events.h event_processor.h config.h logger.h health_monitor.h metrics.h metrics_server.h web_server.h
 	g++ daemon.cpp -o daemon.o -c $(CXXFLAGS)
 
 tests.o: tests.cpp test_framework.h config.h logger.h metrics.h
 	g++ tests.cpp -o tests.o -c $(CXXFLAGS)
 
 # Executables
-daemon: daemon.o daemon_state.o millennium_sdk.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o
-	gcc daemon.o daemon_state.o millennium_sdk.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o -o daemon $(LDFLAGS) -lstdc++
+daemon: daemon.o daemon_state.o millennium_sdk.o events.o event_processor.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o
+	gcc daemon.o daemon_state.o millennium_sdk.o events.o event_processor.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o -o daemon $(LDFLAGS) -lstdc++
 
 tests: tests.o test_framework.o config.o logger.o metrics.o
 	gcc tests.o test_framework.o config.o logger.o metrics.o -o tests $(LDFLAGS) -lstdc++
