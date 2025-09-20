@@ -12,8 +12,8 @@ config.o: config.c config.h
 daemon_state.o: daemon_state.c daemon_state.h
 	gcc daemon_state.c -o daemon_state.o -c $(CFLAGS)
 
-logger.o: logger.cpp logger.h
-	g++ logger.cpp -o logger.o -c $(CXXFLAGS)
+logger.o: logger.c logger.h
+	gcc logger.c -o logger.o -c $(CFLAGS)
 
 health_monitor.o: health_monitor.cpp health_monitor.h logger.h
 	g++ health_monitor.cpp -o health_monitor.o -c $(CXXFLAGS)

@@ -1,8 +1,8 @@
 #include "web_server.h"
 extern "C" {
 #include "config.h"
-}
 #include "logger.h"
+}
 #include "metrics.h"
 #include "health_monitor.h"
 #include <sys/socket.h>
@@ -60,8 +60,8 @@ void WebServer::start() {
     
     server_thread_ = std::make_unique<std::thread>(&WebServer::serverLoop, this);
     
-    MillenniumLogger::getInstance().info("WebServer", 
-        "Web server started on port " + std::to_string(port_));
+    logger_info_with_category("WebServer", 
+        ("Web server started on port " + std::to_string(port_)).c_str());
 }
 
 void WebServer::stop() {
@@ -76,22 +76,22 @@ void WebServer::stop() {
         server_thread_->join();
     }
     
-    MillenniumLogger::getInstance().info("WebServer", "Web server stopped");
+    logger_info_with_category("WebServer", "Web server stopped");
 }
 
 void WebServer::pause() {
     paused_ = true;
-    MillenniumLogger::getInstance().info("WebServer", "Web server paused for audio protection");
+    logger_info_with_category("WebServer", "Web server paused for audio protection");
 }
 
 void WebServer::resume() {
     paused_ = false;
-    MillenniumLogger::getInstance().info("WebServer", "Web server resumed");
+    logger_info_with_category("WebServer", "Web server resumed");
 }
 
 void WebServer::setPort(int port) {
     if (running_.load()) {
-        MillenniumLogger::getInstance().warn("WebServer", 
+        logger_warn_with_category("WebServer", 
             "Cannot change port while server is running");
         return;
     }
@@ -146,7 +146,7 @@ void WebServer::broadcastToWebSockets(const std::string& message) {
 void WebServer::serverLoop() {
     int server_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (server_fd < 0) {
-        MillenniumLogger::getInstance().error("WebServer", 
+        logger_error_with_category("WebServer", 
             "Failed to create socket");
         return;
     }
@@ -161,14 +161,14 @@ void WebServer::serverLoop() {
     address.sin_port = htons(port_);
     
     if (bind(server_fd, (struct sockaddr*)&address, sizeof(address)) < 0) {
-        MillenniumLogger::getInstance().error("WebServer", 
-            "Failed to bind to port " + std::to_string(port_));
+        logger_error_with_category("WebServer", 
+            ("Failed to bind to port " + std::to_string(port_)).c_str());
         close(server_fd);
         return;
     }
     
     if (listen(server_fd, 10) < 0) {
-        MillenniumLogger::getInstance().error("WebServer", 
+        logger_error_with_category("WebServer", 
             "Failed to listen on socket");
         close(server_fd);
         return;
@@ -189,8 +189,8 @@ void WebServer::serverLoop() {
             handleClient(client_fd);
         } else if (errno != EAGAIN && errno != EWOULDBLOCK) {
             // Log error if it's not just a non-blocking accept
-            MillenniumLogger::getInstance().error("WebServer", 
-                "Accept failed with error: " + std::to_string(errno));
+            logger_error_with_category("WebServer", 
+                ("Accept failed with error: " + std::to_string(errno)).c_str());
         }
     }
     
@@ -694,7 +694,13 @@ WebServer::HttpResponse WebServer::handleApiLogs(const HttpRequest& request) {
     std::vector<std::string> log_entries;
     
     // Always get logs from memory - they're always current and available
-    log_entries = MillenniumLogger::getInstance().getRecentLogs(max_entries);
+    char log_buffer[50][512];
+    int log_count = logger_get_recent_logs(log_buffer, max_entries);
+    
+    // Convert C array to C++ vector
+    for (int i = 0; i < log_count; i++) {
+        log_entries.push_back(std::string(log_buffer[i]));
+    }
     
     // If no log file entries, return empty logs
     if (log_entries.empty()) {

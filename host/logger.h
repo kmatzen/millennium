@@ -1,99 +1,102 @@
-#pragma once
+#ifndef LOGGER_H
+#define LOGGER_H
 
-#include <string>
-#include <fstream>
-#include <memory>
-#include <mutex>
-#include <chrono>
-#include <sstream>
-#include <vector>
+#include <stddef.h>
+#include <stdio.h>
+#include <stdarg.h>
+#include <time.h>
 
-class MillenniumLogger {
-public:
-    enum Level { 
-        VERBOSE = 0, 
-        DEBUG = 1, 
-        INFO = 2, 
-        WARN = 3, 
-        ERROR = 4 
-    };
+/* C89 compatible logging levels */
+typedef enum {
+    LOG_LEVEL_VERBOSE = 0,
+    LOG_LEVEL_DEBUG = 1,
+    LOG_LEVEL_INFO = 2,
+    LOG_LEVEL_WARN = 3,
+    LOG_LEVEL_ERROR = 4
+} log_level_t;
 
-    static MillenniumLogger& getInstance();
+/* C89 compatible logger structure */
+typedef struct {
+    log_level_t current_level;
+    char log_file[256];
+    int log_to_console;
+    int log_to_file;
+    FILE* file_stream;
     
-    // Configuration
-    void setLevel(Level level);
-    void setLogFile(const std::string& filename);
-    void setLogToConsole(bool enable);
-    void setLogToFile(bool enable);
-    
-    // Logging methods
-    void log(Level level, const std::string& message);
-    void log(Level level, const std::string& category, const std::string& message);
-    
-    // Convenience methods
-    void verbose(const std::string& message) { log(VERBOSE, message); }
-    void debug(const std::string& message) { log(DEBUG, message); }
-    void info(const std::string& message) { log(INFO, message); }
-    void warn(const std::string& message) { log(WARN, message); }
-    void error(const std::string& message) { log(ERROR, message); }
-    
-    void verbose(const std::string& category, const std::string& message) { log(VERBOSE, category, message); }
-    void debug(const std::string& category, const std::string& message) { log(DEBUG, category, message); }
-    void info(const std::string& category, const std::string& message) { log(INFO, category, message); }
-    void warn(const std::string& category, const std::string& message) { log(WARN, category, message); }
-    void error(const std::string& category, const std::string& message) { log(ERROR, category, message); }
-    
-    // Utility methods
-    static Level parseLevel(const std::string& level_str);
-    static std::string levelToString(Level level);
-    
-    // In-memory log storage
-    std::vector<std::string> getRecentLogs(int max_entries = 50) const;
-    
-    // Structured logging
-    class LogEntry {
-    public:
-        LogEntry(MillenniumLogger& logger, Level level, const std::string& category = "");
-        ~LogEntry();
-        
-        template<typename T>
-        LogEntry& operator<<(const T& value) {
-            stream_ << value;
-            return *this;
-        }
-        
-    private:
-        MillenniumLogger& logger_;
-        Level level_;
-        std::string category_;
-        std::ostringstream stream_;
-    };
-    
-    // Macro for structured logging
-    #define LOG_VERBOSE(category) MillenniumLogger::LogEntry(MillenniumLogger::getInstance(), MillenniumLogger::VERBOSE, category)
-    #define LOG_DEBUG(category) MillenniumLogger::LogEntry(MillenniumLogger::getInstance(), MillenniumLogger::DEBUG, category)
-    #define LOG_INFO(category) MillenniumLogger::LogEntry(MillenniumLogger::getInstance(), MillenniumLogger::INFO, category)
-    #define LOG_WARN(category) MillenniumLogger::LogEntry(MillenniumLogger::getInstance(), MillenniumLogger::WARN, category)
-    #define LOG_ERROR(category) MillenniumLogger::LogEntry(MillenniumLogger::getInstance(), MillenniumLogger::ERROR, category)
+    /* In-memory log storage */
+    char memory_logs[1000][512];  /* Fixed size array for C89 */
+    int memory_logs_count;
+    int memory_logs_start;  /* For circular buffer behavior */
+} logger_data_t;
 
-private:
-    MillenniumLogger() = default;
-    MillenniumLogger(const MillenniumLogger&) = delete;
-    MillenniumLogger& operator=(const MillenniumLogger&) = delete;
-    
-    Level current_level_ = INFO;
-    std::string log_file_;
-    bool log_to_console_ = true;
-    bool log_to_file_ = false;
-    std::unique_ptr<std::ofstream> file_stream_;
-    std::mutex log_mutex_;
-    
-    // In-memory log storage
-    mutable std::mutex memory_logs_mutex_;
-    std::vector<std::string> memory_logs_;
-    static const size_t MAX_MEMORY_LOGS = 1000;
-    
-    void writeLog(Level level, const std::string& category, const std::string& message);
-    std::string formatTimestamp() const;
-    std::string formatLevel(Level level) const;
-};
+/* Global logger instance */
+extern logger_data_t* g_logger;
+
+/* Function declarations */
+logger_data_t* logger_get_instance(void);
+void logger_set_level(log_level_t level);
+void logger_set_log_file(const char* filename);
+void logger_set_log_to_console(int enable);
+void logger_set_log_to_file(int enable);
+
+/* Logging methods */
+void logger_log(log_level_t level, const char* message);
+void logger_log_with_category(log_level_t level, const char* category, const char* message);
+
+/* Printf-style logging methods */
+void logger_logf(log_level_t level, const char* format, ...);
+void logger_logf_with_category(log_level_t level, const char* category, const char* format, ...);
+
+/* Convenience methods */
+void logger_verbose(const char* message);
+void logger_debug(const char* message);
+void logger_info(const char* message);
+void logger_warn(const char* message);
+void logger_error(const char* message);
+
+void logger_verbose_with_category(const char* category, const char* message);
+void logger_debug_with_category(const char* category, const char* message);
+void logger_info_with_category(const char* category, const char* message);
+void logger_warn_with_category(const char* category, const char* message);
+void logger_error_with_category(const char* category, const char* message);
+
+/* Printf-style convenience methods */
+void logger_verbosef(const char* format, ...);
+void logger_debugf(const char* format, ...);
+void logger_infof(const char* format, ...);
+void logger_warnf(const char* format, ...);
+void logger_errorf(const char* format, ...);
+
+void logger_verbosef_with_category(const char* category, const char* format, ...);
+void logger_debugf_with_category(const char* category, const char* format, ...);
+void logger_infof_with_category(const char* category, const char* format, ...);
+void logger_warnf_with_category(const char* category, const char* format, ...);
+void logger_errorf_with_category(const char* category, const char* format, ...);
+
+/* Utility methods */
+log_level_t logger_parse_level(const char* level_str);
+const char* logger_level_to_string(log_level_t level);
+
+/* In-memory log storage */
+int logger_get_recent_logs(char logs[][512], int max_entries);
+
+/* Internal functions */
+void logger_write_log(log_level_t level, const char* category, const char* message);
+void logger_format_timestamp(char* buffer, size_t buffer_size);
+const char* logger_format_level(log_level_t level);
+void logger_add_to_memory(const char* formatted_message);
+
+/* C89 compatible macros for structured logging */
+#define LOG_VERBOSE(...) logger_verbosef(__VA_ARGS__)
+#define LOG_DEBUG(...) logger_debugf(__VA_ARGS__)
+#define LOG_INFO(...) logger_infof(__VA_ARGS__)
+#define LOG_WARN(...) logger_warnf(__VA_ARGS__)
+#define LOG_ERROR(...) logger_errorf(__VA_ARGS__)
+
+#define LOG_VERBOSE_CAT(cat, ...) logger_verbosef_with_category(cat, __VA_ARGS__)
+#define LOG_DEBUG_CAT(cat, ...) logger_debugf_with_category(cat, __VA_ARGS__)
+#define LOG_INFO_CAT(cat, ...) logger_infof_with_category(cat, __VA_ARGS__)
+#define LOG_WARN_CAT(cat, ...) logger_warnf_with_category(cat, __VA_ARGS__)
+#define LOG_ERROR_CAT(cat, ...) logger_errorf_with_category(cat, __VA_ARGS__)
+
+#endif /* LOGGER_H */

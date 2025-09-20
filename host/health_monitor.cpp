@@ -1,5 +1,7 @@
 #include "health_monitor.h"
+extern "C" {
 #include "logger.h"
+}
 #include <thread>
 #include <algorithm>
 #include <sys/statvfs.h>
@@ -26,7 +28,7 @@ void HealthMonitor::registerCheck(const std::string& name,
     
     health_checks_[name] = check;
     
-    MillenniumLogger::getInstance().info("HealthMonitor", "Registered health check: " + name);
+    logger_info_with_category("HealthMonitor", ("Registered health check: " + name).c_str());
 }
 
 void HealthMonitor::unregisterCheck(const std::string& name) {
@@ -35,7 +37,7 @@ void HealthMonitor::unregisterCheck(const std::string& name) {
     auto it = health_checks_.find(name);
     if (it != health_checks_.end()) {
         health_checks_.erase(it);
-        MillenniumLogger::getInstance().info("HealthMonitor", "Unregistered health check: " + name);
+        logger_info_with_category("HealthMonitor", ("Unregistered health check: " + name).c_str());
     }
 }
 
@@ -83,7 +85,7 @@ void HealthMonitor::runCheck(const std::string& name) {
     
     auto it = health_checks_.find(name);
     if (it == health_checks_.end()) {
-        MillenniumLogger::getInstance().warn("HealthMonitor", "Health check not found: " + name);
+        logger_warn_with_category("HealthMonitor", ("Health check not found: " + name).c_str());
         return;
     }
     
@@ -98,8 +100,8 @@ void HealthMonitor::runCheck(const std::string& name) {
         updateStatistics(status);
         
         if (status != HEALTHY) {
-            MillenniumLogger::getInstance().warn("HealthMonitor", 
-                "Health check '" + name + "' returned status: " + statusToString(status));
+            logger_warn_with_category("HealthMonitor", 
+                ("Health check '" + name + "' returned status: " + statusToString(status)).c_str());
         }
     } catch (const std::exception& e) {
         check.last_status = CRITICAL;
@@ -108,8 +110,8 @@ void HealthMonitor::runCheck(const std::string& name) {
         
         updateStatistics(CRITICAL);
         
-        MillenniumLogger::getInstance().error("HealthMonitor", 
-            "Health check '" + name + "' failed: " + e.what());
+        logger_error_with_category("HealthMonitor", 
+            ("Health check '" + name + "' failed: " + e.what()).c_str());
     }
 }
 
@@ -133,8 +135,8 @@ void HealthMonitor::runAllChecks() {
             
             updateStatistics(CRITICAL);
             
-            MillenniumLogger::getInstance().error("HealthMonitor", 
-                "Health check '" + check.name + "' failed: " + e.what());
+            logger_error_with_category("HealthMonitor", 
+                ("Health check '" + check.name + "' failed: " + e.what()).c_str());
         }
     }
 }
@@ -151,14 +153,14 @@ void HealthMonitor::startMonitoring() {
     std::thread monitoring_thread(&HealthMonitor::monitoringLoop, this);
     monitoring_thread.detach();
     
-    MillenniumLogger::getInstance().info("HealthMonitor", "Health monitoring started");
+    logger_info_with_category("HealthMonitor", "Health monitoring started");
 }
 
 void HealthMonitor::stopMonitoring() {
     should_stop_ = true;
     monitoring_active_ = false;
     
-    MillenniumLogger::getInstance().info("HealthMonitor", "Health monitoring stopped");
+    logger_info_with_category("HealthMonitor", "Health monitoring stopped");
 }
 
 void HealthMonitor::monitoringLoop() {
@@ -186,8 +188,8 @@ void HealthMonitor::monitoringLoop() {
                         
                         updateStatistics(CRITICAL);
                         
-                        MillenniumLogger::getInstance().error("HealthMonitor", 
-                            "Health check '" + check.name + "' failed: " + e.what());
+                        logger_error_with_category("HealthMonitor", 
+                            ("Health check '" + check.name + "' failed: " + e.what()).c_str());
                     }
                 }
             }

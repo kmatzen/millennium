@@ -1,6 +1,8 @@
 #include "metrics_server.h"
 #include "metrics.h"
+extern "C" {
 #include "logger.h"
+}
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <unistd.h>
@@ -25,8 +27,8 @@ void MetricsServer::start() {
     
     server_thread_ = std::make_unique<std::thread>(&MetricsServer::serverLoop, this);
     
-    MillenniumLogger::getInstance().info("MetricsServer", 
-        "Metrics server started on port " + std::to_string(port_));
+    logger_info_with_category("MetricsServer", 
+        ("Metrics server started on port " + std::to_string(port_)).c_str());
 }
 
 void MetricsServer::stop() {
@@ -41,12 +43,12 @@ void MetricsServer::stop() {
         server_thread_->join();
     }
     
-    MillenniumLogger::getInstance().info("MetricsServer", "Metrics server stopped");
+    logger_info_with_category("MetricsServer", "Metrics server stopped");
 }
 
 void MetricsServer::setPort(int port) {
     if (running_.load()) {
-        MillenniumLogger::getInstance().warn("MetricsServer", 
+        logger_warn_with_category("MetricsServer", 
             "Cannot change port while server is running");
         return;
     }
@@ -56,7 +58,7 @@ void MetricsServer::setPort(int port) {
 void MetricsServer::serverLoop() {
     int server_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (server_fd < 0) {
-        MillenniumLogger::getInstance().error("MetricsServer", 
+        logger_error_with_category("MetricsServer", 
             "Failed to create socket");
         return;
     }
@@ -71,14 +73,14 @@ void MetricsServer::serverLoop() {
     address.sin_port = htons(port_);
     
     if (bind(server_fd, (struct sockaddr*)&address, sizeof(address)) < 0) {
-        MillenniumLogger::getInstance().error("MetricsServer", 
-            "Failed to bind to port " + std::to_string(port_));
+        logger_error_with_category("MetricsServer", 
+            ("Failed to bind to port " + std::to_string(port_)).c_str());
         close(server_fd);
         return;
     }
     
     if (listen(server_fd, 3) < 0) {
-        MillenniumLogger::getInstance().error("MetricsServer", 
+        logger_error_with_category("MetricsServer", 
             "Failed to listen on socket");
         close(server_fd);
         return;

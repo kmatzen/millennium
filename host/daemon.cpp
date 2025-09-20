@@ -2,7 +2,9 @@ extern "C" {
 #include "config.h"
 #include "daemon_state.h"
 }
+extern "C" {
 #include "logger.h"
+}
 #include "health_monitor.h"
 #include "metrics.h"
 #include "metrics_server.h"
@@ -76,7 +78,6 @@ std::chrono::steady_clock::time_point getDaemonStartTime() {
 // Forward declaration - will be implemented after function declarations
 bool sendControlCommand(const std::string& action);
 config_data_t* config = config_get_instance();
-MillenniumLogger& logger = MillenniumLogger::getInstance();
 HealthMonitor& health_monitor = HealthMonitor::getInstance();
 Metrics& metrics = Metrics::getInstance();
 
@@ -145,18 +146,18 @@ std::string generate_message(int inserted) {
     std::ostringstream message;
     message << "Insert " << std::setfill('0') << std::setw(2)
             << (cost_cents - inserted) << " cents";
-    logger.debug("Display", "Generated message: " + message.str());
+    logger_debug_with_category("Display", ("Generated message: " + message.str()).c_str());
     return message.str();
 }
 
 void handle_coin_event(const std::shared_ptr<CoinEvent> &coin_event) {
     if (!coin_event) {
-        logger.error("Coin", "Received null coin event");
+        logger_error_with_category("Coin", "Received null coin event");
         return;
     }
     
     if (!client) {
-        logger.error("Coin", "Client is null, cannot handle coin event");
+        logger_error_with_category("Coin", "Client is null, cannot handle coin event");
         return;
     }
     
@@ -178,8 +179,8 @@ void handle_coin_event(const std::shared_ptr<CoinEvent> &coin_event) {
         metrics.incrementCounter("coins_inserted");
         metrics.incrementCounter("coins_value_cents", coin_value);
         
-        logger.info("Coin", "Coin inserted: " + code + ", value: " + std::to_string(coin_value) + 
-                   " cents, total: " + std::to_string(daemon_state->inserted_cents) + " cents");
+        logger_info_with_category("Coin", ("Coin inserted: " + code + ", value: " + std::to_string(coin_value) + 
+                   " cents, total: " + std::to_string(daemon_state->inserted_cents) + " cents").c_str());
         
         line1 = format_number(daemon_state->keypad_buffer);
         line2 = generate_message(daemon_state->inserted_cents);
@@ -189,19 +190,19 @@ void handle_coin_event(const std::shared_ptr<CoinEvent> &coin_event) {
 
 void handle_call_state_event(const std::shared_ptr<CallStateEvent> &call_state_event) {
     if (!call_state_event) {
-        logger.error("Call", "Received null call state event");
+        logger_error_with_category("Call", "Received null call state event");
         return;
     }
     
     if (!client) {
-        logger.error("Call", "Client is null, cannot handle call state event");
+        logger_error_with_category("Call", "Client is null, cannot handle call state event");
         return;
     }
     
     if (call_state_event->get_state() == CALL_INCOMING && 
         daemon_state->current_state == DAEMON_STATE_IDLE_DOWN) {
         
-        logger.info("Call", "Incoming call received");
+        logger_info_with_category("Call", "Incoming call received");
         metrics.incrementCounter("calls_incoming");
         
         line1 = "Call incoming...";
@@ -214,7 +215,7 @@ void handle_call_state_event(const std::shared_ptr<CallStateEvent> &call_state_e
         client->writeToCoinValidator('z');
     } else if (call_state_event->get_state() == CALL_ACTIVE) {
         // Handle call established (when baresip reports CALL_ESTABLISHED)
-        logger.info("Call", "Call established - audio should be working");
+        logger_info_with_category("Call", "Call established - audio should be working");
         metrics.incrementCounter("calls_established");
         
         line1 = "Call active";
@@ -228,18 +229,18 @@ void handle_call_state_event(const std::shared_ptr<CallStateEvent> &call_state_e
 
 void handle_hook_event(const std::shared_ptr<HookStateChangeEvent> &hook_event) {
     if (!hook_event) {
-        logger.error("Hook", "Received null hook event");
+        logger_error_with_category("Hook", "Received null hook event");
         return;
     }
     
     if (!client) {
-        logger.error("Hook", "Client is null, cannot handle hook event");
+        logger_error_with_category("Hook", "Client is null, cannot handle hook event");
         return;
     }
     
     if (hook_event->get_direction() == 'U') {
         if (daemon_state->current_state == DAEMON_STATE_CALL_INCOMING) {
-            logger.info("Call", "Call answered");
+            logger_info_with_category("Call", "Call answered");
             metrics.incrementCounter("calls_answered");
             
             daemon_state->current_state = DAEMON_STATE_CALL_ACTIVE;
@@ -248,11 +249,11 @@ void handle_hook_event(const std::shared_ptr<HookStateChangeEvent> &hook_event) 
             try {
                 client->answerCall();
             } catch (const std::exception& e) {
-                logger.error("Call", "Failed to answer call: " + std::string(e.what()));
+                logger_error_with_category("Call", ("Failed to answer call: " + std::string(e.what())).c_str());
                 metrics.incrementCounter("call_answer_errors");
             }
         } else if (daemon_state->current_state == DAEMON_STATE_IDLE_DOWN) {
-            logger.info("Hook", "Hook lifted, transitioning to IDLE_UP");
+            logger_info_with_category("Hook", "Hook lifted, transitioning to IDLE_UP");
             metrics.incrementCounter("hook_lifted");
             
             daemon_state->current_state = DAEMON_STATE_IDLE_UP;
@@ -267,7 +268,7 @@ void handle_hook_event(const std::shared_ptr<HookStateChangeEvent> &hook_event) 
             client->setDisplay(generateDisplayBytes());
         }
     } else if (hook_event->get_direction() == 'D') {
-        logger.info("Hook", "Hook down, call ended");
+        logger_info_with_category("Hook", "Hook down, call ended");
         metrics.incrementCounter("hook_down");
         
         if (daemon_state->current_state == DAEMON_STATE_CALL_ACTIVE) {
@@ -277,7 +278,7 @@ void handle_hook_event(const std::shared_ptr<HookStateChangeEvent> &hook_event) 
         try {
             client->hangup();
         } catch (const std::exception& e) {
-            logger.error("Call", "Failed to hangup call: " + std::string(e.what()));
+            logger_error_with_category("Call", ("Failed to hangup call: " + std::string(e.what())).c_str());
             metrics.incrementCounter("call_hangup_errors");
         }
         
@@ -297,12 +298,12 @@ void handle_hook_event(const std::shared_ptr<HookStateChangeEvent> &hook_event) 
 
 void handle_keypad_event(const std::shared_ptr<KeypadEvent> &keypad_event) {
     if (!keypad_event) {
-        logger.error("Keypad", "Received null keypad event");
+        logger_error_with_category("Keypad", "Received null keypad event");
         return;
     }
     
     if (!client) {
-        logger.error("Keypad", "Client is null, cannot handle keypad event");
+        logger_error_with_category("Keypad", "Client is null, cannot handle keypad event");
         return;
     }
     
@@ -311,7 +312,7 @@ void handle_keypad_event(const std::shared_ptr<KeypadEvent> &keypad_event) {
         
         char key = keypad_event->get_key();
         if (std::isdigit(key)) {
-            logger.debug("Keypad", "Key pressed: " + std::string(1, key));
+            logger_debug_with_category("Keypad", ("Key pressed: " + std::string(1, key)).c_str());
             metrics.incrementCounter("keypad_presses");
             
             daemon_state_add_key(daemon_state, key);
@@ -326,7 +327,7 @@ void handle_keypad_event(const std::shared_ptr<KeypadEvent> &keypad_event) {
 
 void check_and_call() {
     if (!client) {
-        logger.error("Call", "Client is null, cannot initiate call");
+        logger_error_with_category("Call", "Client is null, cannot initiate call");
         return;
     }
     
@@ -338,7 +339,7 @@ void check_and_call() {
         
         std::string number = std::string(daemon_state->keypad_buffer);
         
-        logger.info("Call", "Dialing number: " + number);
+        logger_info_with_category("Call", ("Dialing number: " + number).c_str());
         metrics.incrementCounter("calls_initiated");
         
         line2 = "Calling";
@@ -349,7 +350,7 @@ void check_and_call() {
             daemon_state->current_state = DAEMON_STATE_CALL_ACTIVE;
             daemon_state_update_activity(daemon_state);
         } catch (const std::exception& e) {
-            logger.error("Call", "Failed to initiate call: " + std::string(e.what()));
+            logger_error_with_category("Call", ("Failed to initiate call: " + std::string(e.what())).c_str());
             metrics.incrementCounter("call_errors");
             
             line2 = "Call failed";
@@ -371,11 +372,11 @@ public:
                 it->second(event);
                 metrics.incrementCounter("events_processed");
             } catch (const std::exception& e) {
-                logger.error("EventProcessor", "Error processing event: " + std::string(e.what()));
+                logger_error_with_category("EventProcessor", ("Error processing event: " + std::string(e.what())).c_str());
                 metrics.incrementCounter("event_errors");
             }
         } else {
-            logger.warn("EventProcessor", "Unhandled event type: " + event->name());
+            logger_warn_with_category("EventProcessor", ("Unhandled event type: " + event->name()).c_str());
             metrics.incrementCounter("unhandled_events");
         }
         
@@ -424,17 +425,17 @@ private:
 // Implementation of sendControlCommand (moved here to access display functions)
 bool sendControlCommand(const std::string& action) {
     if (!daemon_state) {
-        MillenniumLogger::getInstance().error("Control", "Daemon state is null");
+        logger_error_with_category("Control", "Daemon state is null");
         return false;
     }
     
     if (!event_processor) {
-        MillenniumLogger::getInstance().error("Control", "Event processor is null");
+        logger_error_with_category("Control", "Event processor is null");
         return false;
     }
     
     try {
-        MillenniumLogger::getInstance().info("Control", "Received control command: " + action);
+        logger_info_with_category("Control", ("Received control command: " + action).c_str());
         std::cout << "[CONTROL] Received command: " << action << std::endl;
         
         // Parse command and arguments
@@ -447,7 +448,7 @@ bool sendControlCommand(const std::string& action) {
             daemon_state_update_activity(daemon_state);
             Metrics::getInstance().setGauge("current_state", static_cast<double>(daemon_state->current_state));
             Metrics::getInstance().incrementCounter("calls_initiated");
-            MillenniumLogger::getInstance().info("Control", "Call initiation requested via web portal");
+            logger_info_with_category("Control", "Call initiation requested via web portal");
             return true;
             
         } else if (command == "reset_system") {
@@ -456,7 +457,7 @@ bool sendControlCommand(const std::string& action) {
             Metrics::getInstance().setGauge("current_state", static_cast<double>(daemon_state->current_state));
             Metrics::getInstance().setGauge("inserted_cents", 0.0);
             Metrics::getInstance().incrementCounter("system_resets");
-            MillenniumLogger::getInstance().info("Control", "System reset requested via web portal");
+            logger_info_with_category("Control", "System reset requested via web portal");
             return true;
             
         } else if (command == "emergency_stop") {
@@ -465,7 +466,7 @@ bool sendControlCommand(const std::string& action) {
             daemon_state_update_activity(daemon_state);
             Metrics::getInstance().setGauge("current_state", static_cast<double>(daemon_state->current_state));
             Metrics::getInstance().incrementCounter("emergency_stops");
-            MillenniumLogger::getInstance().warn("Control", "Emergency stop activated via web portal");
+            logger_warn_with_category("Control", "Emergency stop activated via web portal");
             // Note: We don't actually stop the daemon, just set it to invalid state
             return true;
         } else if (command == "keypad_press") {
@@ -474,10 +475,10 @@ bool sendControlCommand(const std::string& action) {
             if (std::isdigit(key[0])) {
                 auto keypad_event = std::make_shared<KeypadEvent>(key[0]);
                 event_processor->process_event(keypad_event);
-                MillenniumLogger::getInstance().info("Control", "Keypad key '" + key + "' pressed via web portal");
+                logger_info_with_category("Control", ("Keypad key '" + key + "' pressed via web portal").c_str());
                 return true;
             } else {
-                MillenniumLogger::getInstance().warn("Control", "Invalid keypad key: " + key);
+                logger_warn_with_category("Control", ("Invalid keypad key: " + key).c_str());
                 return false;
             }
         } else if (command == "keypad_clear") {
@@ -486,7 +487,7 @@ bool sendControlCommand(const std::string& action) {
                 daemon_state_clear_keypad(daemon_state);
                 daemon_state_update_activity(daemon_state);
                 Metrics::getInstance().incrementCounter("keypad_clears");
-                MillenniumLogger::getInstance().info("Control", "Keypad cleared via web portal");
+                logger_info_with_category("Control", "Keypad cleared via web portal");
                 
                 // Update physical display
                 line1 = format_number(daemon_state->keypad_buffer);
@@ -495,7 +496,7 @@ bool sendControlCommand(const std::string& action) {
                 
                 return true;
             } else {
-                MillenniumLogger::getInstance().warn("Control", "Keypad clear ignored - handset down");
+                logger_warn_with_category("Control", "Keypad clear ignored - handset down");
                 return false;
             }
         } else if (command == "keypad_backspace") {
@@ -504,7 +505,7 @@ bool sendControlCommand(const std::string& action) {
                 daemon_state_remove_last_key(daemon_state);
                 daemon_state_update_activity(daemon_state);
                 Metrics::getInstance().incrementCounter("keypad_backspaces");
-                MillenniumLogger::getInstance().info("Control", "Keypad backspace via web portal");
+                logger_info_with_category("Control", "Keypad backspace via web portal");
                 
                 // Update physical display
                 line1 = format_number(daemon_state->keypad_buffer);
@@ -513,13 +514,13 @@ bool sendControlCommand(const std::string& action) {
                 
                 return true;
             } else {
-                MillenniumLogger::getInstance().warn("Control", "Keypad backspace ignored - handset down or buffer empty");
+                logger_warn_with_category("Control", "Keypad backspace ignored - handset down or buffer empty");
                 return false;
             }
         } else if (command == "coin_insert") {
             // Extract cents from argument and inject as coin event
             std::string cents_str = arg;
-            MillenniumLogger::getInstance().info("Control", "Extracted cents string: '" + cents_str + "'");
+            logger_info_with_category("Control", ("Extracted cents string: '" + cents_str + "'").c_str());
             std::cout << "[CONTROL] Extracted cents: '" << cents_str << "'" << std::endl;
             
             try {
@@ -534,18 +535,18 @@ bool sendControlCommand(const std::string& action) {
                 } else if (cents == 25) {
                     coin_code = 0x38; // COIN_8
                 } else {
-                    MillenniumLogger::getInstance().warn("Control", "Invalid coin value: " + cents_str + "¢");
+                    logger_warn_with_category("Control", ("Invalid coin value: " + cents_str + "¢").c_str());
                     return false;
                 }
                 
                 auto coin_event = std::make_shared<CoinEvent>(coin_code);
                 event_processor->process_event(coin_event);
-                MillenniumLogger::getInstance().info("Control", "Coin inserted: " + cents_str + "¢ via web portal");
+                logger_info_with_category("Control", ("Coin inserted: " + cents_str + "¢ via web portal").c_str());
                 std::cout << "[CONTROL] Coin inserted successfully: " << cents << "¢" << std::endl;
                 
                 return true;
             } catch (const std::exception& e) {
-                MillenniumLogger::getInstance().error("Control", "Failed to parse cents: " + std::string(e.what()));
+                logger_error_with_category("Control", ("Failed to parse cents: " + std::string(e.what())).c_str());
                 std::cout << "[CONTROL] ERROR: Failed to parse cents: " << e.what() << std::endl;
                 return false;
             }
@@ -554,7 +555,7 @@ bool sendControlCommand(const std::string& action) {
             daemon_state_update_activity(daemon_state);
             Metrics::getInstance().setGauge("inserted_cents", 0.0);
             Metrics::getInstance().incrementCounter("coin_returns");
-            MillenniumLogger::getInstance().info("Control", "Coins returned via web portal");
+            logger_info_with_category("Control", "Coins returned via web portal");
             
             // Update physical display
             line1 = format_number(daemon_state->keypad_buffer);
@@ -566,17 +567,17 @@ bool sendControlCommand(const std::string& action) {
             // Inject as hook event
             auto hook_event = std::make_shared<HookStateChangeEvent>('U');
             event_processor->process_event(hook_event);
-            MillenniumLogger::getInstance().info("Control", "Handset lifted via web portal");
+            logger_info_with_category("Control", "Handset lifted via web portal");
             return true;
         } else if (command == "handset_down") {
             // Inject as hook event
             auto hook_event = std::make_shared<HookStateChangeEvent>('D');
             event_processor->process_event(hook_event);
-            MillenniumLogger::getInstance().info("Control", "Handset placed down via web portal");
+            logger_info_with_category("Control", "Handset placed down via web portal");
             return true;
         }
     } catch (const std::exception& e) {
-        MillenniumLogger::getInstance().error("Control", "Error executing control command: " + std::string(e.what()));
+        logger_error_with_category("Control", ("Error executing control command: " + std::string(e.what())).c_str());
     }
     
     return false;
@@ -585,7 +586,7 @@ bool sendControlCommand(const std::string& action) {
 // Signal handler
 void signal_handler(int signal) {
     if (signal == SIGINT || signal == SIGTERM) {
-        logger.info("Daemon", "Received signal " + std::to_string(signal) + ", shutting down gracefully...");
+        logger_info_with_category("Daemon", ("Received signal " + std::to_string(signal) + ", shutting down gracefully...").c_str());
         running = false;
     }
 }
@@ -664,29 +665,29 @@ int main(int argc, char *argv[]) {
         }
         
         if (!config_load_from_file(config, config_file.c_str())) {
-            logger.warn("Config", "Could not load config file: " + config_file + ", using environment variables");
+            logger_warn_with_category("Config", ("Could not load config file: " + config_file + ", using environment variables").c_str());
             config_load_from_environment(config);
         }
         
         if (!config_validate(config)) {
-            logger.error("Config", "Configuration validation failed");
+            logger_error_with_category("Config", "Configuration validation failed");
             return 1;
         }
         
         // Setup logging
-        logger.setLevel(MillenniumLogger::parseLevel(config_get_log_level(config)));
+        logger_set_level(logger_parse_level(config_get_log_level(config)));
         if (config_get_log_to_file(config) && strlen(config_get_log_file(config)) > 0) {
 	    std::cerr << "Logging to " << config_get_log_file(config) << std::endl;
-            logger.setLogFile(config_get_log_file(config));
-            logger.setLogToFile(true);
+            logger_set_log_file(config_get_log_file(config));
+            logger_set_log_to_file(1);
         }
         
-        logger.info("Daemon", "Starting Millennium Daemon");
+        logger_info_with_category("Daemon", "Starting Millennium Daemon");
         
         // Initialize daemon state
         daemon_state = (daemon_state_data_t*)malloc(sizeof(daemon_state_data_t));
         if (!daemon_state) {
-            logger.error("Daemon", "Failed to allocate daemon state memory");
+            logger_error_with_category("Daemon", "Failed to allocate daemon state memory");
             return 1;
         }
         daemon_state_init(daemon_state);
@@ -704,10 +705,10 @@ int main(int argc, char *argv[]) {
         if (config_get_metrics_server_enabled(config)) {
             metrics_server = std::make_unique<MetricsServer>(config_get_metrics_server_port(config));
             metrics_server->start();
-            logger.info("Daemon", "Metrics server started on port " + 
-                       std::to_string(config_get_metrics_server_port(config)));
+            logger_info_with_category("Daemon", ("Metrics server started on port " + 
+                       std::to_string(config_get_metrics_server_port(config))).c_str());
         } else {
-            logger.info("Daemon", "Metrics server disabled");
+            logger_info_with_category("Daemon", "Metrics server disabled");
         }
         
         // Start web server if enabled
@@ -722,15 +723,15 @@ int main(int argc, char *argv[]) {
                 web_server->addStaticRoute("/", portal_content, "text/html");
                 portal_file.close();
             } else {
-                logger.warn("WebServer", "Could not load web_portal.html, serving basic interface");
+                logger_warn_with_category("WebServer", "Could not load web_portal.html, serving basic interface");
                 web_server->addStaticRoute("/", "<h1>Millennium System Portal</h1><p>Web portal not available</p>", "text/html");
             }
             
             web_server->start();
-            logger.info("Daemon", "Web server started on port " + 
-                       std::to_string(config_get_web_server_port(config)));
+            logger_info_with_category("Daemon", ("Web server started on port " + 
+                       std::to_string(config_get_web_server_port(config))).c_str());
         } else {
-            logger.info("Daemon", "Web server disabled");
+            logger_info_with_category("Daemon", "Web server disabled");
         }
         
         // Start metrics collection thread (disabled for single-core optimization)
@@ -744,7 +745,7 @@ int main(int argc, char *argv[]) {
         // Initialize event processor
         event_processor = std::make_unique<EventProcessor>();
         
-        logger.info("Daemon", "Daemon initialized successfully");
+        logger_info_with_category("Daemon", "Daemon initialized successfully");
         
         // Main event loop
         int loop_count = 0;
@@ -774,7 +775,7 @@ int main(int argc, char *argv[]) {
                 
                 // Log metrics summary every 10000 loops (about every 10 seconds) at DEBUG level
                 if (loop_count % 10000 == 0) {
-                    logger.debug("Metrics", "=== Metrics Summary ===");
+                    logger_debug_with_category("Metrics", "=== Metrics Summary ===");
                     
                     // Log only significant counters (non-zero)
                     auto counters = metrics.getAllCounters();
@@ -786,18 +787,18 @@ int main(int argc, char *argv[]) {
                     }
                     
                     if (active_counters > 0) {
-                        logger.debug("Metrics", "Active counters: " + std::to_string(active_counters));
+                        logger_debug_with_category("Metrics", ("Active counters: " + std::to_string(active_counters)).c_str());
                     }
                     
                     // Log current state gauge
                     auto gauges = metrics.getAllGauges();
                     auto state_it = gauges.find("current_state");
                     if (state_it != gauges.end()) {
-                        logger.debug("Metrics", "Current state: " + std::to_string(state_it->second));
+                        logger_debug_with_category("Metrics", ("Current state: " + std::to_string(state_it->second)).c_str());
                     }
                 }
             } catch (const std::exception& e) {
-                logger.error("Daemon", "Error in main loop: " + std::string(e.what()));
+                logger_error_with_category("Daemon", ("Error in main loop: " + std::string(e.what())).c_str());
                 metrics.incrementCounter("main_loop_errors");
                 
                 // Wait a bit before continuing to prevent rapid error loops
@@ -806,7 +807,7 @@ int main(int argc, char *argv[]) {
         }
         
         // Cleanup
-        logger.info("Daemon", "Shutting down daemon");
+        logger_info_with_category("Daemon", "Shutting down daemon");
         
         // Stop metrics server
         if (metrics_server) {
@@ -828,10 +829,10 @@ int main(int argc, char *argv[]) {
             daemon_state = nullptr;
         }
         
-        logger.info("Daemon", "Daemon shutdown complete");
+        logger_info_with_category("Daemon", "Daemon shutdown complete");
         
     } catch (const std::exception& e) {
-        logger.error("Daemon", "Fatal error: " + std::string(e.what()));
+        logger_error_with_category("Daemon", ("Fatal error: " + std::string(e.what())).c_str());
         return 1;
     }
     
