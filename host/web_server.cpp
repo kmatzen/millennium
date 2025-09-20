@@ -2,9 +2,11 @@
 extern "C" {
 #include "config.h"
 #include "logger.h"
-}
 #include "metrics.h"
+}
+extern "C" {
 #include "health_monitor.h"
+}
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -434,34 +436,14 @@ WebServer::HttpResponse WebServer::handleApiMetrics(const HttpRequest& request) 
     HttpResponse response;
     response.content_type = "application/json";
     
-    Metrics& metrics = Metrics::getInstance();
-    
-    std::ostringstream json;
-    json << "{";
-    json << "\"counters\":{";
-    
-    auto counters = metrics.getAllCounters();
-    bool first = true;
-    for (const auto& pair : counters) {
-        if (!first) json << ",";
-        json << "\"" << pair.first << "\":" << pair.second;
-        first = false;
+    /* Use C89 metrics API - simplified version */
+    char *json_data = metrics_export_json();
+    if (json_data) {
+        response.body = std::string(json_data);
+        free(json_data);
+    } else {
+        response.body = "{\"error\":\"Failed to export metrics\"}";
     }
-    json << "},";
-    
-    json << "\"gauges\":{";
-    auto gauges = metrics.getAllGauges();
-    first = true;
-    for (const auto& pair : gauges) {
-        if (!first) json << ",";
-        json << "\"" << pair.first << "\":" << pair.second;
-        first = false;
-    }
-    json << "}";
-    
-    json << "}";
-    
-    response.body = json.str();
     return response;
 }
 
@@ -469,23 +451,22 @@ WebServer::HttpResponse WebServer::handleApiHealth(const HttpRequest& request) {
     HttpResponse response;
     response.content_type = "application/json";
     
-    HealthMonitor& health_monitor = HealthMonitor::getInstance();
-    auto overall_status = health_monitor.getOverallStatus();
-    auto checks = health_monitor.getAllChecks();
+    health_status_t overall_status = health_monitor_get_overall_status();
+    health_check_t checks[32];
+    int checks_count = health_monitor_get_all_checks(checks, 32);
     
     std::ostringstream json;
     json << "{";
-    json << "\"overall_status\":\"" << HealthMonitor::statusToString(overall_status) << "\",";
+    json << "\"overall_status\":\"" << health_monitor_status_to_string(overall_status) << "\",";
     json << "\"checks\":{";
     
     bool first = true;
-    for (const auto& pair : checks) {
+    for (int i = 0; i < checks_count; i++) {
         if (!first) json << ",";
-        json << "\"" << pair.first << "\":{";
-        json << "\"status\":\"" << HealthMonitor::statusToString(pair.second.last_status) << "\",";
-        json << "\"message\":\"" << pair.second.last_message << "\",";
-        json << "\"last_check\":" << std::chrono::duration_cast<std::chrono::seconds>(
-            pair.second.last_check.time_since_epoch()).count();
+        json << "\"" << checks[i].name << "\":{";
+        json << "\"status\":\"" << health_monitor_status_to_string(checks[i].last_status) << "\",";
+        json << "\"message\":\"" << checks[i].last_message << "\",";
+        json << "\"last_check\":" << checks[i].last_check_time;
         json << "}";
         first = false;
     }

@@ -15,14 +15,14 @@ daemon_state.o: daemon_state.c daemon_state.h
 logger.o: logger.c logger.h
 	gcc logger.c -o logger.o -c $(CFLAGS)
 
-health_monitor.o: health_monitor.cpp health_monitor.h logger.h
-	g++ health_monitor.cpp -o health_monitor.o -c $(CXXFLAGS)
+health_monitor.o: health_monitor.c health_monitor.h logger.h
+	gcc health_monitor.c -o health_monitor.o -c $(CFLAGS) -lpthread
 
-metrics.o: metrics.cpp metrics.h
-	g++ metrics.cpp -o metrics.o -c $(CXXFLAGS)
+metrics.o: metrics.c metrics.h
+	gcc metrics.c -o metrics.o -c $(CFLAGS)
 
-metrics_server.o: metrics_server.cpp metrics_server.h metrics.h logger.h
-	g++ metrics_server.cpp -o metrics_server.o -c -std=c++17 -Wall -Wextra
+metrics_server.o: metrics_server.c metrics_server.h metrics.h logger.h
+	gcc metrics_server.c -o metrics_server.o -c $(CFLAGS) -lpthread
 
 web_server.o: web_server.cpp web_server.h config.h logger.h metrics.h health_monitor.h
 	g++ web_server.cpp -o web_server.o -c $(CXXFLAGS)
@@ -41,16 +41,16 @@ tests.o: tests.cpp test_framework.h config.h logger.h metrics.h
 
 # Executables
 daemon: daemon.o daemon_state.o millennium_sdk.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o
-	g++ daemon.o daemon_state.o millennium_sdk.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o -o daemon $(LDFLAGS)
+	gcc daemon.o daemon_state.o millennium_sdk.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o -o daemon $(LDFLAGS) -lstdc++
 
 tests: tests.o test_framework.o config.o logger.o metrics.o
-	g++ tests.o test_framework.o config.o logger.o metrics.o -o tests $(LDFLAGS)
+	gcc tests.o test_framework.o config.o logger.o metrics.o -o tests $(LDFLAGS) -lstdc++
 
 metrics_viewer.o: metrics_viewer.cpp config.h logger.h metrics.h
 	g++ metrics_viewer.cpp -o metrics_viewer.o -c $(CXXFLAGS)
 
 metrics_viewer: metrics_viewer.o config.o logger.o metrics.o
-	g++ metrics_viewer.o config.o logger.o metrics.o -o metrics_viewer $(LDFLAGS)
+	gcc metrics_viewer.o config.o logger.o metrics.o -o metrics_viewer $(LDFLAGS) -lstdc++
 
 all: daemon tests metrics_viewer
 

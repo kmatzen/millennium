@@ -1,13 +1,13 @@
 extern "C" {
 #include "config.h"
 #include "daemon_state.h"
-}
-extern "C" {
 #include "logger.h"
-}
-#include "health_monitor.h"
 #include "metrics.h"
 #include "metrics_server.h"
+}
+extern "C" {
+#include "health_monitor.h"
+}
 #include "web_server.h"
 #include "millennium_sdk.h"
 #include <atomic>
@@ -38,7 +38,7 @@ class EventProcessor;
 std::atomic<bool> running(true);
 daemon_state_data_t* daemon_state = nullptr;  // C pointer instead of unique_ptr
 std::unique_ptr<MillenniumClient> client;
-std::unique_ptr<MetricsServer> metrics_server;
+metrics_server_t *metrics_server = nullptr;
 std::unique_ptr<WebServer> web_server;
 std::unique_ptr<EventProcessor> event_processor;
 
@@ -78,8 +78,8 @@ std::chrono::steady_clock::time_point getDaemonStartTime() {
 // Forward declaration - will be implemented after function declarations
 bool sendControlCommand(const std::string& action);
 config_data_t* config = config_get_instance();
-HealthMonitor& health_monitor = HealthMonitor::getInstance();
-Metrics& metrics = Metrics::getInstance();
+health_monitor_t* health_monitor = health_monitor_get_instance();
+// Metrics instance is now global g_metrics
 
 // Display management
 std::string line1;
@@ -176,8 +176,8 @@ void handle_coin_event(const std::shared_ptr<CoinEvent> &coin_event) {
         daemon_state->inserted_cents += coin_value;
         daemon_state_update_activity(daemon_state);
         
-        metrics.incrementCounter("coins_inserted");
-        metrics.incrementCounter("coins_value_cents", coin_value);
+        metrics_increment_counter("coins_inserted", 1);
+        metrics_increment_counter("coins_value_cents", coin_value);
         
         logger_info_with_category("Coin", ("Coin inserted: " + code + ", value: " + std::to_string(coin_value) + 
                    " cents, total: " + std::to_string(daemon_state->inserted_cents) + " cents").c_str());
@@ -203,7 +203,7 @@ void handle_call_state_event(const std::shared_ptr<CallStateEvent> &call_state_e
         daemon_state->current_state == DAEMON_STATE_IDLE_DOWN) {
         
         logger_info_with_category("Call", "Incoming call received");
-        metrics.incrementCounter("calls_incoming");
+        metrics_increment_counter("calls_incoming", 1);
         
         line1 = "Call incoming...";
         client->setDisplay(generateDisplayBytes());
@@ -216,7 +216,7 @@ void handle_call_state_event(const std::shared_ptr<CallStateEvent> &call_state_e
     } else if (call_state_event->get_state() == CALL_ACTIVE) {
         // Handle call established (when baresip reports CALL_ESTABLISHED)
         logger_info_with_category("Call", "Call established - audio should be working");
-        metrics.incrementCounter("calls_established");
+        metrics_increment_counter("calls_established", 1);
         
         line1 = "Call active";
         line2 = "Audio connected";
@@ -241,7 +241,7 @@ void handle_hook_event(const std::shared_ptr<HookStateChangeEvent> &hook_event) 
     if (hook_event->get_direction() == 'U') {
         if (daemon_state->current_state == DAEMON_STATE_CALL_INCOMING) {
             logger_info_with_category("Call", "Call answered");
-            metrics.incrementCounter("calls_answered");
+            metrics_increment_counter("calls_answered", 1);
             
             daemon_state->current_state = DAEMON_STATE_CALL_ACTIVE;
             daemon_state_update_activity(daemon_state);
@@ -250,11 +250,11 @@ void handle_hook_event(const std::shared_ptr<HookStateChangeEvent> &hook_event) 
                 client->answerCall();
             } catch (const std::exception& e) {
                 logger_error_with_category("Call", ("Failed to answer call: " + std::string(e.what())).c_str());
-                metrics.incrementCounter("call_answer_errors");
+                metrics_increment_counter("call_answer_errors", 1);
             }
         } else if (daemon_state->current_state == DAEMON_STATE_IDLE_DOWN) {
             logger_info_with_category("Hook", "Hook lifted, transitioning to IDLE_UP");
-            metrics.incrementCounter("hook_lifted");
+            metrics_increment_counter("hook_lifted", 1);
             
             daemon_state->current_state = DAEMON_STATE_IDLE_UP;
             daemon_state_update_activity(daemon_state);
@@ -269,17 +269,17 @@ void handle_hook_event(const std::shared_ptr<HookStateChangeEvent> &hook_event) 
         }
     } else if (hook_event->get_direction() == 'D') {
         logger_info_with_category("Hook", "Hook down, call ended");
-        metrics.incrementCounter("hook_down");
+        metrics_increment_counter("hook_down", 1);
         
         if (daemon_state->current_state == DAEMON_STATE_CALL_ACTIVE) {
-            metrics.incrementCounter("calls_ended");
+            metrics_increment_counter("calls_ended", 1);
         }
         
         try {
             client->hangup();
         } catch (const std::exception& e) {
             logger_error_with_category("Call", ("Failed to hangup call: " + std::string(e.what())).c_str());
-            metrics.incrementCounter("call_hangup_errors");
+            metrics_increment_counter("call_hangup_errors", 1);
         }
         
         daemon_state_clear_keypad(daemon_state);
@@ -313,7 +313,7 @@ void handle_keypad_event(const std::shared_ptr<KeypadEvent> &keypad_event) {
         char key = keypad_event->get_key();
         if (std::isdigit(key)) {
             logger_debug_with_category("Keypad", ("Key pressed: " + std::string(1, key)).c_str());
-            metrics.incrementCounter("keypad_presses");
+            metrics_increment_counter("keypad_presses", 1);
             
             daemon_state_add_key(daemon_state, key);
             daemon_state_update_activity(daemon_state);
@@ -340,7 +340,7 @@ void check_and_call() {
         std::string number = std::string(daemon_state->keypad_buffer);
         
         logger_info_with_category("Call", ("Dialing number: " + number).c_str());
-        metrics.incrementCounter("calls_initiated");
+        metrics_increment_counter("calls_initiated", 1);
         
         line2 = "Calling";
         client->setDisplay(generateDisplayBytes());
@@ -351,7 +351,7 @@ void check_and_call() {
             daemon_state_update_activity(daemon_state);
         } catch (const std::exception& e) {
             logger_error_with_category("Call", ("Failed to initiate call: " + std::string(e.what())).c_str());
-            metrics.incrementCounter("call_errors");
+            metrics_increment_counter("call_errors", 1);
             
             line2 = "Call failed";
             client->setDisplay(generateDisplayBytes());
@@ -370,14 +370,14 @@ public:
         if (it != dispatcher.end()) {
             try {
                 it->second(event);
-                metrics.incrementCounter("events_processed");
+                metrics_increment_counter("events_processed", 1);
             } catch (const std::exception& e) {
                 logger_error_with_category("EventProcessor", ("Error processing event: " + std::string(e.what())).c_str());
-                metrics.incrementCounter("event_errors");
+                metrics_increment_counter("event_errors", 1);
             }
         } else {
             logger_warn_with_category("EventProcessor", ("Unhandled event type: " + event->name()).c_str());
-            metrics.incrementCounter("unhandled_events");
+            metrics_increment_counter("unhandled_events", 1);
         }
         
         // Always check side effects after processing any event
@@ -446,17 +446,17 @@ bool sendControlCommand(const std::string& action) {
             // Simulate starting a call by changing state
             daemon_state->current_state = DAEMON_STATE_CALL_INCOMING;
             daemon_state_update_activity(daemon_state);
-            Metrics::getInstance().setGauge("current_state", static_cast<double>(daemon_state->current_state));
-            Metrics::getInstance().incrementCounter("calls_initiated");
+            metrics_set_gauge("current_state", static_cast<double>(daemon_state->current_state));
+            metrics_increment_counter("calls_initiated", 1);
             logger_info_with_category("Control", "Call initiation requested via web portal");
             return true;
             
         } else if (command == "reset_system") {
             // Reset the system state
             daemon_state_reset(daemon_state);
-            Metrics::getInstance().setGauge("current_state", static_cast<double>(daemon_state->current_state));
-            Metrics::getInstance().setGauge("inserted_cents", 0.0);
-            Metrics::getInstance().incrementCounter("system_resets");
+            metrics_set_gauge("current_state", static_cast<double>(daemon_state->current_state));
+            metrics_set_gauge("inserted_cents", 0.0);
+            metrics_increment_counter("system_resets", 1);
             logger_info_with_category("Control", "System reset requested via web portal");
             return true;
             
@@ -464,8 +464,8 @@ bool sendControlCommand(const std::string& action) {
             // Emergency stop - set to invalid state and stop running
             daemon_state->current_state = DAEMON_STATE_INVALID;
             daemon_state_update_activity(daemon_state);
-            Metrics::getInstance().setGauge("current_state", static_cast<double>(daemon_state->current_state));
-            Metrics::getInstance().incrementCounter("emergency_stops");
+            metrics_set_gauge("current_state", static_cast<double>(daemon_state->current_state));
+            metrics_increment_counter("emergency_stops", 1);
             logger_warn_with_category("Control", "Emergency stop activated via web portal");
             // Note: We don't actually stop the daemon, just set it to invalid state
             return true;
@@ -486,7 +486,7 @@ bool sendControlCommand(const std::string& action) {
             if (daemon_state->current_state == DAEMON_STATE_IDLE_UP) {
                 daemon_state_clear_keypad(daemon_state);
                 daemon_state_update_activity(daemon_state);
-                Metrics::getInstance().incrementCounter("keypad_clears");
+                metrics_increment_counter("keypad_clears", 1);
                 logger_info_with_category("Control", "Keypad cleared via web portal");
                 
                 // Update physical display
@@ -504,7 +504,7 @@ bool sendControlCommand(const std::string& action) {
             if (daemon_state->current_state == DAEMON_STATE_IDLE_UP && daemon_state_get_keypad_length(daemon_state) > 0) {
                 daemon_state_remove_last_key(daemon_state);
                 daemon_state_update_activity(daemon_state);
-                Metrics::getInstance().incrementCounter("keypad_backspaces");
+                metrics_increment_counter("keypad_backspaces", 1);
                 logger_info_with_category("Control", "Keypad backspace via web portal");
                 
                 // Update physical display
@@ -553,8 +553,8 @@ bool sendControlCommand(const std::string& action) {
         } else if (command == "coin_return") {
             daemon_state->inserted_cents = 0;
             daemon_state_update_activity(daemon_state);
-            Metrics::getInstance().setGauge("inserted_cents", 0.0);
-            Metrics::getInstance().incrementCounter("coin_returns");
+            metrics_set_gauge("inserted_cents", 0.0);
+            metrics_increment_counter("coin_returns", 1);
             logger_info_with_category("Control", "Coins returned via web portal");
             
             // Update physical display
@@ -592,38 +592,31 @@ void signal_handler(int signal) {
 }
 
 // Health check functions
-HealthMonitor::Status checkSerialConnection() {
+health_status_t checkSerialConnection() {
     // This would check if the serial connection is working
     // For now, we'll return healthy
-    return HealthMonitor::HEALTHY;
+    return HEALTH_STATUS_HEALTHY;
 }
 
-HealthMonitor::Status checkSipConnection() {
+health_status_t checkSipConnection() {
     // This would check if the SIP connection is active
     // For now, we'll return healthy
-    return HealthMonitor::HEALTHY;
+    return HEALTH_STATUS_HEALTHY;
 }
 
-HealthMonitor::Status checkDaemonActivity() {
+health_status_t checkDaemonActivity() {
     if (!daemon_state) {
-        return HealthMonitor::CRITICAL;
+        return HEALTH_STATUS_CRITICAL;
     }
     
-    auto now = std::chrono::steady_clock::now();
+    time_t now = time(NULL);
+    time_t time_since_activity = now - daemon_state->last_activity;
     
-    // Convert time_t to chrono time_point
-    auto last_activity = std::chrono::steady_clock::time_point(
-        std::chrono::seconds(daemon_state->last_activity)
-    );
-    
-    auto time_since_activity = std::chrono::duration_cast<std::chrono::minutes>(
-        now - last_activity);
-    
-    if (time_since_activity.count() > 60) { // No activity for more than 1 hour
-        return HealthMonitor::WARNING;
+    if (time_since_activity > 3600) { // No activity for more than 1 hour
+        return HEALTH_STATUS_WARNING;
     }
     
-    return HealthMonitor::HEALTHY;
+    return HEALTH_STATUS_HEALTHY;
 }
 
 // Metrics collection thread
@@ -637,13 +630,13 @@ void metrics_collection_thread() {
         }
         
         // Update system metrics
-        metrics.setGauge("daemon_uptime_seconds", 
+        metrics_set_gauge("daemon_uptime_seconds", 
             std::chrono::duration_cast<std::chrono::seconds>(
                 std::chrono::steady_clock::now().time_since_epoch()).count());
         
-        metrics.setGauge("current_state", static_cast<double>(daemon_state->current_state));
-        metrics.setGauge("inserted_cents", static_cast<double>(daemon_state->inserted_cents));
-        metrics.setGauge("keypad_buffer_size", static_cast<double>(daemon_state_get_keypad_length(daemon_state)));
+        metrics_set_gauge("current_state", static_cast<double>(daemon_state->current_state));
+        metrics_set_gauge("inserted_cents", static_cast<double>(daemon_state->inserted_cents));
+        metrics_set_gauge("keypad_buffer_size", static_cast<double>(daemon_state_get_keypad_length(daemon_state)));
         
         std::this_thread::sleep_for(std::chrono::seconds(10));
     }
@@ -692,19 +685,27 @@ int main(int argc, char *argv[]) {
         }
         daemon_state_init(daemon_state);
         
+        // Initialize metrics
+        if (metrics_init() != 0) {
+            logger_error_with_category("Daemon", "Failed to initialize metrics");
+            return 1;
+        }
+        
         // Initialize client
         client = std::make_unique<MillenniumClient>();
         
         // Initialize health monitoring
-        health_monitor.registerCheck("serial_connection", checkSerialConnection, std::chrono::seconds(30));
-        health_monitor.registerCheck("sip_connection", checkSipConnection, std::chrono::seconds(60));
-        health_monitor.registerCheck("daemon_activity", checkDaemonActivity, std::chrono::seconds(120));
-        health_monitor.startMonitoring();
+        health_monitor_register_check("serial_connection", checkSerialConnection, 30);
+        health_monitor_register_check("sip_connection", checkSipConnection, 60);
+        health_monitor_register_check("daemon_activity", checkDaemonActivity, 120);
+        health_monitor_start_monitoring();
         
         // Start metrics server if enabled
         if (config_get_metrics_server_enabled(config)) {
-            metrics_server = std::make_unique<MetricsServer>(config_get_metrics_server_port(config));
-            metrics_server->start();
+            metrics_server = metrics_server_create(config_get_metrics_server_port(config));
+            if (metrics_server) {
+                metrics_server_start(metrics_server);
+            }
             logger_info_with_category("Daemon", ("Metrics server started on port " + 
                        std::to_string(config_get_metrics_server_port(config))).c_str());
         } else {
@@ -762,14 +763,14 @@ int main(int argc, char *argv[]) {
                 // Update metrics in main loop (every 1000 loops = ~1 second)
                 if (++loop_count % 1000 == 0) {
                     // Update system metrics (moved from separate thread)
-                    metrics.setGauge("daemon_uptime_seconds", 
+                    metrics_set_gauge("daemon_uptime_seconds", 
                         std::chrono::duration_cast<std::chrono::seconds>(
                             std::chrono::steady_clock::now() - daemon_start_time).count());
                     
                     if (daemon_state) {
-                        metrics.setGauge("current_state", static_cast<double>(daemon_state->current_state));
-                        metrics.setGauge("inserted_cents", static_cast<double>(daemon_state->inserted_cents));
-                        metrics.setGauge("keypad_buffer_size", static_cast<double>(daemon_state_get_keypad_length(daemon_state)));
+                        metrics_set_gauge("current_state", static_cast<double>(daemon_state->current_state));
+                        metrics_set_gauge("inserted_cents", static_cast<double>(daemon_state->inserted_cents));
+                        metrics_set_gauge("keypad_buffer_size", static_cast<double>(daemon_state_get_keypad_length(daemon_state)));
                     }
                 }
                 
@@ -777,29 +778,13 @@ int main(int argc, char *argv[]) {
                 if (loop_count % 10000 == 0) {
                     logger_debug_with_category("Metrics", "=== Metrics Summary ===");
                     
-                    // Log only significant counters (non-zero)
-                    auto counters = metrics.getAllCounters();
-                    int active_counters = 0;
-                    for (const auto& pair : counters) {
-                        if (pair.second > 0) {
-                            active_counters++;
-                        }
-                    }
-                    
-                    if (active_counters > 0) {
-                        logger_debug_with_category("Metrics", ("Active counters: " + std::to_string(active_counters)).c_str());
-                    }
-                    
-                    // Log current state gauge
-                    auto gauges = metrics.getAllGauges();
-                    auto state_it = gauges.find("current_state");
-                    if (state_it != gauges.end()) {
-                        logger_debug_with_category("Metrics", ("Current state: " + std::to_string(state_it->second)).c_str());
-                    }
+                    // Log current state gauge (simplified for C89 version)
+                    double current_state = metrics_get_gauge("current_state");
+                    logger_debug_with_category("Metrics", ("Current state: " + std::to_string(current_state)).c_str());
                 }
             } catch (const std::exception& e) {
                 logger_error_with_category("Daemon", ("Error in main loop: " + std::string(e.what())).c_str());
-                metrics.incrementCounter("main_loop_errors");
+                metrics_increment_counter("main_loop_errors", 1);
                 
                 // Wait a bit before continuing to prevent rapid error loops
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -811,17 +796,22 @@ int main(int argc, char *argv[]) {
         
         // Stop metrics server
         if (metrics_server) {
-            metrics_server->stop();
+            metrics_server_stop(metrics_server);
+            metrics_server_destroy(metrics_server);
+            metrics_server = nullptr;
         }
         
         // Stop metrics thread (disabled for single-core optimization)
         // metrics_thread.join();
         
         // Stop health monitoring
-        health_monitor.stopMonitoring();
+        health_monitor_stop_monitoring();
         
         // Cleanup client
         client.reset();
+        
+        // Cleanup metrics
+        metrics_cleanup();
         
         // Cleanup daemon state
         if (daemon_state) {

@@ -1,32 +1,39 @@
-#pragma once
+#ifndef METRICS_SERVER_H
+#define METRICS_SERVER_H
 
-#include <string>
-#include <thread>
-#include <atomic>
-#include <memory>
+#include <stdint.h>
+#include <pthread.h>
 
-class MetricsServer {
-public:
-    MetricsServer(int port = 8080);
-    ~MetricsServer();
-    
-    void start();
-    void stop();
-    bool isRunning() const { return running_.load(); }
-    
-    // Configuration
-    void setPort(int port);
-    int getPort() const { return port_; }
-    
-private:
-    int port_;
-    std::atomic<bool> running_{false};
-    std::atomic<bool> should_stop_{false};
-    std::unique_ptr<std::thread> server_thread_;
-    
-    void serverLoop();
-    std::string handleRequest(const std::string& request);
-    std::string generateMetricsResponse();
-    std::string generateHealthResponse();
-    void sendResponse(int client_fd, const std::string& response);
+/* Forward declarations */
+typedef struct metrics_server metrics_server_t;
+
+/* Metrics server structure */
+struct metrics_server {
+    int port;
+    int running;
+    int should_stop;
+    pthread_t server_thread;
+    pthread_mutex_t state_mutex;
 };
+
+/* Constructor and destructor */
+metrics_server_t *metrics_server_create(int port);
+void metrics_server_destroy(metrics_server_t *server);
+
+/* Server control */
+int metrics_server_start(metrics_server_t *server);
+int metrics_server_stop(metrics_server_t *server);
+int metrics_server_is_running(const metrics_server_t *server);
+
+/* Configuration */
+int metrics_server_set_port(metrics_server_t *server, int port);
+int metrics_server_get_port(const metrics_server_t *server);
+
+/* Internal methods (used by server thread) */
+void *metrics_server_loop(void *arg);
+char *metrics_server_handle_request(metrics_server_t *server, const char *request);
+char *metrics_server_generate_metrics_response(metrics_server_t *server);
+char *metrics_server_generate_health_response(metrics_server_t *server);
+int metrics_server_send_response(int client_fd, const char *response);
+
+#endif /* METRICS_SERVER_H */
