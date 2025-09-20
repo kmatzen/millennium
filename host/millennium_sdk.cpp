@@ -48,8 +48,18 @@ static void ua_event_handler(enum ua_event ev, bevent *event, void *client) {
         }
       }
     }
+
+    enum CallStateEvent::State state_value;
+    if (ev == UA_EVENT_CALL_INCOMING) {
+      state_value = CallStateEvent::CALL_INCOMING;
+    } else if (ev == UA_EVENT_CALL_ESTABLISHED) {
+      state_value = CallStateEvent::CALL_ACTIVE;
+    } else {
+      state_value = CallStateEvent::INVALID;
+    }
+
     ((MillenniumClient *)client)
-        ->createAndQueueEvent(std::make_shared<CallStateEvent>(ev, call));
+        ->createAndQueueEvent(std::make_shared<CallStateEvent>(uag_event_str(ev), call, state_value));
   }
 }
 
@@ -472,22 +482,16 @@ std::shared_ptr<Event> MillenniumClient::nextEvent() {
 }
 
 std::string CallStateEvent::repr() const {
-  return std::string(uag_event_str(state_));
+  return state_;
 }
 
 struct call *CallStateEvent::get_call() const {
   return call_;
 }
 
-enum State CallStateEvent::get_state() const {
-  switch (state_) {
-  case UA_EVENT_CALL_INCOMING:
-    return CALL_INCOMING;
-  case UA_EVENT_CALL_ESTABLISHED:
-    return CALL_ACTIVE;
-  default:
-    return INVALID;
-  }
+enum CallStateEvent::State CallStateEvent::get_state() const {
+  return state_value_;
+  
 }
 
 void MillenniumClient::setUA(struct ua *ua) {

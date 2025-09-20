@@ -155,17 +155,27 @@ public:
   }
 };
 
-class CallStateEvent : public Event {
-  enum ua_event state_;
-  struct call *call_;
+struct call;
 
+class CallStateEvent : public Event {
 public:
-  explicit CallStateEvent(enum ua_event state, struct call *call)
-      : state_(state), call_(call) {}
+  enum State {
+    INVALID = 0,
+    CALL_INCOMING,
+    CALL_ACTIVE,
+  };
+
+  private:
+  std::string state_;
+  struct call *call_;
+  enum State state_value_;
+public:
+  explicit CallStateEvent(const std::string &state, struct call *call, enum CallStateEvent::State state_value)
+      : state_(state), call_(call), state_value_(state_value) {}
   ~CallStateEvent() override = default;
   std::string name() const override { return "CallStateEvent"; }
   std::string repr() const override;
-  enum State get_state() const;
+  enum CallStateEvent::State get_state() const;
   struct call *get_call() const;
 };
 

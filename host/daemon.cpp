@@ -199,7 +199,7 @@ void handle_call_state_event(const std::shared_ptr<CallStateEvent> &call_state_e
         return;
     }
     
-    if (call_state_event->get_state() == CALL_INCOMING && 
+    if (call_state_event->get_state() == CallStateEvent::CALL_INCOMING && 
         daemon_state->current_state == DAEMON_STATE_IDLE_DOWN) {
         
         logger_info_with_category("Call", "Incoming call received");
@@ -213,7 +213,7 @@ void handle_call_state_event(const std::shared_ptr<CallStateEvent> &call_state_e
         
         client->writeToCoinValidator('f');
         client->writeToCoinValidator('z');
-    } else if (call_state_event->get_state() == CALL_ACTIVE) {
+    } else if (call_state_event->get_state() == CallStateEvent::CALL_ACTIVE) {
         // Handle call established (when baresip reports CALL_ESTABLISHED)
         logger_info_with_category("Call", "Call established - audio should be working");
         metrics_increment_counter("calls_established", 1);
