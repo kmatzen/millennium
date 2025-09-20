@@ -11,9 +11,11 @@
 #include <string>
 #include <thread>
 #include <vector>
+extern "C" {
+#include "events.h"
+}
 
 // Forward declarations
-class Event;
 
 class Logger {
 public:
@@ -54,7 +56,7 @@ class MillenniumClient {
   int display_fd_;
   bool is_open_;
   std::string input_buffer_;
-  std::queue<std::shared_ptr<Event>> event_queue_;
+  std::queue<event_t *> event_queue_;
   std::thread thread_;
   std::string displayMessage_;
   bool displayDirty_;
@@ -71,11 +73,11 @@ public:
   ~MillenniumClient();
 
   void createAndQueueEvent(char event_type, const std::string &payload);
-  void createAndQueueEvent(const std::shared_ptr<Event> &event);
+  void createAndQueueEvent(event_t *event);
   void setDisplay(const std::string &message);
   void writeToCoinValidator(uint8_t data);
   void update();
-  std::shared_ptr<Event> nextEvent();
+  event_t *nextEvent();
   void close();
 
   void call(const std::string &number);

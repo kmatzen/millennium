@@ -30,11 +30,11 @@ web_server.o: web_server.cpp web_server.h config.h logger.h metrics.h health_mon
 test_framework.o: test_framework.cpp test_framework.h
 	g++ test_framework.cpp -o test_framework.o -c $(CXXFLAGS)
 
-events.o: events.cpp events.h
-	g++ events.cpp -o events.o -c $(CXXFLAGS)
+events.o: events.c events.h
+	gcc events.c -o events.o -c $(CFLAGS) `pkg-config libbaresip --cflags` `pkg-config libre --cflags`
 
-event_processor.o: event_processor.cpp event_processor.h events.h
-	g++ event_processor.cpp -o event_processor.o -c $(CXXFLAGS)
+event_processor.o: event_processor.c event_processor.h events.h
+	gcc event_processor.c -o event_processor.o -c $(CFLAGS) `pkg-config libbaresip --cflags` `pkg-config libre --cflags`
 
 millennium_sdk.o: millennium_sdk.cpp millennium_sdk.h events.h
 	g++ millennium_sdk.cpp -o millennium_sdk.o -c $(CXXFLAGS)

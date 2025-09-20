@@ -50,17 +50,19 @@ static void ua_event_handler(enum ua_event ev, bevent *event, void *client) {
       }
     }
 
-    enum CallStateEvent::State state_value;
+    call_state_t state_value;
     if (ev == UA_EVENT_CALL_INCOMING) {
-      state_value = CallStateEvent::CALL_INCOMING;
+      state_value = EVENT_CALL_STATE_INCOMING;
     } else if (ev == UA_EVENT_CALL_ESTABLISHED) {
-      state_value = CallStateEvent::CALL_ACTIVE;
+      state_value = EVENT_CALL_STATE_ACTIVE;
     } else {
-      state_value = CallStateEvent::INVALID;
+      state_value = EVENT_CALL_STATE_INVALID;
     }
 
-    ((MillenniumClient *)client)
-        ->createAndQueueEvent(std::make_shared<CallStateEvent>(uag_event_str(ev), call, state_value));
+    call_state_event_t *call_event = call_state_event_create(uag_event_str(ev), call, state_value);
+    if (call_event) {
+        ((MillenniumClient *)client)->createAndQueueEvent((event_t *)call_event);
+    }
   }
 }
 
@@ -325,21 +327,21 @@ std::string MillenniumClient::extractPayload(char event_type,
                                              size_t event_start) const {
   size_t payload_length = 0;
   switch (event_type) {
-  case EventType::KEYPAD:
-  case EventType::HOOK:
-  case EventType::COIN:
+  case EVENT_TYPE_KEYPAD:
+  case EVENT_TYPE_HOOK:
+  case EVENT_TYPE_COIN:
     payload_length = 1;
     break;
-  case EventType::CARD:
+  case EVENT_TYPE_CARD:
     payload_length = 16;
     break;
-  case EventType::EEPROM_ERROR:
+  case EVENT_TYPE_EEPROM_ERROR:
     payload_length = 3;
     break;
-  case EventType::COIN_UPLOAD_START:
-  case EventType::COIN_UPLOAD_END:
-  case EventType::COIN_VALIDATION_START:
-  case EventType::COIN_VALIDATION_END:
+  case EVENT_TYPE_COIN_UPLOAD_START:
+  case EVENT_TYPE_COIN_UPLOAD_END:
+  case EVENT_TYPE_COIN_VALIDATION_START:
+  case EVENT_TYPE_COIN_VALIDATION_END:
     payload_length = 0;
     break;
   }
@@ -350,38 +352,46 @@ std::string MillenniumClient::extractPayload(char event_type,
   return {};
 }
 
-void MillenniumClient::createAndQueueEvent(
-    const std::shared_ptr<Event> &event) {
-  event_queue_.push(event);
+void MillenniumClient::createAndQueueEvent(event_t *event) {
+  if (event) {
+    event_queue_.push(event);
+  }
 }
 
 void MillenniumClient::createAndQueueEvent(char event_type,
                                            const std::string &payload) {
   Logger::log(Logger::DEBUG,
               "Creating event of type: " + std::string(1, event_type));
-  if (event_type == EventType::KEYPAD) {
-    event_queue_.push(std::make_shared<KeypadEvent>(payload[0]));
-  } else if (event_type == EventType::CARD) {
-    event_queue_.push(std::make_shared<CardEvent>(payload));
-  } else if (event_type == EventType::COIN) {
-    event_queue_.push(
-        std::make_shared<CoinEvent>(static_cast<uint8_t>(payload[0])));
-  } else if (event_type == EventType::HOOK) {
-    event_queue_.push(std::make_shared<HookStateChangeEvent>(payload[0]));
-  } else if (event_type == EventType::COIN_UPLOAD_START) {
-    event_queue_.push(std::make_shared<CoinEepromUploadStart>());
-  } else if (event_type == EventType::COIN_UPLOAD_END) {
-    event_queue_.push(std::make_shared<CoinEepromUploadEnd>());
-  } else if (event_type == EventType::COIN_VALIDATION_START) {
-    event_queue_.push(std::make_shared<CoinEepromValidationStart>());
-  } else if (event_type == EventType::COIN_VALIDATION_END) {
-    event_queue_.push(std::make_shared<CoinEepromValidationEnd>());
-  } else if (event_type == EventType::EEPROM_ERROR) {
+  if (event_type == EVENT_TYPE_KEYPAD) {
+    keypad_event_t *event = keypad_event_create(payload[0]);
+    if (event) event_queue_.push((event_t *)event);
+  } else if (event_type == EVENT_TYPE_CARD) {
+    card_event_t *event = card_event_create(payload.c_str());
+    if (event) event_queue_.push((event_t *)event);
+  } else if (event_type == EVENT_TYPE_COIN) {
+    coin_event_t *event = coin_event_create(static_cast<uint8_t>(payload[0]));
+    if (event) event_queue_.push((event_t *)event);
+  } else if (event_type == EVENT_TYPE_HOOK) {
+    hook_state_change_event_t *event = hook_state_change_event_create(payload[0]);
+    if (event) event_queue_.push((event_t *)event);
+  } else if (event_type == EVENT_TYPE_COIN_UPLOAD_START) {
+    coin_eeprom_upload_start_t *event = coin_eeprom_upload_start_create();
+    if (event) event_queue_.push((event_t *)event);
+  } else if (event_type == EVENT_TYPE_COIN_UPLOAD_END) {
+    coin_eeprom_upload_end_t *event = coin_eeprom_upload_end_create();
+    if (event) event_queue_.push((event_t *)event);
+  } else if (event_type == EVENT_TYPE_COIN_VALIDATION_START) {
+    coin_eeprom_validation_start_t *event = coin_eeprom_validation_start_create();
+    if (event) event_queue_.push((event_t *)event);
+  } else if (event_type == EVENT_TYPE_COIN_VALIDATION_END) {
+    coin_eeprom_validation_end_t *event = coin_eeprom_validation_end_create();
+    if (event) event_queue_.push((event_t *)event);
+  } else if (event_type == EVENT_TYPE_EEPROM_ERROR) {
     uint8_t addr = static_cast<uint8_t>(payload[0]);
     uint8_t expected = static_cast<uint8_t>(payload[1]);
     uint8_t actual = static_cast<uint8_t>(payload[2]);
-    event_queue_.push(
-        std::make_shared<CoinEepromValidationError>(addr, expected, actual));
+    coin_eeprom_validation_error_t *event = coin_eeprom_validation_error_create(addr, expected, actual);
+    if (event) event_queue_.push((event_t *)event);
   } else {
     Logger::log(Logger::WARN,
                 "Unknown event type: " + std::string(1, event_type));
@@ -447,12 +457,14 @@ void MillenniumClient::writeToCoinValidator(uint8_t data) {
                                  std::to_string(data));
 }
 
-std::shared_ptr<Event> MillenniumClient::nextEvent() {
+event_t *MillenniumClient::nextEvent() {
   if (!event_queue_.empty()) {
-    auto event = event_queue_.front();
+    event_t *event = event_queue_.front();
     event_queue_.pop();
+    char *repr = event_get_repr(event);
     Logger::log(Logger::DEBUG,
-                "Dequeued event: " + event->name() + " " + event->repr());
+                "Dequeued event: " + std::string(event_get_name(event)) + " " + std::string(repr ? repr : ""));
+    if (repr) free(repr);
     return event;
   }
   return nullptr;

@@ -10,8 +10,10 @@ extern "C" {
 }
 #include "web_server.h"
 #include "millennium_sdk.h"
+extern "C" {
 #include "events.h"
 #include "event_processor.h"
+}
 #include <atomic>
 #include <csignal>
 #include <cstring>
@@ -34,7 +36,6 @@ extern "C" {
 // DaemonState class replaced with daemon_state_data_t from daemon_state.h
 
 // Forward declarations
-class EventProcessor;
 
 // Global instances
 std::atomic<bool> running(true);
@@ -42,7 +43,7 @@ daemon_state_data_t* daemon_state = nullptr;  // C pointer instead of unique_ptr
 std::unique_ptr<MillenniumClient> client;
 metrics_server_t *metrics_server = nullptr;
 std::unique_ptr<WebServer> web_server;
-std::unique_ptr<EventProcessor> event_processor;
+event_processor_t *event_processor = nullptr;
 
 // Daemon start time for uptime calculation
 std::chrono::steady_clock::time_point daemon_start_time;
@@ -186,7 +187,7 @@ void check_and_call() {
     }
 }
 
-void handle_coin_event(const std::shared_ptr<CoinEvent> &coin_event) {
+void handle_coin_event(coin_event_t *coin_event) {
     if (!coin_event) {
         logger_error_with_category("Coin", "Received null coin event");
         return;
@@ -197,14 +198,19 @@ void handle_coin_event(const std::shared_ptr<CoinEvent> &coin_event) {
         return;
     }
     
-    const auto &code = coin_event->coin_code();
+    char *coin_code_str = coin_event_get_coin_code(coin_event);
+    if (!coin_code_str) {
+        logger_error_with_category("Coin", "Failed to get coin code");
+        return;
+    }
+    
     int coin_value = 0;
     
-    if (code == "COIN_6") {
+    if (strcmp(coin_code_str, "COIN_6") == 0) {
         coin_value = 5;
-    } else if (code == "COIN_7") {
+    } else if (strcmp(coin_code_str, "COIN_7") == 0) {
         coin_value = 10;
-    } else if (code == "COIN_8") {
+    } else if (strcmp(coin_code_str, "COIN_8") == 0) {
         coin_value = 25;
     }
     
@@ -215,8 +221,9 @@ void handle_coin_event(const std::shared_ptr<CoinEvent> &coin_event) {
         metrics_increment_counter("coins_inserted", 1);
         metrics_increment_counter("coins_value_cents", coin_value);
         
-        logger_info_with_category("Coin", ("Coin inserted: " + code + ", value: " + std::to_string(coin_value) + 
-                   " cents, total: " + std::to_string(daemon_state->inserted_cents) + " cents").c_str());
+        std::string log_msg = "Coin inserted: " + std::string(coin_code_str) + ", value: " + std::to_string(coin_value) + 
+                   " cents, total: " + std::to_string(daemon_state->inserted_cents) + " cents";
+        logger_info_with_category("Coin", log_msg.c_str());
         
         line1 = format_number(daemon_state->keypad_buffer);
         line2 = generate_message(daemon_state->inserted_cents);
@@ -225,9 +232,11 @@ void handle_coin_event(const std::shared_ptr<CoinEvent> &coin_event) {
         // Check if we should initiate a call after coin insertion
         check_and_call();
     }
+    
+    free(coin_code_str);
 }
 
-void handle_call_state_event(const std::shared_ptr<CallStateEvent> &call_state_event) {
+void handle_call_state_event(call_state_event_t *call_state_event) {
     if (!call_state_event) {
         logger_error_with_category("Call", "Received null call state event");
         return;
@@ -238,7 +247,7 @@ void handle_call_state_event(const std::shared_ptr<CallStateEvent> &call_state_e
         return;
     }
     
-    if (call_state_event->get_state() == CallStateEvent::CALL_INCOMING && 
+    if (call_state_event_get_state(call_state_event) == EVENT_CALL_STATE_INCOMING && 
         daemon_state->current_state == DAEMON_STATE_IDLE_DOWN) {
         
         logger_info_with_category("Call", "Incoming call received");
@@ -252,7 +261,7 @@ void handle_call_state_event(const std::shared_ptr<CallStateEvent> &call_state_e
         
         client->writeToCoinValidator('f');
         client->writeToCoinValidator('z');
-    } else if (call_state_event->get_state() == CallStateEvent::CALL_ACTIVE) {
+    } else if (call_state_event_get_state(call_state_event) == EVENT_CALL_STATE_ACTIVE) {
         // Handle call established (when baresip reports CALL_ESTABLISHED)
         logger_info_with_category("Call", "Call established - audio should be working");
         metrics_increment_counter("calls_established", 1);
@@ -266,7 +275,7 @@ void handle_call_state_event(const std::shared_ptr<CallStateEvent> &call_state_e
     }
 }
 
-void handle_hook_event(const std::shared_ptr<HookStateChangeEvent> &hook_event) {
+void handle_hook_event(hook_state_change_event_t *hook_event) {
     if (!hook_event) {
         logger_error_with_category("Hook", "Received null hook event");
         return;
@@ -277,7 +286,7 @@ void handle_hook_event(const std::shared_ptr<HookStateChangeEvent> &hook_event) 
         return;
     }
     
-    if (hook_event->get_direction() == 'U') {
+    if (hook_state_change_event_get_direction(hook_event) == 'U') {
         if (daemon_state->current_state == DAEMON_STATE_CALL_INCOMING) {
             logger_info_with_category("Call", "Call answered");
             metrics_increment_counter("calls_answered", 1);
@@ -306,7 +315,7 @@ void handle_hook_event(const std::shared_ptr<HookStateChangeEvent> &hook_event) 
             line1 = format_number(daemon_state->keypad_buffer);
             client->setDisplay(generateDisplayBytes());
         }
-    } else if (hook_event->get_direction() == 'D') {
+    } else if (hook_state_change_event_get_direction(hook_event) == 'D') {
         logger_info_with_category("Hook", "Hook down, call ended");
         metrics_increment_counter("hook_down", 1);
         
@@ -335,7 +344,7 @@ void handle_hook_event(const std::shared_ptr<HookStateChangeEvent> &hook_event) 
     }
 }
 
-void handle_keypad_event(const std::shared_ptr<KeypadEvent> &keypad_event) {
+void handle_keypad_event(keypad_event_t *keypad_event) {
     if (!keypad_event) {
         logger_error_with_category("Keypad", "Received null keypad event");
         return;
@@ -349,7 +358,7 @@ void handle_keypad_event(const std::shared_ptr<KeypadEvent> &keypad_event) {
     if (daemon_state_get_keypad_length(daemon_state) < 10 && 
         daemon_state->current_state == DAEMON_STATE_IDLE_UP) {
         
-        char key = keypad_event->get_key();
+        char key = keypad_event_get_key(keypad_event);
         if (std::isdigit(key)) {
             logger_debug_with_category("Keypad", ("Key pressed: " + std::string(1, key)).c_str());
             metrics_increment_counter("keypad_presses", 1);
@@ -421,8 +430,11 @@ bool sendControlCommand(const std::string& action) {
             // Extract key from argument and inject as keypad event
             std::string key = arg;
             if (std::isdigit(key[0])) {
-                auto keypad_event = std::make_shared<KeypadEvent>(key[0]);
-                event_processor->process_event(keypad_event);
+                keypad_event_t *keypad_event = keypad_event_create(key[0]);
+                if (keypad_event) {
+                    event_processor_process_event(event_processor, (event_t *)keypad_event);
+                    event_destroy((event_t *)keypad_event);
+                }
                 logger_info_with_category("Control", ("Keypad key '" + key + "' pressed via web portal").c_str());
                 return true;
             } else {
@@ -487,8 +499,11 @@ bool sendControlCommand(const std::string& action) {
                     return false;
                 }
                 
-                auto coin_event = std::make_shared<CoinEvent>(coin_code);
-                event_processor->process_event(coin_event);
+                coin_event_t *coin_event = coin_event_create(coin_code);
+                if (coin_event) {
+                    event_processor_process_event(event_processor, (event_t *)coin_event);
+                    event_destroy((event_t *)coin_event);
+                }
                 logger_info_with_category("Control", ("Coin inserted: " + cents_str + "¢ via web portal").c_str());
                 std::cout << "[CONTROL] Coin inserted successfully: " << cents << "¢" << std::endl;
                 
@@ -513,14 +528,20 @@ bool sendControlCommand(const std::string& action) {
             return true;
         } else if (command == "handset_up") {
             // Inject as hook event
-            auto hook_event = std::make_shared<HookStateChangeEvent>('U');
-            event_processor->process_event(hook_event);
+            hook_state_change_event_t *hook_event = hook_state_change_event_create('U');
+            if (hook_event) {
+                event_processor_process_event(event_processor, (event_t *)hook_event);
+                event_destroy((event_t *)hook_event);
+            }
             logger_info_with_category("Control", "Handset lifted via web portal");
             return true;
         } else if (command == "handset_down") {
             // Inject as hook event
-            auto hook_event = std::make_shared<HookStateChangeEvent>('D');
-            event_processor->process_event(hook_event);
+            hook_state_change_event_t *hook_event = hook_state_change_event_create('D');
+            if (hook_event) {
+                event_processor_process_event(event_processor, (event_t *)hook_event);
+                event_destroy((event_t *)hook_event);
+            }
             logger_info_with_category("Control", "Handset placed down via web portal");
             return true;
         }
@@ -692,13 +713,17 @@ int main(int argc, char *argv[]) {
         client->setDisplay(generateDisplayBytes());
         
         // Initialize event processor
-        event_processor = std::make_unique<EventProcessor>();
+        event_processor = event_processor_create();
+        if (!event_processor) {
+            logger_error_with_category("Control", "Failed to create event processor");
+            return 1;
+        }
         
         // Register event handlers
-        event_processor->register_coin_handler(handle_coin_event);
-        event_processor->register_call_state_handler(handle_call_state_event);
-        event_processor->register_hook_handler(handle_hook_event);
-        event_processor->register_keypad_handler(handle_keypad_event);
+        event_processor_register_coin_handler(event_processor, handle_coin_event);
+        event_processor_register_call_state_handler(event_processor, handle_call_state_event);
+        event_processor_register_hook_handler(event_processor, handle_hook_event);
+        event_processor_register_keypad_handler(event_processor, handle_keypad_event);
         
         logger_info_with_category("Daemon", "Daemon initialized successfully");
         
@@ -708,9 +733,10 @@ int main(int argc, char *argv[]) {
             try {
 	    	client->update();
                 
-                auto event = client->nextEvent();
+                event_t *event = client->nextEvent();
                 if (event) {
-                    event_processor->process_event(event);
+                    event_processor_process_event(event_processor, event);
+                    event_destroy(event);
                 }
                 
                 // Update metrics in main loop (every 1000 loops = ~1 second)
@@ -765,6 +791,12 @@ int main(int argc, char *argv[]) {
         
         // Cleanup metrics
         metrics_cleanup();
+        
+        // Cleanup event processor
+        if (event_processor) {
+            event_processor_destroy(event_processor);
+            event_processor = nullptr;
+        }
         
         // Cleanup daemon state
         if (daemon_state) {
