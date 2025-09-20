@@ -3,10 +3,6 @@
 
 #include <time.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 /* C equivalent of DaemonState class */
 typedef enum {
     DAEMON_STATE_INVALID = 0,
@@ -34,9 +30,5 @@ int daemon_state_get_keypad_length(const daemon_state_data_t* state);
 void daemon_state_clear_keypad(daemon_state_data_t* state);
 void daemon_state_add_key(daemon_state_data_t* state, char key);
 void daemon_state_remove_last_key(daemon_state_data_t* state);
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif /* DAEMON_STATE_H */
