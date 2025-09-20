@@ -1,11 +1,13 @@
+extern "C" {
 #include "config.h"
+#include "daemon_state.h"
+}
 #include "logger.h"
 #include "health_monitor.h"
 #include "metrics.h"
 #include "metrics_server.h"
 #include "web_server.h"
 #include "millennium_sdk.h"
-#include "daemon_state.h"
 #include <atomic>
 #include <csignal>
 #include <cstring>
@@ -73,7 +75,7 @@ std::chrono::steady_clock::time_point getDaemonStartTime() {
 
 // Forward declaration - will be implemented after function declarations
 bool sendControlCommand(const std::string& action);
-Config& config = Config::getInstance();
+config_data_t* config = config_get_instance();
 MillenniumLogger& logger = MillenniumLogger::getInstance();
 HealthMonitor& health_monitor = HealthMonitor::getInstance();
 Metrics& metrics = Metrics::getInstance();
@@ -139,7 +141,7 @@ std::string format_number(const char* buffer) {
 }
 
 std::string generate_message(int inserted) {
-    int cost_cents = config.getCallCostCents();
+    int cost_cents = config_get_call_cost_cents(config);
     std::ostringstream message;
     message << "Insert " << std::setfill('0') << std::setw(2)
             << (cost_cents - inserted) << " cents";
@@ -328,7 +330,7 @@ void check_and_call() {
         return;
     }
     
-    int cost_cents = config.getCallCostCents();
+    int cost_cents = config_get_call_cost_cents(config);
     
     if (daemon_state_get_keypad_length(daemon_state) == 10 && 
         daemon_state->inserted_cents >= cost_cents &&
@@ -661,21 +663,21 @@ int main(int argc, char *argv[]) {
             config_file = argv[2];
         }
         
-        if (!config.loadFromFile(config_file)) {
+        if (!config_load_from_file(config, config_file.c_str())) {
             logger.warn("Config", "Could not load config file: " + config_file + ", using environment variables");
-            config.loadFromEnvironment();
+            config_load_from_environment(config);
         }
         
-        if (!config.validate()) {
+        if (!config_validate(config)) {
             logger.error("Config", "Configuration validation failed");
             return 1;
         }
         
         // Setup logging
-        logger.setLevel(MillenniumLogger::parseLevel(config.getLogLevel()));
-        if (config.getLogToFile() && !config.getLogFile().empty()) {
-	    std::cerr << "Logging to " << config.getLogFile() << std::endl;
-            logger.setLogFile(config.getLogFile());
+        logger.setLevel(MillenniumLogger::parseLevel(config_get_log_level(config)));
+        if (config_get_log_to_file(config) && strlen(config_get_log_file(config)) > 0) {
+	    std::cerr << "Logging to " << config_get_log_file(config) << std::endl;
+            logger.setLogFile(config_get_log_file(config));
             logger.setLogToFile(true);
         }
         
@@ -699,18 +701,18 @@ int main(int argc, char *argv[]) {
         health_monitor.startMonitoring();
         
         // Start metrics server if enabled
-        if (config.getMetricsServerEnabled()) {
-            metrics_server = std::make_unique<MetricsServer>(config.getMetricsServerPort());
+        if (config_get_metrics_server_enabled(config)) {
+            metrics_server = std::make_unique<MetricsServer>(config_get_metrics_server_port(config));
             metrics_server->start();
             logger.info("Daemon", "Metrics server started on port " + 
-                       std::to_string(config.getMetricsServerPort()));
+                       std::to_string(config_get_metrics_server_port(config)));
         } else {
             logger.info("Daemon", "Metrics server disabled");
         }
         
         // Start web server if enabled
-        if (config.getWebServerEnabled()) {
-            web_server = std::make_unique<WebServer>(config.getWebServerPort());
+        if (config_get_web_server_enabled(config)) {
+            web_server = std::make_unique<WebServer>(config_get_web_server_port(config));
             
             // Add the web portal as a static route
             std::ifstream portal_file("web_portal.html");
@@ -726,7 +728,7 @@ int main(int argc, char *argv[]) {
             
             web_server->start();
             logger.info("Daemon", "Web server started on port " + 
-                       std::to_string(config.getWebServerPort()));
+                       std::to_string(config_get_web_server_port(config)));
         } else {
             logger.info("Daemon", "Web server disabled");
         }

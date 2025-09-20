@@ -5,8 +5,8 @@ LDFLAGS=-lpthread -latomic `pkg-config libre --libs` `pkg-config libbaresip --li
 CFLAGS=-g -O3 -Wall -Wextra -std=c89
 
 # Object files
-config.o: config.cpp config.h
-	g++ config.cpp -o config.o -c $(CXXFLAGS)
+config.o: config.c config.h
+	gcc config.c -o config.o -c $(CFLAGS)
 
 # C object files
 daemon_state.o: daemon_state.c daemon_state.h

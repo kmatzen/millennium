@@ -1,5 +1,7 @@
 #include "web_server.h"
+extern "C" {
 #include "config.h"
+}
 #include "logger.h"
 #include "metrics.h"
 #include "health_monitor.h"
@@ -498,34 +500,34 @@ WebServer::HttpResponse WebServer::handleApiConfig(const HttpRequest& request) {
     HttpResponse response;
     response.content_type = "application/json";
     
-    Config& config = Config::getInstance();
+    config_data_t* config = config_get_instance();
     
     std::ostringstream json;
     json << "{";
     json << "\"hardware\":{";
-    json << "\"display_device\":\"" << config.getDisplayDevice() << "\",";
-    json << "\"baud_rate\":" << config.getBaudRate();
+    json << "\"display_device\":\"" << config_get_display_device(config) << "\",";
+    json << "\"baud_rate\":" << config_get_baud_rate(config);
     json << "},";
     json << "\"call\":{";
-    json << "\"cost_cents\":" << config.getCallCostCents() << ",";
-    json << "\"timeout_seconds\":" << config.getCallTimeoutSeconds();
+    json << "\"cost_cents\":" << config_get_call_cost_cents(config) << ",";
+    json << "\"timeout_seconds\":" << config_get_call_timeout_seconds(config);
     json << "},";
     json << "\"logging\":{";
-    json << "\"level\":\"" << config.getLogLevel() << "\",";
-    json << "\"file\":\"" << config.getLogFile() << "\",";
-    json << "\"to_file\":" << (config.getLogToFile() ? "true" : "false");
+    json << "\"level\":\"" << config_get_log_level(config) << "\",";
+    json << "\"file\":\"" << config_get_log_file(config) << "\",";
+    json << "\"to_file\":" << (config_get_log_to_file(config) ? "true" : "false");
     json << "},";
     json << "\"system\":{";
-    json << "\"update_interval_ms\":" << config.getUpdateIntervalMs() << ",";
-    json << "\"max_retries\":" << config.getMaxRetries();
+    json << "\"update_interval_ms\":" << config_get_update_interval_ms(config) << ",";
+    json << "\"max_retries\":" << config_get_max_retries(config);
     json << "},";
     json << "\"metrics_server\":{";
-    json << "\"enabled\":" << (config.getMetricsServerEnabled() ? "true" : "false") << ",";
-    json << "\"port\":" << config.getMetricsServerPort();
+    json << "\"enabled\":" << (config_get_metrics_server_enabled(config) ? "true" : "false") << ",";
+    json << "\"port\":" << config_get_metrics_server_port(config);
     json << "},";
     json << "\"web_server\":{";
-    json << "\"enabled\":" << (config.getWebServerEnabled() ? "true" : "false") << ",";
-    json << "\"port\":" << config.getWebServerPort();
+    json << "\"enabled\":" << (config_get_web_server_enabled(config) ? "true" : "false") << ",";
+    json << "\"port\":" << config_get_web_server_port(config);
     json << "}";
     json << "}";
     
@@ -682,8 +684,8 @@ WebServer::HttpResponse WebServer::handleApiLogs(const HttpRequest& request) {
     }
     
     // Get log file path from config
-    Config& config = Config::getInstance();
-    std::string log_file = config.getLogFile();
+    config_data_t* config = config_get_instance();
+    std::string log_file = config_get_log_file(config);
     
     std::ostringstream json;
     json << "{";

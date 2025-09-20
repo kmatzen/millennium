@@ -1,14 +1,18 @@
+extern "C" {
 #include "config.h"
+}
 #include "logger.h"
 #include <atomic>
 #include <csignal>
 #include <iostream>
 #include <thread>
 #include <chrono>
+#include <map>
+#include <mutex>
 
 // Global state
 std::atomic<bool> running(true);
-Config& config = Config::getInstance();
+config_data_t* config = config_get_instance();
 MillenniumLogger& logger = MillenniumLogger::getInstance();
 
 // Signal handler
@@ -176,26 +180,26 @@ int main(int argc, char *argv[]) {
             config_file = argv[2];
         }
         
-        if (!config.loadFromFile(config_file)) {
+        if (!config_load_from_file(config, config_file.c_str())) {
             logger.warn("Config", "Could not load config file: " + config_file + ", using environment variables");
-            config.loadFromEnvironment();
+            config_load_from_environment(config);
         }
         
-        if (!config.validate()) {
+        if (!config_validate(config)) {
             logger.error("Config", "Configuration validation failed");
             return 1;
         }
         
         // Setup logging
-        logger.setLevel(MillenniumLogger::parseLevel(config.getLogLevel()));
-        if (config.getLogToFile() && !config.getLogFile().empty()) {
-            logger.setLogFile(config.getLogFile());
+        logger.setLevel(MillenniumLogger::parseLevel(config_get_log_level(config)));
+        if (config_get_log_to_file(config) && strlen(config_get_log_file(config)) > 0) {
+            logger.setLogFile(config_get_log_file(config));
             logger.setLogToFile(true);
         }
         
         logger.info("Daemon", "Starting Millennium Daemon (Simple Version)");
         logger.info("Daemon", "Configuration loaded successfully");
-        logger.info("Daemon", "Call cost: " + std::to_string(config.getCallCostCents()) + " cents");
+        logger.info("Daemon", "Call cost: " + std::to_string(config_get_call_cost_cents(config)) + " cents");
         
         // Initialize components
         SimpleHealthMonitor& health_monitor = SimpleHealthMonitor::getInstance();
