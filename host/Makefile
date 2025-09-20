@@ -1,9 +1,16 @@
 CXXFLAGS=-g -O3 -std=c++17 -Wall -Wextra `pkg-config libbaresip --cflags` `pkg-config libre --cflags`
 LDFLAGS=-lpthread -latomic `pkg-config libre --libs` `pkg-config libbaresip --libs`
 
+# C flags for C files
+CFLAGS=-g -O3 -Wall -Wextra -std=c89
+
 # Object files
 config.o: config.cpp config.h
 	g++ config.cpp -o config.o -c $(CXXFLAGS)
+
+# C object files
+daemon_state.o: daemon_state.c daemon_state.h
+	gcc daemon_state.c -o daemon_state.o -c $(CFLAGS)
 
 logger.o: logger.cpp logger.h
 	g++ logger.cpp -o logger.o -c $(CXXFLAGS)
@@ -33,8 +40,8 @@ tests.o: tests.cpp test_framework.h config.h logger.h metrics.h
 	g++ tests.cpp -o tests.o -c $(CXXFLAGS)
 
 # Executables
-daemon: daemon.o millennium_sdk.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o
-	g++ daemon.o millennium_sdk.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o -o daemon $(LDFLAGS)
+daemon: daemon.o daemon_state.o millennium_sdk.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o
+	g++ daemon.o daemon_state.o millennium_sdk.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o -o daemon $(LDFLAGS)
 
 tests: tests.o test_framework.o config.o logger.o metrics.o
 	g++ tests.o test_framework.o config.o logger.o metrics.o -o tests $(LDFLAGS)
@@ -48,7 +55,7 @@ metrics_viewer: metrics_viewer.o config.o logger.o metrics.o
 all: daemon tests metrics_viewer
 
 clean:
-	rm -rf *.o daemon tests metrics_viewer
+	rm -rf *.o daemon tests metrics_viewer test_daemon_state
 
 install: daemon
 	sudo mkdir -p /etc/millennium
@@ -69,4 +76,11 @@ uninstall:
 test: tests
 	./tests
 
-.PHONY: all clean install uninstall test
+# C test executable
+test_daemon_state: test_daemon_state.c daemon_state.o
+	gcc test_daemon_state.c daemon_state.o -o test_daemon_state $(CFLAGS)
+
+test_c: test_daemon_state
+	./test_daemon_state
+
+.PHONY: all clean install uninstall test test_c
