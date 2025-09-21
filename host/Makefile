@@ -25,8 +25,8 @@ metrics.o: metrics.c metrics.h
 metrics_server.o: metrics_server.c metrics_server.h metrics.h logger.h
 	gcc metrics_server.c -o metrics_server.o -c $(CFLAGS) -lpthread
 
-web_server.o: web_server.cpp web_server.h config.h logger.h metrics.h health_monitor.h
-	g++ web_server.cpp -o web_server.o -c $(CXXFLAGS)
+web_server.o: web_server.c web_server.h config.h logger.h metrics.h health_monitor.h
+	gcc web_server.c -o web_server.o -c $(CFLAGS)
 
 test_framework.o: test_framework.cpp test_framework.h
 	g++ test_framework.cpp -o test_framework.o -c $(CXXFLAGS)

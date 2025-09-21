@@ -42,7 +42,7 @@ std::atomic<bool> running(true);
 daemon_state_data_t* daemon_state = nullptr;  // C pointer instead of unique_ptr
 millennium_client_t* client = nullptr;  // C pointer instead of unique_ptr
 metrics_server_t *metrics_server = nullptr;
-std::unique_ptr<WebServer> web_server;
+struct web_server* web_server = nullptr;
 event_processor_t *event_processor = nullptr;
 
 // Daemon start time for uptime calculation
@@ -76,6 +76,37 @@ DaemonStateInfo getDaemonStateInfo() {
 
 std::chrono::steady_clock::time_point getDaemonStartTime() {
     return daemon_start_time;
+}
+
+// C-compatible functions for web server
+extern "C" {
+    time_t get_daemon_start_time(void) {
+        auto start_time = daemon_start_time;
+        auto now = std::chrono::steady_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::seconds>(now - start_time);
+        return time(NULL) - duration.count();
+    }
+    
+    struct daemon_state_info get_daemon_state_info(void) {
+        struct daemon_state_info info;
+        memset(&info, 0, sizeof(info));
+        
+        if (daemon_state) {
+            info.current_state = (int)daemon_state->current_state;
+            info.inserted_cents = daemon_state->inserted_cents;
+            strncpy(info.keypad_buffer, daemon_state->keypad_buffer, sizeof(info.keypad_buffer) - 1);
+            info.keypad_buffer[sizeof(info.keypad_buffer) - 1] = '\0';
+            info.last_activity = daemon_state->last_activity;
+        } else {
+            info.current_state = 0;
+            info.inserted_cents = 0;
+            strcpy(info.keypad_buffer, "");
+            info.last_activity = time(NULL);
+        }
+        
+        return info;
+    }
+    
 }
 
 // Forward declaration - will be implemented after function declarations
@@ -552,6 +583,16 @@ bool sendControlCommand(const std::string& action) {
     return false;
 }
 
+// C wrapper for sendControlCommand
+extern "C" {
+    int send_control_command(const char* action) {
+        if (!action) return 0;
+        
+        std::string action_str(action);
+        return sendControlCommand(action_str) ? 1 : 0;
+    }
+}
+
 // Signal handler
 void signal_handler(int signal) {
     if (signal == SIGINT || signal == SIGTERM) {
@@ -683,23 +724,15 @@ int main(int argc, char *argv[]) {
         
         // Start web server if enabled
         if (config_get_web_server_enabled(config)) {
-            web_server = std::make_unique<WebServer>(config_get_web_server_port(config));
+            web_server = web_server_create(config_get_web_server_port(config));
             
-            // Add the web portal as a static route
-            std::ifstream portal_file("web_portal.html");
-            if (portal_file.is_open()) {
-                std::string portal_content((std::istreambuf_iterator<char>(portal_file)),
-                                         std::istreambuf_iterator<char>());
-                web_server->addStaticRoute("/", portal_content, "text/html");
-                portal_file.close();
-            } else {
-                logger_warn_with_category("WebServer", "Could not load web_portal.html, serving basic interface");
-                web_server->addStaticRoute("/", "<h1>Millennium System Portal</h1><p>Web portal not available</p>", "text/html");
-            }
+            // Add the web portal as a file route (streaming)
+            web_server_add_file_route(web_server, "/", "web_portal.html", "text/html");
             
-            web_server->start();
-            logger_info_with_category("Daemon", ("Web server started on port " + 
-                       std::to_string(config_get_web_server_port(config))).c_str());
+            web_server_start(web_server);
+            char start_msg[256];
+            snprintf(start_msg, sizeof(start_msg), "Web server started on port %d", config_get_web_server_port(config));
+            logger_info_with_category("Daemon", start_msg);
         } else {
             logger_info_with_category("Daemon", "Web server disabled");
         }
@@ -785,6 +818,13 @@ int main(int argc, char *argv[]) {
         
         // Stop health monitoring
         health_monitor_stop_monitoring();
+        
+        // Stop web server
+        if (web_server) {
+            web_server_stop(web_server);
+            web_server_destroy(web_server);
+            web_server = nullptr;
+        }
         
         // Cleanup client
         millennium_client_destroy(client);
