@@ -3,6 +3,7 @@ LDFLAGS=-lpthread -latomic `pkg-config libre --libs` `pkg-config libbaresip --li
 
 # C flags for C files
 CFLAGS=-g -O3 -Wall -Wextra -std=c89
+C99_CFLAGS=-g -O3 -Wall -Wextra -std=c99
 
 # Object files
 config.o: config.c config.h
@@ -30,13 +31,16 @@ web_server.o: web_server.cpp web_server.h config.h logger.h metrics.h health_mon
 test_framework.o: test_framework.cpp test_framework.h
 	g++ test_framework.cpp -o test_framework.o -c $(CXXFLAGS)
 
+baresip_interface.o: baresip_interface.c baresip_interface.h
+	gcc baresip_interface.c -o baresip_interface.o -c $(C99_CFLAGS) `pkg-config libbaresip --cflags` `pkg-config libre --cflags`
+
 events.o: events.c events.h
-	gcc events.c -o events.o -c $(CFLAGS) `pkg-config libbaresip --cflags` `pkg-config libre --cflags`
+	gcc events.c -o events.o -c $(CFLAGS)
 
 event_processor.o: event_processor.c event_processor.h events.h
-	gcc event_processor.c -o event_processor.o -c $(CFLAGS) `pkg-config libbaresip --cflags` `pkg-config libre --cflags`
+	gcc event_processor.c -o event_processor.o -c $(CFLAGS)
 
-millennium_sdk.o: millennium_sdk.cpp millennium_sdk.h events.h
+millennium_sdk.o: millennium_sdk.cpp millennium_sdk.h events.h baresip_interface.h
 	g++ millennium_sdk.cpp -o millennium_sdk.o -c $(CXXFLAGS)
 
 daemon.o: daemon.cpp millennium_sdk.h events.h event_processor.h config.h logger.h health_monitor.h metrics.h metrics_server.h web_server.h
@@ -46,8 +50,8 @@ tests.o: tests.cpp test_framework.h config.h logger.h metrics.h
 	g++ tests.cpp -o tests.o -c $(CXXFLAGS)
 
 # Executables
-daemon: daemon.o daemon_state.o millennium_sdk.o events.o event_processor.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o
-	gcc daemon.o daemon_state.o millennium_sdk.o events.o event_processor.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o -o daemon $(LDFLAGS) -lstdc++
+daemon: daemon.o daemon_state.o millennium_sdk.o baresip_interface.o events.o event_processor.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o
+	gcc daemon.o daemon_state.o millennium_sdk.o baresip_interface.o events.o event_processor.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o -o daemon $(LDFLAGS) -lstdc++
 
 tests: tests.o test_framework.o config.o logger.o metrics.o
 	gcc tests.o test_framework.o config.o logger.o metrics.o -o tests $(LDFLAGS) -lstdc++

@@ -1,9 +1,5 @@
 #pragma once
 
-// clang-format off
-#include <re.h>
-#include <baresip.h>
-// clang-format on
 #include <cstdint>
 #include <iostream>
 #include <memory>
@@ -13,6 +9,7 @@
 #include <vector>
 extern "C" {
 #include "events.h"
+#include "baresip_interface.h"
 }
 
 // Forward declarations

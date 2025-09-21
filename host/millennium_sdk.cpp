@@ -1,26 +1,20 @@
 #include "millennium_sdk.h"
 #include "events.h"
-#include <baresip.h>
 #include <csignal>
 #include <cstring>
 #include <fcntl.h>
 #include <iostream>
 #include <linux/serial.h>
-#include <re.h>
 #include <sstream>
 #include <sys/select.h>
 #include <termios.h>
 #include <unistd.h>
 
-#define DEBUG_MODULE ""
-#define DEBUG_LEVEL 0
-#include <re_dbg.h>
-
 namespace {
 constexpr int BAUD_RATE = B9600;
 }
 
-enum { ASYNC_WORKERS = 4 };
+enum { ASYNC_WORKERS = BARESIP_ASYNC_WORKERS };
 
 Logger::Level Logger::parseLevel(const std::string &level_str) {
   if (level_str == "DEBUG")
@@ -36,14 +30,14 @@ Logger::Level Logger::parseLevel(const std::string &level_str) {
 
 Logger::Level Logger::current_level_ = Logger::INFO;
 
-static void ua_event_handler(enum ua_event ev, bevent *event, void *client) {
-  Logger::log(Logger::INFO, "UA event: " + std::string(uag_event_str(ev)));
+static void ua_event_handler(baresip_ua_event ev, struct bevent *event, void *client) {
+  Logger::log(Logger::INFO, "UA event: " + std::string(baresip_uag_event_str(ev)));
   if (client) {
-    struct call *call = bevent_get_call(event);
+    struct call *call = baresip_bevent_get_call(event);
     if (call) {
       // For incoming calls, we need to set the UA pointer
-      if (ev == UA_EVENT_CALL_INCOMING) {
-        struct ua *ua = call_get_ua(call);
+      if (ev == BARESIP_UA_EVENT_CALL_INCOMING) {
+        struct ua *ua = baresip_call_get_ua(call);
         if (ua) {
           ((MillenniumClient *)client)->setUA(ua);
         }
@@ -51,15 +45,15 @@ static void ua_event_handler(enum ua_event ev, bevent *event, void *client) {
     }
 
     call_state_t state_value;
-    if (ev == UA_EVENT_CALL_INCOMING) {
+    if (ev == BARESIP_UA_EVENT_CALL_INCOMING) {
       state_value = EVENT_CALL_STATE_INCOMING;
-    } else if (ev == UA_EVENT_CALL_ESTABLISHED) {
+    } else if (ev == BARESIP_UA_EVENT_CALL_ESTABLISHED) {
       state_value = EVENT_CALL_STATE_ACTIVE;
     } else {
       state_value = EVENT_CALL_STATE_INVALID;
     }
 
-    call_state_event_t *call_event = call_state_event_create(uag_event_str(ev), call, state_value);
+    call_state_event_t *call_event = call_state_event_create(baresip_uag_event_str(ev), call, state_value);
     if (call_event) {
         ((MillenniumClient *)client)->createAndQueueEvent((event_t *)call_event);
     }
@@ -70,18 +64,18 @@ void list_audio_devices() {
   struct le *le;
 
   Logger::log(Logger::INFO, "--- Audio Sources ---");
-  for (le = list_head(baresip_ausrcl()); le; le = le->next) {
-    struct ausrc *ausrc = (struct ausrc *)le->data;
-    if (ausrc && ausrc->name) {
-      Logger::log(Logger::INFO, "Source: " + std::string(ausrc->name));
+  for (le = baresip_ausrcl_head(); le; le = baresip_list_next(le)) {
+    struct ausrc *ausrc = baresip_list_data(le);
+    if (ausrc && baresip_ausrc_name(ausrc)) {
+      Logger::log(Logger::INFO, "Source: " + std::string(baresip_ausrc_name(ausrc)));
     }
   }
 
   Logger::log(Logger::INFO, "--- Audio Players ---");
-  for (le = list_head(baresip_auplayl()); le; le = le->next) {
-    struct auplay *auplay = (struct auplay *)le->data;
-    if (auplay && auplay->name) {
-      Logger::log(Logger::INFO, "Player: " + std::string(auplay->name));
+  for (le = baresip_auplayl_head(); le; le = baresip_list_next(le)) {
+    struct auplay *auplay = baresip_auplay_data(le);
+    if (auplay && baresip_auplay_name(auplay)) {
+      Logger::log(Logger::INFO, "Player: " + std::string(baresip_auplay_name(auplay)));
     }
   }
 }
@@ -124,36 +118,36 @@ MillenniumClient::MillenniumClient() : display_fd_(-1), is_open_(false), ua_(nul
   tcsetattr(display_fd_, TCSANOW, &options);
 
   Logger::log(Logger::DEBUG, "libre_init");
-  int err = libre_init();
+  int err = baresip_libre_init();
   if (err) {
     Logger::log(Logger::ERROR, "libre_init failed");
     throw std::runtime_error("libre_init failed");
   }
 
-  re_thread_async_init(ASYNC_WORKERS);
+  baresip_re_thread_async_init(ASYNC_WORKERS);
 
-  log_enable_debug(true);
+  baresip_log_enable_debug(true);
 
-  int dbg_level = DBG_DEBUG;
-  enum dbg_flags dbg_flags = (enum dbg_flags)(DBG_ANSI | DBG_TIME);
-  dbg_init(dbg_level, dbg_flags);
+  int dbg_level = BARESIP_DBG_DEBUG;
+  int dbg_flags = BARESIP_DBG_ANSI | BARESIP_DBG_TIME;
+  baresip_dbg_init(dbg_level, dbg_flags);
 
   Logger::log(Logger::DEBUG, "conf_configure");
-  err = conf_configure();
+  err = baresip_conf_configure();
   if (err) {
     Logger::log(Logger::ERROR, "conf_configure failed");
     throw std::runtime_error("conf_configure failed");
   }
 
-  Logger::log(Logger::DEBUG, "baresip_init");
-  if (baresip_init(conf_config()) != 0) {
+  Logger::log(Logger::DEBUG, "baresip_init_c");
+  if (baresip_init_c(baresip_conf_config()) != 0) {
     Logger::log(Logger::ERROR, "Failed to initialize Baresip.");
     throw std::runtime_error("Failed to initialize Baresip.");
   }
 
-  play_set_path(baresip_player(), "/usr/local/share/baresip");
+  baresip_play_set_path(baresip_player_c(), "/usr/local/share/baresip");
 
-  err = ua_init("baresip v" BARESIP_VERSION " (" ARCH "/" OS ")", true, true,
+  err = baresip_ua_init("baresip v2.0.0 (x86_64/linux)", true, true,
                 true);
   if (err) {
     Logger::log(Logger::ERROR, "ua_init failed");
@@ -161,15 +155,15 @@ MillenniumClient::MillenniumClient() : display_fd_(-1), is_open_(false), ua_(nul
   }
 
   Logger::log(Logger::DEBUG, "conf_modules");
-  err = conf_modules();
+  err = baresip_conf_modules();
   if (err) {
     Logger::log(Logger::ERROR, "conf_modules failed");
     throw std::runtime_error("conf_modules failed");
   }
 
-  bevent_register(ua_event_handler, this);
+  baresip_bevent_register(ua_event_handler, this);
 
-  thread_ = std::thread([]() { re_main(nullptr); });
+  thread_ = std::thread([]() { baresip_re_main(nullptr); });
 
   Logger::log(Logger::INFO, "MillenniumClient initialized successfully.");
   is_open_ = true;
@@ -180,14 +174,14 @@ MillenniumClient::~MillenniumClient() { close(); }
 void MillenniumClient::close() {
   if (is_open_) {
     ::close(display_fd_);
-    ua_stop_all(true);
-    ua_close();
-    module_app_unload();
-    conf_close();
-    baresip_close();
-    mod_close();
-    re_thread_async_close();
-    libre_close();
+    baresip_ua_stop_all(true);
+    baresip_ua_close();
+    baresip_module_app_unload();
+    baresip_conf_close();
+    baresip_close_c();
+    baresip_mod_close();
+    baresip_re_thread_async_close();
+    baresip_libre_close();
     thread_.join();
     is_open_ = false;
     Logger::log(Logger::INFO, "MillenniumClient closed.");
@@ -202,9 +196,7 @@ void MillenniumClient::call(const std::string &number) {
   Logger::log(Logger::INFO, "Initiating call to: " + target.str());
   
   // Find the appropriate UA for this request URI (like the CLI does)
-  struct pl pluri;
-  pl_set_str(&pluri, target.str().c_str());
-  struct ua *ua = uag_find_requri_pl(&pluri);
+  struct ua *ua = baresip_ua_find_requri(target.str().c_str());
   
   if (!ua) {
     Logger::log(Logger::ERROR, "Could not find UA for: " + target.str());
@@ -216,21 +208,21 @@ void MillenniumClient::call(const std::string &number) {
   
   // Complete the URI (like the CLI does)
   char *uric = nullptr;
-  int err = account_uri_complete_strdup(ua_account(ua), &uric, &pluri);
+  int err = baresip_account_uri_complete_strdup(baresip_ua_account(ua), &uric, target.str().c_str());
   if (err != 0) {
     Logger::log(Logger::ERROR, "Failed to complete URI: " + target.str() + " " + std::to_string(err));
     throw std::runtime_error("Failed to complete URI");
   }
   
-  Logger::log(Logger::INFO, "Using UA: " + std::string(account_aor(ua_account(ua))));
+  Logger::log(Logger::INFO, "Using UA: " + std::string(baresip_account_aor(baresip_ua_account(ua))));
   Logger::log(Logger::INFO, "Completed URI: " + std::string(uric));
   
   // Make the call (like the CLI does)
   struct call *call = nullptr;
-  err = ua_connect(ua, &call, nullptr, uric, VIDMODE_OFF);
+  err = baresip_ua_connect(ua, &call, nullptr, uric, BARESIP_VIDMODE_OFF);
   
   // Clean up the completed URI
-  mem_deref(uric);
+  baresip_mem_deref(uric);
   
   if (err != 0) {
     Logger::log(Logger::ERROR, "Failed to initiate call to: " + target.str() +
@@ -248,13 +240,13 @@ void MillenniumClient::answerCall() {
   }
   
   // Find the current call for this UA
-  struct call *call = ua_call(ua_);
+  struct call *call = baresip_ua_call(ua_);
   if (!call) {
     Logger::log(Logger::ERROR, "Cannot answer call: No active call found");
     return;
   }
   
-  ua_answer(ua_, call, VIDMODE_OFF);
+  baresip_ua_answer(ua_, call, BARESIP_VIDMODE_OFF);
   Logger::log(Logger::INFO, "Call answered.");
 }
 
@@ -265,13 +257,13 @@ void MillenniumClient::hangup() {
   }
   
   // Find the current call for this UA
-  struct call *call = ua_call(ua_);
+  struct call *call = baresip_ua_call(ua_);
   if (!call) {
     Logger::log(Logger::WARN, "Cannot hangup call: No active call found");
     return;
   }
   
-  ua_hangup(ua_, call, 0, "Call terminated");
+  baresip_ua_hangup(ua_, call, 0, "Call terminated");
   Logger::log(Logger::INFO, "Call terminated.");
 }
 

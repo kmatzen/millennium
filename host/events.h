@@ -5,6 +5,8 @@
 #include <stdint.h>
 #include <stddef.h>
 
+struct call;
+
 /* Event type constants */
 #define EVENT_TYPE_KEYPAD 'K'
 #define EVENT_TYPE_CARD 'C'
@@ -16,11 +18,6 @@
 #define EVENT_TYPE_EEPROM_ERROR 'E'
 #define EVENT_TYPE_HOOK 'H'
 #define EVENT_TYPE_CALL_STATE '1'
-
-/* Forward declaration */
-#ifndef NO_BARESIP
-struct call;
-#endif
 
 /* Event type enumeration */
 typedef enum {
