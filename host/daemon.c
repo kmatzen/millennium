@@ -39,6 +39,19 @@ char line2[MAX_STRING_LEN];
 
 /* Thread synchronization */
 pthread_mutex_t running_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t daemon_state_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+/* Simple validation macro */
+#define VALIDATE_BASICS() do { \
+    if (!client) { \
+        logger_error_with_category("Event", "Client is null"); \
+        return; \
+    } \
+    if (!daemon_state) { \
+        logger_error_with_category("Event", "Daemon state is null"); \
+        return; \
+    } \
+} while(0)
 
 /* Function prototypes */
 static void signal_handler(int signal);
@@ -66,11 +79,13 @@ struct daemon_state_info get_daemon_state_info(void) {
     memset(&info, 0, sizeof(info));
     
     if (daemon_state) {
+        pthread_mutex_lock(&daemon_state_mutex);
         info.current_state = (int)daemon_state->current_state;
         info.inserted_cents = daemon_state->inserted_cents;
         strncpy(info.keypad_buffer, daemon_state->keypad_buffer, sizeof(info.keypad_buffer) - 1);
         info.keypad_buffer[sizeof(info.keypad_buffer) - 1] = '\0';
         info.last_activity = daemon_state->last_activity;
+        pthread_mutex_unlock(&daemon_state_mutex);
     } else {
         info.current_state = 0;
         info.inserted_cents = 0;
@@ -178,13 +193,11 @@ void generate_message(int inserted, char *output) {
 }
 
 void check_and_call(void) {
-    if (!client) {
-        logger_error_with_category("Call", "Client is null, cannot initiate call");
-        return;
-    }
+    VALIDATE_BASICS();
     
     int cost_cents = config_get_call_cost_cents(config_get_instance());
     
+    /* Quick check without mutex - if conditions aren't met, no need to lock */
     if (daemon_state_get_keypad_length(daemon_state) == 10 && 
         daemon_state->inserted_cents >= cost_cents &&
         daemon_state->current_state == DAEMON_STATE_IDLE_UP) {
@@ -204,8 +217,12 @@ void check_and_call(void) {
         millennium_client_set_display(client, display_bytes);
         
         millennium_client_call(client, number);
+        
+        /* Only lock for the state change */
+        pthread_mutex_lock(&daemon_state_mutex);
         daemon_state->current_state = DAEMON_STATE_CALL_ACTIVE;
         daemon_state_update_activity(daemon_state);
+        pthread_mutex_unlock(&daemon_state_mutex);
     }
 }
 
@@ -214,11 +231,7 @@ void handle_coin_event(coin_event_t *coin_event) {
         logger_error_with_category("Coin", "Received null coin event");
         return;
     }
-    
-    if (!client) {
-        logger_error_with_category("Coin", "Client is null, cannot handle coin event");
-        return;
-    }
+    VALIDATE_BASICS();
     
     char *coin_code_str = coin_event_get_coin_code(coin_event);
     if (!coin_code_str) {
@@ -236,27 +249,33 @@ void handle_coin_event(coin_event_t *coin_event) {
         coin_value = 25;
     }
     
-    if (coin_value > 0 && daemon_state->current_state == DAEMON_STATE_IDLE_UP) {
-        daemon_state->inserted_cents += coin_value;
-        daemon_state_update_activity(daemon_state);
-        
-        metrics_increment_counter("coins_inserted", 1);
-        metrics_increment_counter("coins_value_cents", coin_value);
-        
-        char log_msg[MAX_STRING_LEN];
-        sprintf(log_msg, 
-                "Coin inserted: %s, value: %d cents, total: %d cents",
-                coin_code_str, coin_value, daemon_state->inserted_cents);
-        logger_info_with_category("Coin", log_msg);
-        
-        format_number(daemon_state->keypad_buffer, line1);
-        generate_message(daemon_state->inserted_cents, line2);
-        char display_bytes[100];
-        generate_display_bytes(display_bytes, sizeof(display_bytes));
-        millennium_client_set_display(client, display_bytes);
+    if (coin_value > 0) {
+        pthread_mutex_lock(&daemon_state_mutex);
+        if (daemon_state->current_state == DAEMON_STATE_IDLE_UP) {
+            daemon_state->inserted_cents += coin_value;
+            daemon_state_update_activity(daemon_state);
+            
+            metrics_increment_counter("coins_inserted", 1);
+            metrics_increment_counter("coins_value_cents", coin_value);
+            
+            char log_msg[MAX_STRING_LEN];
+            sprintf(log_msg, 
+                    "Coin inserted: %s, value: %d cents, total: %d cents",
+                    coin_code_str, coin_value, daemon_state->inserted_cents);
+            logger_info_with_category("Coin", log_msg);
+            
+            format_number(daemon_state->keypad_buffer, line1);
+            generate_message(daemon_state->inserted_cents, line2);
+            char display_bytes[100];
+            generate_display_bytes(display_bytes, sizeof(display_bytes));
+            millennium_client_set_display(client, display_bytes);
+        }
+        pthread_mutex_unlock(&daemon_state_mutex);
         
         /* Check if we should initiate a call after coin insertion */
-        check_and_call();
+        if (coin_value > 0) {
+            check_and_call();
+        }
     }
     
     free(coin_code_str);
@@ -267,12 +286,9 @@ void handle_call_state_event(call_state_event_t *call_state_event) {
         logger_error_with_category("Call", "Received null call state event");
         return;
     }
+    VALIDATE_BASICS();
     
-    if (!client) {
-        logger_error_with_category("Call", "Client is null, cannot handle call state event");
-        return;
-    }
-    
+    pthread_mutex_lock(&daemon_state_mutex);
     if (call_state_event_get_state(call_state_event) == EVENT_CALL_STATE_INCOMING && 
         daemon_state->current_state == DAEMON_STATE_IDLE_DOWN) {
         
@@ -287,8 +303,6 @@ void handle_call_state_event(call_state_event_t *call_state_event) {
         daemon_state->current_state = DAEMON_STATE_CALL_INCOMING;
         daemon_state_update_activity(daemon_state);
         
-        millennium_client_write_to_coin_validator(client, 'f');
-        millennium_client_write_to_coin_validator(client, 'z');
     } else if (call_state_event_get_state(call_state_event) == EVENT_CALL_STATE_ACTIVE) {
         /* Handle call established (when baresip reports CALL_ESTABLISHED) */
         logger_info_with_category("Call", "Call established - audio should be working");
@@ -303,6 +317,13 @@ void handle_call_state_event(call_state_event_t *call_state_event) {
         daemon_state->current_state = DAEMON_STATE_CALL_ACTIVE;
         daemon_state_update_activity(daemon_state);
     }
+    pthread_mutex_unlock(&daemon_state_mutex);
+    
+    /* Handle coin validator commands outside of mutex */
+    if (call_state_event_get_state(call_state_event) == EVENT_CALL_STATE_INCOMING) {
+        millennium_client_write_to_coin_validator(client, 'f');
+        millennium_client_write_to_coin_validator(client, 'z');
+    }
 }
 
 void handle_hook_event(hook_state_change_event_t *hook_event) {
@@ -310,12 +331,9 @@ void handle_hook_event(hook_state_change_event_t *hook_event) {
         logger_error_with_category("Hook", "Received null hook event");
         return;
     }
+    VALIDATE_BASICS();
     
-    if (!client) {
-        logger_error_with_category("Hook", "Client is null, cannot handle hook event");
-        return;
-    }
-    
+    pthread_mutex_lock(&daemon_state_mutex);
     if (hook_state_change_event_get_direction(hook_event) == 'U') {
         if (daemon_state->current_state == DAEMON_STATE_CALL_INCOMING) {
             logger_info_with_category("Call", "Call answered");
@@ -324,7 +342,6 @@ void handle_hook_event(hook_state_change_event_t *hook_event) {
             daemon_state->current_state = DAEMON_STATE_CALL_ACTIVE;
             daemon_state_update_activity(daemon_state);
             
-            millennium_client_answer_call(client);
         } else if (daemon_state->current_state == DAEMON_STATE_IDLE_DOWN) {
             logger_info_with_category("Hook", "Hook lifted, transitioning to IDLE_UP");
             metrics_increment_counter("hook_lifted", 1);
@@ -332,7 +349,6 @@ void handle_hook_event(hook_state_change_event_t *hook_event) {
             daemon_state->current_state = DAEMON_STATE_IDLE_UP;
             daemon_state_update_activity(daemon_state);
             
-            millennium_client_write_to_coin_validator(client, 'a');
             daemon_state->inserted_cents = 0;
             daemon_state_clear_keypad(daemon_state);
             
@@ -350,8 +366,6 @@ void handle_hook_event(hook_state_change_event_t *hook_event) {
             metrics_increment_counter("calls_ended", 1);
         }
         
-        millennium_client_hangup(client);
-        
         daemon_state_clear_keypad(daemon_state);
         daemon_state->inserted_cents = 0;
         
@@ -361,14 +375,29 @@ void handle_hook_event(hook_state_change_event_t *hook_event) {
         generate_display_bytes(display_bytes, sizeof(display_bytes));
         millennium_client_set_display(client, display_bytes);
         
-        /* Determine coin validator command based on current state */
-        char coin_cmd = (daemon_state->current_state == DAEMON_STATE_IDLE_UP) ? 'f' : 'c';
-        millennium_client_write_to_coin_validator(client, coin_cmd);
-        millennium_client_write_to_coin_validator(client, 'z');
-        
-        /* Update state after sending commands */
+        /* Update state */
         daemon_state->current_state = DAEMON_STATE_IDLE_DOWN;
         daemon_state_update_activity(daemon_state);
+    }
+    pthread_mutex_unlock(&daemon_state_mutex);
+    
+    /* Handle external calls outside of mutex */
+    if (hook_state_change_event_get_direction(hook_event) == 'U') {
+        /* Check what state we ended up in after the mutex section */
+        pthread_mutex_lock(&daemon_state_mutex);
+        if (daemon_state->current_state == DAEMON_STATE_CALL_ACTIVE) {
+            pthread_mutex_unlock(&daemon_state_mutex);
+            millennium_client_answer_call(client);
+        } else if (daemon_state->current_state == DAEMON_STATE_IDLE_UP) {
+            pthread_mutex_unlock(&daemon_state_mutex);
+            millennium_client_write_to_coin_validator(client, 'a');
+        } else {
+            pthread_mutex_unlock(&daemon_state_mutex);
+        }
+    } else if (hook_state_change_event_get_direction(hook_event) == 'D') {
+        millennium_client_hangup(client);
+        millennium_client_write_to_coin_validator(client, 'c'); /* Always 'c' for hook down */
+        millennium_client_write_to_coin_validator(client, 'z');
     }
 }
 
@@ -377,17 +406,14 @@ void handle_keypad_event(keypad_event_t *keypad_event) {
         logger_error_with_category("Keypad", "Received null keypad event");
         return;
     }
+    VALIDATE_BASICS();
     
-    if (!client) {
-        logger_error_with_category("Keypad", "Client is null, cannot handle keypad event");
-        return;
-    }
-    
-    if (daemon_state_get_keypad_length(daemon_state) < 10 && 
-        daemon_state->current_state == DAEMON_STATE_IDLE_UP) {
-        
-        char key = keypad_event_get_key(keypad_event);
-        if (isdigit(key)) {
+    char key = keypad_event_get_key(keypad_event);
+    if (isdigit(key)) {
+        pthread_mutex_lock(&daemon_state_mutex);
+        if (daemon_state_get_keypad_length(daemon_state) < 10 && 
+            daemon_state->current_state == DAEMON_STATE_IDLE_UP) {
+            
             char log_msg[MAX_STRING_LEN];
             sprintf(log_msg, "Key pressed: %c", key);
             logger_debug_with_category("Keypad", log_msg);
@@ -401,8 +427,11 @@ void handle_keypad_event(keypad_event_t *keypad_event) {
             char display_bytes[100];
             generate_display_bytes(display_bytes, sizeof(display_bytes));
             millennium_client_set_display(client, display_bytes);
-            
-            /* Check if we should initiate a call after keypad input */
+        }
+        pthread_mutex_unlock(&daemon_state_mutex);
+        
+        /* Check if we should initiate a call after keypad input */
+        if (isdigit(key)) {
             check_and_call();
         }
     }
@@ -453,28 +482,34 @@ int send_control_command(const char* action) {
     
     if (strcmp(command, "start_call") == 0) {
         /* Simulate starting a call by changing state */
+        pthread_mutex_lock(&daemon_state_mutex);
         daemon_state->current_state = DAEMON_STATE_CALL_INCOMING;
         daemon_state_update_activity(daemon_state);
         metrics_set_gauge("current_state", (double)daemon_state->current_state);
         metrics_increment_counter("calls_initiated", 1);
+        pthread_mutex_unlock(&daemon_state_mutex);
         logger_info_with_category("Control", "Call initiation requested via web portal");
         return 1;
         
     } else if (strcmp(command, "reset_system") == 0) {
         /* Reset the system state */
+        pthread_mutex_lock(&daemon_state_mutex);
         daemon_state_reset(daemon_state);
         metrics_set_gauge("current_state", (double)daemon_state->current_state);
         metrics_set_gauge("inserted_cents", 0.0);
         metrics_increment_counter("system_resets", 1);
+        pthread_mutex_unlock(&daemon_state_mutex);
         logger_info_with_category("Control", "System reset requested via web portal");
         return 1;
         
     } else if (strcmp(command, "emergency_stop") == 0) {
         /* Emergency stop - set to invalid state and stop running */
+        pthread_mutex_lock(&daemon_state_mutex);
         daemon_state->current_state = DAEMON_STATE_INVALID;
         daemon_state_update_activity(daemon_state);
         metrics_set_gauge("current_state", (double)daemon_state->current_state);
         metrics_increment_counter("emergency_stops", 1);
+        pthread_mutex_unlock(&daemon_state_mutex);
         logger_warn_with_category("Control", "Emergency stop activated via web portal");
         /* Note: We don't actually stop the daemon, just set it to invalid state */
         return 1;
@@ -498,6 +533,7 @@ int send_control_command(const char* action) {
         
     } else if (strcmp(command, "keypad_clear") == 0) {
         /* Only allow clear when handset is up (same as physical keypad logic) */
+        pthread_mutex_lock(&daemon_state_mutex);
         if (daemon_state->current_state == DAEMON_STATE_IDLE_UP) {
             daemon_state_clear_keypad(daemon_state);
             daemon_state_update_activity(daemon_state);
@@ -510,15 +546,16 @@ int send_control_command(const char* action) {
             char display_bytes[100];
             generate_display_bytes(display_bytes, sizeof(display_bytes));
             millennium_client_set_display(client, display_bytes);
-            
-            return 1;
         } else {
             logger_warn_with_category("Control", "Keypad clear ignored - handset down");
-            return 0;
         }
+        int success = (daemon_state->current_state == DAEMON_STATE_IDLE_UP);
+        pthread_mutex_unlock(&daemon_state_mutex);
+        return success;
         
     } else if (strcmp(command, "keypad_backspace") == 0) {
         /* Only allow backspace when handset is up and buffer is not empty */
+        pthread_mutex_lock(&daemon_state_mutex);
         if (daemon_state->current_state == DAEMON_STATE_IDLE_UP && daemon_state_get_keypad_length(daemon_state) > 0) {
             daemon_state_remove_last_key(daemon_state);
             daemon_state_update_activity(daemon_state);
@@ -531,12 +568,12 @@ int send_control_command(const char* action) {
             char display_bytes[100];
             generate_display_bytes(display_bytes, sizeof(display_bytes));
             millennium_client_set_display(client, display_bytes);
-            
-            return 1;
         } else {
             logger_warn_with_category("Control", "Keypad backspace ignored - handset down or buffer empty");
-            return 0;
         }
+        int success = (daemon_state->current_state == DAEMON_STATE_IDLE_UP && daemon_state_get_keypad_length(daemon_state) > 0);
+        pthread_mutex_unlock(&daemon_state_mutex);
+        return success;
         
     } else if (strcmp(command, "coin_insert") == 0) {
         /* Extract cents from argument and inject as coin event */
@@ -584,6 +621,7 @@ int send_control_command(const char* action) {
         return 1;
         
     } else if (strcmp(command, "coin_return") == 0) {
+        pthread_mutex_lock(&daemon_state_mutex);
         daemon_state->inserted_cents = 0;
         daemon_state_update_activity(daemon_state);
         metrics_set_gauge("inserted_cents", 0.0);
@@ -597,6 +635,7 @@ int send_control_command(const char* action) {
         generate_display_bytes(display_bytes, sizeof(display_bytes));
         millennium_client_set_display(client, display_bytes);
         
+        pthread_mutex_unlock(&daemon_state_mutex);
         return 1;
         
     } else if (strcmp(command, "handset_up") == 0) {
@@ -654,7 +693,13 @@ health_status_t check_daemon_activity(void) {
     }
     
     time_t now = time(NULL);
-    time_t time_since_activity = now - daemon_state->last_activity;
+    time_t last_activity;
+    
+    pthread_mutex_lock(&daemon_state_mutex);
+    last_activity = daemon_state->last_activity;
+    pthread_mutex_unlock(&daemon_state_mutex);
+    
+    time_t time_since_activity = now - last_activity;
     
     if (time_since_activity > 3600) { /* No activity for more than 1 hour */
         return HEALTH_STATUS_WARNING;
@@ -687,17 +732,25 @@ void* metrics_collection_thread(void* arg) {
         metrics_set_gauge("daemon_uptime_seconds", (double)uptime);
         
         if (daemon_state) {
-            /* Use mutex to prevent race conditions with main thread */
+            /* Simple check if we should still be running */
             pthread_mutex_lock(&running_mutex);
-            /* Check if we should still be running after acquiring mutex */
             if (!running) {
                 pthread_mutex_unlock(&running_mutex);
                 break;
             }
-            metrics_set_gauge("current_state", (double)daemon_state->current_state);
-            metrics_set_gauge("inserted_cents", (double)daemon_state->inserted_cents);
-            metrics_set_gauge("keypad_buffer_size", (double)daemon_state_get_keypad_length(daemon_state));
             pthread_mutex_unlock(&running_mutex);
+            
+            /* Quick snapshot of state without holding mutex too long */
+            pthread_mutex_lock(&daemon_state_mutex);
+            double current_state = (double)daemon_state->current_state;
+            double inserted_cents = (double)daemon_state->inserted_cents;
+            double keypad_size = (double)daemon_state_get_keypad_length(daemon_state);
+            pthread_mutex_unlock(&daemon_state_mutex);
+            
+            /* Update metrics outside of mutex */
+            metrics_set_gauge("current_state", current_state);
+            metrics_set_gauge("inserted_cents", inserted_cents);
+            metrics_set_gauge("keypad_buffer_size", keypad_size);
         }
         
         sleep(10);
@@ -806,11 +859,13 @@ int main(int argc, char *argv[]) {
     }
     
     /* Initialize display */
+    pthread_mutex_lock(&daemon_state_mutex);
     format_number(daemon_state->keypad_buffer, line1);
     generate_message(daemon_state->inserted_cents, line2);
     char display_bytes[100];
     generate_display_bytes(display_bytes, sizeof(display_bytes));
     millennium_client_set_display(client, display_bytes);
+    pthread_mutex_unlock(&daemon_state_mutex);
     
     /* Initialize event processor */
     event_processor = event_processor_create();
@@ -851,12 +906,16 @@ int main(int argc, char *argv[]) {
         metrics_set_gauge("daemon_uptime_seconds", (double)uptime);
         
         if (daemon_state) {
-            /* Use mutex to prevent race conditions with metrics thread */
-            pthread_mutex_lock(&running_mutex);
-            metrics_set_gauge("current_state", (double)daemon_state->current_state);
-            metrics_set_gauge("inserted_cents", (double)daemon_state->inserted_cents);
-            metrics_set_gauge("keypad_buffer_size", (double)daemon_state_get_keypad_length(daemon_state));
-            pthread_mutex_unlock(&running_mutex);
+            /* Quick snapshot for metrics */
+            pthread_mutex_lock(&daemon_state_mutex);
+            double current_state = (double)daemon_state->current_state;
+            double inserted_cents = (double)daemon_state->inserted_cents;
+            double keypad_size = (double)daemon_state_get_keypad_length(daemon_state);
+            pthread_mutex_unlock(&daemon_state_mutex);
+            
+            metrics_set_gauge("current_state", current_state);
+            metrics_set_gauge("inserted_cents", inserted_cents);
+            metrics_set_gauge("keypad_buffer_size", keypad_size);
         }
         }
         
