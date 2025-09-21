@@ -40,12 +40,12 @@ event_processor.o: event_processor.c event_processor.h events.h
 millennium_sdk.o: millennium_sdk.c millennium_sdk.h events.h baresip_interface.h
 	gcc millennium_sdk.c -o millennium_sdk.o -c $(CFLAGS)
 
-daemon.o: daemon.cpp millennium_sdk.h events.h event_processor.h config.h logger.h health_monitor.h metrics.h metrics_server.h web_server.h
-	g++ daemon.cpp -o daemon.o -c -g -O3 -std=c++17 -Wall -Wextra
+daemon.o: daemon.c millennium_sdk.h events.h event_processor.h config.h logger.h health_monitor.h metrics.h metrics_server.h web_server.h
+	gcc daemon.c -o daemon.o -c $(CFLAGS)
 
 # Executables
 daemon: daemon.o daemon_state.o millennium_sdk.o baresip_interface.o events.o event_processor.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o
-	gcc daemon.o daemon_state.o millennium_sdk.o baresip_interface.o events.o event_processor.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o -o daemon $(LDFLAGS) -lstdc++
+	gcc daemon.o daemon_state.o millennium_sdk.o baresip_interface.o events.o event_processor.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o -o daemon $(LDFLAGS)
 
 all: daemon
 
