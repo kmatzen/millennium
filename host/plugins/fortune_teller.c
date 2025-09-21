@@ -221,12 +221,12 @@ static void fortune_teller_give_fortune(void) {
     const char* fortune = fortune_teller_get_random_fortune(fortune_teller_data.fortune_type);
     const char* category = fortune_categories[fortune_teller_data.fortune_type];
     
-    /* Show fortune category */
+    /* Show fortune category and text */
     char display_bytes[100];
     size_t pos = 0;
     int i;
     
-    /* Add line1, padded or truncated to 20 characters */
+    /* Add line1: Category name, padded or truncated to 20 characters */
     for (i = 0; i < 20 && pos < sizeof(display_bytes) - 2; i++) {
         display_bytes[pos++] = (i < (int)strlen(category)) ? category[i] : ' ';
     }
@@ -234,9 +234,9 @@ static void fortune_teller_give_fortune(void) {
     /* Add line feed */
     display_bytes[pos++] = 0x0A;
     
-    /* Add line2, padded or truncated to 20 characters */
+    /* Add line2: Fortune text, truncated to 20 characters */
     for (i = 0; i < 20 && pos < sizeof(display_bytes) - 1; i++) {
-        display_bytes[pos++] = (i < 6) ? "Fortune"[i] : ' ';
+        display_bytes[pos++] = (i < (int)strlen(fortune)) ? fortune[i] : ' ';
     }
     
     /* Null terminate */

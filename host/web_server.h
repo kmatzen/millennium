@@ -150,6 +150,7 @@ struct http_response web_server_handle_api_config(const struct http_request* req
 struct http_response web_server_handle_api_state(const struct http_request* request);
 struct http_response web_server_handle_api_control(const struct http_request* request);
 struct http_response web_server_handle_api_logs(const struct http_request* request);
+struct http_response web_server_handle_api_plugins(const struct http_request* request);
 
 /* Utility functions */
 int web_server_is_in_call(void);

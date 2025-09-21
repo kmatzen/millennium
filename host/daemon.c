@@ -8,6 +8,7 @@
 #include "millennium_sdk.h"
 #include "events.h"
 #include "event_processor.h"
+#include "plugins.h"
 #include <signal.h>
 #include <string.h>
 #include <stdio.h>
@@ -57,7 +58,6 @@ pthread_mutex_t daemon_state_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 /* Function prototypes */
 static void signal_handler(int signal);
-static void check_and_call(void);
 static void handle_coin_event(coin_event_t *coin_event);
 static void handle_call_state_event(call_state_event_t *call_state_event);
 static void handle_hook_event(hook_state_change_event_t *hook_event);
@@ -236,42 +236,7 @@ static int keypad_has_space(void) {
 }
 
 /* Helper function to safely update daemon state with mutex protection */
-static void safe_update_daemon_state(daemon_state_t new_state) {
-    if (!daemon_state) return;
-    
-    pthread_mutex_lock(&daemon_state_mutex);
-    daemon_state->current_state = new_state;
-    daemon_state_update_activity(daemon_state);
-    pthread_mutex_unlock(&daemon_state_mutex);
-}
 
-void check_and_call(void) {
-    VALIDATE_BASICS();
-    
-    int cost_cents = config_get_call_cost_cents(config_get_instance());
-    
-    /* Quick check without mutex - if conditions aren't met, no need to lock */
-    int keypad_ready = (daemon_state_get_keypad_length(daemon_state) == MAX_KEYPAD_DIGITS);
-    int enough_money = (daemon_state->inserted_cents >= cost_cents);
-    int phone_ready = is_phone_ready_for_operation();
-    
-    if (keypad_ready && enough_money && phone_ready) {
-        
-        char number[MAX_KEYPAD_LEN];
-        strncpy(number, daemon_state->keypad_buffer, MAX_KEYPAD_DIGITS);
-        number[MAX_KEYPAD_DIGITS] = '\0';
-        
-        logger_infof_with_category("Call", "Dialing number: %s", number);
-        metrics_increment_counter("calls_initiated", 1);
-        
-        update_display_with_content(line1, "Calling");
-        
-        millennium_client_call(client, number);
-        
-        /* Update state safely */
-        safe_update_daemon_state(DAEMON_STATE_CALL_ACTIVE);
-    }
-}
 
 void handle_coin_event(coin_event_t *coin_event) {
     if (!coin_event) {
@@ -314,9 +279,9 @@ void handle_coin_event(coin_event_t *coin_event) {
         }
         pthread_mutex_unlock(&daemon_state_mutex);
         
-        /* Check if we should initiate a call after coin insertion */
+        /* Let active plugin handle the coin event */
         if (coin_value > 0) {
-            check_and_call();
+            plugins_handle_coin(coin_value, coin_code_str);
         }
     }
     
@@ -355,6 +320,9 @@ void handle_call_state_event(call_state_event_t *call_state_event) {
         daemon_state_update_activity(daemon_state);
     }
     pthread_mutex_unlock(&daemon_state_mutex);
+    
+    /* Let active plugin handle the call state event */
+    plugins_handle_call_state(call_state_event_get_state(call_state_event));
     
     /* Handle coin validator commands outside of mutex */
     if (call_state_event_get_state(call_state_event) == EVENT_CALL_STATE_INCOMING) {
@@ -416,6 +384,9 @@ void handle_hook_event(hook_state_change_event_t *hook_event) {
     }
     pthread_mutex_unlock(&daemon_state_mutex);
     
+    /* Let active plugin handle the hook event */
+    plugins_handle_hook(hook_up, hook_down);
+    
     /* Handle external calls outside of mutex */
     if (hook_up) {
         /* Check what state we ended up in after the mutex section */
@@ -459,9 +430,9 @@ void handle_keypad_event(keypad_event_t *keypad_event) {
         }
         pthread_mutex_unlock(&daemon_state_mutex);
         
-        /* Check if we should initiate a call after keypad input */
+        /* Let active plugin handle the keypad event */
         if (isdigit(key)) {
-            check_and_call();
+            plugins_handle_keypad(key);
         }
     }
 }
@@ -664,6 +635,22 @@ int send_control_command(const char* action) {
         }
         logger_info_with_category("Control", "Handset placed down via web portal");
         return 1;
+        
+    } else if (strcmp(command, "activate_plugin") == 0) {
+        /* Activate a plugin */
+        if (strlen(arg) > 0) {
+            int result = plugins_activate(arg);
+            if (result == 0) {
+                logger_infof_with_category("Control", "Plugin %s activated via web portal", arg);
+                return 1;
+            } else {
+                logger_warnf_with_category("Control", "Failed to activate plugin %s", arg);
+                return 0;
+            }
+        } else {
+            logger_warn_with_category("Control", "Plugin activation command missing plugin name");
+            return 0;
+        }
     }
     
     return 0;
@@ -844,6 +831,9 @@ int main(int argc, char *argv[]) {
     event_processor_register_hook_handler(event_processor, handle_hook_event);
     event_processor_register_keypad_handler(event_processor, handle_keypad_event);
     
+    /* Initialize plugin system */
+    plugins_init();
+    
     logger_info_with_category("Daemon", "Daemon initialized successfully");
     
     /* Main event loop */
@@ -915,6 +905,9 @@ int main(int argc, char *argv[]) {
         event_processor_destroy(event_processor);
         event_processor = NULL;
     }
+    
+    /* Cleanup plugin system */
+    plugins_cleanup();
     
     /* Cleanup daemon state */
     if (daemon_state) {

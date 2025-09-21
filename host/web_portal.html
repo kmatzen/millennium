@@ -232,6 +232,74 @@
             border-left: 4px solid #3498db;
         }
 
+        /* Plugin Management Styles */
+        .plugin-section {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: rgba(155, 89, 182, 0.1);
+            border-radius: 8px;
+            border-left: 4px solid #9b59b6;
+        }
+
+        .plugin-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .plugin-card {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            border: 2px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .plugin-card.active {
+            border-color: #27ae60;
+            background: rgba(39, 174, 96, 0.05);
+        }
+
+        .plugin-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+        }
+
+        .plugin-name {
+            font-weight: bold;
+            font-size: 1.1em;
+            color: #2c3e50;
+            margin-bottom: 8px;
+        }
+
+        .plugin-description {
+            color: #7f8c8d;
+            font-size: 0.9em;
+            margin-bottom: 12px;
+            line-height: 1.4;
+        }
+
+        .plugin-status {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .plugin-status.active {
+            background: #27ae60;
+            color: white;
+        }
+
+        .plugin-status.inactive {
+            background: #95a5a6;
+            color: white;
+        }
+
         .simulation-section h3 {
             color: #2c3e50;
             margin-bottom: 10px;
@@ -550,6 +618,18 @@
                 </div>
             </div>
 
+            <!-- Plugin Management Panel -->
+            <div class="card control-panel">
+                <h2>Plugin Management</h2>
+                
+                <div class="plugin-section">
+                    <h3>Available Plugins</h3>
+                    <div class="plugin-grid" id="plugin-grid">
+                        <div class="loading">Loading plugins...</div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Configuration Panel -->
             <div class="card config-panel">
                 <h2>System Configuration</h2>
@@ -650,7 +730,8 @@
                     updateMetrics(),
                     updateHealthChecks(),
                     updateConfiguration(),
-                    updateLogs()
+                    updateLogs(),
+                    updatePlugins()
                 ]);
                 
                 updateLastUpdateTime();
@@ -869,6 +950,64 @@
                 
             } catch (error) {
                 document.getElementById('logs-container').innerHTML = '<div class="error">Failed to load logs</div>';
+            }
+        }
+
+        // Update plugins
+        async function updatePlugins() {
+            try {
+                const response = await fetch('/api/plugins');
+                const data = await response.json();
+                
+                const pluginGrid = document.getElementById('plugin-grid');
+                pluginGrid.innerHTML = '';
+                
+                if (data.plugins && data.plugins.length > 0) {
+                    data.plugins.forEach(plugin => {
+                        const pluginCard = document.createElement('div');
+                        pluginCard.className = `plugin-card ${plugin.active ? 'active' : ''}`;
+                        pluginCard.innerHTML = `
+                            <div class="plugin-name">${plugin.name}</div>
+                            <div class="plugin-description">${plugin.description}</div>
+                            <div class="plugin-status ${plugin.active ? 'active' : 'inactive'}">
+                                ${plugin.active ? 'Active' : 'Inactive'}
+                            </div>
+                            <button class="btn ${plugin.active ? 'btn-success' : 'btn-primary'}" 
+                                    onclick="activatePlugin('${plugin.name}')" 
+                                    style="margin-top: 10px; width: 100%;">
+                                ${plugin.active ? 'Currently Active' : 'Activate'}
+                            </button>
+                        `;
+                        pluginGrid.appendChild(pluginCard);
+                    });
+                } else {
+                    pluginGrid.innerHTML = '<div class="loading">No plugins available</div>';
+                }
+                
+            } catch (error) {
+                document.getElementById('plugin-grid').innerHTML = '<div class="error">Failed to load plugins</div>';
+            }
+        }
+
+        // Activate a plugin
+        async function activatePlugin(pluginName) {
+            try {
+                const response = await fetch('/api/control', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'activate_plugin', plugin: pluginName })
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    showMessage(`Plugin "${pluginName}" activated successfully!`, 'success');
+                    // Immediately update the UI for better responsiveness
+                    updatePlugins();
+                } else {
+                    showMessage(`Failed to activate plugin "${pluginName}": ${result.message || 'Unknown error'}`, 'error');
+                }
+            } catch (error) {
+                showMessage(`Failed to activate plugin "${pluginName}": ${error.message}`, 'error');
             }
         }
 

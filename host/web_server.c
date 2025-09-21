@@ -3,6 +3,7 @@
 #include "logger.h"
 #include "metrics.h"
 #include "health_monitor.h"
+#include "plugins.h"
 
 #include <sys/socket.h>
 #include <sys/select.h>
@@ -704,6 +705,7 @@ void web_server_setup_api_routes(struct web_server* server) {
     web_server_add_route(server, "GET", "/api/state", web_server_handle_api_state);
     web_server_add_route(server, "POST", "/api/control", web_server_handle_api_control);
     web_server_add_route(server, "GET", "/api/logs", web_server_handle_api_logs);
+    web_server_add_route(server, "GET", "/api/plugins", web_server_handle_api_plugins);
 }
 
 /* Default handlers */
@@ -923,6 +925,7 @@ struct http_response web_server_handle_api_control(const struct http_request* re
     char json[512];
     char action[64] = "unknown";
     char key[16] = "";
+    char plugin[64] = "";
     int cents = 0;
     
     /* Parse action from JSON body */
@@ -957,6 +960,20 @@ struct http_response web_server_handle_api_control(const struct http_request* re
     char* cents_pos = strstr(request->body, "\"cents\":");
     if (cents_pos) {
         cents = atoi(cents_pos + 8); /* Length of "cents": */
+    }
+    
+    /* Parse plugin for plugin actions */
+    char* plugin_pos = strstr(request->body, "\"plugin\":\"");
+    if (plugin_pos) {
+        char* start = plugin_pos + 10; /* Length of "plugin":" */
+        char* end = strchr(start, '"');
+        if (end) {
+            size_t len = end - start;
+            if (len < sizeof(plugin)) {
+                memcpy(plugin, start, len);
+                plugin[len] = '\0';
+            }
+        }
     }
     
     /* Handle different actions */
@@ -997,6 +1014,15 @@ struct http_response web_server_handle_api_control(const struct http_request* re
     } else if (strcmp(action, "handset_down") == 0) {
         success = send_control_command("handset_down");
         strcpy(message, success ? "Handset placed down" : "Failed to simulate handset down");
+    } else if (strcmp(action, "activate_plugin") == 0) {
+        char cmd[128];
+        sprintf(cmd, "activate_plugin:%s", plugin);
+        success = send_control_command(cmd);
+        if (success) {
+            sprintf(message, "Plugin %s activated", plugin);
+        } else {
+            sprintf(message, "Failed to activate plugin %s", plugin);
+        }
     } else {
         sprintf(message, "Unknown action: %s", action);
     }
@@ -1057,7 +1083,8 @@ struct http_response web_server_handle_api_logs(const struct http_request* reque
     
     int first = 1;
     int total_count = 0;
-    for (i = 0; i < log_count && remaining > 200; i++) {
+    /* Process logs in reverse order (newest first) */
+    for (i = log_count - 1; i >= 0 && remaining > 200; i--) {
         if (!first) {
             written = sprintf(ptr, ",");
             if (written > 0 && (size_t)written < remaining) {
@@ -1095,10 +1122,11 @@ struct http_response web_server_handle_api_logs(const struct http_request* reque
             escaped_message[200] = '\0';
         }
         
-        /* Extract timestamp from the log message if available */
+        /* Extract timestamp and level from the log message */
         time_t log_timestamp = time(NULL); /* Default to current time */
+        char log_level[16] = "INFO"; /* Default level */
         
-        /* Try to parse timestamp from log message format: [YYYY-MM-DD HH:MM:SS.mmm] */
+        /* Try to parse timestamp from log message format: [YYYY-MM-DD HH:MM:SS.mmm] [LEVEL] [CATEGORY] message */
         char* timestamp_start = strstr(log_buffer[i], "[");
         if (timestamp_start) {
             char* timestamp_end = strstr(timestamp_start + 1, "]");
@@ -1117,12 +1145,50 @@ struct http_response web_server_handle_api_logs(const struct http_request* reque
                     tm_time.tm_sec = sec;
                     log_timestamp = mktime(&tm_time);
                 }
+                
+                /* Try to parse log level from the next [LEVEL] section */
+                char* level_start = strstr(timestamp_end + 1, "[");
+                if (level_start) {
+                    char* level_end = strstr(level_start + 1, "]");
+                    if (level_end) {
+                        size_t level_len = level_end - level_start - 1;
+                        if (level_len > 0 && level_len < sizeof(log_level) - 1) {
+                            strncpy(log_level, level_start + 1, level_len);
+                            log_level[level_len] = '\0';
+                        }
+                    }
+                }
+            }
+        }
+        
+        /* Filter by level if specified */
+        if (strcmp(level, "ALL") != 0) {
+            /* Convert both to uppercase for comparison */
+            char upper_level[16];
+            char upper_log_level[16];
+            int j;
+            
+            /* Convert requested level to uppercase */
+            for (j = 0; level[j] != '\0' && j < (int)(sizeof(upper_level) - 1); j++) {
+                upper_level[j] = toupper(level[j]);
+            }
+            upper_level[j] = '\0';
+            
+            /* Convert log level to uppercase */
+            for (j = 0; log_level[j] != '\0' && j < (int)(sizeof(upper_log_level) - 1); j++) {
+                upper_log_level[j] = toupper(log_level[j]);
+            }
+            upper_log_level[j] = '\0';
+            
+            /* Skip if level doesn't match */
+            if (strcmp(upper_level, upper_log_level) != 0) {
+                continue;
             }
         }
         
         written = sprintf(ptr,
-            "{\"timestamp\":%ld,\"level\":\"INFO\",\"message\":\"%s\"}",
-            log_timestamp, escaped_message);
+            "{\"timestamp\":%ld,\"level\":\"%s\",\"message\":\"%s\"}",
+            log_timestamp, log_level, escaped_message);
         if (written > 0 && (size_t)written < remaining) {
             ptr += written;
             remaining -= written;
@@ -1137,6 +1203,46 @@ struct http_response web_server_handle_api_logs(const struct http_request* reque
         ptr += written;
         remaining -= written;
     }
+    
+    web_server_strcpy_safe(response.body, json, sizeof(response.body));
+    return response;
+}
+
+struct http_response web_server_handle_api_plugins(const struct http_request* request) {
+    (void)request; /* Suppress unused parameter warning */
+    struct http_response response;
+    memset(&response, 0, sizeof(response));
+    web_server_strcpy_safe(response.content_type, "application/json", sizeof(response.content_type));
+    
+    char json[1024];
+    const char* active_plugin = plugins_get_active_name();
+    
+    sprintf(json,
+        "{"
+        "\"plugins\":["
+        "{"
+        "\"name\":\"Classic Phone\","
+        "\"description\":\"Traditional pay phone functionality with VoIP calling\","
+        "\"active\":%s"
+        "},"
+        "{"
+        "\"name\":\"Fortune Teller\","
+        "\"description\":\"Mystical fortune telling experience - 25¢ per fortune\","
+        "\"active\":%s"
+        "},"
+        "{"
+        "\"name\":\"Jukebox\","
+        "\"description\":\"Coin-operated music player - 25¢ per song\","
+        "\"active\":%s"
+        "}"
+        "],"
+        "\"active_plugin\":\"%s\""
+        "}",
+        (active_plugin && strcmp(active_plugin, "Classic Phone") == 0) ? "true" : "false",
+        (active_plugin && strcmp(active_plugin, "Fortune Teller") == 0) ? "true" : "false",
+        (active_plugin && strcmp(active_plugin, "Jukebox") == 0) ? "true" : "false",
+        active_plugin ? active_plugin : "Unknown"
+    );
     
     web_server_strcpy_safe(response.body, json, sizeof(response.body));
     return response;

@@ -40,17 +40,29 @@ event_processor.o: event_processor.c event_processor.h events.h
 millennium_sdk.o: millennium_sdk.c millennium_sdk.h events.h baresip_interface.h
 	gcc millennium_sdk.c -o millennium_sdk.o -c $(CFLAGS)
 
-daemon.o: daemon.c millennium_sdk.h events.h event_processor.h config.h logger.h health_monitor.h metrics.h metrics_server.h web_server.h
+daemon.o: daemon.c millennium_sdk.h events.h event_processor.h config.h logger.h health_monitor.h metrics.h metrics_server.h web_server.h plugins.h
 	gcc daemon.c -o daemon.o -c $(CFLAGS)
 
 # Executables
-daemon: daemon.o daemon_state.o millennium_sdk.o baresip_interface.o events.o event_processor.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o
-	gcc daemon.o daemon_state.o millennium_sdk.o baresip_interface.o events.o event_processor.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o -o daemon $(LDFLAGS)
+plugins.o: plugins.c plugins.h
+	gcc plugins.c -o plugins.o -c $(CFLAGS)
+
+plugins/classic_phone.o: plugins/classic_phone.c plugins.h
+	gcc plugins/classic_phone.c -o plugins/classic_phone.o -c $(CFLAGS)
+
+plugins/fortune_teller.o: plugins/fortune_teller.c plugins.h
+	gcc plugins/fortune_teller.c -o plugins/fortune_teller.o -c $(CFLAGS)
+
+plugins/jukebox.o: plugins/jukebox.c plugins.h
+	gcc plugins/jukebox.c -o plugins/jukebox.o -c $(CFLAGS)
+
+daemon: daemon.o daemon_state.o millennium_sdk.o baresip_interface.o events.o event_processor.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o plugins.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o
+	gcc daemon.o daemon_state.o millennium_sdk.o baresip_interface.o events.o event_processor.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o plugins.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o -o daemon $(LDFLAGS)
 
 all: daemon
 
 clean:
-	rm -rf *.o daemon
+	rm -rf *.o daemon plugins/*.o
 
 install: daemon
 	sudo mkdir -p /etc/millennium
