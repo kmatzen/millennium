@@ -9,12 +9,6 @@
 /* Global logger instance */
 logger_data_t* g_logger = NULL;
 
-/* C89 compatible safe sprintf - ensures null termination */
-static void safe_sprintf(char* buffer, size_t buffer_size, const char* format, va_list args) {
-    vsprintf(buffer, format, args);
-    /* Ensure null termination */
-    buffer[buffer_size - 1] = '\0';
-}
 
 logger_data_t* logger_get_instance(void) {
     if (g_logger == NULL) {
@@ -293,184 +287,107 @@ void logger_error_with_category(const char* category, const char* message) {
     logger_log_with_category(LOG_LEVEL_ERROR, category, message);
 }
 
-/* Printf-style logging methods */
-void logger_logf(log_level_t level, const char* format, ...) {
+/* C89 compatible printf-style logging - single implementation */
+static void logger_vlogf(log_level_t level, const char* category, const char* format, va_list args) {
     char buffer[512];
-    va_list args;
     
     if (format == NULL) {
         return;
     }
     
-    va_start(args, format);
-    safe_sprintf(buffer, sizeof(buffer), format, args);
-    va_end(args);
+    /* C89 compatible: use vsprintf with size check */
+    vsprintf(buffer, format, args);
+    buffer[sizeof(buffer) - 1] = '\0'; /* Ensure null termination */
     
-    logger_log(level, buffer);
+    if (category && strlen(category) > 0) {
+        logger_log_with_category(level, category, buffer);
+    } else {
+        logger_log(level, buffer);
+    }
+}
+
+/* Printf-style logging methods */
+void logger_logf(log_level_t level, const char* format, ...) {
+    va_list args;
+    va_start(args, format);
+    logger_vlogf(level, NULL, format, args);
+    va_end(args);
 }
 
 void logger_logf_with_category(log_level_t level, const char* category, const char* format, ...) {
-    char buffer[512];
     va_list args;
-    
-    if (format == NULL) {
-        return;
-    }
-    
     va_start(args, format);
-    safe_sprintf(buffer, sizeof(buffer), format, args);
+    logger_vlogf(level, category, format, args);
     va_end(args);
-    
-    logger_log_with_category(level, category, buffer);
 }
 
-/* Printf-style convenience methods */
+/* Convenience methods using the simplified implementation */
 void logger_verbosef(const char* format, ...) {
-    char buffer[512];
     va_list args;
-    
-    if (format == NULL) {
-        return;
-    }
-    
     va_start(args, format);
-    safe_sprintf(buffer, sizeof(buffer), format, args);
+    logger_vlogf(LOG_LEVEL_VERBOSE, NULL, format, args);
     va_end(args);
-    
-    logger_verbose(buffer);
 }
 
 void logger_debugf(const char* format, ...) {
-    char buffer[512];
     va_list args;
-    
-    if (format == NULL) {
-        return;
-    }
-    
     va_start(args, format);
-    safe_sprintf(buffer, sizeof(buffer), format, args);
+    logger_vlogf(LOG_LEVEL_DEBUG, NULL, format, args);
     va_end(args);
-    
-    logger_debug(buffer);
 }
 
 void logger_infof(const char* format, ...) {
-    char buffer[512];
     va_list args;
-    
-    if (format == NULL) {
-        return;
-    }
-    
     va_start(args, format);
-    safe_sprintf(buffer, sizeof(buffer), format, args);
+    logger_vlogf(LOG_LEVEL_INFO, NULL, format, args);
     va_end(args);
-    
-    logger_info(buffer);
 }
 
 void logger_warnf(const char* format, ...) {
-    char buffer[512];
     va_list args;
-    
-    if (format == NULL) {
-        return;
-    }
-    
     va_start(args, format);
-    safe_sprintf(buffer, sizeof(buffer), format, args);
+    logger_vlogf(LOG_LEVEL_WARN, NULL, format, args);
     va_end(args);
-    
-    logger_warn(buffer);
 }
 
 void logger_errorf(const char* format, ...) {
-    char buffer[512];
     va_list args;
-    
-    if (format == NULL) {
-        return;
-    }
-    
     va_start(args, format);
-    safe_sprintf(buffer, sizeof(buffer), format, args);
+    logger_vlogf(LOG_LEVEL_ERROR, NULL, format, args);
     va_end(args);
-    
-    logger_error(buffer);
 }
 
 void logger_verbosef_with_category(const char* category, const char* format, ...) {
-    char buffer[512];
     va_list args;
-    
-    if (format == NULL) {
-        return;
-    }
-    
     va_start(args, format);
-    safe_sprintf(buffer, sizeof(buffer), format, args);
+    logger_vlogf(LOG_LEVEL_VERBOSE, category, format, args);
     va_end(args);
-    
-    logger_verbose_with_category(category, buffer);
 }
 
 void logger_debugf_with_category(const char* category, const char* format, ...) {
-    char buffer[512];
     va_list args;
-    
-    if (format == NULL) {
-        return;
-    }
-    
     va_start(args, format);
-    safe_sprintf(buffer, sizeof(buffer), format, args);
+    logger_vlogf(LOG_LEVEL_DEBUG, category, format, args);
     va_end(args);
-    
-    logger_debug_with_category(category, buffer);
 }
 
 void logger_infof_with_category(const char* category, const char* format, ...) {
-    char buffer[512];
     va_list args;
-    
-    if (format == NULL) {
-        return;
-    }
-    
     va_start(args, format);
-    safe_sprintf(buffer, sizeof(buffer), format, args);
+    logger_vlogf(LOG_LEVEL_INFO, category, format, args);
     va_end(args);
-    
-    logger_info_with_category(category, buffer);
 }
 
 void logger_warnf_with_category(const char* category, const char* format, ...) {
-    char buffer[512];
     va_list args;
-    
-    if (format == NULL) {
-        return;
-    }
-    
     va_start(args, format);
-    safe_sprintf(buffer, sizeof(buffer), format, args);
+    logger_vlogf(LOG_LEVEL_WARN, category, format, args);
     va_end(args);
-    
-    logger_warn_with_category(category, buffer);
 }
 
 void logger_errorf_with_category(const char* category, const char* format, ...) {
-    char buffer[512];
     va_list args;
-    
-    if (format == NULL) {
-        return;
-    }
-    
     va_start(args, format);
-    safe_sprintf(buffer, sizeof(buffer), format, args);
+    logger_vlogf(LOG_LEVEL_ERROR, category, format, args);
     va_end(args);
-    
-    logger_error_with_category(category, buffer);
 }

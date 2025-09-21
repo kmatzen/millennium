@@ -16,6 +16,7 @@
 #include <ctype.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <stdarg.h>
 
 #define EVENT_CATEGORIES 3
 #define DISPLAY_WIDTH 20
@@ -192,6 +193,7 @@ static void update_display(void) {
     millennium_client_set_display(client, display_bytes);
 }
 
+
 /* Helper function to validate phone state for operations */
 static int is_phone_ready_for_operation(void) {
     return (daemon_state && daemon_state->current_state == DAEMON_STATE_IDLE_UP);
@@ -218,9 +220,7 @@ void check_and_call(void) {
         strncpy(number, daemon_state->keypad_buffer, 10);
         number[10] = '\0';
         
-        char log_msg[MAX_STRING_LEN];
-        sprintf(log_msg, "Dialing number: %s", number);
-        logger_info_with_category("Call", log_msg);
+        logger_infof_with_category("Call", "Dialing number: %s", number);
         metrics_increment_counter("calls_initiated", 1);
         
         strcpy(line2, "Calling");
@@ -269,11 +269,9 @@ void handle_coin_event(coin_event_t *coin_event) {
             metrics_increment_counter("coins_inserted", 1);
             metrics_increment_counter("coins_value_cents", coin_value);
             
-            char log_msg[MAX_STRING_LEN];
-            sprintf(log_msg, 
+            logger_infof_with_category("Coin", 
                     "Coin inserted: %s, value: %d cents, total: %d cents",
                     coin_code_str, coin_value, daemon_state->inserted_cents);
-            logger_info_with_category("Coin", log_msg);
             
             format_number(daemon_state->keypad_buffer, line1);
             generate_message(daemon_state->inserted_cents, line2);

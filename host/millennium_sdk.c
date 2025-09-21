@@ -157,10 +157,14 @@ static void string_buffer_ensure_capacity(struct millennium_client *client, size
 }
 
 static void string_buffer_append(struct millennium_client *client, const char *data, size_t len) {
+    if (!client || !data || len == 0) return;
+    
     string_buffer_ensure_capacity(client, client->input_buffer_size + len + 1);
-    memcpy(client->input_buffer + client->input_buffer_size, data, len);
-    client->input_buffer_size += len;
-    client->input_buffer[client->input_buffer_size] = '\0';
+    if (client->input_buffer) {
+        memcpy(client->input_buffer + client->input_buffer_size, data, len);
+        client->input_buffer_size += len;
+        client->input_buffer[client->input_buffer_size] = '\0';
+    }
 }
 
 /* UA event handler */
