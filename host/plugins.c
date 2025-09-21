@@ -1,0 +1,172 @@
+#define _POSIX_C_SOURCE 199309L
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#include <sys/time.h>
+#include "plugins.h"
+#include "logger.h"
+#include "millennium_sdk.h"
+
+/* Maximum number of plugins */
+#define MAX_PLUGINS 10
+
+/* Plugin registry */
+static plugin_t plugins[MAX_PLUGINS];
+static int plugin_count = 0;
+static int active_plugin_index = -1;
+
+/* External references */
+extern daemon_state_data_t *daemon_state;
+extern millennium_client_t *client;
+
+void plugins_init(void) {
+    plugin_count = 0;
+    active_plugin_index = -1;
+    
+    /* Register built-in plugins */
+    register_classic_phone_plugin();
+    register_fortune_teller_plugin();
+    register_jukebox_plugin();
+    
+    /* Activate classic phone by default */
+    plugins_activate("Classic Phone");
+    
+    logger_info_with_category("Plugins", "Plugin system initialized");
+}
+
+void plugins_cleanup(void) {
+    plugin_count = 0;
+    active_plugin_index = -1;
+    logger_info_with_category("Plugins", "Plugin system cleaned up");
+}
+
+int plugins_register(const char *name, const char *description,
+                    coin_handler_t coin_handler,
+                    keypad_handler_t keypad_handler,
+                    hook_handler_t hook_handler,
+                    call_state_handler_t call_state_handler) {
+    if (plugin_count >= MAX_PLUGINS) {
+        logger_error_with_category("Plugins", "Maximum number of plugins reached");
+        return -1;
+    }
+    
+    if (!name || !description) {
+        logger_error_with_category("Plugins", "Plugin name and description required");
+        return -1;
+    }
+    
+    /* Check if plugin already exists */
+    int i;
+    for (i = 0; i < plugin_count; i++) {
+        if (strcmp(plugins[i].name, name) == 0) {
+            logger_warnf_with_category("Plugins", "Plugin %s already registered", name);
+            return -1;
+        }
+    }
+    
+    /* Register the plugin */
+    plugins[plugin_count].name = name;
+    plugins[plugin_count].description = description;
+    plugins[plugin_count].handle_coin = coin_handler;
+    plugins[plugin_count].handle_keypad = keypad_handler;
+    plugins[plugin_count].handle_hook = hook_handler;
+    plugins[plugin_count].handle_call_state = call_state_handler;
+    
+    plugin_count++;
+    
+    logger_infof_with_category("Plugins", "Plugin %s registered", name);
+    return 0;
+}
+
+int plugins_activate(const char *plugin_name) {
+    if (!plugin_name) {
+        logger_error_with_category("Plugins", "Plugin name required for activation");
+        return -1;
+    }
+    
+    /* Find the plugin */
+    int i;
+    for (i = 0; i < plugin_count; i++) {
+        if (strcmp(plugins[i].name, plugin_name) == 0) {
+            active_plugin_index = i;
+            logger_infof_with_category("Plugins", "Plugin %s activated", plugin_name);
+            return 0;
+        }
+    }
+    
+    logger_warnf_with_category("Plugins", "Plugin %s not found", plugin_name);
+    return -1;
+}
+
+const char* plugins_get_active_name(void) {
+    if (active_plugin_index >= 0 && active_plugin_index < plugin_count) {
+        return plugins[active_plugin_index].name;
+    }
+    return NULL;
+}
+
+int plugins_list(char *buffer, size_t buffer_size) {
+    if (!buffer || buffer_size == 0) {
+        return -1;
+    }
+    
+    buffer[0] = '\0';
+    int pos = 0;
+    
+    int i;
+    for (i = 0; i < plugin_count && pos < (int)buffer_size - 1; i++) {
+        char temp[256];
+        sprintf(temp, "%s: %s%s\n",
+                plugins[i].name, plugins[i].description,
+                (i == active_plugin_index) ? " (ACTIVE)" : "");
+        
+        int len = strlen(temp);
+        if (pos + len < (int)buffer_size - 1) {
+            strcpy(buffer + pos, temp);
+            pos += len;
+        }
+    }
+    
+    return 0;
+}
+
+int plugins_handle_coin(int coin_value, const char *coin_code) {
+    if (active_plugin_index >= 0 && active_plugin_index < plugin_count) {
+        plugin_t *active_plugin = &plugins[active_plugin_index];
+        if (active_plugin->handle_coin) {
+            return active_plugin->handle_coin(coin_value, coin_code);
+        }
+    }
+    return -1; /* No active plugin or handler */
+}
+
+int plugins_handle_keypad(char key) {
+    if (active_plugin_index >= 0 && active_plugin_index < plugin_count) {
+        plugin_t *active_plugin = &plugins[active_plugin_index];
+        if (active_plugin->handle_keypad) {
+            return active_plugin->handle_keypad(key);
+        }
+    }
+    return -1; /* No active plugin or handler */
+}
+
+int plugins_handle_hook(int hook_up, int hook_down) {
+    if (active_plugin_index >= 0 && active_plugin_index < plugin_count) {
+        plugin_t *active_plugin = &plugins[active_plugin_index];
+        if (active_plugin->handle_hook) {
+            return active_plugin->handle_hook(hook_up, hook_down);
+        }
+    }
+    return -1; /* No active plugin or handler */
+}
+
+int plugins_handle_call_state(int call_state) {
+    if (active_plugin_index >= 0 && active_plugin_index < plugin_count) {
+        plugin_t *active_plugin = &plugins[active_plugin_index];
+        if (active_plugin->handle_call_state) {
+            return active_plugin->handle_call_state(call_state);
+        }
+    }
+    return -1; /* No active plugin or handler */
+}
