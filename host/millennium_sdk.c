@@ -504,10 +504,6 @@ void millennium_client_process_event_buffer(struct millennium_client *client) {
 
         millennium_client_create_and_queue_event_char(client, event_type, payload);
         
-        if (payload) {
-            free(payload);
-        }
-        
         /* Remove processed data from buffer */
         size_t payload_len = payload ? strlen(payload) : 0;
         size_t remove_len = event_start + payload_len + 1;
@@ -519,6 +515,12 @@ void millennium_client_process_event_buffer(struct millennium_client *client) {
         } else {
             client->input_buffer_size = 0;
             client->input_buffer[0] = '\0';
+        }
+        
+        /* Free payload after processing to prevent memory leak */
+        if (payload) {
+            free(payload);
+            payload = NULL;
         }
     }
 }

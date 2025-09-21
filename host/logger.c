@@ -295,7 +295,7 @@ static void logger_vlogf(log_level_t level, const char* category, const char* fo
         return;
     }
     
-    /* C89 compatible: use vsprintf with size check */
+    /* C89 compatible: use vsprintf with size check for safety */
     vsprintf(buffer, format, args);
     buffer[sizeof(buffer) - 1] = '\0'; /* Ensure null termination */
     

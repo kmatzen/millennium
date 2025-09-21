@@ -53,7 +53,7 @@ void daemon_state_add_key(daemon_state_data_t* state, char key) {
     if (!state || !isdigit(key)) return;
     
     len = daemon_state_get_keypad_length(state);
-    if (len < 10) {  /* Max 10 digits */
+    if (len < 10) {  /* Max 10 digits - matches MAX_KEYPAD_DIGITS in daemon.c */
         state->keypad_buffer[len] = key;
         state->keypad_buffer[len + 1] = '\0';
     }

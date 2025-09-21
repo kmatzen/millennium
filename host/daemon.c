@@ -22,6 +22,7 @@
 #define DISPLAY_WIDTH 20
 #define MAX_STRING_LEN 256
 #define MAX_KEYPAD_LEN 11
+#define MAX_KEYPAD_DIGITS 10
 
 /* Global state management */
 volatile int running = 1;
@@ -178,6 +179,18 @@ void generate_message(int inserted, char *output) {
     logger_debugf_with_category("Display", "Generated message: %s", output);
 }
 
+/* Helper function to safely copy strings with bounds checking */
+static void safe_strcpy(char *dest, const char *src, size_t dest_size) {
+    if (!dest || dest_size == 0) return;
+    
+    if (src) {
+        strncpy(dest, src, dest_size - 1);
+    } else {
+        dest[0] = '\0';
+    }
+    dest[dest_size - 1] = '\0';
+}
+
 /* Helper function to update display - consolidates repetitive code */
 static void update_display(void) {
     if (!client || !daemon_state) {
@@ -195,25 +208,9 @@ static void update_display_with_content(const char *line1_content, const char *l
         return;
     }
     
-    strncpy(line1, line1_content ? line1_content : "", sizeof(line1) - 1);
-    line1[sizeof(line1) - 1] = '\0';
-    
-    strncpy(line2, line2_content ? line2_content : "", sizeof(line2) - 1);
-    line2[sizeof(line2) - 1] = '\0';
-    
+    safe_strcpy(line1, line1_content, sizeof(line1));
+    safe_strcpy(line2, line2_content, sizeof(line2));
     update_display();
-}
-
-/* Helper function to safely copy strings with bounds checking */
-static void safe_strcpy(char *dest, const char *src, size_t dest_size) {
-    if (!dest || dest_size == 0) return;
-    
-    if (src) {
-        strncpy(dest, src, dest_size - 1);
-    } else {
-        dest[0] = '\0';
-    }
-    dest[dest_size - 1] = '\0';
 }
 
 /* Helper function to update display with keypad and coin information */
@@ -235,7 +232,17 @@ static int is_phone_ready_for_operation(void) {
 
 /* Helper function to validate keypad buffer has space */
 static int keypad_has_space(void) {
-    return (daemon_state && daemon_state_get_keypad_length(daemon_state) < 10);
+    return (daemon_state && daemon_state_get_keypad_length(daemon_state) < MAX_KEYPAD_DIGITS);
+}
+
+/* Helper function to safely update daemon state with mutex protection */
+static void safe_update_daemon_state(daemon_state_t new_state) {
+    if (!daemon_state) return;
+    
+    pthread_mutex_lock(&daemon_state_mutex);
+    daemon_state->current_state = new_state;
+    daemon_state_update_activity(daemon_state);
+    pthread_mutex_unlock(&daemon_state_mutex);
 }
 
 void check_and_call(void) {
@@ -244,15 +251,15 @@ void check_and_call(void) {
     int cost_cents = config_get_call_cost_cents(config_get_instance());
     
     /* Quick check without mutex - if conditions aren't met, no need to lock */
-    int keypad_ready = (daemon_state_get_keypad_length(daemon_state) == 10);
+    int keypad_ready = (daemon_state_get_keypad_length(daemon_state) == MAX_KEYPAD_DIGITS);
     int enough_money = (daemon_state->inserted_cents >= cost_cents);
     int phone_ready = is_phone_ready_for_operation();
     
     if (keypad_ready && enough_money && phone_ready) {
         
-        char number[11];
-        strncpy(number, daemon_state->keypad_buffer, 10);
-        number[10] = '\0';
+        char number[MAX_KEYPAD_LEN];
+        strncpy(number, daemon_state->keypad_buffer, MAX_KEYPAD_DIGITS);
+        number[MAX_KEYPAD_DIGITS] = '\0';
         
         logger_infof_with_category("Call", "Dialing number: %s", number);
         metrics_increment_counter("calls_initiated", 1);
@@ -261,11 +268,8 @@ void check_and_call(void) {
         
         millennium_client_call(client, number);
         
-        /* Only lock for the state change */
-        pthread_mutex_lock(&daemon_state_mutex);
-        daemon_state->current_state = DAEMON_STATE_CALL_ACTIVE;
-        daemon_state_update_activity(daemon_state);
-        pthread_mutex_unlock(&daemon_state_mutex);
+        /* Update state safely */
+        safe_update_daemon_state(DAEMON_STATE_CALL_ACTIVE);
     }
 }
 
@@ -668,10 +672,12 @@ int send_control_command(const char* action) {
 /* Signal handler */
 void signal_handler(int signal) {
     if (signal == SIGINT || signal == SIGTERM) {
-    logger_infof_with_category("Daemon", "Received signal %d, shutting down gracefully...", signal);
+        logger_infof_with_category("Daemon", "Received signal %d, shutting down gracefully...", signal);
         pthread_mutex_lock(&running_mutex);
         running = 0;
         pthread_mutex_unlock(&running_mutex);
+    } else {
+        logger_warnf_with_category("Daemon", "Received unexpected signal %d", signal);
     }
 }
 
