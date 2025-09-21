@@ -175,11 +175,7 @@ void generate_message(int inserted, char *output) {
     
     sprintf(output, "Insert %02d cents", remaining);
     
-    char log_msg[MAX_STRING_LEN];
-    strcpy(log_msg, "Generated message: ");
-    strncat(log_msg, output, MAX_STRING_LEN - 20); /* Leave room for "Generated message: " */
-    log_msg[MAX_STRING_LEN - 1] = '\0'; /* Ensure null termination */
-    logger_debug_with_category("Display", log_msg);
+    logger_debugf_with_category("Display", "Generated message: %s", output);
 }
 
 /* Helper function to update display - consolidates repetitive code */
@@ -191,6 +187,44 @@ static void update_display(void) {
     char display_bytes[100];
     generate_display_bytes(display_bytes, sizeof(display_bytes));
     millennium_client_set_display(client, display_bytes);
+}
+
+/* Helper function to update display with formatted content */
+static void update_display_with_content(const char *line1_content, const char *line2_content) {
+    if (!client || !daemon_state) {
+        return;
+    }
+    
+    strncpy(line1, line1_content ? line1_content : "", sizeof(line1) - 1);
+    line1[sizeof(line1) - 1] = '\0';
+    
+    strncpy(line2, line2_content ? line2_content : "", sizeof(line2) - 1);
+    line2[sizeof(line2) - 1] = '\0';
+    
+    update_display();
+}
+
+/* Helper function to safely copy strings with bounds checking */
+static void safe_strcpy(char *dest, const char *src, size_t dest_size) {
+    if (!dest || dest_size == 0) return;
+    
+    if (src) {
+        strncpy(dest, src, dest_size - 1);
+    } else {
+        dest[0] = '\0';
+    }
+    dest[dest_size - 1] = '\0';
+}
+
+/* Helper function to update display with keypad and coin information */
+static void update_display_with_state(void) {
+    if (!daemon_state) return;
+    
+    char formatted_number[32];
+    char message[32];
+    format_number(daemon_state->keypad_buffer, formatted_number);
+    generate_message(daemon_state->inserted_cents, message);
+    update_display_with_content(formatted_number, message);
 }
 
 
@@ -223,8 +257,7 @@ void check_and_call(void) {
         logger_infof_with_category("Call", "Dialing number: %s", number);
         metrics_increment_counter("calls_initiated", 1);
         
-        strcpy(line2, "Calling");
-        update_display();
+        update_display_with_content(line1, "Calling");
         
         millennium_client_call(client, number);
         
@@ -273,9 +306,7 @@ void handle_coin_event(coin_event_t *coin_event) {
                     "Coin inserted: %s, value: %d cents, total: %d cents",
                     coin_code_str, coin_value, daemon_state->inserted_cents);
             
-            format_number(daemon_state->keypad_buffer, line1);
-            generate_message(daemon_state->inserted_cents, line2);
-            update_display();
+            update_display_with_state();
         }
         pthread_mutex_unlock(&daemon_state_mutex);
         
@@ -304,8 +335,7 @@ void handle_call_state_event(call_state_event_t *call_state_event) {
         logger_info_with_category("Call", "Incoming call received");
         metrics_increment_counter("calls_incoming", 1);
         
-        strcpy(line1, "Call incoming...");
-        update_display();
+        update_display_with_content("Call incoming...", line2);
         
         daemon_state->current_state = DAEMON_STATE_CALL_INCOMING;
         daemon_state_update_activity(daemon_state);
@@ -315,9 +345,7 @@ void handle_call_state_event(call_state_event_t *call_state_event) {
         logger_info_with_category("Call", "Call established - audio should be working");
         metrics_increment_counter("calls_established", 1);
         
-        strcpy(line1, "Call active");
-        strcpy(line2, "Audio connected");
-        update_display();
+        update_display_with_content("Call active", "Audio connected");
         
         daemon_state->current_state = DAEMON_STATE_CALL_ACTIVE;
         daemon_state_update_activity(daemon_state);
@@ -363,9 +391,7 @@ void handle_hook_event(hook_state_change_event_t *hook_event) {
             daemon_state->inserted_cents = 0;
             daemon_state_clear_keypad(daemon_state);
             
-            generate_message(daemon_state->inserted_cents, line2);
-            format_number(daemon_state->keypad_buffer, line1);
-            update_display();
+            update_display_with_state();
         }
     } else if (hook_down) {
         logger_info_with_category("Hook", "Hook down, call ended");
@@ -378,9 +404,7 @@ void handle_hook_event(hook_state_change_event_t *hook_event) {
         daemon_state_clear_keypad(daemon_state);
         daemon_state->inserted_cents = 0;
         
-        generate_message(daemon_state->inserted_cents, line2);
-        format_number(daemon_state->keypad_buffer, line1);
-        update_display();
+        update_display_with_state();
         
         /* Update state */
         daemon_state->current_state = DAEMON_STATE_IDLE_DOWN;
@@ -421,17 +445,13 @@ void handle_keypad_event(keypad_event_t *keypad_event) {
         
         if (keypad_has_space() && is_phone_ready_for_operation()) {
             
-            char log_msg[MAX_STRING_LEN];
-            sprintf(log_msg, "Key pressed: %c", key);
-            logger_debug_with_category("Keypad", log_msg);
+            logger_debugf_with_category("Keypad", "Key pressed: %c", key);
             metrics_increment_counter("keypad_presses", 1);
             
             daemon_state_add_key(daemon_state, key);
             daemon_state_update_activity(daemon_state);
             
-            generate_message(daemon_state->inserted_cents, line2);
-            format_number(daemon_state->keypad_buffer, line1);
-            update_display();
+            update_display_with_state();
         }
         pthread_mutex_unlock(&daemon_state_mutex);
         
@@ -458,9 +478,7 @@ int send_control_command(const char* action) {
         return 0;
     }
     
-    char log_msg[MAX_STRING_LEN];
-    sprintf(log_msg, "Received control command: %s", action);
-    logger_info_with_category("Control", log_msg);
+    logger_infof_with_category("Control", "Received control command: %s", action);
     printf("[CONTROL] Received command: %s\n", action);
     
     /* Parse command and arguments */
@@ -473,16 +491,14 @@ int send_control_command(const char* action) {
         if (cmd_len >= MAX_STRING_LEN) {
             cmd_len = MAX_STRING_LEN - 1;
         }
-        strncpy(command, action, cmd_len);
+        safe_strcpy(command, action, cmd_len + 1);
         command[cmd_len] = '\0';
         
         /* Safely copy argument */
-        strncpy(arg, colon_pos + 1, MAX_STRING_LEN - 1);
-        arg[MAX_STRING_LEN - 1] = '\0';
+        safe_strcpy(arg, colon_pos + 1, MAX_STRING_LEN);
     } else {
-        strncpy(command, action, MAX_STRING_LEN - 1);
-        command[MAX_STRING_LEN - 1] = '\0';
-        strcpy(arg, "");
+        safe_strcpy(command, action, MAX_STRING_LEN);
+        arg[0] = '\0';
     }
     
     if (strcmp(command, "start_call") == 0) {
@@ -527,12 +543,10 @@ int send_control_command(const char* action) {
                 event_processor_process_event(event_processor, (event_t *)keypad_event);
                 event_destroy((event_t *)keypad_event);
             }
-            sprintf(log_msg, "Keypad key '%c' pressed via web portal", arg[0]);
-            logger_info_with_category("Control", log_msg);
+            logger_infof_with_category("Control", "Keypad key '%c' pressed via web portal", arg[0]);
             return 1;
         } else {
-            sprintf(log_msg, "Invalid keypad key: %c", arg[0]);
-            logger_warn_with_category("Control", log_msg);
+            logger_warnf_with_category("Control", "Invalid keypad key: %c", arg[0]);
             return 0;
         }
         
@@ -546,9 +560,7 @@ int send_control_command(const char* action) {
             logger_info_with_category("Control", "Keypad cleared via web portal");
             
             /* Update physical display */
-            format_number(daemon_state->keypad_buffer, line1);
-            generate_message(daemon_state->inserted_cents, line2);
-            update_display();
+            update_display_with_state();
         } else {
             logger_warn_with_category("Control", "Keypad clear ignored - handset down");
         }
@@ -568,9 +580,7 @@ int send_control_command(const char* action) {
             logger_info_with_category("Control", "Keypad backspace via web portal");
             
             /* Update physical display */
-            format_number(daemon_state->keypad_buffer, line1);
-            generate_message(daemon_state->inserted_cents, line2);
-            update_display();
+            update_display_with_state();
         } else {
             logger_warn_with_category("Control", "Keypad backspace ignored - handset down or buffer empty");
         }
@@ -585,16 +595,14 @@ int send_control_command(const char* action) {
             return 0;
         }
         
-        sprintf(log_msg, "Extracted cents string: '%s'", arg);
-        logger_info_with_category("Control", log_msg);
+        logger_infof_with_category("Control", "Extracted cents string: '%s'", arg);
         printf("[CONTROL] Extracted cents: '%s'\n", arg);
         
         int cents = atoi(arg);
         
         /* Validate coin value */
         if (cents <= 0) {
-            sprintf(log_msg, "Invalid coin value: %d¢", cents);
-            logger_warn_with_category("Control", log_msg);
+            logger_warnf_with_category("Control", "Invalid coin value: %d¢", cents);
             return 0;
         }
         
@@ -605,8 +613,7 @@ int send_control_command(const char* action) {
             case 10: coin_code = 0x37; break; /* COIN_7 */
             case 25: coin_code = 0x38; break; /* COIN_8 */
             default:
-                sprintf(log_msg, "Invalid coin value: %d¢", cents);
-                logger_warn_with_category("Control", log_msg);
+                logger_warnf_with_category("Control", "Invalid coin value: %d¢", cents);
                 return 0;
         }
         
@@ -615,8 +622,7 @@ int send_control_command(const char* action) {
             event_processor_process_event(event_processor, (event_t *)coin_event);
             event_destroy((event_t *)coin_event);
         }
-        sprintf(log_msg, "Coin inserted: %d¢ via web portal", cents);
-        logger_info_with_category("Control", log_msg);
+        logger_infof_with_category("Control", "Coin inserted: %d¢ via web portal", cents);
         printf("[CONTROL] Coin inserted successfully: %d¢\n", cents);
         
         return 1;
@@ -630,11 +636,7 @@ int send_control_command(const char* action) {
         logger_info_with_category("Control", "Coins returned via web portal");
         
         /* Update physical display */
-        format_number(daemon_state->keypad_buffer, line1);
-        generate_message(daemon_state->inserted_cents, line2);
-        char display_bytes[100];
-        generate_display_bytes(display_bytes, sizeof(display_bytes));
-        millennium_client_set_display(client, display_bytes);
+        update_display_with_state();
         
         pthread_mutex_unlock(&daemon_state_mutex);
         return 1;
@@ -666,9 +668,7 @@ int send_control_command(const char* action) {
 /* Signal handler */
 void signal_handler(int signal) {
     if (signal == SIGINT || signal == SIGTERM) {
-        char log_msg[MAX_STRING_LEN];
-        sprintf(log_msg, "Received signal %d, shutting down gracefully...", signal);
-        logger_info_with_category("Daemon", log_msg);
+    logger_infof_with_category("Daemon", "Received signal %d, shutting down gracefully...", signal);
         pthread_mutex_lock(&running_mutex);
         running = 0;
         pthread_mutex_unlock(&running_mutex);
@@ -735,7 +735,6 @@ int main(int argc, char *argv[]) {
     /* health_monitor_t* health_monitor = health_monitor_get_instance(); */
     int loop_count = 0;
     char config_file[MAX_STRING_LEN];
-    char start_msg[MAX_STRING_LEN];
     
     /* Record daemon start time for uptime calculation */
     daemon_start_time = time(NULL);
@@ -751,9 +750,7 @@ int main(int argc, char *argv[]) {
     }
     
     if (!config_load_from_file(config, config_file)) {
-        char log_msg[MAX_STRING_LEN];
-        sprintf(log_msg, "Could not load config file: %s, using environment variables", config_file);
-        logger_warn_with_category("Config", log_msg);
+        logger_warnf_with_category("Config", "Could not load config file: %s, using environment variables", config_file);
         config_load_from_environment(config);
     }
     
@@ -801,9 +798,8 @@ int main(int argc, char *argv[]) {
         if (metrics_server) {
             metrics_server_start(metrics_server);
         }
-        sprintf(start_msg, "Metrics server started on port %d", 
+        logger_infof_with_category("Daemon", "Metrics server started on port %d", 
                 config_get_metrics_server_port(config));
-        logger_info_with_category("Daemon", start_msg);
     } else {
         logger_info_with_category("Daemon", "Metrics server disabled");
     }
@@ -816,9 +812,8 @@ int main(int argc, char *argv[]) {
         web_server_add_file_route(web_server, "/", "web_portal.html", "text/html");
         
         web_server_start(web_server);
-        sprintf(start_msg, "Web server started on port %d", 
+        logger_infof_with_category("Daemon", "Web server started on port %d", 
                 config_get_web_server_port(config));
-        logger_info_with_category("Daemon", start_msg);
     } else {
         logger_info_with_category("Daemon", "Web server disabled");
     }
@@ -827,9 +822,7 @@ int main(int argc, char *argv[]) {
     
     /* Initialize display */
     pthread_mutex_lock(&daemon_state_mutex);
-    format_number(daemon_state->keypad_buffer, line1);
-    generate_message(daemon_state->inserted_cents, line2);
-    update_display();
+    update_display_with_state();
     pthread_mutex_unlock(&daemon_state_mutex);
     
     /* Initialize event processor */
@@ -875,9 +868,7 @@ int main(int argc, char *argv[]) {
             
             /* Log current state gauge (simplified for C89 version) */
             double current_state = metrics_get_gauge("current_state");
-            char log_msg[MAX_STRING_LEN];
-            sprintf(log_msg, "Current state: %.0f", current_state);
-            logger_debug_with_category("Metrics", log_msg);
+            logger_debugf_with_category("Metrics", "Current state: %.0f", current_state);
         }
     }
     

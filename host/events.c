@@ -10,7 +10,8 @@ static char *strdup_safe(const char *src) {
     size_t len = strlen(src);
     char *dst = malloc(len + 1);
     if (dst) {
-        strcpy(dst, src);
+        memcpy(dst, src, len);
+        dst[len] = '\0';
     }
     return dst;
 }

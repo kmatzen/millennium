@@ -4,6 +4,7 @@
 #include "millennium_sdk.h"
 #include "events.h"
 #include "baresip_interface.h"
+#include "logger.h"
 #include <errno.h>
 #include <fcntl.h>
 /* #include <linux/serial.h> */ /* Linux-specific, not available on macOS */
@@ -17,9 +18,6 @@
 #include <time.h>
 #include <unistd.h>
 
-/* Global logger instance */
-static millennium_logger_t g_logger = {LOGGER_INFO};
-
 /* Forward declarations */
 static void ua_event_handler(enum baresip_ua_event ev, struct bevent *event, void *client);
 static void *baresip_thread_func(void *arg);
@@ -31,59 +29,11 @@ static char *string_duplicate(const char *src);
 static void string_buffer_append(struct millennium_client *client, const char *data, size_t len);
 static void string_buffer_ensure_capacity(struct millennium_client *client, size_t needed);
 
-/* Logger functions */
-logger_level_t millennium_logger_parse_level(const char *level_str) {
-    if (strcmp(level_str, "DEBUG") == 0)
-        return LOGGER_DEBUG;
-    if (strcmp(level_str, "INFO") == 0)
-        return LOGGER_INFO;
-    if (strcmp(level_str, "WARN") == 0)
-        return LOGGER_WARN;
-    if (strcmp(level_str, "ERROR") == 0)
-        return LOGGER_ERROR;
-    return LOGGER_INFO; /* Default level */
-}
-
-void millennium_logger_set_level(logger_level_t level) {
-    g_logger.current_level = level;
-}
-
-logger_level_t millennium_logger_get_current_level(void) {
-    return g_logger.current_level;
-}
-
-void millennium_logger_log(logger_level_t level, const char *message) {
-    if (level >= g_logger.current_level) {
-        const char *level_str;
-        switch (level) {
-        case LOGGER_VERBOSE:
-            level_str = "VERBOSE";
-            break;
-        case LOGGER_DEBUG:
-            level_str = "DEBUG";
-            break;
-        case LOGGER_INFO:
-            level_str = "INFO";
-            break;
-        case LOGGER_WARN:
-            level_str = "WARN";
-            break;
-        case LOGGER_ERROR:
-            level_str = "ERROR";
-            break;
-        default:
-            level_str = "UNKNOWN";
-            break;
-        }
-        fprintf(stderr, "%s: %s\n", level_str, message);
-    }
-}
-
 /* Event queue implementation */
 static void event_queue_push(struct millennium_client *client, void *event) {
     struct event_queue_node *node = malloc(sizeof(struct event_queue_node));
     if (!node) {
-        millennium_logger_log(LOGGER_ERROR, "Failed to allocate memory for event queue node");
+        logger_error_with_category("SDK", "Failed to allocate memory for event queue node");
         return;
     }
     
@@ -151,7 +101,7 @@ static void string_buffer_ensure_capacity(struct millennium_client *client, size
             client->input_buffer = new_buffer;
             client->input_buffer_capacity = new_capacity;
         } else {
-            millennium_logger_log(LOGGER_ERROR, "Failed to reallocate input buffer");
+            logger_error_with_category("SDK", "Failed to reallocate input buffer");
         }
     }
 }
@@ -169,14 +119,12 @@ static void string_buffer_append(struct millennium_client *client, const char *d
 
 /* UA event handler */
 static void ua_event_handler(enum baresip_ua_event ev, struct bevent *event, void *client) {
-    char message[256];
     struct call *call;
     struct ua *ua;
     call_state_t state_value;
     call_state_event_t *call_event;
     
-    snprintf(message, sizeof(message), "UA event: %s", baresip_uag_event_str(ev));
-    millennium_logger_log(LOGGER_INFO, message);
+    logger_infof_with_category("SDK", "UA event: %s", baresip_uag_event_str(ev));
     
     if (client) {
         call = baresip_bevent_get_call(event);
@@ -217,23 +165,20 @@ void list_audio_devices(void) {
     struct le *le;
     struct ausrc *ausrc;
     struct auplay *auplay;
-    char message[256];
 
-    millennium_logger_log(LOGGER_INFO, "--- Audio Sources ---");
+    logger_info_with_category("SDK", "--- Audio Sources ---");
     for (le = baresip_ausrcl_head(); le; le = baresip_list_next(le)) {
         ausrc = baresip_list_data(le);
         if (ausrc && baresip_ausrc_name(ausrc)) {
-            snprintf(message, sizeof(message), "Source: %s", baresip_ausrc_name(ausrc));
-            millennium_logger_log(LOGGER_INFO, message);
+            logger_infof_with_category("SDK", "Source: %s", baresip_ausrc_name(ausrc));
         }
     }
 
-    millennium_logger_log(LOGGER_INFO, "--- Audio Players ---");
+    logger_info_with_category("SDK", "--- Audio Players ---");
     for (le = baresip_auplayl_head(); le; le = baresip_list_next(le)) {
         auplay = baresip_auplay_data(le);
         if (auplay && baresip_auplay_name(auplay)) {
-            snprintf(message, sizeof(message), "Player: %s", baresip_auplay_name(auplay));
-            millennium_logger_log(LOGGER_INFO, message);
+            logger_infof_with_category("SDK", "Player: %s", baresip_auplay_name(auplay));
         }
     }
 }
@@ -242,7 +187,7 @@ void list_audio_devices(void) {
 struct millennium_client *millennium_client_create(void) {
     struct millennium_client *client = malloc(sizeof(struct millennium_client));
     if (!client) {
-        millennium_logger_log(LOGGER_ERROR, "Failed to allocate memory for MillenniumClient");
+        logger_error_with_category("SDK", "Failed to allocate memory for MillenniumClient");
         return NULL;
     }
     
@@ -254,7 +199,7 @@ struct millennium_client *millennium_client_create(void) {
     client->input_buffer = malloc(client->input_buffer_capacity);
     if (!client->input_buffer) {
         free(client);
-        millennium_logger_log(LOGGER_ERROR, "Failed to allocate input buffer");
+        logger_error_with_category("SDK", "Failed to allocate input buffer");
         return NULL;
     }
     client->input_buffer[0] = '\0';
@@ -277,7 +222,7 @@ struct millennium_client *millennium_client_create(void) {
     
     client->display_fd = open(display_device, O_RDWR | O_NOCTTY);
     if (client->display_fd == -1) {
-        millennium_logger_log(LOGGER_ERROR, "Failed to open display device.");
+        logger_error_with_category("SDK", "Failed to open display device.");
         millennium_client_destroy(client);
         return NULL;
     }
@@ -285,17 +230,13 @@ struct millennium_client *millennium_client_create(void) {
     /* Set display_fd to non-blocking mode */
     int flags = fcntl(client->display_fd, F_GETFL, 0);
     if (flags == -1) {
-        char message[256];
-        snprintf(message, sizeof(message), "Failed to get file descriptor flags: %s", strerror(errno));
-        millennium_logger_log(LOGGER_ERROR, message);
+        logger_errorf_with_category("SDK", "Failed to get file descriptor flags: %s", strerror(errno));
         millennium_client_destroy(client);
         return NULL;
     }
 
     if (fcntl(client->display_fd, F_SETFL, flags | O_NONBLOCK) == -1) {
-        char message[256];
-        snprintf(message, sizeof(message), "Failed to set non-blocking mode: %s", strerror(errno));
-        millennium_logger_log(LOGGER_ERROR, message);
+        logger_errorf_with_category("SDK", "Failed to set non-blocking mode: %s", strerror(errno));
         millennium_client_destroy(client);
         return NULL;
     }
@@ -312,10 +253,10 @@ struct millennium_client *millennium_client_create(void) {
     options.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG);
     tcsetattr(client->display_fd, TCSANOW, &options);
 
-    millennium_logger_log(LOGGER_DEBUG, "libre_init");
+    logger_debug_with_category("SDK", "libre_init");
     int err = baresip_libre_init();
     if (err) {
-        millennium_logger_log(LOGGER_ERROR, "libre_init failed");
+        logger_error_with_category("SDK", "libre_init failed");
         millennium_client_destroy(client);
         return NULL;
     }
@@ -328,17 +269,17 @@ struct millennium_client *millennium_client_create(void) {
     int dbg_flags = BARESIP_DBG_ANSI | BARESIP_DBG_TIME;
     baresip_dbg_init(dbg_level, dbg_flags);
 
-    millennium_logger_log(LOGGER_DEBUG, "conf_configure");
+    logger_debug_with_category("SDK", "conf_configure");
     err = baresip_conf_configure();
     if (err) {
-        millennium_logger_log(LOGGER_ERROR, "conf_configure failed");
+        logger_error_with_category("SDK", "conf_configure failed");
         millennium_client_destroy(client);
         return NULL;
     }
 
-    millennium_logger_log(LOGGER_DEBUG, "baresip_init_c");
+    logger_debug_with_category("SDK", "baresip_init_c");
     if (baresip_init_c(baresip_conf_config()) != 0) {
-        millennium_logger_log(LOGGER_ERROR, "Failed to initialize Baresip.");
+        logger_error_with_category("SDK", "Failed to initialize Baresip.");
         millennium_client_destroy(client);
         return NULL;
     }
@@ -347,15 +288,15 @@ struct millennium_client *millennium_client_create(void) {
 
     err = baresip_ua_init("baresip v2.0.0 (x86_64/linux)", 1, 1, 1);
     if (err) {
-        millennium_logger_log(LOGGER_ERROR, "ua_init failed");
+        logger_error_with_category("SDK", "ua_init failed");
         millennium_client_destroy(client);
         return NULL;
     }
 
-    millennium_logger_log(LOGGER_DEBUG, "conf_modules");
+    logger_debug_with_category("SDK", "conf_modules");
     err = baresip_conf_modules();
     if (err) {
-        millennium_logger_log(LOGGER_ERROR, "conf_modules failed");
+        logger_error_with_category("SDK", "conf_modules failed");
         millennium_client_destroy(client);
         return NULL;
     }
@@ -364,12 +305,12 @@ struct millennium_client *millennium_client_create(void) {
 
     /* Create thread */
     if (pthread_create((pthread_t *)&client->thread_handle, NULL, baresip_thread_func, NULL) != 0) {
-        millennium_logger_log(LOGGER_ERROR, "Failed to create baresip thread");
+        logger_error_with_category("SDK", "Failed to create baresip thread");
         millennium_client_destroy(client);
         return NULL;
     }
 
-    millennium_logger_log(LOGGER_INFO, "MillenniumClient initialized successfully.");
+    logger_info_with_category("SDK", "MillenniumClient initialized successfully.");
     client->is_open = 1;
     return client;
 }
@@ -413,13 +354,12 @@ void millennium_client_close(struct millennium_client *client) {
         }
         
         client->is_open = 0;
-        millennium_logger_log(LOGGER_INFO, "MillenniumClient closed.");
+        logger_info_with_category("SDK", "MillenniumClient closed.");
     }
 }
 
 void millennium_client_call(struct millennium_client *client, const char *number) {
     char target[64];
-    char message[256];
     struct ua *ua;
     char *uric;
     int err;
@@ -427,18 +367,15 @@ void millennium_client_call(struct millennium_client *client, const char *number
     
     snprintf(target, sizeof(target), "+1%s", number);
 
-    snprintf(message, sizeof(message), "ua: %p", client->ua);
-    millennium_logger_log(LOGGER_DEBUG, message);
+    logger_debugf_with_category("SDK", "ua: %p", client->ua);
     
-    snprintf(message, sizeof(message), "Initiating call to: %s", target);
-    millennium_logger_log(LOGGER_INFO, message);
+    logger_infof_with_category("SDK", "Initiating call to: %s", target);
     
     /* Find the appropriate UA for this request URI */
     ua = baresip_ua_find_requri(target);
     
     if (!ua) {
-        snprintf(message, sizeof(message), "Could not find UA for: %s", target);
-        millennium_logger_log(LOGGER_ERROR, message);
+        logger_errorf_with_category("SDK", "Could not find UA for: %s", target);
         return;
     }
     
@@ -449,16 +386,13 @@ void millennium_client_call(struct millennium_client *client, const char *number
     uric = NULL;
     err = baresip_account_uri_complete_strdup(baresip_ua_account(ua), &uric, target);
     if (err != 0) {
-        snprintf(message, sizeof(message), "Failed to complete URI: %s %d", target, err);
-        millennium_logger_log(LOGGER_ERROR, message);
+        logger_errorf_with_category("SDK", "Failed to complete URI: %s %d", target, err);
         return;
     }
     
-    snprintf(message, sizeof(message), "Using UA: %s", baresip_account_aor(baresip_ua_account(ua)));
-    millennium_logger_log(LOGGER_INFO, message);
+    logger_infof_with_category("SDK", "Using UA: %s", baresip_account_aor(baresip_ua_account(ua)));
     
-    snprintf(message, sizeof(message), "Completed URI: %s", uric);
-    millennium_logger_log(LOGGER_INFO, message);
+    logger_infof_with_category("SDK", "Completed URI: %s", uric);
     
     /* Make the call */
     call = NULL;
@@ -468,46 +402,44 @@ void millennium_client_call(struct millennium_client *client, const char *number
     baresip_mem_deref(uric);
     
     if (err != 0) {
-        snprintf(message, sizeof(message), "Failed to initiate call to: %s %d", target, err);
-        millennium_logger_log(LOGGER_ERROR, message);
+        logger_errorf_with_category("SDK", "Failed to initiate call to: %s %d", target, err);
     } else {
-        snprintf(message, sizeof(message), "Calling: %s", number);
-        millennium_logger_log(LOGGER_INFO, message);
+        logger_infof_with_category("SDK", "Calling: %s", number);
     }
 }
 
 void millennium_client_answer_call(struct millennium_client *client) {
     if (!client->ua) {
-        millennium_logger_log(LOGGER_ERROR, "Cannot answer call: UA is null");
+        logger_error_with_category("SDK", "Cannot answer call: UA is null");
         return;
     }
     
     /* Find the current call for this UA */
     struct call *call = baresip_ua_call((struct ua *)client->ua);
     if (!call) {
-        millennium_logger_log(LOGGER_ERROR, "Cannot answer call: No active call found");
+        logger_error_with_category("SDK", "Cannot answer call: No active call found");
         return;
     }
     
     baresip_ua_answer((struct ua *)client->ua, call, BARESIP_VIDMODE_OFF);
-    millennium_logger_log(LOGGER_INFO, "Call answered.");
+    logger_info_with_category("SDK", "Call answered.");
 }
 
 void millennium_client_hangup(struct millennium_client *client) {
     if (!client->ua) {
-        millennium_logger_log(LOGGER_ERROR, "Cannot hangup call: UA is null");
+        logger_error_with_category("SDK", "Cannot hangup call: UA is null");
         return;
     }
     
     /* Find the current call for this UA */
     struct call *call = baresip_ua_call((struct ua *)client->ua);
     if (!call) {
-        millennium_logger_log(LOGGER_WARN, "Cannot hangup call: No active call found");
+        logger_warn_with_category("SDK", "Cannot hangup call: No active call found");
         return;
     }
     
     baresip_ua_hangup((struct ua *)client->ua, call, 0, "Call terminated");
-    millennium_logger_log(LOGGER_INFO, "Call terminated.");
+    logger_info_with_category("SDK", "Call terminated.");
 }
 
 void millennium_client_update(struct millennium_client *client) {
@@ -522,9 +454,7 @@ void millennium_client_update(struct millennium_client *client) {
 
     if (bytes_read == -1 && errno != EAGAIN && errno != EWOULDBLOCK) {
         /* Log only if the error is not due to no data being available */
-        char message[256];
-        snprintf(message, sizeof(message), "Error reading from display_fd: %s", strerror(errno));
-        millennium_logger_log(LOGGER_ERROR, message);
+        logger_errorf_with_category("SDK", "Error reading from display_fd: %s", strerror(errno));
     }
 
     struct timespec current_time;
@@ -539,14 +469,14 @@ void millennium_client_update(struct millennium_client *client) {
         client->display_dirty = 0;
     } else {
         if (client->display_dirty) {
-            millennium_logger_log(LOGGER_INFO, "waiting");
+            logger_info_with_category("SDK", "waiting");
         }
     }
 }
 
 void millennium_client_process_event_buffer(struct millennium_client *client) {
     while (client->input_buffer_size > 0) {
-        millennium_logger_log(LOGGER_DEBUG, client->input_buffer);
+        logger_debug_with_category("SDK", client->input_buffer);
         
         size_t event_start = 0;
         size_t i;
@@ -566,13 +496,10 @@ void millennium_client_process_event_buffer(struct millennium_client *client) {
         char event_type = client->input_buffer[event_start];
         char *payload = millennium_client_extract_payload(client, event_type, event_start);
         
-        char message[256];
-        snprintf(message, sizeof(message), "Event type: %c", event_type);
-        millennium_logger_log(LOGGER_DEBUG, message);
+        logger_debugf_with_category("SDK", "Event type: %c", event_type);
         
         if (payload) {
-            snprintf(message, sizeof(message), "Payload: %s", payload);
-            millennium_logger_log(LOGGER_DEBUG, message);
+            logger_debugf_with_category("SDK", "Payload: %s", payload);
         }
 
         millennium_client_create_and_queue_event_char(client, event_type, payload);
@@ -638,9 +565,7 @@ void millennium_client_create_and_queue_event_ptr(struct millennium_client *clie
 }
 
 void millennium_client_create_and_queue_event_char(struct millennium_client *client, char event_type, const char *payload) {
-    char message[256];
-    snprintf(message, sizeof(message), "Creating event of type: %c", event_type);
-    millennium_logger_log(LOGGER_DEBUG, message);
+    logger_debugf_with_category("SDK", "Creating event of type: %c", event_type);
     
     if (event_type == EVENT_TYPE_KEYPAD && payload && strlen(payload) > 0) {
         keypad_event_t *event = keypad_event_create(payload[0]);
@@ -673,8 +598,7 @@ void millennium_client_create_and_queue_event_char(struct millennium_client *cli
         coin_eeprom_validation_error_t *event = coin_eeprom_validation_error_create(addr, expected, actual);
         if (event) event_queue_push(client, (void *)event);
     } else {
-        snprintf(message, sizeof(message), "Unknown event type: %c", event_type);
-        millennium_logger_log(LOGGER_WARN, message);
+        logger_warnf_with_category("SDK", "Unknown event type: %c", event_type);
     }
 }
 
@@ -692,16 +616,14 @@ void millennium_client_set_display(struct millennium_client *client, const char 
     }
     client->display_message = string_duplicate(message);
     if (!client->display_message) {
-        millennium_logger_log(LOGGER_ERROR, "Failed to duplicate display message");
+        logger_error_with_category("SDK", "Failed to duplicate display message");
     }
 }
 
 void millennium_client_write_to_display(struct millennium_client *client, const char *message) {
     if (!message) return;
     
-    char log_message[256];
-    snprintf(log_message, sizeof(log_message), "Writing message to display: %s", message);
-    millennium_logger_log(LOGGER_DEBUG, log_message);
+    logger_debugf_with_category("SDK", "Writing message to display: %s", message);
 
     /* Step 1: Write the command */
     uint8_t cmd_data = (uint8_t)strlen(message);
@@ -728,37 +650,30 @@ void millennium_client_write_to_display(struct millennium_client *client, const 
                 continue;
             } else {
                 /* Log other errors and exit */
-                snprintf(log_message, sizeof(log_message), "Error writing to display: %s", strerror(errno));
-                millennium_logger_log(LOGGER_ERROR, log_message);
+                logger_errorf_with_category("SDK", "Error writing to display: %s", strerror(errno));
                 return;
             }
         }
     }
 
-    snprintf(log_message, sizeof(log_message), "Successfully wrote %lu bytes to display.", (unsigned long)total_bytes_written);
-    millennium_logger_log(LOGGER_DEBUG, log_message);
+    logger_debugf_with_category("SDK", "Successfully wrote %lu bytes to display.", (unsigned long)total_bytes_written);
 }
 
 void millennium_client_write_to_coin_validator(struct millennium_client *client, uint8_t data) {
-    char message[256];
-    snprintf(message, sizeof(message), "Writing to coin validator: %d", data);
-    millennium_logger_log(LOGGER_DEBUG, message);
+    logger_debugf_with_category("SDK", "Writing to coin validator: %d", data);
 
     /* Step 1: Write the command */
     millennium_client_write_command(client, 0x03, &data, 1);
 
-    snprintf(message, sizeof(message), "Successfully wrote command to coin validator: %d", data);
-    millennium_logger_log(LOGGER_DEBUG, message);
+    logger_debugf_with_category("SDK", "Successfully wrote command to coin validator: %d", data);
 }
 
 void *millennium_client_next_event(struct millennium_client *client) {
     if (!event_queue_empty(client)) {
         void *event = event_queue_pop(client);
         char *repr = event_get_repr((event_t *)event);
-        char message[512];
-        snprintf(message, sizeof(message), "Dequeued event: %s %s", 
+        logger_debugf_with_category("SDK", "Dequeued event: %s %s", 
                 event_get_name((event_t *)event), repr ? repr : "");
-        millennium_logger_log(LOGGER_DEBUG, message);
         if (repr) free(repr);
         return event;
     }
@@ -767,15 +682,11 @@ void *millennium_client_next_event(struct millennium_client *client) {
 
 void millennium_client_set_ua(struct millennium_client *client, void *ua) {
     client->ua = ua;
-    char message[256];
-    snprintf(message, sizeof(message), "UA set to: %p", client->ua);
-    millennium_logger_log(LOGGER_DEBUG, message);
+    logger_debugf_with_category("SDK", "UA set to: %p", client->ua);
 }
 
 void millennium_client_write_command(struct millennium_client *client, uint8_t command, const uint8_t *data, size_t data_size) {
-    char message[256];
-    snprintf(message, sizeof(message), "Writing command to display: %d", command);
-    millennium_logger_log(LOGGER_DEBUG, message);
+    logger_debugf_with_category("SDK", "Writing command to display: %d", command);
 
     /* Step 1: Write the command */
     while (1) {
@@ -790,9 +701,8 @@ void millennium_client_write_command(struct millennium_client *client, uint8_t c
                 nanosleep(&sleep_time, NULL);
                 continue;
             } else {
-                snprintf(message, sizeof(message), "Failed to write command: %d, error: %s", 
+                logger_errorf_with_category("SDK", "Failed to write command: %d, error: %s", 
                         command, strerror(errno));
-                millennium_logger_log(LOGGER_ERROR, message);
                 return;
             }
         }
@@ -818,14 +728,12 @@ void millennium_client_write_command(struct millennium_client *client, uint8_t c
                     nanosleep(&sleep_time, NULL);
                     continue;
                 } else {
-                    snprintf(message, sizeof(message), "Error writing data to display, error: %s", strerror(errno));
-                    millennium_logger_log(LOGGER_ERROR, message);
+                    logger_errorf_with_category("SDK", "Error writing data to display, error: %s", strerror(errno));
                     return;
                 }
             }
         }
 
-        snprintf(message, sizeof(message), "Successfully wrote %lu bytes of data to display.", (unsigned long)total_bytes_written);
-        millennium_logger_log(LOGGER_DEBUG, message);
+        logger_debugf_with_category("SDK", "Successfully wrote %lu bytes of data to display.", (unsigned long)total_bytes_written);
     }
 }
