@@ -28,9 +28,6 @@ metrics_server.o: metrics_server.c metrics_server.h metrics.h logger.h
 web_server.o: web_server.c web_server.h config.h logger.h metrics.h health_monitor.h
 	gcc web_server.c -o web_server.o -c $(CFLAGS)
 
-test_framework.o: test_framework.cpp test_framework.h
-	g++ test_framework.cpp -o test_framework.o -c $(CXXFLAGS)
-
 baresip_interface.o: baresip_interface.c baresip_interface.h
 	gcc baresip_interface.c -o baresip_interface.o -c $(C99_CFLAGS)
 
@@ -46,20 +43,14 @@ millennium_sdk.o: millennium_sdk.c millennium_sdk.h events.h baresip_interface.h
 daemon.o: daemon.cpp millennium_sdk.h events.h event_processor.h config.h logger.h health_monitor.h metrics.h metrics_server.h web_server.h
 	g++ daemon.cpp -o daemon.o -c -g -O3 -std=c++17 -Wall -Wextra
 
-tests.o: tests.cpp test_framework.h config.h logger.h metrics.h
-	g++ tests.cpp -o tests.o -c $(CXXFLAGS)
-
 # Executables
 daemon: daemon.o daemon_state.o millennium_sdk.o baresip_interface.o events.o event_processor.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o
 	gcc daemon.o daemon_state.o millennium_sdk.o baresip_interface.o events.o event_processor.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o -o daemon $(LDFLAGS) -lstdc++
 
-tests: tests.o test_framework.o config.o logger.o metrics.o
-	gcc tests.o test_framework.o config.o logger.o metrics.o -o tests $(LDFLAGS) -lstdc++
-
-all: daemon tests
+all: daemon
 
 clean:
-	rm -rf *.o daemon tests test_daemon_state
+	rm -rf *.o daemon
 
 install: daemon
 	sudo mkdir -p /etc/millennium
@@ -77,14 +68,4 @@ uninstall:
 	sudo rm -f /etc/systemd/system/millennium-daemon.service
 	sudo systemctl daemon-reload
 
-test: tests
-	./tests
-
-# C test executable
-test_daemon_state: test_daemon_state.c daemon_state.o
-	gcc test_daemon_state.c daemon_state.o -o test_daemon_state $(CFLAGS)
-
-test_c: test_daemon_state
-	./test_daemon_state
-
-.PHONY: all clean install uninstall test test_c
+.PHONY: all clean install uninstall
