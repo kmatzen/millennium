@@ -1,4 +1,4 @@
-CXXFLAGS=-g -O3 -std=c++17 -Wall -Wextra `pkg-config libbaresip --cflags` `pkg-config libre --cflags`
+CXXFLAGS=-g -O3 -std=c++17 -Wall -Wextra
 LDFLAGS=-lpthread -latomic `pkg-config libre --libs` `pkg-config libbaresip --libs`
 
 # C flags for C files
@@ -32,7 +32,7 @@ test_framework.o: test_framework.cpp test_framework.h
 	g++ test_framework.cpp -o test_framework.o -c $(CXXFLAGS)
 
 baresip_interface.o: baresip_interface.c baresip_interface.h
-	gcc baresip_interface.c -o baresip_interface.o -c $(C99_CFLAGS) `pkg-config libbaresip --cflags` `pkg-config libre --cflags`
+	gcc baresip_interface.c -o baresip_interface.o -c $(C99_CFLAGS)
 
 events.o: events.c events.h
 	gcc events.c -o events.o -c $(CFLAGS)
@@ -40,11 +40,11 @@ events.o: events.c events.h
 event_processor.o: event_processor.c event_processor.h events.h
 	gcc event_processor.c -o event_processor.o -c $(CFLAGS)
 
-millennium_sdk.o: millennium_sdk.cpp millennium_sdk.h events.h baresip_interface.h
-	g++ millennium_sdk.cpp -o millennium_sdk.o -c $(CXXFLAGS)
+millennium_sdk.o: millennium_sdk.c millennium_sdk.h events.h baresip_interface.h
+	gcc millennium_sdk.c -o millennium_sdk.o -c $(CFLAGS)
 
 daemon.o: daemon.cpp millennium_sdk.h events.h event_processor.h config.h logger.h health_monitor.h metrics.h metrics_server.h web_server.h
-	g++ daemon.cpp -o daemon.o -c $(CXXFLAGS)
+	g++ daemon.cpp -o daemon.o -c -g -O3 -std=c++17 -Wall -Wextra
 
 tests.o: tests.cpp test_framework.h config.h logger.h metrics.h
 	g++ tests.cpp -o tests.o -c $(CXXFLAGS)

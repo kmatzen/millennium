@@ -1,85 +1,95 @@
-#pragma once
+#ifndef MILLENNIUM_SDK_H
+#define MILLENNIUM_SDK_H
 
-#include <cstdint>
-#include <iostream>
-#include <memory>
-#include <queue>
-#include <string>
-#include <thread>
-#include <vector>
-extern "C" {
-#include "events.h"
-#include "baresip_interface.h"
-}
+#include <stdint.h>
+#include <stddef.h>
+#include <time.h>
 
-// Forward declarations
+/* Forward declarations */
+struct millennium_client;
+struct millennium_logger;
 
-class Logger {
-public:
-  enum Level { VERBOSE, DEBUG, INFO, WARN, ERROR };
+/* Logger level enumeration */
+typedef enum {
+    LOGGER_VERBOSE = 0,
+    LOGGER_DEBUG,
+    LOGGER_INFO,
+    LOGGER_WARN,
+    LOGGER_ERROR
+} logger_level_t;
 
-  static Logger::Level parseLevel(const std::string &level_str);
-  static void setLevel(Level level) { current_level_ = level; }
+/* Logger structure */
+typedef struct millennium_logger {
+    logger_level_t current_level;
+} millennium_logger_t;
 
-  static void log(Level level, const std::string &message) {
-    if (level >= current_level_) {
-      std::cerr << levelToString(level) << ": " << message << std::endl;
-    }
-  }
+/* Millennium client structure */
+typedef struct millennium_client {
+    int display_fd;
+    int is_open;
+    char *input_buffer;
+    size_t input_buffer_size;
+    size_t input_buffer_capacity;
+    
+    /* Event queue - simple linked list implementation */
+    struct event_queue_node {
+        void *event;
+        struct event_queue_node *next;
+    } *event_queue_head, *event_queue_tail;
+    
+    /* Thread handle - using pthread for C89 compatibility */
+    void *thread_handle;
+    
+    char *display_message;
+    int display_dirty;
+    struct timespec last_update_time;
+    void *ua; /* struct ua * */
+    
+    /* Function pointers for event handling */
+    void (*create_and_queue_event_char)(struct millennium_client *client, char event_type, const char *payload);
+    void (*create_and_queue_event_ptr)(struct millennium_client *client, void *event);
+} millennium_client_t;
 
-private:
-  static Level current_level_;
+/* Function declarations */
 
-  static std::string levelToString(Level level) {
-    switch (level) {
-    case VERBOSE:
-      return "VERBOSE";
-    case DEBUG:
-      return "DEBUG";
-    case INFO:
-      return "INFO";
-    case WARN:
-      return "WARN";
-    case ERROR:
-      return "ERROR";
-    default:
-      return "UNKNOWN";
-    }
-  }
-};
+/* Logger functions */
+logger_level_t millennium_logger_parse_level(const char *level_str);
+void millennium_logger_set_level(logger_level_t level);
+void millennium_logger_log(logger_level_t level, const char *message);
+logger_level_t millennium_logger_get_current_level(void);
 
+/* Millennium client functions */
+struct millennium_client *millennium_client_create(void);
+void millennium_client_destroy(struct millennium_client *client);
+void millennium_client_close(struct millennium_client *client);
 
-class MillenniumClient {
-  int display_fd_;
-  bool is_open_;
-  std::string input_buffer_;
-  std::queue<event_t *> event_queue_;
-  std::thread thread_;
-  std::string displayMessage_;
-  bool displayDirty_;
-  std::chrono::steady_clock::time_point lastUpdateTime_;
-  struct ua *ua_;
+/* Event handling */
+void millennium_client_create_and_queue_event_char(struct millennium_client *client, char event_type, const char *payload);
+void millennium_client_create_and_queue_event_ptr(struct millennium_client *client, void *event);
 
-  void writeCommand(uint8_t command, const std::vector<uint8_t> &data);
-  void processEventBuffer();
-  std::string extractPayload(char event_type, size_t event_start) const;
-  void writeToDisplay(const std::string &message);
+/* Display and communication */
+void millennium_client_set_display(struct millennium_client *client, const char *message);
+void millennium_client_write_to_coin_validator(struct millennium_client *client, uint8_t data);
+void millennium_client_update(struct millennium_client *client);
+void *millennium_client_next_event(struct millennium_client *client);
 
-public:
-  MillenniumClient();
-  ~MillenniumClient();
+/* Call functions */
+void millennium_client_call(struct millennium_client *client, const char *number);
+void millennium_client_answer_call(struct millennium_client *client);
+void millennium_client_hangup(struct millennium_client *client);
+void millennium_client_set_ua(struct millennium_client *client, void *ua);
 
-  void createAndQueueEvent(char event_type, const std::string &payload);
-  void createAndQueueEvent(event_t *event);
-  void setDisplay(const std::string &message);
-  void writeToCoinValidator(uint8_t data);
-  void update();
-  event_t *nextEvent();
-  void close();
+/* Internal functions */
+void millennium_client_write_command(struct millennium_client *client, uint8_t command, const uint8_t *data, size_t data_size);
+void millennium_client_process_event_buffer(struct millennium_client *client);
+char *millennium_client_extract_payload(struct millennium_client *client, char event_type, size_t event_start);
+void millennium_client_write_to_display(struct millennium_client *client, const char *message);
 
-  void call(const std::string &number);
-  void answerCall();
-  void hangup();
-  void setUA(struct ua *ua);
-};
-;
+/* Utility functions */
+void list_audio_devices(void);
+
+/* Constants */
+#define BAUD_RATE B9600
+#define ASYNC_WORKERS 4
+
+#endif /* MILLENNIUM_SDK_H */

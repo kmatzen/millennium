@@ -9,8 +9,8 @@ extern "C" {
 #include "health_monitor.h"
 }
 #include "web_server.h"
-#include "millennium_sdk.h"
 extern "C" {
+#include "millennium_sdk.h"
 #include "events.h"
 #include "event_processor.h"
 }
@@ -40,7 +40,7 @@ extern "C" {
 // Global instances
 std::atomic<bool> running(true);
 daemon_state_data_t* daemon_state = nullptr;  // C pointer instead of unique_ptr
-std::unique_ptr<MillenniumClient> client;
+millennium_client_t* client = nullptr;  // C pointer instead of unique_ptr
 metrics_server_t *metrics_server = nullptr;
 std::unique_ptr<WebServer> web_server;
 event_processor_t *event_processor = nullptr;
@@ -171,10 +171,10 @@ void check_and_call() {
         metrics_increment_counter("calls_initiated", 1);
         
         line2 = "Calling";
-        client->setDisplay(generateDisplayBytes());
+        millennium_client_set_display(client, generateDisplayBytes().c_str());
         
         try {
-            client->call(number);
+            millennium_client_call(client, number.c_str());
             daemon_state->current_state = DAEMON_STATE_CALL_ACTIVE;
             daemon_state_update_activity(daemon_state);
         } catch (const std::exception& e) {
@@ -182,7 +182,7 @@ void check_and_call() {
             metrics_increment_counter("call_errors", 1);
             
             line2 = "Call failed";
-            client->setDisplay(generateDisplayBytes());
+            millennium_client_set_display(client, generateDisplayBytes().c_str());
         }
     }
 }
@@ -227,7 +227,7 @@ void handle_coin_event(coin_event_t *coin_event) {
         
         line1 = format_number(daemon_state->keypad_buffer);
         line2 = generate_message(daemon_state->inserted_cents);
-        client->setDisplay(generateDisplayBytes());
+        millennium_client_set_display(client, generateDisplayBytes().c_str());
         
         // Check if we should initiate a call after coin insertion
         check_and_call();
@@ -254,13 +254,13 @@ void handle_call_state_event(call_state_event_t *call_state_event) {
         metrics_increment_counter("calls_incoming", 1);
         
         line1 = "Call incoming...";
-        client->setDisplay(generateDisplayBytes());
+        millennium_client_set_display(client, generateDisplayBytes().c_str());
         
         daemon_state->current_state = DAEMON_STATE_CALL_INCOMING;
         daemon_state_update_activity(daemon_state);
         
-        client->writeToCoinValidator('f');
-        client->writeToCoinValidator('z');
+        millennium_client_write_to_coin_validator(client, 'f');
+        millennium_client_write_to_coin_validator(client, 'z');
     } else if (call_state_event_get_state(call_state_event) == EVENT_CALL_STATE_ACTIVE) {
         // Handle call established (when baresip reports CALL_ESTABLISHED)
         logger_info_with_category("Call", "Call established - audio should be working");
@@ -268,7 +268,7 @@ void handle_call_state_event(call_state_event_t *call_state_event) {
         
         line1 = "Call active";
         line2 = "Audio connected";
-        client->setDisplay(generateDisplayBytes());
+        millennium_client_set_display(client, generateDisplayBytes().c_str());
         
         daemon_state->current_state = DAEMON_STATE_CALL_ACTIVE;
         daemon_state_update_activity(daemon_state);
@@ -295,7 +295,7 @@ void handle_hook_event(hook_state_change_event_t *hook_event) {
             daemon_state_update_activity(daemon_state);
             
             try {
-                client->answerCall();
+                millennium_client_answer_call(client);
             } catch (const std::exception& e) {
                 logger_error_with_category("Call", ("Failed to answer call: " + std::string(e.what())).c_str());
                 metrics_increment_counter("call_answer_errors", 1);
@@ -307,13 +307,13 @@ void handle_hook_event(hook_state_change_event_t *hook_event) {
             daemon_state->current_state = DAEMON_STATE_IDLE_UP;
             daemon_state_update_activity(daemon_state);
             
-            client->writeToCoinValidator('a');
+            millennium_client_write_to_coin_validator(client, 'a');
             daemon_state->inserted_cents = 0;
             daemon_state_clear_keypad(daemon_state);
             
             line2 = generate_message(daemon_state->inserted_cents);
             line1 = format_number(daemon_state->keypad_buffer);
-            client->setDisplay(generateDisplayBytes());
+            millennium_client_set_display(client, generateDisplayBytes().c_str());
         }
     } else if (hook_state_change_event_get_direction(hook_event) == 'D') {
         logger_info_with_category("Hook", "Hook down, call ended");
@@ -324,7 +324,7 @@ void handle_hook_event(hook_state_change_event_t *hook_event) {
         }
         
         try {
-            client->hangup();
+            millennium_client_hangup(client);
         } catch (const std::exception& e) {
             logger_error_with_category("Call", ("Failed to hangup call: " + std::string(e.what())).c_str());
             metrics_increment_counter("call_hangup_errors", 1);
@@ -335,10 +335,10 @@ void handle_hook_event(hook_state_change_event_t *hook_event) {
         
         line2 = generate_message(daemon_state->inserted_cents);
         line1 = format_number(daemon_state->keypad_buffer);
-        client->setDisplay(generateDisplayBytes());
+        millennium_client_set_display(client, generateDisplayBytes().c_str());
         
-        client->writeToCoinValidator(daemon_state->current_state == DAEMON_STATE_IDLE_UP ? 'f' : 'c');
-        client->writeToCoinValidator('z');
+        millennium_client_write_to_coin_validator(client, daemon_state->current_state == DAEMON_STATE_IDLE_UP ? 'f' : 'c');
+        millennium_client_write_to_coin_validator(client, 'z');
         daemon_state->current_state = DAEMON_STATE_IDLE_DOWN;
         daemon_state_update_activity(daemon_state);
     }
@@ -368,7 +368,7 @@ void handle_keypad_event(keypad_event_t *keypad_event) {
             
             line2 = generate_message(daemon_state->inserted_cents);
             line1 = format_number(daemon_state->keypad_buffer);
-            client->setDisplay(generateDisplayBytes());
+            millennium_client_set_display(client, generateDisplayBytes().c_str());
             
             // Check if we should initiate a call after keypad input
             check_and_call();
@@ -452,7 +452,7 @@ bool sendControlCommand(const std::string& action) {
                 // Update physical display
                 line1 = format_number(daemon_state->keypad_buffer);
                 line2 = generate_message(daemon_state->inserted_cents);
-                client->setDisplay(generateDisplayBytes());
+                millennium_client_set_display(client, generateDisplayBytes().c_str());
                 
                 return true;
             } else {
@@ -470,7 +470,7 @@ bool sendControlCommand(const std::string& action) {
                 // Update physical display
                 line1 = format_number(daemon_state->keypad_buffer);
                 line2 = generate_message(daemon_state->inserted_cents);
-                client->setDisplay(generateDisplayBytes());
+                millennium_client_set_display(client, generateDisplayBytes().c_str());
                 
                 return true;
             } else {
@@ -523,7 +523,7 @@ bool sendControlCommand(const std::string& action) {
             // Update physical display
             line1 = format_number(daemon_state->keypad_buffer);
             line2 = generate_message(daemon_state->inserted_cents);
-            client->setDisplay(generateDisplayBytes());
+            millennium_client_set_display(client, generateDisplayBytes().c_str());
             
             return true;
         } else if (command == "handset_up") {
@@ -661,7 +661,7 @@ int main(int argc, char *argv[]) {
         }
         
         // Initialize client
-        client = std::make_unique<MillenniumClient>();
+        client = millennium_client_create();
         
         // Initialize health monitoring
         health_monitor_register_check("serial_connection", checkSerialConnection, 30);
@@ -710,7 +710,7 @@ int main(int argc, char *argv[]) {
         // Initialize display
         line1 = format_number(daemon_state->keypad_buffer);
         line2 = generate_message(daemon_state->inserted_cents);
-        client->setDisplay(generateDisplayBytes());
+        millennium_client_set_display(client, generateDisplayBytes().c_str());
         
         // Initialize event processor
         event_processor = event_processor_create();
@@ -731,9 +731,9 @@ int main(int argc, char *argv[]) {
         int loop_count = 0;
         while (running) {
             try {
-	    	client->update();
+	    	millennium_client_update(client);
                 
-                event_t *event = client->nextEvent();
+                event_t *event = (event_t *)millennium_client_next_event(client);
                 if (event) {
                     event_processor_process_event(event_processor, event);
                     event_destroy(event);
@@ -787,7 +787,8 @@ int main(int argc, char *argv[]) {
         health_monitor_stop_monitoring();
         
         // Cleanup client
-        client.reset();
+        millennium_client_destroy(client);
+        client = nullptr;
         
         // Cleanup metrics
         metrics_cleanup();
