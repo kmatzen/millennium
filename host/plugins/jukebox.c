@@ -3,9 +3,19 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
+#include <pthread.h>
 #include "../plugins.h"
 #include "../logger.h"
 #include "../millennium_sdk.h"
+
+/* ALSA support - only on Linux */
+#ifdef __linux__
+#include <alsa/asoundlib.h>
+#define HAVE_ALSA 1
+#else
+#define HAVE_ALSA 0
+#endif
 
 /* Jukebox plugin data */
 typedef struct {
@@ -16,6 +26,11 @@ typedef struct {
     time_t last_activity;
     time_t play_start_time;
     int play_duration_seconds;
+#if HAVE_ALSA
+    snd_pcm_t *pcm_handle;  /* ALSA PCM handle */
+#endif
+    pthread_t audio_thread;  /* Audio playback thread */
+    int stop_audio;  /* Flag to stop audio thread */
 } jukebox_data_t;
 
 static jukebox_data_t jukebox_data = {0};
@@ -29,21 +44,31 @@ typedef struct {
     const char *title;
     const char *artist;
     int duration_seconds;
+    const char *audio_file;
 } song_info_t;
 
 static const song_info_t songs[] = {
-    {"Bohemian Rhapsody", "Queen", 355},
-    {"Hotel California", "Eagles", 391},
-    {"Stairway to Heaven", "Led Zeppelin", 482},
-    {"Sweet Child O Mine", "Guns N Roses", 356},
-    {"Imagine", "John Lennon", 183},
-    {"Billie Jean", "Michael Jackson", 294},
-    {"Like a Rolling Stone", "Bob Dylan", 366},
-    {"Smells Like Teen Spirit", "Nirvana", 301},
-    {"What's Going On", "Marvin Gaye", 233}
+    {"Bohemian Rhapsody", "Queen", 355, "/usr/share/millennium/music/bohemian_rhapsody.wav"},
+    {"Hotel California", "Eagles", 391, "/usr/share/millennium/music/hotel_california.wav"},
+    {"Stairway to Heaven", "Led Zeppelin", 482, "/usr/share/millennium/music/stairway_to_heaven.wav"},
+    {"Sweet Child O Mine", "Guns N Roses", 356, "/usr/share/millennium/music/sweet_child_o_mine.wav"},
+    {"Imagine", "John Lennon", 183, "/usr/share/millennium/music/imagine.wav"},
+    {"Billie Jean", "Michael Jackson", 294, "/usr/share/millennium/music/billie_jean.wav"},
+    {"Like a Rolling Stone", "Bob Dylan", 366, "/usr/share/millennium/music/like_a_rolling_stone.wav"},
+    {"Smells Like Teen Spirit", "Nirvana", 301, "/usr/share/millennium/music/smells_like_teen_spirit.wav"},
+    {"What's Going On", "Marvin Gaye", 233, "/usr/share/millennium/music/whats_going_on.wav"}
 };
 
 #define NUM_SONGS (sizeof(songs) / sizeof(songs[0]))
+
+/* Audio functions */
+static int jukebox_play_wav_file(const char* wav_file);
+static void jukebox_stop_audio(void);
+static void* jukebox_audio_thread(void* arg);
+#if HAVE_ALSA
+static int jukebox_init_alsa(void);
+static void jukebox_cleanup_alsa(void);
+#endif
 
 /* Internal functions */
 static void jukebox_show_welcome(void);
@@ -187,9 +212,10 @@ static void jukebox_show_playing(void) {
         size_t pos = 0;
         int i;
         
-        /* Add line1, padded or truncated to 20 characters */
+        /* Add line1: "Now Playing" indicator */
+        const char* playing_indicator = "Now Playing";
         for (i = 0; i < 20 && pos < sizeof(display_bytes) - 2; i++) {
-            display_bytes[pos++] = (i < (int)strlen(song->title)) ? song->title[i] : ' ';
+            display_bytes[pos++] = (i < (int)strlen(playing_indicator)) ? playing_indicator[i] : ' ';
         }
         
         /* Add line feed */
@@ -223,6 +249,20 @@ static void jukebox_play_song(int song_number) {
     char log_msg[256];
     sprintf(log_msg, "Playing song: %s by %s", song->title, song->artist);
     logger_info_with_category("Jukebox", log_msg);
+    
+    /* Play the WAV file using ALSA */
+    const char* wav_file = songs[song_number].audio_file;
+    if (jukebox_play_wav_file(wav_file) == 0) {
+        char log_msg[256];
+        sprintf(log_msg, "Started playing WAV file: %s", wav_file);
+        logger_info_with_category("Jukebox", log_msg);
+    } else {
+        logger_warn_with_category("Jukebox", "Failed to play WAV file, falling back to beep tones");
+        /* Fallback to simple beep if WAV file not available */
+        char command[128];
+        sprintf(command, "beep -f 800 -l 200 -n -f 1000 -l 200 -n -f 1200 -l 400 &");
+        system(command);
+    }
 }
 
 static void jukebox_stop_song(void) {
@@ -231,6 +271,9 @@ static void jukebox_stop_song(void) {
         jukebox_data.selected_song = -1;
         
         logger_info_with_category("Jukebox", "Song stopped");
+        
+        /* Stop the audio player */
+        jukebox_stop_audio();
         
         /* Return to menu or welcome */
         if (jukebox_data.inserted_cents >= jukebox_data.song_cost_cents) {
@@ -255,6 +298,192 @@ static void jukebox_check_playback(void) {
 }
 #pragma GCC diagnostic pop
 
+/* Audio functions */
+#if HAVE_ALSA
+static int jukebox_init_alsa(void) {
+    int err;
+    
+    /* Open PCM device for playback */
+    err = snd_pcm_open(&jukebox_data.pcm_handle, "default", SND_PCM_STREAM_PLAYBACK, 0);
+    if (err < 0) {
+        char log_msg[256];
+        sprintf(log_msg, "Cannot open PCM device: %s", snd_strerror(err));
+        logger_error_with_category("Jukebox", log_msg);
+        return -1;
+    }
+    
+    /* Set hardware parameters */
+    snd_pcm_hw_params_t *hw_params;
+    hw_params = malloc(snd_pcm_hw_params_sizeof());
+    if (!hw_params) {
+        logger_error_with_category("Jukebox", "Cannot allocate hardware parameters");
+        snd_pcm_close(jukebox_data.pcm_handle);
+        return -1;
+    }
+    
+    err = snd_pcm_hw_params_any(jukebox_data.pcm_handle, hw_params);
+    if (err < 0) {
+        logger_error_with_category("Jukebox", "Cannot initialize hardware parameter structure");
+        snd_pcm_close(jukebox_data.pcm_handle);
+        free(hw_params);
+        return -1;
+    }
+    
+    /* Set access type */
+    err = snd_pcm_hw_params_set_access(jukebox_data.pcm_handle, hw_params, SND_PCM_ACCESS_RW_INTERLEAVED);
+    if (err < 0) {
+        logger_error_with_category("Jukebox", "Cannot set access type");
+        snd_pcm_close(jukebox_data.pcm_handle);
+        free(hw_params);
+        return -1;
+    }
+    
+    /* Set sample format */
+    err = snd_pcm_hw_params_set_format(jukebox_data.pcm_handle, hw_params, SND_PCM_FORMAT_S16_LE);
+    if (err < 0) {
+        logger_error_with_category("Jukebox", "Cannot set sample format");
+        snd_pcm_close(jukebox_data.pcm_handle);
+        free(hw_params);
+        return -1;
+    }
+    
+    /* Set sample rate */
+    unsigned int rate = 44100;
+    err = snd_pcm_hw_params_set_rate_near(jukebox_data.pcm_handle, hw_params, &rate, 0);
+    if (err < 0) {
+        logger_error_with_category("Jukebox", "Cannot set sample rate");
+        snd_pcm_close(jukebox_data.pcm_handle);
+        free(hw_params);
+        return -1;
+    }
+    
+    /* Set number of channels */
+    err = snd_pcm_hw_params_set_channels(jukebox_data.pcm_handle, hw_params, 2);
+    if (err < 0) {
+        logger_error_with_category("Jukebox", "Cannot set channel count");
+        snd_pcm_close(jukebox_data.pcm_handle);
+        free(hw_params);
+        return -1;
+    }
+    
+    /* Apply hardware parameters */
+    err = snd_pcm_hw_params(jukebox_data.pcm_handle, hw_params);
+    if (err < 0) {
+        logger_error_with_category("Jukebox", "Cannot set hardware parameters");
+        snd_pcm_close(jukebox_data.pcm_handle);
+        free(hw_params);
+        return -1;
+    }
+    
+    /* Free hardware parameters */
+    free(hw_params);
+    
+    logger_info_with_category("Jukebox", "ALSA initialized successfully");
+    return 0;
+}
+
+/* Helper function for future cleanup - kept for extensibility */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
+static void jukebox_cleanup_alsa(void) {
+    if (jukebox_data.pcm_handle) {
+        snd_pcm_close(jukebox_data.pcm_handle);
+        jukebox_data.pcm_handle = NULL;
+        logger_info_with_category("Jukebox", "ALSA cleaned up");
+    }
+}
+#pragma GCC diagnostic pop
+#endif
+
+static int jukebox_play_wav_file(const char* wav_file) {
+#if HAVE_ALSA
+    /* Initialize ALSA if not already done */
+    if (!jukebox_data.pcm_handle) {
+        if (jukebox_init_alsa() < 0) {
+            return -1;
+        }
+    }
+#endif
+    
+    /* Set stop flag to false */
+    jukebox_data.stop_audio = 0;
+    
+    /* Create audio thread */
+    int err = pthread_create(&jukebox_data.audio_thread, NULL, jukebox_audio_thread, (void*)wav_file);
+    if (err != 0) {
+        logger_error_with_category("Jukebox", "Failed to create audio thread");
+        return -1;
+    }
+    
+    logger_info_with_category("Jukebox", "Started audio thread for WAV file");
+    return 0;
+}
+
+static void* jukebox_audio_thread(void* arg) {
+    const char* wav_file = (const char*)arg;
+    FILE *file;
+    char buffer[4096];
+    size_t bytes_read;
+    
+    /* Open WAV file */
+    file = fopen(wav_file, "rb");
+    if (!file) {
+        char log_msg[256];
+        sprintf(log_msg, "Cannot open WAV file: %s", wav_file);
+        logger_error_with_category("Jukebox", log_msg);
+        return NULL;
+    }
+    
+    /* Skip WAV header (44 bytes) */
+    fseek(file, 44, SEEK_SET);
+    
+#if HAVE_ALSA
+    /* Play audio data using ALSA */
+    while (!jukebox_data.stop_audio && (bytes_read = fread(buffer, 1, sizeof(buffer), file)) > 0) {
+        snd_pcm_sframes_t frames_written = snd_pcm_writei(jukebox_data.pcm_handle, buffer, bytes_read / 4);
+        if (frames_written < 0) {
+            /* Recover from underrun */
+            frames_written = snd_pcm_recover(jukebox_data.pcm_handle, frames_written, 0);
+            if (frames_written < 0) {
+                logger_error_with_category("Jukebox", "Cannot recover from underrun");
+                break;
+            }
+        }
+    }
+#else
+    /* Fallback: just read the file to simulate playback */
+    while (!jukebox_data.stop_audio && (bytes_read = fread(buffer, 1, sizeof(buffer), file)) > 0) {
+        /* Simulate playback time - use sleep for C89 compatibility */
+        /* Note: sleep(0) is not portable, so we'll just continue */
+    }
+#endif
+    
+    fclose(file);
+    
+    /* Mark as finished */
+    jukebox_data.is_playing = 0;
+    jukebox_data.selected_song = -1;
+    
+    logger_info_with_category("Jukebox", "WAV file playback finished");
+    return NULL;
+}
+
+static void jukebox_stop_audio(void) {
+    jukebox_data.stop_audio = 1;
+    
+#if HAVE_ALSA
+    if (jukebox_data.pcm_handle) {
+        snd_pcm_drop(jukebox_data.pcm_handle);
+        snd_pcm_prepare(jukebox_data.pcm_handle);
+    }
+#endif
+    
+    /* Wait for audio thread to finish */
+    pthread_join(jukebox_data.audio_thread, NULL);
+    
+    logger_info_with_category("Jukebox", "Audio stopped");
+}
+
 /* Plugin registration function */
 void register_jukebox_plugin(void) {
     /* Initialize plugin data */
@@ -265,6 +494,10 @@ void register_jukebox_plugin(void) {
     jukebox_data.last_activity = time(NULL);
     jukebox_data.play_start_time = 0;
     jukebox_data.play_duration_seconds = 0;
+#if HAVE_ALSA
+    jukebox_data.pcm_handle = NULL;
+#endif
+    jukebox_data.stop_audio = 0;
     
     plugins_register("Jukebox",
                     "Coin-operated music player",

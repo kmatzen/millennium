@@ -1,5 +1,5 @@
 CXXFLAGS=-g -O3 -std=c++17 -Wall -Wextra
-LDFLAGS=-lpthread -latomic `pkg-config libre --libs` `pkg-config libbaresip --libs`
+LDFLAGS=-lpthread -latomic -lasound `pkg-config libre --libs` `pkg-config libbaresip --libs`
 
 # C flags for C files
 CFLAGS=-g -O3 -Wall -Wextra -std=c89
@@ -54,7 +54,7 @@ plugins/fortune_teller.o: plugins/fortune_teller.c plugins.h
 	gcc plugins/fortune_teller.c -o plugins/fortune_teller.o -c $(CFLAGS)
 
 plugins/jukebox.o: plugins/jukebox.c plugins.h
-	gcc plugins/jukebox.c -o plugins/jukebox.o -c $(CFLAGS)
+	gcc plugins/jukebox.c -o plugins/jukebox.o -c $(C99_CFLAGS) -lpthread
 
 daemon: daemon.o daemon_state.o millennium_sdk.o baresip_interface.o events.o event_processor.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o plugins.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o
 	gcc daemon.o daemon_state.o millennium_sdk.o baresip_interface.o events.o event_processor.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o plugins.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o -o daemon $(LDFLAGS)
