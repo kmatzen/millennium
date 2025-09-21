@@ -56,16 +56,10 @@ daemon: daemon.o daemon_state.o millennium_sdk.o baresip_interface.o events.o ev
 tests: tests.o test_framework.o config.o logger.o metrics.o
 	gcc tests.o test_framework.o config.o logger.o metrics.o -o tests $(LDFLAGS) -lstdc++
 
-metrics_viewer.o: metrics_viewer.cpp config.h logger.h metrics.h
-	g++ metrics_viewer.cpp -o metrics_viewer.o -c $(CXXFLAGS)
-
-metrics_viewer: metrics_viewer.o config.o logger.o metrics.o
-	gcc metrics_viewer.o config.o logger.o metrics.o -o metrics_viewer $(LDFLAGS) -lstdc++
-
-all: daemon tests metrics_viewer
+all: daemon tests
 
 clean:
-	rm -rf *.o daemon tests metrics_viewer test_daemon_state
+	rm -rf *.o daemon tests test_daemon_state
 
 install: daemon
 	sudo mkdir -p /etc/millennium
