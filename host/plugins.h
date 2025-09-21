@@ -9,6 +9,7 @@ typedef int (*coin_handler_t)(int coin_value, const char *coin_code);
 typedef int (*keypad_handler_t)(char key);
 typedef int (*hook_handler_t)(int hook_up, int hook_down);
 typedef int (*call_state_handler_t)(int call_state);
+typedef void (*activation_handler_t)(void);
 
 /* Plugin structure */
 typedef struct {
@@ -18,6 +19,7 @@ typedef struct {
     keypad_handler_t handle_keypad;
     hook_handler_t handle_hook;
     call_state_handler_t handle_call_state;
+    activation_handler_t handle_activation;
 } plugin_t;
 
 /* Plugin management functions */
@@ -27,7 +29,8 @@ int plugins_register(const char *name, const char *description,
                     coin_handler_t coin_handler,
                     keypad_handler_t keypad_handler,
                     hook_handler_t hook_handler,
-                    call_state_handler_t call_state_handler);
+                    call_state_handler_t call_state_handler,
+                    activation_handler_t activation_handler);
 int plugins_activate(const char *plugin_name);
 const char* plugins_get_active_name(void);
 int plugins_list(char *buffer, size_t buffer_size);

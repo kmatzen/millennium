@@ -45,7 +45,8 @@ int plugins_register(const char *name, const char *description,
                     coin_handler_t coin_handler,
                     keypad_handler_t keypad_handler,
                     hook_handler_t hook_handler,
-                    call_state_handler_t call_state_handler) {
+                    call_state_handler_t call_state_handler,
+                    activation_handler_t activation_handler) {
     if (plugin_count >= MAX_PLUGINS) {
         logger_error_with_category("Plugins", "Maximum number of plugins reached");
         return -1;
@@ -72,6 +73,7 @@ int plugins_register(const char *name, const char *description,
     plugins[plugin_count].handle_keypad = keypad_handler;
     plugins[plugin_count].handle_hook = hook_handler;
     plugins[plugin_count].handle_call_state = call_state_handler;
+    plugins[plugin_count].handle_activation = activation_handler;
     
     plugin_count++;
     
@@ -90,6 +92,12 @@ int plugins_activate(const char *plugin_name) {
     for (i = 0; i < plugin_count; i++) {
         if (strcmp(plugins[i].name, plugin_name) == 0) {
             active_plugin_index = i;
+            
+            /* Call the plugin's activation handler if it exists */
+            if (plugins[i].handle_activation) {
+                plugins[i].handle_activation();
+            }
+            
             logger_infof_with_category("Plugins", "Plugin %s activated", plugin_name);
             return 0;
         }

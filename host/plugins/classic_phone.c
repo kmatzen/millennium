@@ -138,9 +138,27 @@ static int classic_phone_handle_call_state(int call_state) {
 }
 
 /* Internal function implementations */
+static void classic_phone_on_activation(void) {
+    /* Reset state and show welcome when plugin is activated */
+    classic_phone_data.inserted_cents = 0;
+    classic_phone_data.keypad_length = 0;
+    classic_phone_data.is_dialing = 0;
+    classic_phone_data.is_in_call = 0;
+    classic_phone_data.last_activity = time(NULL);
+    classic_phone_show_welcome();
+}
+
 static void classic_phone_show_welcome(void) {
+    char line1[21];
     char line2[21];
-    sprintf(line2, "Insert %d cents", classic_phone_data.call_cost_cents);
+    
+    if (classic_phone_data.inserted_cents > 0) {
+        sprintf(line1, "Have: %dc", classic_phone_data.inserted_cents);
+        sprintf(line2, "Need: %dc", classic_phone_data.call_cost_cents - classic_phone_data.inserted_cents);
+    } else {
+        sprintf(line1, "Insert %dc", classic_phone_data.call_cost_cents);
+        strcpy(line2, "to make a call");
+    }
     
     char display_bytes[100];
     size_t pos = 0;
@@ -148,7 +166,7 @@ static void classic_phone_show_welcome(void) {
     
     /* Add line1, padded or truncated to 20 characters */
     for (i = 0; i < 20 && pos < sizeof(display_bytes) - 2; i++) {
-        display_bytes[pos++] = (i < 13) ? "CLASSIC PHONE"[i] : ' ';
+        display_bytes[pos++] = (i < (int)strlen(line1)) ? line1[i] : ' ';
     }
     
     /* Add line feed */
@@ -200,7 +218,7 @@ static void classic_phone_show_incoming_call(void) {
     char line2[21];
     
     strcpy(line1, "Call incoming...");
-    strcpy(line2, "                "); /* Empty line2 */
+    strcpy(line2, "Pick up handset");
     
     char display_bytes[100];
     size_t pos = 0;
@@ -425,5 +443,6 @@ void register_classic_phone_plugin(void) {
                     classic_phone_handle_coin,
                     classic_phone_handle_keypad,
                     classic_phone_handle_hook,
-                    classic_phone_handle_call_state);
+                    classic_phone_handle_call_state,
+                    classic_phone_on_activation);
 }

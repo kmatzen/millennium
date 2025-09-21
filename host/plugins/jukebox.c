@@ -153,9 +153,29 @@ static int jukebox_handle_call_state(int call_state) {
 }
 
 /* Internal function implementations */
+static void jukebox_on_activation(void) {
+    /* Reset state and show welcome when plugin is activated */
+    jukebox_data.inserted_cents = 0;
+    jukebox_data.selected_song = -1;
+    jukebox_data.is_playing = 0;
+    jukebox_data.last_activity = time(NULL);
+    jukebox_data.play_start_time = 0;
+    jukebox_data.play_duration_seconds = 0;
+    jukebox_data.stop_audio = 0;
+    jukebox_show_welcome();
+}
+
 static void jukebox_show_welcome(void) {
+    char line1[21];
     char line2[21];
-    sprintf(line2, "Insert %d cents", jukebox_data.song_cost_cents);
+    
+    if (jukebox_data.inserted_cents > 0) {
+        sprintf(line1, "Have: %dc", jukebox_data.inserted_cents);
+        sprintf(line2, "Need: %dc", jukebox_data.song_cost_cents - jukebox_data.inserted_cents);
+    } else {
+        sprintf(line1, "Insert %dc", jukebox_data.song_cost_cents);
+        strcpy(line2, "to play music");
+    }
     
     char display_bytes[100];
     size_t pos = 0;
@@ -163,7 +183,7 @@ static void jukebox_show_welcome(void) {
     
     /* Add line1, padded or truncated to 20 characters */
     for (i = 0; i < 20 && pos < sizeof(display_bytes) - 2; i++) {
-        display_bytes[pos++] = (i < 7) ? "JUKEBOX"[i] : ' ';
+        display_bytes[pos++] = (i < (int)strlen(line1)) ? line1[i] : ' ';
     }
     
     /* Add line feed */
@@ -212,16 +232,15 @@ static void jukebox_show_playing(void) {
         size_t pos = 0;
         int i;
         
-        /* Add line1: "Now Playing" indicator */
-        const char* playing_indicator = "Now Playing";
+        /* Add line1: Song title, padded or truncated to 20 characters */
         for (i = 0; i < 20 && pos < sizeof(display_bytes) - 2; i++) {
-            display_bytes[pos++] = (i < (int)strlen(playing_indicator)) ? playing_indicator[i] : ' ';
+            display_bytes[pos++] = (i < (int)strlen(song->title)) ? song->title[i] : ' ';
         }
         
         /* Add line feed */
         display_bytes[pos++] = 0x0A;
         
-        /* Add line2, padded or truncated to 20 characters */
+        /* Add line2: Artist name, padded or truncated to 20 characters */
         for (i = 0; i < 20 && pos < sizeof(display_bytes) - 1; i++) {
             display_bytes[pos++] = (i < (int)strlen(song->artist)) ? song->artist[i] : ' ';
         }
@@ -504,5 +523,6 @@ void register_jukebox_plugin(void) {
                     jukebox_handle_coin,
                     jukebox_handle_keypad,
                     jukebox_handle_hook,
-                    jukebox_handle_call_state);
+                    jukebox_handle_call_state,
+                    jukebox_on_activation);
 }

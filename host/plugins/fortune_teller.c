@@ -137,9 +137,26 @@ static int fortune_teller_handle_call_state(int call_state) {
 }
 
 /* Internal function implementations */
+static void fortune_teller_on_activation(void) {
+    /* Reset state and show welcome when plugin is activated */
+    fortune_teller_data.inserted_cents = 0;
+    fortune_teller_data.fortune_type = 0;
+    fortune_teller_data.is_ready = 0;
+    fortune_teller_data.last_activity = time(NULL);
+    fortune_teller_show_welcome();
+}
+
 static void fortune_teller_show_welcome(void) {
+    char line1[21];
     char line2[21];
-    sprintf(line2, "Insert %d cents", fortune_teller_data.fortune_cost_cents);
+    
+    if (fortune_teller_data.inserted_cents > 0) {
+        sprintf(line1, "Have: %dc", fortune_teller_data.inserted_cents);
+        sprintf(line2, "Need: %dc", fortune_teller_data.fortune_cost_cents - fortune_teller_data.inserted_cents);
+    } else {
+        sprintf(line1, "Insert %dc", fortune_teller_data.fortune_cost_cents);
+        strcpy(line2, "for your fortune");
+    }
     
     char display_bytes[100];
     size_t pos = 0;
@@ -147,7 +164,7 @@ static void fortune_teller_show_welcome(void) {
     
     /* Add line1, padded or truncated to 20 characters */
     for (i = 0; i < 20 && pos < sizeof(display_bytes) - 2; i++) {
-        display_bytes[pos++] = (i < 13) ? "FORTUNE TELLER"[i] : ' ';
+        display_bytes[pos++] = (i < (int)strlen(line1)) ? line1[i] : ' ';
     }
     
     /* Add line feed */
@@ -203,7 +220,7 @@ static void fortune_teller_show_reading(void) {
     
     /* Add line2, padded or truncated to 20 characters */
     for (i = 0; i < 20 && pos < sizeof(display_bytes) - 1; i++) {
-        display_bytes[pos++] = (i < 7) ? "Crystal"[i] : ' ';
+        display_bytes[pos++] = (i < 8) ? "Crystal..."[i] : ' ';
     }
     
     /* Null terminate */
@@ -296,5 +313,6 @@ void register_fortune_teller_plugin(void) {
                     fortune_teller_handle_coin,
                     fortune_teller_handle_keypad,
                     fortune_teller_handle_hook,
-                    fortune_teller_handle_call_state);
+                    fortune_teller_handle_call_state,
+                    fortune_teller_on_activation);
 }
