@@ -684,8 +684,12 @@ void millennium_client_set_display(struct millennium_client *client, const char 
     client->display_dirty = 1;
     if (client->display_message) {
         free(client->display_message);
+        client->display_message = NULL;
     }
     client->display_message = string_duplicate(message);
+    if (!client->display_message) {
+        millennium_logger_log(LOGGER_ERROR, "Failed to duplicate display message");
+    }
 }
 
 void millennium_client_write_to_display(struct millennium_client *client, const char *message) {

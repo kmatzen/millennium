@@ -668,7 +668,7 @@ char* web_server_serialize_response(const struct http_response* response) {
     }
     
     /* Content-Length header */
-    written = sprintf(ptr, "Content-Length: %u\r\n", strlen(response->body));
+    written = sprintf(ptr, "Content-Length: %lu\r\n", (unsigned long)strlen(response->body));
     if (written > 0 && (size_t)written < remaining) {
         ptr += written;
         remaining -= written;
@@ -1095,9 +1095,34 @@ struct http_response web_server_handle_api_logs(const struct http_request* reque
             escaped_message[200] = '\0';
         }
         
+        /* Extract timestamp from the log message if available */
+        time_t log_timestamp = time(NULL); /* Default to current time */
+        
+        /* Try to parse timestamp from log message format: [YYYY-MM-DD HH:MM:SS.mmm] */
+        char* timestamp_start = strstr(log_buffer[i], "[");
+        if (timestamp_start) {
+            char* timestamp_end = strstr(timestamp_start + 1, "]");
+            if (timestamp_end) {
+                /* Parse the timestamp - format: YYYY-MM-DD HH:MM:SS.mmm */
+                int year, month, day, hour, min, sec, msec;
+                if (sscanf(timestamp_start + 1, "%d-%d-%d %d:%d:%d.%d", 
+                          &year, &month, &day, &hour, &min, &sec, &msec) == 7) {
+                    /* Convert to time_t (approximate) */
+                    struct tm tm_time = {0};
+                    tm_time.tm_year = year - 1900;
+                    tm_time.tm_mon = month - 1;
+                    tm_time.tm_mday = day;
+                    tm_time.tm_hour = hour;
+                    tm_time.tm_min = min;
+                    tm_time.tm_sec = sec;
+                    log_timestamp = mktime(&tm_time);
+                }
+            }
+        }
+        
         written = sprintf(ptr,
             "{\"timestamp\":%ld,\"level\":\"INFO\",\"message\":\"%s\"}",
-            time(NULL), escaped_message);
+            log_timestamp, escaped_message);
         if (written > 0 && (size_t)written < remaining) {
             ptr += written;
             remaining -= written;
@@ -1266,7 +1291,7 @@ int web_server_send_streaming_response(int client_fd, const struct http_response
     }
     
     /* Content-Length header */
-    written = sprintf(ptr, "Content-Length: %u\r\n", response->content_length);
+    written = sprintf(ptr, "Content-Length: %lu\r\n", (unsigned long)response->content_length);
     if (written > 0 && (size_t)written < remaining) {
         ptr += written;
         remaining -= written;

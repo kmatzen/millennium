@@ -64,10 +64,13 @@ static void handle_keypad_event(keypad_event_t *keypad_event);
 static void generate_display_bytes(char *output, size_t output_size);
 static void format_number(const char* buffer, char *output);
 static void generate_message(int inserted, char *output);
+static void update_display(void);
+static int is_phone_ready_for_operation(void);
+static int keypad_has_space(void);
 static health_status_t check_serial_connection(void);
 static health_status_t check_sip_connection(void);
 static health_status_t check_daemon_activity(void);
-static void* metrics_collection_thread(void* arg);
+static void update_metrics(void);
 
 /* C-compatible functions for web server */
 time_t get_daemon_start_time(void) {
@@ -98,55 +101,41 @@ struct daemon_state_info get_daemon_state_info(void) {
 
 /* Display management functions */
 void generate_display_bytes(char *output, size_t output_size) {
-    char truncated_line1[DISPLAY_WIDTH + 1];
-    char truncated_line2[DISPLAY_WIDTH + 1];
-    char temp_output[100];
-    int i, j;
+    size_t required_size;
+    size_t pos;
+    int i;
     
     if (!output || output_size == 0) {
         return;
     }
     
-    /* Truncate or pad line1 to fit DISPLAY_WIDTH */
-    strncpy(truncated_line1, line1, DISPLAY_WIDTH);
-    truncated_line1[DISPLAY_WIDTH] = '\0';
-    for (i = strlen(truncated_line1); i < DISPLAY_WIDTH; i++) {
-        truncated_line1[i] = ' ';
+    /* Calculate required size: 2 lines * DISPLAY_WIDTH + 1 line feed + 1 null terminator */
+    required_size = (2 * DISPLAY_WIDTH) + 2;
+    
+    if (output_size < required_size) {
+        /* Buffer too small, truncate safely */
+        output_size = required_size - 1;
     }
     
-    /* Truncate or pad line2 to fit DISPLAY_WIDTH */
-    strncpy(truncated_line2, line2, DISPLAY_WIDTH);
-    truncated_line2[DISPLAY_WIDTH] = '\0';
-    for (i = strlen(truncated_line2); i < DISPLAY_WIDTH; i++) {
-        truncated_line2[i] = ' ';
-    }
+    pos = 0;
     
-    /* Build output string */
-    j = 0;
-    for (i = 0; i < DISPLAY_WIDTH && j < (int)output_size - 1; i++) {
-        temp_output[j++] = truncated_line1[i];
+    /* Add line1, padded or truncated to DISPLAY_WIDTH */
+    for (i = 0; i < DISPLAY_WIDTH && pos < output_size - 1; i++) {
+        output[pos++] = (i < (int)strlen(line1)) ? line1[i] : ' ';
     }
     
     /* Add line feed */
-    if (j < (int)output_size - 1) {
-        temp_output[j++] = 0x0A;
+    if (pos < output_size - 1) {
+        output[pos++] = 0x0A;
     }
     
-    /* Add line2 characters */
-    for (i = 0; i < DISPLAY_WIDTH && j < (int)output_size - 1; i++) {
-        temp_output[j++] = truncated_line2[i];
+    /* Add line2, padded or truncated to DISPLAY_WIDTH */
+    for (i = 0; i < DISPLAY_WIDTH && pos < output_size - 1; i++) {
+        output[pos++] = (i < (int)strlen(line2)) ? line2[i] : ' ';
     }
     
-    temp_output[j] = '\0';
-    
-    /* Ensure we don't exceed output buffer */
-    if (j >= (int)output_size) {
-        j = (int)output_size - 1;
-        temp_output[j] = '\0';
-    }
-    
-    strncpy(output, temp_output, output_size - 1);
-    output[output_size - 1] = '\0';
+    /* Null terminate */
+    output[pos] = '\0';
 }
 
 void format_number(const char* buffer, char *output) {
@@ -192,6 +181,27 @@ void generate_message(int inserted, char *output) {
     logger_debug_with_category("Display", log_msg);
 }
 
+/* Helper function to update display - consolidates repetitive code */
+static void update_display(void) {
+    if (!client || !daemon_state) {
+        return;
+    }
+    
+    char display_bytes[100];
+    generate_display_bytes(display_bytes, sizeof(display_bytes));
+    millennium_client_set_display(client, display_bytes);
+}
+
+/* Helper function to validate phone state for operations */
+static int is_phone_ready_for_operation(void) {
+    return (daemon_state && daemon_state->current_state == DAEMON_STATE_IDLE_UP);
+}
+
+/* Helper function to validate keypad buffer has space */
+static int keypad_has_space(void) {
+    return (daemon_state && daemon_state_get_keypad_length(daemon_state) < 10);
+}
+
 void check_and_call(void) {
     VALIDATE_BASICS();
     
@@ -200,7 +210,7 @@ void check_and_call(void) {
     /* Quick check without mutex - if conditions aren't met, no need to lock */
     int keypad_ready = (daemon_state_get_keypad_length(daemon_state) == 10);
     int enough_money = (daemon_state->inserted_cents >= cost_cents);
-    int phone_ready = (daemon_state->current_state == DAEMON_STATE_IDLE_UP);
+    int phone_ready = is_phone_ready_for_operation();
     
     if (keypad_ready && enough_money && phone_ready) {
         
@@ -214,9 +224,7 @@ void check_and_call(void) {
         metrics_increment_counter("calls_initiated", 1);
         
         strcpy(line2, "Calling");
-        char display_bytes[100];
-        generate_display_bytes(display_bytes, sizeof(display_bytes));
-        millennium_client_set_display(client, display_bytes);
+        update_display();
         
         millennium_client_call(client, number);
         
@@ -253,9 +261,8 @@ void handle_coin_event(coin_event_t *coin_event) {
     
     if (coin_value > 0) {
         pthread_mutex_lock(&daemon_state_mutex);
-        int phone_ready = (daemon_state->current_state == DAEMON_STATE_IDLE_UP);
         
-        if (phone_ready) {
+        if (is_phone_ready_for_operation()) {
             daemon_state->inserted_cents += coin_value;
             daemon_state_update_activity(daemon_state);
             
@@ -270,9 +277,7 @@ void handle_coin_event(coin_event_t *coin_event) {
             
             format_number(daemon_state->keypad_buffer, line1);
             generate_message(daemon_state->inserted_cents, line2);
-            char display_bytes[100];
-            generate_display_bytes(display_bytes, sizeof(display_bytes));
-            millennium_client_set_display(client, display_bytes);
+            update_display();
         }
         pthread_mutex_unlock(&daemon_state_mutex);
         
@@ -302,9 +307,7 @@ void handle_call_state_event(call_state_event_t *call_state_event) {
         metrics_increment_counter("calls_incoming", 1);
         
         strcpy(line1, "Call incoming...");
-        char display_bytes[100];
-        generate_display_bytes(display_bytes, sizeof(display_bytes));
-        millennium_client_set_display(client, display_bytes);
+        update_display();
         
         daemon_state->current_state = DAEMON_STATE_CALL_INCOMING;
         daemon_state_update_activity(daemon_state);
@@ -316,9 +319,7 @@ void handle_call_state_event(call_state_event_t *call_state_event) {
         
         strcpy(line1, "Call active");
         strcpy(line2, "Audio connected");
-        char display_bytes[100];
-        generate_display_bytes(display_bytes, sizeof(display_bytes));
-        millennium_client_set_display(client, display_bytes);
+        update_display();
         
         daemon_state->current_state = DAEMON_STATE_CALL_ACTIVE;
         daemon_state_update_activity(daemon_state);
@@ -366,9 +367,7 @@ void handle_hook_event(hook_state_change_event_t *hook_event) {
             
             generate_message(daemon_state->inserted_cents, line2);
             format_number(daemon_state->keypad_buffer, line1);
-            char display_bytes[100];
-            generate_display_bytes(display_bytes, sizeof(display_bytes));
-            millennium_client_set_display(client, display_bytes);
+            update_display();
         }
     } else if (hook_down) {
         logger_info_with_category("Hook", "Hook down, call ended");
@@ -383,9 +382,7 @@ void handle_hook_event(hook_state_change_event_t *hook_event) {
         
         generate_message(daemon_state->inserted_cents, line2);
         format_number(daemon_state->keypad_buffer, line1);
-        char display_bytes[100];
-        generate_display_bytes(display_bytes, sizeof(display_bytes));
-        millennium_client_set_display(client, display_bytes);
+        update_display();
         
         /* Update state */
         daemon_state->current_state = DAEMON_STATE_IDLE_DOWN;
@@ -423,10 +420,8 @@ void handle_keypad_event(keypad_event_t *keypad_event) {
     char key = keypad_event_get_key(keypad_event);
     if (isdigit(key)) {
         pthread_mutex_lock(&daemon_state_mutex);
-        int buffer_has_space = (daemon_state_get_keypad_length(daemon_state) < 10);
-        int phone_ready = (daemon_state->current_state == DAEMON_STATE_IDLE_UP);
         
-        if (buffer_has_space && phone_ready) {
+        if (keypad_has_space() && is_phone_ready_for_operation()) {
             
             char log_msg[MAX_STRING_LEN];
             sprintf(log_msg, "Key pressed: %c", key);
@@ -438,9 +433,7 @@ void handle_keypad_event(keypad_event_t *keypad_event) {
             
             generate_message(daemon_state->inserted_cents, line2);
             format_number(daemon_state->keypad_buffer, line1);
-            char display_bytes[100];
-            generate_display_bytes(display_bytes, sizeof(display_bytes));
-            millennium_client_set_display(client, display_bytes);
+            update_display();
         }
         pthread_mutex_unlock(&daemon_state_mutex);
         
@@ -548,7 +541,7 @@ int send_control_command(const char* action) {
     } else if (strcmp(command, "keypad_clear") == 0) {
         /* Only allow clear when handset is up (same as physical keypad logic) */
         pthread_mutex_lock(&daemon_state_mutex);
-        if (daemon_state->current_state == DAEMON_STATE_IDLE_UP) {
+        if (is_phone_ready_for_operation()) {
             daemon_state_clear_keypad(daemon_state);
             daemon_state_update_activity(daemon_state);
             metrics_increment_counter("keypad_clears", 1);
@@ -557,23 +550,20 @@ int send_control_command(const char* action) {
             /* Update physical display */
             format_number(daemon_state->keypad_buffer, line1);
             generate_message(daemon_state->inserted_cents, line2);
-            char display_bytes[100];
-            generate_display_bytes(display_bytes, sizeof(display_bytes));
-            millennium_client_set_display(client, display_bytes);
+            update_display();
         } else {
             logger_warn_with_category("Control", "Keypad clear ignored - handset down");
         }
-        int success = (daemon_state->current_state == DAEMON_STATE_IDLE_UP);
+        int success = is_phone_ready_for_operation();
         pthread_mutex_unlock(&daemon_state_mutex);
         return success;
         
     } else if (strcmp(command, "keypad_backspace") == 0) {
         /* Only allow backspace when handset is up and buffer is not empty */
         pthread_mutex_lock(&daemon_state_mutex);
-        int phone_ready = (daemon_state->current_state == DAEMON_STATE_IDLE_UP);
         int buffer_not_empty = (daemon_state_get_keypad_length(daemon_state) > 0);
         
-        if (phone_ready && buffer_not_empty) {
+        if (is_phone_ready_for_operation() && buffer_not_empty) {
             daemon_state_remove_last_key(daemon_state);
             daemon_state_update_activity(daemon_state);
             metrics_increment_counter("keypad_backspaces", 1);
@@ -582,13 +572,11 @@ int send_control_command(const char* action) {
             /* Update physical display */
             format_number(daemon_state->keypad_buffer, line1);
             generate_message(daemon_state->inserted_cents, line2);
-            char display_bytes[100];
-            generate_display_bytes(display_bytes, sizeof(display_bytes));
-            millennium_client_set_display(client, display_bytes);
+            update_display();
         } else {
             logger_warn_with_category("Control", "Keypad backspace ignored - handset down or buffer empty");
         }
-        int success = (phone_ready && buffer_not_empty);
+        int success = (is_phone_ready_for_operation() && buffer_not_empty);
         pthread_mutex_unlock(&daemon_state_mutex);
         return success;
         
@@ -723,61 +711,30 @@ health_status_t check_daemon_activity(void) {
     return HEALTH_STATUS_HEALTHY;
 }
 
-/* Metrics collection thread */
-void* metrics_collection_thread(void* arg) {
-    (void)arg; /* Suppress unused parameter warning */
+/* Helper function to update metrics - consolidated from thread */
+static void update_metrics(void) {
+    if (!daemon_state) return;
     
-    while (1) {
-        pthread_mutex_lock(&running_mutex);
-        if (!running) {
-            pthread_mutex_unlock(&running_mutex);
-            break;
-        }
-        pthread_mutex_unlock(&running_mutex);
-        
-        /* Skip metrics collection during audio activity to save CPU */
-        if (daemon_state && daemon_state->current_state >= 2) {
-            /* During audio activity, sleep longer and skip metrics */
-            sleep(30);
-            continue;
-        }
-        
-        /* Update system metrics */
-        time_t uptime = time(NULL) - daemon_start_time;
-        metrics_set_gauge("daemon_uptime_seconds", (double)uptime);
-        
-        if (daemon_state) {
-            /* Simple check if we should still be running */
-            pthread_mutex_lock(&running_mutex);
-            if (!running) {
-                pthread_mutex_unlock(&running_mutex);
-                break;
-            }
-            pthread_mutex_unlock(&running_mutex);
-            
-            /* Quick snapshot of state without holding mutex too long */
-            pthread_mutex_lock(&daemon_state_mutex);
-            double current_state = (double)daemon_state->current_state;
-            double inserted_cents = (double)daemon_state->inserted_cents;
-            double keypad_size = (double)daemon_state_get_keypad_length(daemon_state);
-            pthread_mutex_unlock(&daemon_state_mutex);
-            
-            /* Update metrics outside of mutex */
-            metrics_set_gauge("current_state", current_state);
-            metrics_set_gauge("inserted_cents", inserted_cents);
-            metrics_set_gauge("keypad_buffer_size", keypad_size);
-        }
-        
-        sleep(10);
-    }
+    /* Update system metrics */
+    time_t uptime = time(NULL) - daemon_start_time;
+    metrics_set_gauge("daemon_uptime_seconds", (double)uptime);
     
-    return NULL;
+    /* Quick snapshot of state without holding mutex too long */
+    pthread_mutex_lock(&daemon_state_mutex);
+    double current_state = (double)daemon_state->current_state;
+    double inserted_cents = (double)daemon_state->inserted_cents;
+    double keypad_size = (double)daemon_state_get_keypad_length(daemon_state);
+    pthread_mutex_unlock(&daemon_state_mutex);
+    
+    /* Update metrics outside of mutex */
+    metrics_set_gauge("current_state", current_state);
+    metrics_set_gauge("inserted_cents", inserted_cents);
+    metrics_set_gauge("keypad_buffer_size", keypad_size);
 }
 
 int main(int argc, char *argv[]) {
     config_data_t* config = config_get_instance();
     /* health_monitor_t* health_monitor = health_monitor_get_instance(); */
-    pthread_t metrics_thread;
     int loop_count = 0;
     char config_file[MAX_STRING_LEN];
     char start_msg[MAX_STRING_LEN];
@@ -868,18 +825,13 @@ int main(int argc, char *argv[]) {
         logger_info_with_category("Daemon", "Web server disabled");
     }
     
-    /* Start metrics collection thread */
-    if (pthread_create(&metrics_thread, NULL, metrics_collection_thread, NULL) != 0) {
-        logger_error_with_category("Daemon", "Failed to create metrics thread");
-    }
+    /* Metrics collection is now handled in the main loop */
     
     /* Initialize display */
     pthread_mutex_lock(&daemon_state_mutex);
     format_number(daemon_state->keypad_buffer, line1);
     generate_message(daemon_state->inserted_cents, line2);
-    char display_bytes[100];
-    generate_display_bytes(display_bytes, sizeof(display_bytes));
-    millennium_client_set_display(client, display_bytes);
+    update_display();
     pthread_mutex_unlock(&daemon_state_mutex);
     
     /* Initialize event processor */
@@ -916,22 +868,7 @@ int main(int argc, char *argv[]) {
         
         /* Update metrics in main loop (every 1000 loops = ~1 second) */
         if (++loop_count % 1000 == 0) {
-        /* Update system metrics (moved from separate thread) */
-        time_t uptime = time(NULL) - daemon_start_time;
-        metrics_set_gauge("daemon_uptime_seconds", (double)uptime);
-        
-        if (daemon_state) {
-            /* Quick snapshot for metrics */
-            pthread_mutex_lock(&daemon_state_mutex);
-            double current_state = (double)daemon_state->current_state;
-            double inserted_cents = (double)daemon_state->inserted_cents;
-            double keypad_size = (double)daemon_state_get_keypad_length(daemon_state);
-            pthread_mutex_unlock(&daemon_state_mutex);
-            
-            metrics_set_gauge("current_state", current_state);
-            metrics_set_gauge("inserted_cents", inserted_cents);
-            metrics_set_gauge("keypad_buffer_size", keypad_size);
-        }
+            update_metrics();
         }
         
         /* Log metrics summary every 10000 loops (about every 10 seconds) at DEBUG level */
@@ -956,11 +893,10 @@ int main(int argc, char *argv[]) {
         metrics_server = NULL;
     }
     
-    /* Stop metrics thread */
+    /* Stop running flag */
     pthread_mutex_lock(&running_mutex);
     running = 0;
     pthread_mutex_unlock(&running_mutex);
-    pthread_join(metrics_thread, NULL);
     
     /* Stop health monitoring */
     health_monitor_stop_monitoring();
