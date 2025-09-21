@@ -198,9 +198,11 @@ void check_and_call(void) {
     int cost_cents = config_get_call_cost_cents(config_get_instance());
     
     /* Quick check without mutex - if conditions aren't met, no need to lock */
-    if (daemon_state_get_keypad_length(daemon_state) == 10 && 
-        daemon_state->inserted_cents >= cost_cents &&
-        daemon_state->current_state == DAEMON_STATE_IDLE_UP) {
+    int keypad_ready = (daemon_state_get_keypad_length(daemon_state) == 10);
+    int enough_money = (daemon_state->inserted_cents >= cost_cents);
+    int phone_ready = (daemon_state->current_state == DAEMON_STATE_IDLE_UP);
+    
+    if (keypad_ready && enough_money && phone_ready) {
         
         char number[11];
         strncpy(number, daemon_state->keypad_buffer, 10);
@@ -251,7 +253,9 @@ void handle_coin_event(coin_event_t *coin_event) {
     
     if (coin_value > 0) {
         pthread_mutex_lock(&daemon_state_mutex);
-        if (daemon_state->current_state == DAEMON_STATE_IDLE_UP) {
+        int phone_ready = (daemon_state->current_state == DAEMON_STATE_IDLE_UP);
+        
+        if (phone_ready) {
             daemon_state->inserted_cents += coin_value;
             daemon_state_update_activity(daemon_state);
             
@@ -289,8 +293,10 @@ void handle_call_state_event(call_state_event_t *call_state_event) {
     VALIDATE_BASICS();
     
     pthread_mutex_lock(&daemon_state_mutex);
-    if (call_state_event_get_state(call_state_event) == EVENT_CALL_STATE_INCOMING && 
-        daemon_state->current_state == DAEMON_STATE_IDLE_DOWN) {
+    int is_incoming = (call_state_event_get_state(call_state_event) == EVENT_CALL_STATE_INCOMING);
+    int phone_down = (daemon_state->current_state == DAEMON_STATE_IDLE_DOWN);
+    
+    if (is_incoming && phone_down) {
         
         logger_info_with_category("Call", "Incoming call received");
         metrics_increment_counter("calls_incoming", 1);
@@ -334,15 +340,21 @@ void handle_hook_event(hook_state_change_event_t *hook_event) {
     VALIDATE_BASICS();
     
     pthread_mutex_lock(&daemon_state_mutex);
-    if (hook_state_change_event_get_direction(hook_event) == 'U') {
-        if (daemon_state->current_state == DAEMON_STATE_CALL_INCOMING) {
+    int hook_up = (hook_state_change_event_get_direction(hook_event) == 'U');
+    int hook_down = (hook_state_change_event_get_direction(hook_event) == 'D');
+    
+    if (hook_up) {
+        int call_incoming = (daemon_state->current_state == DAEMON_STATE_CALL_INCOMING);
+        int phone_down = (daemon_state->current_state == DAEMON_STATE_IDLE_DOWN);
+        
+        if (call_incoming) {
             logger_info_with_category("Call", "Call answered");
             metrics_increment_counter("calls_answered", 1);
             
             daemon_state->current_state = DAEMON_STATE_CALL_ACTIVE;
             daemon_state_update_activity(daemon_state);
             
-        } else if (daemon_state->current_state == DAEMON_STATE_IDLE_DOWN) {
+        } else if (phone_down) {
             logger_info_with_category("Hook", "Hook lifted, transitioning to IDLE_UP");
             metrics_increment_counter("hook_lifted", 1);
             
@@ -358,7 +370,7 @@ void handle_hook_event(hook_state_change_event_t *hook_event) {
             generate_display_bytes(display_bytes, sizeof(display_bytes));
             millennium_client_set_display(client, display_bytes);
         }
-    } else if (hook_state_change_event_get_direction(hook_event) == 'D') {
+    } else if (hook_down) {
         logger_info_with_category("Hook", "Hook down, call ended");
         metrics_increment_counter("hook_down", 1);
         
@@ -382,7 +394,7 @@ void handle_hook_event(hook_state_change_event_t *hook_event) {
     pthread_mutex_unlock(&daemon_state_mutex);
     
     /* Handle external calls outside of mutex */
-    if (hook_state_change_event_get_direction(hook_event) == 'U') {
+    if (hook_up) {
         /* Check what state we ended up in after the mutex section */
         pthread_mutex_lock(&daemon_state_mutex);
         if (daemon_state->current_state == DAEMON_STATE_CALL_ACTIVE) {
@@ -394,7 +406,7 @@ void handle_hook_event(hook_state_change_event_t *hook_event) {
         } else {
             pthread_mutex_unlock(&daemon_state_mutex);
         }
-    } else if (hook_state_change_event_get_direction(hook_event) == 'D') {
+    } else if (hook_down) {
         millennium_client_hangup(client);
         millennium_client_write_to_coin_validator(client, 'c'); /* Always 'c' for hook down */
         millennium_client_write_to_coin_validator(client, 'z');
@@ -411,8 +423,10 @@ void handle_keypad_event(keypad_event_t *keypad_event) {
     char key = keypad_event_get_key(keypad_event);
     if (isdigit(key)) {
         pthread_mutex_lock(&daemon_state_mutex);
-        if (daemon_state_get_keypad_length(daemon_state) < 10 && 
-            daemon_state->current_state == DAEMON_STATE_IDLE_UP) {
+        int buffer_has_space = (daemon_state_get_keypad_length(daemon_state) < 10);
+        int phone_ready = (daemon_state->current_state == DAEMON_STATE_IDLE_UP);
+        
+        if (buffer_has_space && phone_ready) {
             
             char log_msg[MAX_STRING_LEN];
             sprintf(log_msg, "Key pressed: %c", key);
@@ -556,7 +570,10 @@ int send_control_command(const char* action) {
     } else if (strcmp(command, "keypad_backspace") == 0) {
         /* Only allow backspace when handset is up and buffer is not empty */
         pthread_mutex_lock(&daemon_state_mutex);
-        if (daemon_state->current_state == DAEMON_STATE_IDLE_UP && daemon_state_get_keypad_length(daemon_state) > 0) {
+        int phone_ready = (daemon_state->current_state == DAEMON_STATE_IDLE_UP);
+        int buffer_not_empty = (daemon_state_get_keypad_length(daemon_state) > 0);
+        
+        if (phone_ready && buffer_not_empty) {
             daemon_state_remove_last_key(daemon_state);
             daemon_state_update_activity(daemon_state);
             metrics_increment_counter("keypad_backspaces", 1);
@@ -571,7 +588,7 @@ int send_control_command(const char* action) {
         } else {
             logger_warn_with_category("Control", "Keypad backspace ignored - handset down or buffer empty");
         }
-        int success = (daemon_state->current_state == DAEMON_STATE_IDLE_UP && daemon_state_get_keypad_length(daemon_state) > 0);
+        int success = (phone_ready && buffer_not_empty);
         pthread_mutex_unlock(&daemon_state_mutex);
         return success;
         
@@ -597,16 +614,14 @@ int send_control_command(const char* action) {
         
         /* Map cents to coin codes (same as physical coin reader) */
         uint8_t coin_code;
-        if (cents == 5) {
-            coin_code = 0x36; /* COIN_6 */
-        } else if (cents == 10) {
-            coin_code = 0x37; /* COIN_7 */
-        } else if (cents == 25) {
-            coin_code = 0x38; /* COIN_8 */
-        } else {
-            sprintf(log_msg, "Invalid coin value: %d¢", cents);
-            logger_warn_with_category("Control", log_msg);
-            return 0;
+        switch (cents) {
+            case 5:  coin_code = 0x36; break; /* COIN_6 */
+            case 10: coin_code = 0x37; break; /* COIN_7 */
+            case 25: coin_code = 0x38; break; /* COIN_8 */
+            default:
+                sprintf(log_msg, "Invalid coin value: %d¢", cents);
+                logger_warn_with_category("Control", log_msg);
+                return 0;
         }
         
         coin_event_t *coin_event = coin_event_create(coin_code);
