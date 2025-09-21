@@ -58,8 +58,7 @@ static void* metrics_collection_thread(void* arg);
 
 /* C-compatible functions for web server */
 time_t get_daemon_start_time(void) {
-    time_t now = time(NULL);
-    return now - (time(NULL) - daemon_start_time);
+    return daemon_start_time;
 }
 
 struct daemon_state_info get_daemon_state_info(void) {
@@ -89,13 +88,16 @@ void generate_display_bytes(char *output, size_t output_size) {
     char temp_output[100];
     int i, j;
     
+    if (!output || output_size == 0) {
+        return;
+    }
+    
     /* Truncate or pad line1 to fit DISPLAY_WIDTH */
     strncpy(truncated_line1, line1, DISPLAY_WIDTH);
     truncated_line1[DISPLAY_WIDTH] = '\0';
     for (i = strlen(truncated_line1); i < DISPLAY_WIDTH; i++) {
         truncated_line1[i] = ' ';
     }
-    truncated_line1[DISPLAY_WIDTH] = '\0';
     
     /* Truncate or pad line2 to fit DISPLAY_WIDTH */
     strncpy(truncated_line2, line2, DISPLAY_WIDTH);
@@ -103,7 +105,6 @@ void generate_display_bytes(char *output, size_t output_size) {
     for (i = strlen(truncated_line2); i < DISPLAY_WIDTH; i++) {
         truncated_line2[i] = ' ';
     }
-    truncated_line2[DISPLAY_WIDTH] = '\0';
     
     /* Build output string */
     j = 0;
@@ -123,9 +124,10 @@ void generate_display_bytes(char *output, size_t output_size) {
     
     temp_output[j] = '\0';
     
-    /* Limit to 100 characters */
-    if (j > 100) {
-        temp_output[99] = '\0';
+    /* Ensure we don't exceed output buffer */
+    if (j >= (int)output_size) {
+        j = (int)output_size - 1;
+        temp_output[j] = '\0';
     }
     
     strncpy(output, temp_output, output_size - 1);
@@ -134,8 +136,14 @@ void generate_display_bytes(char *output, size_t output_size) {
 
 void format_number(const char* buffer, char *output) {
     char filled[11] = "__________";  /* 10 underscores + null terminator */
-    int len = strlen(buffer);
+    int len;
     int i;
+    
+    if (!buffer || !output) {
+        return;
+    }
+    
+    len = strlen(buffer);
     
     for (i = 0; i < len && i < 10; i++) {
         filled[i] = buffer[i];
@@ -148,8 +156,17 @@ void format_number(const char* buffer, char *output) {
 }
 
 void generate_message(int inserted, char *output) {
+    if (!output) {
+        return;
+    }
+    
     int cost_cents = config_get_call_cost_cents(config_get_instance());
     int remaining = cost_cents - inserted;
+    
+    /* Ensure remaining is not negative */
+    if (remaining < 0) {
+        remaining = 0;
+    }
     
     sprintf(output, "Insert %02d cents", remaining);
     
@@ -344,8 +361,12 @@ void handle_hook_event(hook_state_change_event_t *hook_event) {
         generate_display_bytes(display_bytes, sizeof(display_bytes));
         millennium_client_set_display(client, display_bytes);
         
-        millennium_client_write_to_coin_validator(client, daemon_state->current_state == DAEMON_STATE_IDLE_UP ? 'f' : 'c');
+        /* Determine coin validator command based on current state */
+        char coin_cmd = (daemon_state->current_state == DAEMON_STATE_IDLE_UP) ? 'f' : 'c';
+        millennium_client_write_to_coin_validator(client, coin_cmd);
         millennium_client_write_to_coin_validator(client, 'z');
+        
+        /* Update state after sending commands */
         daemon_state->current_state = DAEMON_STATE_IDLE_DOWN;
         daemon_state_update_activity(daemon_state);
     }
@@ -415,11 +436,18 @@ int send_control_command(const char* action) {
     
     if (colon_pos) {
         size_t cmd_len = colon_pos - action;
+        if (cmd_len >= MAX_STRING_LEN) {
+            cmd_len = MAX_STRING_LEN - 1;
+        }
         strncpy(command, action, cmd_len);
         command[cmd_len] = '\0';
-        strcpy(arg, colon_pos + 1);
+        
+        /* Safely copy argument */
+        strncpy(arg, colon_pos + 1, MAX_STRING_LEN - 1);
+        arg[MAX_STRING_LEN - 1] = '\0';
     } else {
-        strcpy(command, action);
+        strncpy(command, action, MAX_STRING_LEN - 1);
+        command[MAX_STRING_LEN - 1] = '\0';
         strcpy(arg, "");
     }
     
@@ -512,11 +540,23 @@ int send_control_command(const char* action) {
         
     } else if (strcmp(command, "coin_insert") == 0) {
         /* Extract cents from argument and inject as coin event */
+        if (strlen(arg) == 0) {
+            logger_warn_with_category("Control", "Coin insert command missing argument");
+            return 0;
+        }
+        
         sprintf(log_msg, "Extracted cents string: '%s'", arg);
         logger_info_with_category("Control", log_msg);
         printf("[CONTROL] Extracted cents: '%s'\n", arg);
         
         int cents = atoi(arg);
+        
+        /* Validate coin value */
+        if (cents <= 0) {
+            sprintf(log_msg, "Invalid coin value: %d¢", cents);
+            logger_warn_with_category("Control", log_msg);
+            return 0;
+        }
         
         /* Map cents to coin codes (same as physical coin reader) */
         uint8_t coin_code;
@@ -647,9 +687,17 @@ void* metrics_collection_thread(void* arg) {
         metrics_set_gauge("daemon_uptime_seconds", (double)uptime);
         
         if (daemon_state) {
+            /* Use mutex to prevent race conditions with main thread */
+            pthread_mutex_lock(&running_mutex);
+            /* Check if we should still be running after acquiring mutex */
+            if (!running) {
+                pthread_mutex_unlock(&running_mutex);
+                break;
+            }
             metrics_set_gauge("current_state", (double)daemon_state->current_state);
             metrics_set_gauge("inserted_cents", (double)daemon_state->inserted_cents);
             metrics_set_gauge("keypad_buffer_size", (double)daemon_state_get_keypad_length(daemon_state));
+            pthread_mutex_unlock(&running_mutex);
         }
         
         sleep(10);
@@ -798,15 +846,18 @@ int main(int argc, char *argv[]) {
         
         /* Update metrics in main loop (every 1000 loops = ~1 second) */
         if (++loop_count % 1000 == 0) {
-            /* Update system metrics (moved from separate thread) */
-            time_t uptime = time(NULL) - daemon_start_time;
-            metrics_set_gauge("daemon_uptime_seconds", (double)uptime);
-            
-            if (daemon_state) {
-                metrics_set_gauge("current_state", (double)daemon_state->current_state);
-                metrics_set_gauge("inserted_cents", (double)daemon_state->inserted_cents);
-                metrics_set_gauge("keypad_buffer_size", (double)daemon_state_get_keypad_length(daemon_state));
-            }
+        /* Update system metrics (moved from separate thread) */
+        time_t uptime = time(NULL) - daemon_start_time;
+        metrics_set_gauge("daemon_uptime_seconds", (double)uptime);
+        
+        if (daemon_state) {
+            /* Use mutex to prevent race conditions with metrics thread */
+            pthread_mutex_lock(&running_mutex);
+            metrics_set_gauge("current_state", (double)daemon_state->current_state);
+            metrics_set_gauge("inserted_cents", (double)daemon_state->inserted_cents);
+            metrics_set_gauge("keypad_buffer_size", (double)daemon_state_get_keypad_length(daemon_state));
+            pthread_mutex_unlock(&running_mutex);
+        }
         }
         
         /* Log metrics summary every 10000 loops (about every 10 seconds) at DEBUG level */
