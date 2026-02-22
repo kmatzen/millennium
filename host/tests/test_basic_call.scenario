@@ -1,0 +1,34 @@
+# Test: Basic call flow
+# Verifies the standard call lifecycle: pick up, insert coins,
+# dial, call connects, hang up.
+
+# Phone starts with receiver down
+assert_state IDLE_DOWN
+assert_display Lift receiver
+
+# Pick up handset
+hook_up
+assert_state IDLE_UP
+assert_display Insert 50c
+
+# Insert a quarter — not enough yet
+coin 25
+assert_display Have: 25c
+
+# Insert another quarter — now we have 50c
+coin 25
+assert_display Have: 50c
+
+# Dial a number
+keys 555
+assert_display (555) ___-____
+
+keys 1234567
+# 10 digits entered with enough money — call starts automatically
+assert_display Call active
+assert_state CALL_ACTIVE
+
+# Hang up
+hook_down
+assert_state IDLE_DOWN
+assert_display Lift receiver

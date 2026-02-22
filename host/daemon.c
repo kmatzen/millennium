@@ -850,9 +850,10 @@ int main(int argc, char *argv[]) {
             event_destroy(event);
         }
         
-        /* Update metrics in main loop (every 1000 loops = ~1 second) */
+        /* Update metrics and tick plugins (every 1000 loops = ~1 second) */
         if (++loop_count % 1000 == 0) {
             update_metrics();
+            plugins_tick();
         }
         
         /* Log metrics summary every 10000 loops (about every 10 seconds) at DEBUG level */

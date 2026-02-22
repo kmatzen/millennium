@@ -318,5 +318,6 @@ void register_fortune_teller_plugin(void) {
                     fortune_teller_handle_keypad,
                     fortune_teller_handle_hook,
                     fortune_teller_handle_call_state,
-                    fortune_teller_on_activation);
+                    fortune_teller_on_activation,
+                    NULL);
 }

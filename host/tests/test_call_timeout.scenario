@@ -1,0 +1,46 @@
+# Test: Call timeout enforcement
+# Verifies that calls are automatically terminated after the configured
+# timeout, and that a countdown warning appears on the display.
+#
+# The simulator sets call.timeout_seconds=5 for fast testing.
+
+hook_up
+assert_state IDLE_UP
+assert_display Insert 50c
+
+# Insert enough money
+coin 25
+coin 25
+assert_display Have: 50c
+
+# Dial a complete 10-digit number — call auto-starts and connects
+keys 5551234567
+assert_display Call active
+assert_state CALL_ACTIVE
+
+# With timeout=5 and TIMEOUT_WARNING_SECONDS=60, warning shows
+# immediately since remaining (5) < 60. Advance 1 second.
+wait 1
+assert_display remaining
+print
+
+# Advance closer to timeout
+wait 2
+assert_display remaining
+assert_display Call active
+print
+
+# Advance past timeout — call should be ended
+wait 3
+assert_no_display Call active
+assert_no_display remaining
+
+# Receiver is still up — phone returns to idle-up state
+# (user hasn't hung up yet, just the call was terminated)
+assert_display Insert 50c
+print
+
+# User puts handset down
+hook_down
+assert_state IDLE_DOWN
+assert_display Lift receiver
