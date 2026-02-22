@@ -80,14 +80,26 @@ simulator: $(SIM_OBJS)
 
 all: daemon
 
+# Unit test binary
+UNIT_TEST_OBJS = tests/unit_tests.o daemon_state.o events.o event_processor.o config.o logger.o metrics.o plugins.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o state_persistence.o
+
+tests/unit_tests.o: tests/unit_tests.c tests/test_framework.h config.h daemon_state.h plugins.h logger.h metrics.h millennium_sdk.h
+	gcc tests/unit_tests.c -o tests/unit_tests.o -c $(C99_CFLAGS) -I.
+
+unit_tests: $(UNIT_TEST_OBJS)
+	gcc $(UNIT_TEST_OBJS) -o unit_tests $(SIM_LDFLAGS)
+
 # Run all scenario tests via the simulator
-test: simulator
+test: simulator unit_tests
+	@echo "Running unit tests..."
+	@./unit_tests
+	@echo ""
 	@echo "Running scenario tests..."
 	@./simulator tests/*.scenario
 	@echo ""
 
 clean:
-	rm -rf *.o daemon simulator plugins/*.o
+	rm -rf *.o daemon simulator unit_tests plugins/*.o tests/*.o
 
 install: daemon
 	sudo mkdir -p /etc/millennium
@@ -105,4 +117,4 @@ uninstall:
 	sudo rm -f /etc/systemd/system/millennium-daemon.service
 	sudo systemctl daemon-reload
 
-.PHONY: all clean install uninstall test
+.PHONY: all clean install uninstall test unit_tests
