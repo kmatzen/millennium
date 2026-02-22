@@ -4,6 +4,7 @@
 #include <string.h>
 #include <time.h>
 #include <sys/time.h>
+#include <pthread.h>
 #include "plugins.h"
 #include "logger.h"
 #include "millennium_sdk.h"
@@ -15,6 +16,7 @@
 static plugin_t plugins[MAX_PLUGINS];
 static int plugin_count = 0;
 static int active_plugin_index = -1;
+static pthread_mutex_t plugins_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 /* External references */
 extern daemon_state_data_t *daemon_state;
@@ -89,6 +91,8 @@ int plugins_activate(const char *plugin_name) {
         return -1;
     }
     
+    pthread_mutex_lock(&plugins_mutex);
+    
     /* Find the plugin */
     int i;
     for (i = 0; i < plugin_count; i++) {
@@ -101,25 +105,32 @@ int plugins_activate(const char *plugin_name) {
             }
             
             logger_infof_with_category("Plugins", "Plugin %s activated", plugin_name);
+            pthread_mutex_unlock(&plugins_mutex);
             return 0;
         }
     }
     
     logger_warnf_with_category("Plugins", "Plugin %s not found", plugin_name);
+    pthread_mutex_unlock(&plugins_mutex);
     return -1;
 }
 
 const char* plugins_get_active_name(void) {
+    pthread_mutex_lock(&plugins_mutex);
+    const char *name = NULL;
     if (active_plugin_index >= 0 && active_plugin_index < plugin_count) {
-        return plugins[active_plugin_index].name;
+        name = plugins[active_plugin_index].name;
     }
-    return NULL;
+    pthread_mutex_unlock(&plugins_mutex);
+    return name;
 }
 
 int plugins_list(char *buffer, size_t buffer_size) {
     if (!buffer || buffer_size == 0) {
         return -1;
     }
+    
+    pthread_mutex_lock(&plugins_mutex);
     
     buffer[0] = '\0';
     int pos = 0;
@@ -139,6 +150,7 @@ int plugins_list(char *buffer, size_t buffer_size) {
         }
     }
     
+    pthread_mutex_unlock(&plugins_mutex);
     return 0;
 }
 

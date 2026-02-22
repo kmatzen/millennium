@@ -8,9 +8,12 @@
 #include <ctype.h>
 #include <errno.h>
 #include <float.h>
+#include <pthread.h>
 
 /* Global metrics instance */
 metrics_t *g_metrics = NULL;
+
+static pthread_mutex_t metrics_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 /* C89-compatible strdup implementation */
 static char *my_strdup(const char *s) {
@@ -225,13 +228,19 @@ int metrics_increment_counter(const char *name, uint64_t amount) {
     
     if (!g_metrics || !name) return -1;
     
+    pthread_mutex_lock(&metrics_mutex);
+    
     index = find_counter_index(name);
     if (index < 0) {
         index = add_counter(name);
-        if (index < 0) return -1;
+        if (index < 0) {
+            pthread_mutex_unlock(&metrics_mutex);
+            return -1;
+        }
     }
     
     g_metrics->counters[index].value += amount;
+    pthread_mutex_unlock(&metrics_mutex);
     return 0;
 }
 
@@ -240,25 +249,34 @@ int metrics_reset_counter(const char *name) {
     
     if (!g_metrics || !name) return -1;
     
+    pthread_mutex_lock(&metrics_mutex);
+    
     index = find_counter_index(name);
     if (index >= 0) {
         g_metrics->counters[index].value = 0;
         g_metrics->counters[index].last_reset = time(NULL);
     }
     
+    pthread_mutex_unlock(&metrics_mutex);
     return 0;
 }
 
 uint64_t metrics_get_counter(const char *name) {
     int index;
+    uint64_t value;
     
     if (!g_metrics || !name) return 0;
     
+    pthread_mutex_lock(&metrics_mutex);
+    
     index = find_counter_index(name);
     if (index >= 0) {
-        return g_metrics->counters[index].value;
+        value = g_metrics->counters[index].value;
+        pthread_mutex_unlock(&metrics_mutex);
+        return value;
     }
     
+    pthread_mutex_unlock(&metrics_mutex);
     return 0;
 }
 
@@ -267,15 +285,21 @@ int metrics_set_gauge(const char *name, double value) {
     
     if (!g_metrics || !name) return -1;
     
+    pthread_mutex_lock(&metrics_mutex);
+    
     index = find_gauge_index(name);
     if (index < 0) {
         index = add_gauge(name);
-        if (index < 0) return -1;
+        if (index < 0) {
+            pthread_mutex_unlock(&metrics_mutex);
+            return -1;
+        }
     }
     
     g_metrics->gauges[index].value = value;
     g_metrics->gauges[index].last_update = time(NULL);
     
+    pthread_mutex_unlock(&metrics_mutex);
     return 0;
 }
 
@@ -284,15 +308,21 @@ int metrics_increment_gauge(const char *name, double amount) {
     
     if (!g_metrics || !name) return -1;
     
+    pthread_mutex_lock(&metrics_mutex);
+    
     index = find_gauge_index(name);
     if (index < 0) {
         index = add_gauge(name);
-        if (index < 0) return -1;
+        if (index < 0) {
+            pthread_mutex_unlock(&metrics_mutex);
+            return -1;
+        }
     }
     
     g_metrics->gauges[index].value += amount;
     g_metrics->gauges[index].last_update = time(NULL);
     
+    pthread_mutex_unlock(&metrics_mutex);
     return 0;
 }
 
@@ -301,28 +331,40 @@ int metrics_decrement_gauge(const char *name, double amount) {
     
     if (!g_metrics || !name) return -1;
     
+    pthread_mutex_lock(&metrics_mutex);
+    
     index = find_gauge_index(name);
     if (index < 0) {
         index = add_gauge(name);
-        if (index < 0) return -1;
+        if (index < 0) {
+            pthread_mutex_unlock(&metrics_mutex);
+            return -1;
+        }
     }
     
     g_metrics->gauges[index].value -= amount;
     g_metrics->gauges[index].last_update = time(NULL);
     
+    pthread_mutex_unlock(&metrics_mutex);
     return 0;
 }
 
 double metrics_get_gauge(const char *name) {
     int index;
+    double value;
     
     if (!g_metrics || !name) return 0.0;
     
+    pthread_mutex_lock(&metrics_mutex);
+    
     index = find_gauge_index(name);
     if (index >= 0) {
-        return g_metrics->gauges[index].value;
+        value = g_metrics->gauges[index].value;
+        pthread_mutex_unlock(&metrics_mutex);
+        return value;
     }
     
+    pthread_mutex_unlock(&metrics_mutex);
     return 0.0;
 }
 
@@ -332,10 +374,15 @@ int metrics_observe_histogram(const char *name, double value) {
     
     if (!g_metrics || !name) return -1;
     
+    pthread_mutex_lock(&metrics_mutex);
+    
     index = find_histogram_index(name);
     if (index < 0) {
         index = add_histogram(name);
-        if (index < 0) return -1;
+        if (index < 0) {
+            pthread_mutex_unlock(&metrics_mutex);
+            return -1;
+        }
     }
     hist = &g_metrics->histograms[index];
     
@@ -345,7 +392,10 @@ int metrics_observe_histogram(const char *name, double value) {
         if (new_capacity == 0) new_capacity = 16;
         
         double *new_values = realloc(hist->values, new_capacity * sizeof(double));
-        if (!new_values) return -1;
+        if (!new_values) {
+            pthread_mutex_unlock(&metrics_mutex);
+            return -1;
+        }
         
         hist->values = new_values;
         hist->values_capacity = new_capacity;
@@ -365,10 +415,11 @@ int metrics_observe_histogram(const char *name, double value) {
     if (value < hist->min_value) hist->min_value = value;
     if (value > hist->max_value) hist->max_value = value;
     
+    pthread_mutex_unlock(&metrics_mutex);
     return 0;
 }
 
-int metrics_get_histogram_stats(const char *name, metrics_histogram_stats_t *stats) {
+static int metrics_get_histogram_stats_unlocked(const char *name, metrics_histogram_stats_t *stats) {
     int index;
     metrics_histogram_t *hist;
     double *values_copy = NULL;
@@ -419,10 +470,23 @@ int metrics_get_histogram_stats(const char *name, metrics_histogram_stats_t *sta
     return 0;
 }
 
+int metrics_get_histogram_stats(const char *name, metrics_histogram_stats_t *stats) {
+    int result;
+    
+    if (!g_metrics || !name || !stats) return -1;
+    
+    pthread_mutex_lock(&metrics_mutex);
+    result = metrics_get_histogram_stats_unlocked(name, stats);
+    pthread_mutex_unlock(&metrics_mutex);
+    return result;
+}
+
 int metrics_reset_all(void) {
     int i;
     
     if (!g_metrics) return -1;
+    
+    pthread_mutex_lock(&metrics_mutex);
     
     /* Reset counters */
     for (i = 0; i < (int)g_metrics->counter_count; i++) {
@@ -448,6 +512,7 @@ int metrics_reset_all(void) {
         g_metrics->histograms[i].max_value = -DBL_MAX;
     }
     
+    pthread_mutex_unlock(&metrics_mutex);
     return 0;
 }
 
@@ -459,6 +524,8 @@ char *metrics_export_prometheus(void) {
     
     if (!g_metrics) return NULL;
     
+    pthread_mutex_lock(&metrics_mutex);
+    
     /* Calculate approximate size needed */
     len = 1024; /* Base size */
     len += g_metrics->counter_count * 100;
@@ -466,7 +533,10 @@ char *metrics_export_prometheus(void) {
     len += g_metrics->histogram_count * 500;
     
     result = malloc(len);
-    if (!result) return NULL;
+    if (!result) {
+        pthread_mutex_unlock(&metrics_mutex);
+        return NULL;
+    }
     
     /* Add timestamp */
     pos += snprintf(result + pos, len - pos,
@@ -521,7 +591,7 @@ char *metrics_export_prometheus(void) {
         metrics_histogram_stats_t stats;
         char *sanitized_name;
         
-        if (metrics_get_histogram_stats(g_metrics->histogram_names[i], &stats) == 0) {
+        if (metrics_get_histogram_stats_unlocked(g_metrics->histogram_names[i], &stats) == 0) {
             sanitized_name = metrics_sanitize_name(g_metrics->histogram_names[i]);
             if (sanitized_name) {
                 pos += snprintf(result + pos, len - pos,
@@ -585,6 +655,7 @@ char *metrics_export_prometheus(void) {
         }
     }
     
+    pthread_mutex_unlock(&metrics_mutex);
     return result;
 }
 
@@ -597,8 +668,13 @@ char *metrics_export_json(void) {
     
     if (!g_metrics) return NULL;
     
+    pthread_mutex_lock(&metrics_mutex);
+    
     timestamp = metrics_format_timestamp();
-    if (!timestamp) return NULL;
+    if (!timestamp) {
+        pthread_mutex_unlock(&metrics_mutex);
+        return NULL;
+    }
     
     /* Calculate approximate size needed */
     len = 1024; /* Base size */
@@ -610,6 +686,7 @@ char *metrics_export_json(void) {
     result = malloc(len);
     if (!result) {
         free(timestamp);
+        pthread_mutex_unlock(&metrics_mutex);
         return NULL;
     }
     
@@ -641,7 +718,7 @@ char *metrics_export_json(void) {
     for (i = 0; i < (int)g_metrics->histogram_count; i++) {
         metrics_histogram_stats_t stats;
         
-        if (metrics_get_histogram_stats(g_metrics->histogram_names[i], &stats) == 0) {
+        if (metrics_get_histogram_stats_unlocked(g_metrics->histogram_names[i], &stats) == 0) {
             if (i > 0) pos += snprintf(result + pos, len - pos, ",\n");
             pos += snprintf(result + pos, len - pos, "    \"%s\": {\n",
                 g_metrics->histogram_names[i]);
@@ -669,6 +746,7 @@ char *metrics_export_json(void) {
                 pos += snprintf(result + pos, len - pos, "}\n");
     
     free(timestamp);
+    pthread_mutex_unlock(&metrics_mutex);
     return result;
 }
 
