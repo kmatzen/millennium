@@ -1,4 +1,4 @@
-#define _POSIX_C_SOURCE 199309L
+#define _POSIX_C_SOURCE 200112L
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -110,7 +110,7 @@ static int classic_phone_handle_hook(int hook_up, int hook_down) {
 
 static int classic_phone_handle_call_state(int call_state) {
     char log_msg[128];
-    sprintf(log_msg, "Call state changed to: %d (dialing=%d, in_call=%d)", 
+    snprintf(log_msg, sizeof(log_msg), "Call state changed to: %d (dialing=%d, in_call=%d)", 
             call_state, classic_phone_data.is_dialing, classic_phone_data.is_in_call);
     logger_info_with_category("ClassicPhone", log_msg);
     
@@ -178,9 +178,9 @@ static void classic_phone_update_display(void) {
         }
         
         if (classic_phone_data.inserted_cents > 0) {
-            sprintf(line2, "Have: %dc", classic_phone_data.inserted_cents);
+            snprintf(line2, sizeof(line2), "Have: %dc", classic_phone_data.inserted_cents);
         } else {
-            sprintf(line2, "Insert %dc", classic_phone_data.call_cost_cents);
+            snprintf(line2, sizeof(line2), "Insert %dc", classic_phone_data.call_cost_cents);
         }
     }
     
@@ -255,7 +255,8 @@ static void classic_phone_check_and_call(void) {
 
 static void classic_phone_start_call(void) {
     classic_phone_data.is_dialing = 1;
-    strcpy(classic_phone_data.current_number, classic_phone_data.keypad_buffer);
+    strncpy(classic_phone_data.current_number, classic_phone_data.keypad_buffer, sizeof(classic_phone_data.current_number) - 1);
+    classic_phone_data.current_number[sizeof(classic_phone_data.current_number) - 1] = '\0';
     
     classic_phone_update_display();
     
@@ -266,7 +267,7 @@ static void classic_phone_start_call(void) {
     millennium_client_call(client, classic_phone_data.current_number);
     
     char log_msg[256];
-    sprintf(log_msg, "Starting call to %s", classic_phone_data.current_number);
+    snprintf(log_msg, sizeof(log_msg), "Starting call to %s", classic_phone_data.current_number);
     logger_info_with_category("ClassicPhone", log_msg);
 }
 
@@ -297,7 +298,7 @@ static void classic_phone_format_number(const char* buffer, char *output) {
         filled[i] = buffer[i];
     }
     
-    sprintf(output, "(%c%c%c) %c%c%c-%c%c%c%c",
+    snprintf(output, 21, "(%c%c%c) %c%c%c-%c%c%c%c",
             filled[0], filled[1], filled[2],
             filled[3], filled[4], filled[5],
             filled[6], filled[7], filled[8], filled[9]);
@@ -343,7 +344,7 @@ static void classic_phone_tick(void) {
     seconds = remaining % 60;
 
     strcpy(line1, "Call active");
-    sprintf(line2, "%d:%02d remaining", minutes, seconds);
+    snprintf(line2, sizeof(line2), "%d:%02d remaining", minutes, seconds);
 
     pos = 0;
     for (i = 0; i < 20 && pos < sizeof(display_bytes) - 2; i++) {

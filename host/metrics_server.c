@@ -1,3 +1,4 @@
+#define _POSIX_C_SOURCE 200112L
 #include "metrics_server.h"
 #include "metrics.h"
 #include "logger.h"
@@ -278,7 +279,7 @@ char *metrics_server_generate_metrics_response(metrics_server_t *server) {
         return NULL;
     }
     
-    sprintf(response,
+    snprintf(response, response_len,
         "HTTP/1.1 200 OK\r\n"
         "Content-Type: text/plain; version=0.0.4; charset=utf-8\r\n"
         "Content-Length: %zu\r\n"
@@ -299,7 +300,7 @@ char *metrics_server_generate_health_response(metrics_server_t *server) {
     response = malloc(200);
     if (!response) return NULL;
     
-    sprintf(response,
+    snprintf(response, 200,
         "HTTP/1.1 200 OK\r\n"
         "Content-Type: application/json\r\n"
         "Content-Length: 15\r\n"

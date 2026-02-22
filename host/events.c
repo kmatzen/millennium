@@ -1,3 +1,4 @@
+#define _POSIX_C_SOURCE 200112L
 #include "events.h"
 #include "logger.h"
 #include <stdlib.h>
@@ -295,7 +296,7 @@ static char *coin_eeprom_validation_error_get_repr(void *event) {
     coin_eeprom_validation_error_t *ee = (coin_eeprom_validation_error_t *)event;
     char *repr = malloc(64);
     if (repr) {
-        sprintf(repr, "Addr: %d, Expected: %d, Actual: %d", 
+        snprintf(repr, 64, "Addr: %d, Expected: %d, Actual: %d", 
                 ee->addr, ee->expected, ee->actual);
     }
     return repr;

@@ -1,3 +1,4 @@
+#define _POSIX_C_SOURCE 200112L
 #include "logger.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -147,9 +148,9 @@ void logger_write_log(log_level_t level, const char* category, const char* messa
     
     /* Format the log message */
     if (category != NULL && strlen(category) > 0) {
-        sprintf(formatted_message, "[%s] [%s] [%s] %s", timestamp, level_str, category, message);
+        snprintf(formatted_message, sizeof(formatted_message), "[%s] [%s] [%s] %s", timestamp, level_str, category, message);
     } else {
-        sprintf(formatted_message, "[%s] [%s] %s", timestamp, level_str, message);
+        snprintf(formatted_message, sizeof(formatted_message), "[%s] [%s] %s", timestamp, level_str, message);
     }
     
     /* Store in memory */
@@ -187,7 +188,7 @@ void logger_format_timestamp(char* buffer, size_t buffer_size) {
     milliseconds = now % 1000;
     
     /* Format timestamp: YYYY-MM-DD HH:MM:SS.mmm */
-    sprintf(buffer, "%04d-%02d-%02d %02d:%02d:%02d.%03ld",
+    snprintf(buffer, 64, "%04d-%02d-%02d %02d:%02d:%02d.%03ld",
             tm_info->tm_year + 1900,
             tm_info->tm_mon + 1,
             tm_info->tm_mday,
@@ -295,9 +296,7 @@ static void logger_vlogf(log_level_t level, const char* category, const char* fo
         return;
     }
     
-    /* C89 compatible: use vsprintf with size check for safety */
-    vsprintf(buffer, format, args);
-    buffer[sizeof(buffer) - 1] = '\0'; /* Ensure null termination */
+    vsnprintf(buffer, sizeof(buffer), format, args);
     
     if (category && strlen(category) > 0) {
         logger_log_with_category(level, category, buffer);

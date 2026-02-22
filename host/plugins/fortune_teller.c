@@ -1,4 +1,4 @@
-#define _POSIX_C_SOURCE 199309L
+#define _POSIX_C_SOURCE 200112L
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -155,10 +155,10 @@ static void fortune_teller_show_welcome(void) {
         strcpy(line1, "Lift receiver");
         strcpy(line2, "for fortune");
     } else if (fortune_teller_data.inserted_cents > 0) {
-        sprintf(line1, "Have: %dc", fortune_teller_data.inserted_cents);
-        sprintf(line2, "Need: %dc", fortune_teller_data.fortune_cost_cents - fortune_teller_data.inserted_cents);
+        snprintf(line1, sizeof(line1), "Have: %dc", fortune_teller_data.inserted_cents);
+        snprintf(line2, sizeof(line2), "Need: %dc", fortune_teller_data.fortune_cost_cents - fortune_teller_data.inserted_cents);
     } else {
-        sprintf(line1, "Insert %dc", fortune_teller_data.fortune_cost_cents);
+        snprintf(line1, sizeof(line1), "Insert %dc", fortune_teller_data.fortune_cost_cents);
         strcpy(line2, "for your fortune");
     }
     
@@ -267,7 +267,7 @@ static void fortune_teller_give_fortune(void) {
     
     /* Log the fortune */
     char log_msg[256];
-    sprintf(log_msg, "Fortune given: %s - %s", category, fortune);
+    snprintf(log_msg, sizeof(log_msg), "Fortune given: %s - %s", category, fortune);
     logger_info_with_category("FortuneTeller", log_msg);
     
     /* Reset for next fortune */

@@ -1,3 +1,4 @@
+#define _POSIX_C_SOURCE 200112L
 #include "web_server.h"
 #include "config.h"
 #include "logger.h"
@@ -429,7 +430,7 @@ void web_server_init_socket(struct web_server* server) {
     
     if (bind(server->server_fd, (struct sockaddr*)&address, sizeof(address)) < 0) {
         char error_msg[256];
-        sprintf(error_msg, "Failed to bind to port %d", server->port);
+        snprintf(error_msg, sizeof(error_msg), "Failed to bind to port %d", server->port);
         logger_error_with_category("WebServer", error_msg);
         close(server->server_fd);
         server->server_fd = -1;
@@ -448,7 +449,7 @@ void web_server_init_socket(struct web_server* server) {
     fcntl(server->server_fd, F_SETFL, flags | O_NONBLOCK);
     
     char start_msg[256];
-    sprintf(start_msg, "Web server started on port %d", server->port);
+    snprintf(start_msg, sizeof(start_msg), "Web server started on port %d", server->port);
     logger_info_with_category("WebServer", start_msg);
 }
 
@@ -470,7 +471,7 @@ void* web_server_thread_func(void* arg) {
         } else if (errno != EAGAIN && errno != EWOULDBLOCK) {
             /* Log error if it's not just a non-blocking accept */
             char error_msg[256];
-            sprintf(error_msg, "Accept failed with error: %d", errno);
+            snprintf(error_msg, sizeof(error_msg), "Accept failed with error: %d", errno);
             logger_error_with_category("WebServer", error_msg);
         }
         
@@ -642,7 +643,7 @@ char* web_server_serialize_response(const struct http_response* response) {
         default: status_text = "Unknown"; break;
     }
     
-    int written = sprintf(ptr, "HTTP/1.1 %d %s\r\n", response->status_code, status_text);
+    int written = snprintf(ptr, remaining, "HTTP/1.1 %d %s\r\n", response->status_code, status_text);
     if (written > 0 && (size_t)written < remaining) {
         ptr += written;
         remaining -= written;
@@ -651,7 +652,7 @@ char* web_server_serialize_response(const struct http_response* response) {
     /* Headers */
     int i;
     for (i = 0; i < response->header_count; i++) {
-        written = sprintf(ptr, "%s: %s\r\n", 
+        written = snprintf(ptr, remaining, "%s: %s\r\n", 
                           response->header_keys[i], response->header_values[i]);
         if (written > 0 && (size_t)written < remaining) {
             ptr += written;
@@ -661,7 +662,7 @@ char* web_server_serialize_response(const struct http_response* response) {
     
     /* Content-Type header if not already set */
     if (strlen(response->content_type) > 0) {
-        written = sprintf(ptr, "Content-Type: %s\r\n", response->content_type);
+        written = snprintf(ptr, remaining, "Content-Type: %s\r\n", response->content_type);
         if (written > 0 && (size_t)written < remaining) {
             ptr += written;
             remaining -= written;
@@ -669,14 +670,14 @@ char* web_server_serialize_response(const struct http_response* response) {
     }
     
     /* Content-Length header */
-    written = sprintf(ptr, "Content-Length: %lu\r\n", (unsigned long)strlen(response->body));
+    written = snprintf(ptr, remaining, "Content-Length: %lu\r\n", (unsigned long)strlen(response->body));
     if (written > 0 && (size_t)written < remaining) {
         ptr += written;
         remaining -= written;
     }
     
     /* Connection header */
-    written = sprintf(ptr, "Connection: close\r\n\r\n");
+    written = snprintf(ptr, remaining, "Connection: close\r\n\r\n");
     if (written > 0 && (size_t)written < remaining) {
         ptr += written;
         remaining -= written;
@@ -749,7 +750,7 @@ struct http_response web_server_handle_api_status(const struct http_request* req
     time_t uptime_seconds = now - start_time;
     
     char json[512];
-    sprintf(json, 
+    snprintf(json, sizeof(json),
         "{"
         "\"status\":\"running\","
         "\"uptime\":%ld,"
@@ -792,7 +793,7 @@ struct http_response web_server_handle_api_health(const struct http_request* req
     char* ptr = json;
     size_t remaining = sizeof(json);
     
-    int written = sprintf(ptr, "{\"overall_status\":\"%s\",\"checks\":{", 
+    int written = snprintf(ptr, remaining, "{\"overall_status\":\"%s\",\"checks\":{", 
                           health_monitor_status_to_string(overall_status));
     if (written > 0 && (size_t)written < remaining) {
         ptr += written;
@@ -803,14 +804,14 @@ struct http_response web_server_handle_api_health(const struct http_request* req
     int first = 1;
     for (i = 0; i < checks_count && remaining > 100; i++) {
         if (!first) {
-            written = sprintf(ptr, ",");
+            written = snprintf(ptr, remaining, ",");
             if (written > 0 && (size_t)written < remaining) {
                 ptr += written;
                 remaining -= written;
             }
         }
         
-        written = sprintf(ptr, 
+        written = snprintf(ptr, remaining,
             "\"%s\":{\"status\":\"%s\",\"message\":\"%s\",\"last_check\":%ld}",
             checks[i].name,
             health_monitor_status_to_string(checks[i].last_status),
@@ -823,7 +824,7 @@ struct http_response web_server_handle_api_health(const struct http_request* req
         first = 0;
     }
     
-    written = sprintf(ptr, "}}");
+    written = snprintf(ptr, remaining, "}}");
     if (written > 0 && (size_t)written < remaining) {
         ptr += written;
         remaining -= written;
@@ -846,7 +847,7 @@ struct http_response web_server_handle_api_config(const struct http_request* req
     }
     
     char json[2048];
-    sprintf(json,
+    snprintf(json, sizeof(json),
         "{"
         "\"hardware\":{"
         "\"display_device\":\"%s\","
@@ -901,7 +902,7 @@ struct http_response web_server_handle_api_state(const struct http_request* requ
     char json[512];
     struct daemon_state_info state_info = get_daemon_state_info();
     
-    sprintf(json,
+    snprintf(json, sizeof(json),
         "{"
         "\"current_state\":%d,"
         "\"inserted_cents\":%d,"
@@ -982,52 +983,52 @@ struct http_response web_server_handle_api_control(const struct http_request* re
     
     if (strcmp(action, "start_call") == 0) {
         success = send_control_command("start_call");
-        strcpy(message, success ? "Call initiation requested" : "Failed to initiate call");
+        snprintf(message, sizeof(message), "%s", success ? "Call initiation requested" : "Failed to initiate call");
     } else if (strcmp(action, "reset_system") == 0) {
         success = send_control_command("reset_system");
-        strcpy(message, success ? "System reset initiated" : "Failed to reset system");
+        snprintf(message, sizeof(message), "%s", success ? "System reset initiated" : "Failed to reset system");
     } else if (strcmp(action, "emergency_stop") == 0) {
         success = send_control_command("emergency_stop");
-        strcpy(message, success ? "Emergency stop activated" : "Failed to activate emergency stop");
+        snprintf(message, sizeof(message), "%s", success ? "Emergency stop activated" : "Failed to activate emergency stop");
     } else if (strcmp(action, "keypad_press") == 0) {
         char cmd[32];
-        sprintf(cmd, "keypad_press:%s", key);
+        snprintf(cmd, sizeof(cmd), "keypad_press:%s", key);
         success = send_control_command(cmd);
-        sprintf(message, success ? "Keypad key %s pressed" : "Failed to simulate keypad press", key);
+        snprintf(message, sizeof(message), success ? "Keypad key %s pressed" : "Failed to simulate keypad press", key);
     } else if (strcmp(action, "keypad_clear") == 0) {
         success = send_control_command("keypad_clear");
-        strcpy(message, success ? "Keypad cleared" : "Failed to clear keypad");
+        snprintf(message, sizeof(message), "%s", success ? "Keypad cleared" : "Failed to clear keypad");
     } else if (strcmp(action, "keypad_backspace") == 0) {
         success = send_control_command("keypad_backspace");
-        strcpy(message, success ? "Keypad backspace" : "Failed to simulate backspace");
+        snprintf(message, sizeof(message), "%s", success ? "Keypad backspace" : "Failed to simulate backspace");
     } else if (strcmp(action, "coin_insert") == 0) {
         char cmd[32];
-        sprintf(cmd, "coin_insert:%d", cents);
+        snprintf(cmd, sizeof(cmd), "coin_insert:%d", cents);
         success = send_control_command(cmd);
-        sprintf(message, success ? "Coin inserted: %d¢" : "Failed to insert coin", cents);
+        snprintf(message, sizeof(message), success ? "Coin inserted: %d¢" : "Failed to insert coin", cents);
     } else if (strcmp(action, "coin_return") == 0) {
         success = send_control_command("coin_return");
-        strcpy(message, success ? "Coins returned" : "Failed to return coins");
+        snprintf(message, sizeof(message), "%s", success ? "Coins returned" : "Failed to return coins");
     } else if (strcmp(action, "handset_up") == 0) {
         success = send_control_command("handset_up");
-        strcpy(message, success ? "Handset lifted" : "Failed to simulate handset up");
+        snprintf(message, sizeof(message), "%s", success ? "Handset lifted" : "Failed to simulate handset up");
     } else if (strcmp(action, "handset_down") == 0) {
         success = send_control_command("handset_down");
-        strcpy(message, success ? "Handset placed down" : "Failed to simulate handset down");
+        snprintf(message, sizeof(message), "%s", success ? "Handset placed down" : "Failed to simulate handset down");
     } else if (strcmp(action, "activate_plugin") == 0) {
         char cmd[128];
-        sprintf(cmd, "activate_plugin:%s", plugin);
+        snprintf(cmd, sizeof(cmd), "activate_plugin:%s", plugin);
         success = send_control_command(cmd);
         if (success) {
-            sprintf(message, "Plugin %s activated", plugin);
+            snprintf(message, sizeof(message), "Plugin %s activated", plugin);
         } else {
-            sprintf(message, "Failed to activate plugin %s", plugin);
+            snprintf(message, sizeof(message), "Failed to activate plugin %s", plugin);
         }
     } else {
-        sprintf(message, "Unknown action: %s", action);
+        snprintf(message, sizeof(message), "Unknown action: %s", action);
     }
     
-    sprintf(json,
+    snprintf(json, sizeof(json),
         "{"
         "\"success\":%s,"
         "\"action\":\"%s\","
@@ -1071,7 +1072,7 @@ struct http_response web_server_handle_api_logs(const struct http_request* reque
     char* ptr = json;
     size_t remaining = sizeof(json);
     
-    int written = sprintf(ptr, "{\"logs\":[");
+    int written = snprintf(ptr, remaining, "{\"logs\":[");
     if (written > 0 && (size_t)written < remaining) {
         ptr += written;
         remaining -= written;
@@ -1086,7 +1087,7 @@ struct http_response web_server_handle_api_logs(const struct http_request* reque
     /* Process logs in reverse order (newest first) */
     for (i = log_count - 1; i >= 0 && remaining > 200; i--) {
         if (!first) {
-            written = sprintf(ptr, ",");
+            written = snprintf(ptr, remaining, ",");
             if (written > 0 && (size_t)written < remaining) {
                 ptr += written;
                 remaining -= written;
@@ -1186,7 +1187,7 @@ struct http_response web_server_handle_api_logs(const struct http_request* reque
             }
         }
         
-        written = sprintf(ptr,
+        written = snprintf(ptr, remaining,
             "{\"timestamp\":%ld,\"level\":\"%s\",\"message\":\"%s\"}",
             log_timestamp, log_level, escaped_message);
         if (written > 0 && (size_t)written < remaining) {
@@ -1198,7 +1199,7 @@ struct http_response web_server_handle_api_logs(const struct http_request* reque
         total_count++;
     }
     
-    written = sprintf(ptr, "],\"total\":%d}", total_count);
+    written = snprintf(ptr, remaining, "],\"total\":%d}", total_count);
     if (written > 0 && (size_t)written < remaining) {
         ptr += written;
         remaining -= written;
@@ -1217,7 +1218,7 @@ struct http_response web_server_handle_api_plugins(const struct http_request* re
     char json[1024];
     const char* active_plugin = plugins_get_active_name();
     
-    sprintf(json,
+    snprintf(json, sizeof(json),
         "{"
         "\"plugins\":["
         "{"
@@ -1279,7 +1280,7 @@ int web_server_check_rate_limit(struct web_server* server, const char* client_ip
     
     time_t now = time(NULL);
     char key[128];
-    sprintf(key, "%s:%s", client_ip, endpoint);
+    snprintf(key, sizeof(key), "%s:%s", client_ip, endpoint);
     
     /* Clean up old entries (older than 60 seconds) */
     int i;
@@ -1288,7 +1289,8 @@ int web_server_check_rate_limit(struct web_server* server, const char* client_ip
             /* Remove this entry by shifting remaining entries */
             int j;
             for (j = i; j < server->rate_limit_count - 1; j++) {
-                strcpy(server->rate_limit_keys[j], server->rate_limit_keys[j + 1]);
+                strncpy(server->rate_limit_keys[j], server->rate_limit_keys[j + 1], sizeof(server->rate_limit_keys[j]) - 1);
+                server->rate_limit_keys[j][sizeof(server->rate_limit_keys[j]) - 1] = '\0';
                 server->rate_limit_infos[j] = server->rate_limit_infos[j + 1];
             }
             server->rate_limit_count--;
@@ -1309,7 +1311,8 @@ int web_server_check_rate_limit(struct web_server* server, const char* client_ip
         /* Create new entry */
         if (server->rate_limit_count < 64) {
             found_idx = server->rate_limit_count;
-            strcpy(server->rate_limit_keys[found_idx], key);
+            strncpy(server->rate_limit_keys[found_idx], key, sizeof(server->rate_limit_keys[found_idx]) - 1);
+            server->rate_limit_keys[found_idx][sizeof(server->rate_limit_keys[found_idx]) - 1] = '\0';
             server->rate_limit_infos[found_idx].request_count = 0;
             server->rate_limit_count++;
         } else {
@@ -1383,21 +1386,21 @@ int web_server_send_streaming_response(int client_fd, const struct http_response
     size_t remaining = sizeof(headers);
     
     /* Status line */
-    int written = sprintf(ptr, "HTTP/1.1 %d OK\r\n", response->status_code);
+    int written = snprintf(ptr, remaining, "HTTP/1.1 %d OK\r\n", response->status_code);
     if (written > 0 && (size_t)written < remaining) {
         ptr += written;
         remaining -= written;
     }
     
     /* Content-Type header */
-    written = sprintf(ptr, "Content-Type: %s\r\n", response->content_type);
+    written = snprintf(ptr, remaining, "Content-Type: %s\r\n", response->content_type);
     if (written > 0 && (size_t)written < remaining) {
         ptr += written;
         remaining -= written;
     }
     
     /* Content-Length header */
-    written = sprintf(ptr, "Content-Length: %lu\r\n", (unsigned long)response->content_length);
+    written = snprintf(ptr, remaining, "Content-Length: %lu\r\n", (unsigned long)response->content_length);
     if (written > 0 && (size_t)written < remaining) {
         ptr += written;
         remaining -= written;
@@ -1406,7 +1409,7 @@ int web_server_send_streaming_response(int client_fd, const struct http_response
     /* Additional headers */
     int i;
     for (i = 0; i < response->header_count; i++) {
-        written = sprintf(ptr, "%s: %s\r\n", 
+        written = snprintf(ptr, remaining, "%s: %s\r\n", 
                           response->header_keys[i], response->header_values[i]);
         if (written > 0 && (size_t)written < remaining) {
             ptr += written;
@@ -1415,7 +1418,7 @@ int web_server_send_streaming_response(int client_fd, const struct http_response
     }
     
     /* Connection header */
-    written = sprintf(ptr, "Connection: close\r\n\r\n");
+    written = snprintf(ptr, remaining, "Connection: close\r\n\r\n");
     if (written > 0 && (size_t)written < remaining) {
         ptr += written;
         remaining -= written;

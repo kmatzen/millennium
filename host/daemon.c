@@ -1,3 +1,4 @@
+#define _POSIX_C_SOURCE 200112L
 #include "config.h"
 #include "daemon_state.h"
 #include "logger.h"
@@ -155,10 +156,10 @@ void format_number(const char* buffer, char *output) {
         filled[i] = buffer[i];
     }
     
-    sprintf(output, "(%c%c%c) %c%c%c-%c%c%c%c",
-            filled[0], filled[1], filled[2],
-            filled[3], filled[4], filled[5],
-            filled[6], filled[7], filled[8], filled[9]);
+    snprintf(output, 21, "(%c%c%c) %c%c%c-%c%c%c%c",
+             filled[0], filled[1], filled[2],
+             filled[3], filled[4], filled[5],
+             filled[6], filled[7], filled[8], filled[9]);
 }
 
 void generate_message(int inserted, char *output) {
@@ -174,7 +175,7 @@ void generate_message(int inserted, char *output) {
         remaining = 0;
     }
     
-    sprintf(output, "Insert %02d cents", remaining);
+    snprintf(output, 32, "Insert %02d cents", remaining);
     
     logger_debugf_with_category("Display", "Generated message: %s", output);
 }
@@ -736,7 +737,8 @@ int main(int argc, char *argv[]) {
     /* Load configuration */
     strcpy(config_file, "/etc/millennium/daemon.conf");
     if (argc > 2 && strcmp(argv[1], "--config") == 0) {
-        strcpy(config_file, argv[2]);
+        strncpy(config_file, argv[2], MAX_STRING_LEN - 1);
+        config_file[MAX_STRING_LEN - 1] = '\0';
     }
     
     if (!config_load_from_file(config, config_file)) {

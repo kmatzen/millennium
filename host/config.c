@@ -1,3 +1,4 @@
+#define _POSIX_C_SOURCE 200112L
 #include "config.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -252,7 +253,8 @@ int config_set_value(config_data_t* config, const char* key, const char* value) 
                 strncpy(config->values[i], value, sizeof(config->values[i]) - 1);
                 config->values[i][sizeof(config->values[i]) - 1] = '\0';
             } else {
-                strcpy(config->values[i], value);
+                strncpy(config->values[i], value, sizeof(config->values[i]) - 1);
+                config->values[i][sizeof(config->values[i]) - 1] = '\0';
             }
             return 1;
         }
@@ -265,7 +267,8 @@ int config_set_value(config_data_t* config, const char* key, const char* value) 
         strncpy(config->keys[config->count], key, sizeof(config->keys[config->count]) - 1);
         config->keys[config->count][sizeof(config->keys[config->count]) - 1] = '\0';
     } else {
-        strcpy(config->keys[config->count], key);
+        strncpy(config->keys[config->count], key, sizeof(config->keys[config->count]) - 1);
+        config->keys[config->count][sizeof(config->keys[config->count]) - 1] = '\0';
     }
     
     if (strlen(value) >= sizeof(config->values[config->count])) {
@@ -273,7 +276,8 @@ int config_set_value(config_data_t* config, const char* key, const char* value) 
         strncpy(config->values[config->count], value, sizeof(config->values[config->count]) - 1);
         config->values[config->count][sizeof(config->values[config->count]) - 1] = '\0';
     } else {
-        strcpy(config->values[config->count], value);
+        strncpy(config->values[config->count], value, sizeof(config->values[config->count]) - 1);
+        config->values[config->count][sizeof(config->values[config->count]) - 1] = '\0';
     }
     config->count++;
     
