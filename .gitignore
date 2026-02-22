@@ -18,3 +18,4 @@ host/*.log
 *.pch
 pcb/*.lck
 host/wireplumber/
+host/unit_tests
