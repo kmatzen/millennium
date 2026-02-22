@@ -16,3 +16,4 @@ host/test_daemon_state
 host/*.log
 *.pch
 pcb/*.lck
+host/wireplumber/
