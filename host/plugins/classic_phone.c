@@ -139,8 +139,8 @@ static int classic_phone_handle_call_state(int call_state) {
 
 /* Internal function implementations */
 static void classic_phone_on_activation(void) {
-    /* Reset state and show display when plugin is activated */
-    classic_phone_data.inserted_cents = 0;
+    /* Restore coins from daemon_state (may have been loaded from persisted state) */
+    classic_phone_data.inserted_cents = daemon_state ? daemon_state->inserted_cents : 0;
     classic_phone_data.keypad_length = 0;
     classic_phone_data.is_dialing = 0;
     classic_phone_data.is_in_call = 0;

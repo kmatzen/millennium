@@ -10,6 +10,7 @@
 #include "events.h"
 #include "event_processor.h"
 #include "plugins.h"
+#include "state_persistence.h"
 #include <signal.h>
 #include <string.h>
 #include <stdio.h>
@@ -41,6 +42,9 @@ time_t daemon_start_time;
 char line1[MAX_STRING_LEN];
 char line2[MAX_STRING_LEN];
 
+/* State persistence */
+static const char *state_file_path = NULL;
+
 /* Thread synchronization */
 pthread_mutex_t running_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t daemon_state_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -71,6 +75,7 @@ static void update_display(void);
 static int is_phone_ready_for_operation(void);
 static int keypad_has_space(void);
 static health_status_t check_serial_connection(void);
+static void daemon_save_state(void);
 static health_status_t check_sip_connection(void);
 static health_status_t check_daemon_activity(void);
 static void update_metrics(void);
@@ -238,6 +243,21 @@ static int keypad_has_space(void) {
 
 /* Helper function to safely update daemon state with mutex protection */
 
+static void daemon_save_state(void) {
+    persisted_state_t ps;
+    if (!state_file_path || !daemon_state) return;
+
+    pthread_mutex_lock(&daemon_state_mutex);
+    ps.inserted_cents = daemon_state->inserted_cents;
+    ps.last_state = (int)daemon_state->current_state;
+    pthread_mutex_unlock(&daemon_state_mutex);
+
+    strncpy(ps.active_plugin, plugins_get_active_name() ? plugins_get_active_name() : "",
+            sizeof(ps.active_plugin) - 1);
+    ps.active_plugin[sizeof(ps.active_plugin) - 1] = '\0';
+
+    state_persistence_save(&ps, state_file_path);
+}
 
 void handle_coin_event(coin_event_t *coin_event) {
     if (!coin_event) {
@@ -283,6 +303,7 @@ void handle_coin_event(coin_event_t *coin_event) {
         /* Let active plugin handle the coin event */
         if (coin_value > 0) {
             plugins_handle_coin(coin_value, coin_code_str);
+            daemon_save_state();
         }
     }
     
@@ -325,6 +346,8 @@ void handle_call_state_event(call_state_event_t *call_state_event) {
     /* Let active plugin handle the call state event */
     plugins_handle_call_state(call_state_event_get_state(call_state_event));
     
+    daemon_save_state();
+
     /* Handle coin validator commands outside of mutex */
     if (call_state_event_get_state(call_state_event) == EVENT_CALL_STATE_INCOMING) {
         millennium_client_write_to_coin_validator(client, 'f');
@@ -406,6 +429,8 @@ void handle_hook_event(hook_state_change_event_t *hook_event) {
         millennium_client_write_to_coin_validator(client, 'c'); /* Always 'c' for hook down */
         millennium_client_write_to_coin_validator(client, 'z');
     }
+
+    daemon_save_state();
 }
 
 void handle_keypad_event(keypad_event_t *keypad_event) {
@@ -763,6 +788,8 @@ int main(int argc, char *argv[]) {
     }
     
     logger_info_with_category("Daemon", "Starting Millennium Daemon");
+
+    state_file_path = config_get_state_file(config);
     
     /* Initialize daemon state */
     daemon_state = (daemon_state_data_t*)malloc(sizeof(daemon_state_data_t));
@@ -835,7 +862,31 @@ int main(int argc, char *argv[]) {
     
     /* Initialize plugin system */
     plugins_init();
-    
+
+    /* Restore persisted state */
+    {
+        persisted_state_t ps;
+        if (state_persistence_load(&ps, state_file_path) == 0) {
+            logger_infof_with_category("Daemon",
+                "Restored state: coins=%d, plugin=%s, last_state=%d",
+                ps.inserted_cents, ps.active_plugin, ps.last_state);
+
+            pthread_mutex_lock(&daemon_state_mutex);
+            daemon_state->inserted_cents = ps.inserted_cents;
+            pthread_mutex_unlock(&daemon_state_mutex);
+
+            if (strlen(ps.active_plugin) > 0) {
+                plugins_activate(ps.active_plugin);
+            }
+
+            if (ps.last_state == (int)DAEMON_STATE_CALL_ACTIVE) {
+                logger_warn_with_category("Daemon",
+                    "Unclean shutdown detected: last state was CALL_ACTIVE");
+                metrics_increment_counter("unclean_shutdowns", 1);
+            }
+        }
+    }
+
     logger_info_with_category("Daemon", "Daemon initialized successfully");
     
     /* Main event loop */

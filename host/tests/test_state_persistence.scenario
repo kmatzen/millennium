@@ -1,0 +1,38 @@
+# Test: State persistence saves and restores coins across "restarts"
+
+# Start fresh, lift receiver
+hook_up
+assert_state IDLE_UP
+assert_display Insert 50c
+
+# Insert coins
+coin 25
+assert_display Have: 25c
+coin 25
+assert_display Have: 50c
+
+# Save state with coins inserted (state=IDLE_UP, coins=50)
+save_state /tmp/millennium_test_state
+print
+
+# Simulate "crash": go to a clean state
+hook_down
+assert_state IDLE_DOWN
+assert_display Lift receiver
+
+# Simulate daemon restart: load persisted state directly
+# This restores daemon_state (IDLE_UP, 50 cents) and re-activates the plugin
+load_state /tmp/millennium_test_state
+
+# After restore, plugin reads coins from daemon_state — display should show them
+assert_state IDLE_UP
+assert_display Have: 50c
+print
+
+# Verify we can still make a call with restored coins
+keys 5551234567
+assert_display Call active
+assert_state CALL_ACTIVE
+
+hook_down
+assert_state IDLE_DOWN

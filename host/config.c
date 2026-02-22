@@ -323,6 +323,11 @@ int config_get_log_max_files(const config_data_t* config) {
     return config_get_int(config, "logging.max_files", 5);
 }
 
+/* State Persistence Configuration */
+const char* config_get_state_file(const config_data_t* config) {
+    return config_get_string(config, "persistence.state_file", "/var/lib/millennium/state");
+}
+
 /* System Configuration */
 int config_get_update_interval_ms(const config_data_t* config) {
     return config_get_int(config, "system.update_interval_ms", 33);
