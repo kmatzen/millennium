@@ -1,0 +1,29 @@
+#ifndef UPDATER_H
+#define UPDATER_H
+
+/*
+ * OTA update checker.
+ * Compares the running version against the latest GitHub release tag.
+ */
+
+/* Semantic version comparison.
+ * Returns <0 if a < b, 0 if equal, >0 if a > b.
+ * Expects "X.Y.Z" format (leading 'v' is stripped). */
+int updater_compare_versions(const char *a, const char *b);
+
+/*
+ * Check GitHub for the latest release tag.
+ * Uses curl (must be installed) to query the GitHub Releases API.
+ * Stores result internally; subsequent calls return the cached value
+ * until updater_check() is called again.
+ * Returns 0 on success, -1 on failure.
+ */
+int updater_check(void);
+
+/* Returns the cached latest version string, or NULL if never checked. */
+const char *updater_get_latest_version(void);
+
+/* Returns 1 if the latest version is newer than the running version. */
+int updater_is_update_available(void);
+
+#endif /* UPDATER_H */
