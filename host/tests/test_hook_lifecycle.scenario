@@ -1,0 +1,26 @@
+# Test: Hook up/down lifecycle
+# Verifies that state transitions correctly on hook events
+# and that coins/keypad are reset on hook down.
+
+# Start idle
+assert_state IDLE_DOWN
+
+# Pick up
+hook_up
+assert_state IDLE_UP
+
+# Insert coins and dial some digits
+coin 25
+keys 555
+assert_display (555) ___-____
+
+# Put handset down — everything should reset
+hook_down
+assert_state IDLE_DOWN
+assert_display Lift receiver
+
+# Pick up again — coins and keypad should be cleared
+hook_up
+assert_state IDLE_UP
+assert_display Insert 50c
+assert_display (___) ___-____

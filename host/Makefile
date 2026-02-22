@@ -59,10 +59,32 @@ plugins/jukebox.o: plugins/jukebox.c plugins.h
 daemon: daemon.o daemon_state.o millennium_sdk.o baresip_interface.o events.o event_processor.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o plugins.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o
 	gcc daemon.o daemon_state.o millennium_sdk.o baresip_interface.o events.o event_processor.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o plugins.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o -o daemon $(LDFLAGS)
 
+# Simulator object file (uses C99 for mixed declarations)
+simulator.o: simulator.c millennium_sdk.h events.h config.h daemon_state.h logger.h metrics.h plugins.h
+	gcc simulator.c -o simulator.o -c $(C99_CFLAGS)
+
+# Simulator objects — no baresip, no web server, no daemon.o
+SIM_OBJS = simulator.o daemon_state.o events.o event_processor.o config.o logger.o metrics.o plugins.o plugins/classic_phone.o plugins/fortune_teller.o
+
+# On Linux, wrap time() for simulated time; elsewhere use real time
+SIM_LDFLAGS = -lpthread
+ifeq ($(shell uname -s),Linux)
+SIM_LDFLAGS += -Wl,--wrap=time
+endif
+
+simulator: $(SIM_OBJS)
+	gcc $(SIM_OBJS) -o simulator $(SIM_LDFLAGS)
+
 all: daemon
 
+# Run all scenario tests via the simulator
+test: simulator
+	@echo "Running scenario tests..."
+	@./simulator tests/*.scenario
+	@echo ""
+
 clean:
-	rm -rf *.o daemon plugins/*.o
+	rm -rf *.o daemon simulator plugins/*.o
 
 install: daemon
 	sudo mkdir -p /etc/millennium
@@ -80,4 +102,4 @@ uninstall:
 	sudo rm -f /etc/systemd/system/millennium-daemon.service
 	sudo systemctl daemon-reload
 
-.PHONY: all clean install uninstall
+.PHONY: all clean install uninstall test

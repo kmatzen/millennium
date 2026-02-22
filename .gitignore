@@ -13,6 +13,7 @@ host/daemon_simple
 host/daemon_working
 host/test_c_integration
 host/test_daemon_state
+host/simulator
 host/*.log
 *.pch
 pcb/*.lck

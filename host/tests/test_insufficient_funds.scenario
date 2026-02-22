@@ -1,0 +1,23 @@
+# Test: Insufficient funds
+# Verifies that dialing 10 digits without enough money does NOT
+# start a call.
+
+hook_up
+assert_state IDLE_UP
+
+# Insert only 25 cents (need 50)
+coin 25
+assert_display Have: 25c
+
+# Dial a full number
+keys 5551234567
+assert_display (555) 123-4567
+
+# Should NOT be in a call — not enough money
+assert_state IDLE_UP
+assert_no_display Call active
+
+# Now insert the remaining 25c — call should auto-start and connect
+coin 25
+assert_display Call active
+assert_state CALL_ACTIVE
