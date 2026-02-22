@@ -86,8 +86,14 @@ UNIT_TEST_OBJS = tests/unit_tests.o daemon_state.o events.o event_processor.o co
 tests/unit_tests.o: tests/unit_tests.c tests/test_framework.h config.h daemon_state.h plugins.h logger.h metrics.h millennium_sdk.h
 	gcc tests/unit_tests.c -o tests/unit_tests.o -c $(C99_CFLAGS) -I.
 
+# Link ALSA only on Linux (jukebox plugin uses it)
+UNIT_LDFLAGS = $(SIM_LDFLAGS)
+ifeq ($(shell uname -s),Linux)
+UNIT_LDFLAGS += -lasound -lm
+endif
+
 unit_tests: $(UNIT_TEST_OBJS)
-	gcc $(UNIT_TEST_OBJS) -o unit_tests $(SIM_LDFLAGS)
+	gcc $(UNIT_TEST_OBJS) -o unit_tests $(UNIT_LDFLAGS)
 
 # Run all scenario tests via the simulator
 test: simulator unit_tests
