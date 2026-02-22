@@ -5,6 +5,11 @@ LDFLAGS=-lpthread -latomic -lasound `pkg-config libre --libs` `pkg-config libbar
 CFLAGS=-g -O3 -Wall -Wextra -std=c89
 C99_CFLAGS=-g -O3 -Wall -Wextra -std=c99
 
+# Build version info
+GIT_HASH := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+BUILD_TIME := $(shell date -u '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || echo "unknown")
+VERSION_CFLAGS = -DGIT_HASH='"$(GIT_HASH)"' -DBUILD_TIME='"$(BUILD_TIME)"'
+
 # Object files
 config.o: config.c config.h
 	gcc config.c -o config.o -c $(CFLAGS)
@@ -28,7 +33,7 @@ metrics_server.o: metrics_server.c metrics_server.h metrics.h logger.h
 websocket.o: websocket.c websocket.h
 	gcc websocket.c -o websocket.o -c $(CFLAGS)
 
-web_server.o: web_server.c web_server.h websocket.h config.h logger.h metrics.h health_monitor.h
+web_server.o: web_server.c web_server.h websocket.h config.h logger.h metrics.h health_monitor.h version.h
 	gcc web_server.c -o web_server.o -c $(CFLAGS)
 
 baresip_interface.o: baresip_interface.c baresip_interface.h
@@ -49,6 +54,9 @@ state_persistence.o: state_persistence.c state_persistence.h daemon_state.h logg
 display_manager.o: display_manager.c display_manager.h millennium_sdk.h
 	gcc display_manager.c -o display_manager.o -c $(CFLAGS)
 
+version.o: version.c version.h
+	gcc version.c -o version.o -c $(CFLAGS) $(VERSION_CFLAGS)
+
 daemon.o: daemon.c millennium_sdk.h events.h event_processor.h config.h logger.h health_monitor.h metrics.h metrics_server.h web_server.h plugins.h state_persistence.h display_manager.h
 	gcc daemon.c -o daemon.o -c $(CFLAGS)
 
@@ -65,15 +73,15 @@ plugins/fortune_teller.o: plugins/fortune_teller.c plugins.h
 plugins/jukebox.o: plugins/jukebox.c plugins.h
 	gcc plugins/jukebox.c -o plugins/jukebox.o -c $(C99_CFLAGS) -lpthread
 
-daemon: daemon.o daemon_state.o millennium_sdk.o baresip_interface.o events.o event_processor.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o websocket.o plugins.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o state_persistence.o display_manager.o
-	gcc daemon.o daemon_state.o millennium_sdk.o baresip_interface.o events.o event_processor.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o websocket.o plugins.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o state_persistence.o display_manager.o -o daemon $(LDFLAGS)
+daemon: daemon.o daemon_state.o millennium_sdk.o baresip_interface.o events.o event_processor.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o websocket.o plugins.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o state_persistence.o display_manager.o version.o
+	gcc daemon.o daemon_state.o millennium_sdk.o baresip_interface.o events.o event_processor.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o websocket.o plugins.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o state_persistence.o display_manager.o version.o -o daemon $(LDFLAGS)
 
 # Simulator object file (uses C99 for mixed declarations)
 simulator.o: simulator.c millennium_sdk.h events.h config.h daemon_state.h logger.h metrics.h plugins.h
 	gcc simulator.c -o simulator.o -c $(C99_CFLAGS)
 
 # Simulator objects — no baresip, no web server, no daemon.o
-SIM_OBJS = simulator.o daemon_state.o events.o event_processor.o config.o logger.o metrics.o plugins.o plugins/classic_phone.o plugins/fortune_teller.o state_persistence.o display_manager.o
+SIM_OBJS = simulator.o daemon_state.o events.o event_processor.o config.o logger.o metrics.o plugins.o plugins/classic_phone.o plugins/fortune_teller.o state_persistence.o display_manager.o version.o
 
 # On Linux, wrap time() for simulated time; elsewhere use real time
 SIM_LDFLAGS = -lpthread
@@ -87,7 +95,7 @@ simulator: $(SIM_OBJS)
 all: daemon
 
 # Unit test binary
-UNIT_TEST_OBJS = tests/unit_tests.o daemon_state.o events.o event_processor.o config.o logger.o metrics.o plugins.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o state_persistence.o display_manager.o
+UNIT_TEST_OBJS = tests/unit_tests.o daemon_state.o events.o event_processor.o config.o logger.o metrics.o plugins.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o state_persistence.o display_manager.o version.o
 
 tests/unit_tests.o: tests/unit_tests.c tests/test_framework.h config.h daemon_state.h plugins.h logger.h metrics.h millennium_sdk.h
 	gcc tests/unit_tests.c -o tests/unit_tests.o -c $(C99_CFLAGS) -I.
