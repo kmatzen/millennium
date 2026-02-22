@@ -1,0 +1,33 @@
+# Test: Display manager scrolling for long text
+
+# Short text should display statically (no scrolling)
+set_display Hello World|Short Line
+assert_display Hello World
+assert_display Short Line
+
+# Long text on line2 should initially show first 20 chars
+set_display Header|This is a very long fortune message that scrolls
+assert_display Header
+assert_display This is a very long
+
+# After ticking, line2 should scroll left — "his is a very long f"
+tick_display 1
+assert_display his is a very long f
+
+# Tick 5 more (6 total from start) — text continues scrolling
+tick_display 5
+assert_display s a very long fortun
+
+# Long text on line1 should also scroll
+set_display Extremely Long Title That Exceeds Display|Short
+assert_display Extremely Long Title
+assert_display Short
+
+tick_display 5
+assert_display ely Long Title That
+
+# Short text should never scroll even after many ticks
+set_display Static|Text
+tick_display 20
+assert_display Static
+assert_display Text

@@ -9,6 +9,7 @@
 #include "../millennium_sdk.h"
 #include "../config.h"
 #include "../metrics.h"
+#include "../display_manager.h"
 
 /* Classic phone plugin data */
 typedef struct {
@@ -184,28 +185,7 @@ static void classic_phone_update_display(void) {
         }
     }
     
-    /* Send to display */
-    char display_bytes[100];
-    size_t pos = 0;
-    int i;
-    
-    /* Add line1, padded or truncated to 20 characters */
-    for (i = 0; i < 20 && pos < sizeof(display_bytes) - 2; i++) {
-        display_bytes[pos++] = (i < (int)strlen(line1)) ? line1[i] : ' ';
-    }
-    
-    /* Add line feed */
-    display_bytes[pos++] = 0x0A;
-    
-    /* Add line2, padded or truncated to 20 characters */
-    for (i = 0; i < 20 && pos < sizeof(display_bytes) - 1; i++) {
-        display_bytes[pos++] = (i < (int)strlen(line2)) ? line2[i] : ' ';
-    }
-    
-    /* Null terminate */
-    display_bytes[pos] = '\0';
-    
-    millennium_client_set_display(client, display_bytes);
+    display_manager_set_text(line1, line2);
 }
 
 /* Helper function for future keypad functionality - kept for extensibility */
@@ -311,9 +291,6 @@ static void classic_phone_tick(void) {
     int seconds;
     char line1[21];
     char line2[21];
-    char display_bytes[100];
-    size_t pos;
-    int i;
 
     if (!classic_phone_data.is_in_call) {
         return;
@@ -346,17 +323,7 @@ static void classic_phone_tick(void) {
     strcpy(line1, "Call active");
     snprintf(line2, sizeof(line2), "%d:%02d remaining", minutes, seconds);
 
-    pos = 0;
-    for (i = 0; i < 20 && pos < sizeof(display_bytes) - 2; i++) {
-        display_bytes[pos++] = (i < (int)strlen(line1)) ? line1[i] : ' ';
-    }
-    display_bytes[pos++] = 0x0A;
-    for (i = 0; i < 20 && pos < sizeof(display_bytes) - 1; i++) {
-        display_bytes[pos++] = (i < (int)strlen(line2)) ? line2[i] : ' ';
-    }
-    display_bytes[pos] = '\0';
-
-    millennium_client_set_display(client, display_bytes);
+    display_manager_set_text(line1, line2);
 }
 
 /* Plugin registration function */

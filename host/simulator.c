@@ -8,6 +8,7 @@
 #include "event_processor.h"
 #include "plugins.h"
 #include "state_persistence.h"
+#include "display_manager.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -498,6 +499,7 @@ static int run_scenario(const char *path) {
                 sim_time_advance(1);
 #endif
                 plugins_tick();
+                display_manager_tick();
                 sim_drain_events();
                 if (sim_hangup_called) {
                     sim_hangup_called = 0;
@@ -586,6 +588,30 @@ static int run_scenario(const char *path) {
             }
         }
 
+        /* ── set_display <line1>|<line2> ─────────────────────────── */
+        else if (strncmp(cmd, "set_display ", 12) == 0) {
+            char buf[512];
+            char *sep;
+            strncpy(buf, cmd + 12, sizeof(buf) - 1);
+            buf[sizeof(buf) - 1] = '\0';
+            sep = strchr(buf, '|');
+            if (sep) {
+                *sep = '\0';
+                display_manager_set_text(buf, sep + 1);
+            } else {
+                display_manager_set_text(buf, "");
+            }
+        }
+
+        /* ── tick_display [N] ───────────────────────────────────── */
+        else if (strncmp(cmd, "tick_display", 12) == 0) {
+            int count = 1;
+            if (cmd[12] == ' ') count = atoi(cmd + 13);
+            if (count < 1) count = 1;
+            { int t; for (t = 0; t < count; t++) display_manager_tick(); }
+            sim_drain_events();
+        }
+
         /* ── unknown ─────────────────────────────────────────────── */
         else {
             fprintf(stderr, "  WARNING: unknown command: %s\n", cmd);
@@ -627,6 +653,7 @@ int main(int argc, char *argv[]) {
     client = millennium_client_create();
     if (!client) { fprintf(stderr, "FATAL: client\n"); return 1; }
 
+    display_manager_init(client);
     plugins_init();
 
     sim_time_init();
