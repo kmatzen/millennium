@@ -6,9 +6,11 @@
 #include <ctype.h>
 #include <time.h>
 #include <stdarg.h>
+#include <pthread.h>
 
 /* Global logger instance */
 logger_data_t* g_logger = NULL;
+static pthread_mutex_t logger_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 
 logger_data_t* logger_get_instance(void) {
@@ -205,6 +207,8 @@ void logger_write_log(log_level_t level, const char* category, const char* messa
         return;
     }
     
+    pthread_mutex_lock(&logger_mutex);
+    
     logger_format_timestamp(timestamp, sizeof(timestamp));
     level_str = logger_format_level(level);
     
@@ -236,6 +240,8 @@ void logger_write_log(log_level_t level, const char* category, const char* messa
         }
         logger_check_rotation(logger);
     }
+    
+    pthread_mutex_unlock(&logger_mutex);
 }
 
 void logger_format_timestamp(char* buffer, size_t buffer_size) {
@@ -302,6 +308,8 @@ int logger_get_recent_logs(char logs[][512], int max_entries) {
         return 0;
     }
     
+    pthread_mutex_lock(&logger_mutex);
+    
     count = (max_entries < logger->memory_logs_count) ? max_entries : logger->memory_logs_count;
     
     for (i = 0, j = logger->memory_logs_start; i < count; i++) {
@@ -309,6 +317,8 @@ int logger_get_recent_logs(char logs[][512], int max_entries) {
         logs[i][sizeof(logs[i]) - 1] = '\0';
         j = (j + 1) % 1000;
     }
+    
+    pthread_mutex_unlock(&logger_mutex);
     
     return count;
 }
