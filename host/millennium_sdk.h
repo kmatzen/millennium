@@ -48,6 +48,13 @@ typedef struct millennium_client {
     /* Function pointers for event handling */
     void (*create_and_queue_event_char)(struct millennium_client *client, char event_type, const char *payload);
     void (*create_and_queue_event_ptr)(struct millennium_client *client, void *event);
+
+    /* Serial health tracking */
+    struct timespec last_serial_activity;
+    int serial_healthy;
+    int reconnect_attempts;
+    struct timespec next_reconnect_time;
+    char serial_device_path[256];
 } millennium_client_t;
 
 /* Function declarations */
@@ -85,11 +92,18 @@ void millennium_client_process_event_buffer(struct millennium_client *client);
 char *millennium_client_extract_payload(struct millennium_client *client, char event_type, size_t event_start);
 void millennium_client_write_to_display(struct millennium_client *client, const char *message);
 
+/* Serial health and reconnection */
+int millennium_client_serial_is_healthy(struct millennium_client *client);
+void millennium_client_check_serial(struct millennium_client *client);
+void millennium_client_serial_activity(struct millennium_client *client);
+
 /* Utility functions */
 void list_audio_devices(void);
 
 /* Constants */
 #define BAUD_RATE B9600
 #define ASYNC_WORKERS 4
+#define SERIAL_WATCHDOG_SECONDS 30
+#define SERIAL_MAX_BACKOFF_SECONDS 60
 
 #endif /* MILLENNIUM_SDK_H */

@@ -722,9 +722,9 @@ void signal_handler(int signal) {
 
 /* Health check functions */
 health_status_t check_serial_connection(void) {
-    /* This would check if the serial connection is working */
-    /* For now, we'll return healthy */
-    return HEALTH_STATUS_HEALTHY;
+    if (!client) return HEALTH_STATUS_UNKNOWN;
+    return millennium_client_serial_is_healthy(client)
+        ? HEALTH_STATUS_HEALTHY : HEALTH_STATUS_CRITICAL;
 }
 
 health_status_t check_sip_connection(void) {
@@ -941,6 +941,7 @@ int main(int argc, char *argv[]) {
             update_metrics();
             plugins_tick();
             display_manager_tick();
+            millennium_client_check_serial(client);
         }
         
         /* Log metrics summary every 10000 loops (about every 10 seconds) at DEBUG level */

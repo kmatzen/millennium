@@ -28,6 +28,7 @@ static void event_queue_clear(struct millennium_client *client);
 static char *string_duplicate(const char *src);
 static void string_buffer_append(struct millennium_client *client, const char *data, size_t len);
 static void string_buffer_ensure_capacity(struct millennium_client *client, size_t needed);
+static int open_serial_port(struct millennium_client *client, const char *device);
 
 /* Event queue implementation */
 static void event_queue_push(struct millennium_client *client, void *event) {
@@ -183,6 +184,48 @@ void list_audio_devices(void) {
     }
 }
 
+/* Open (or reopen) the serial port, configuring termios. Returns 0 on success. */
+static int open_serial_port(struct millennium_client *client, const char *device) {
+    int flags;
+    struct termios options;
+
+    if (client->display_fd != -1) {
+        close(client->display_fd);
+        client->display_fd = -1;
+    }
+
+    client->display_fd = open(device, O_RDWR | O_NOCTTY);
+    if (client->display_fd == -1) {
+        logger_errorf_with_category("SDK", "Failed to open serial device %s: %s", device, strerror(errno));
+        return -1;
+    }
+
+    flags = fcntl(client->display_fd, F_GETFL, 0);
+    if (flags == -1 || fcntl(client->display_fd, F_SETFL, flags | O_NONBLOCK) == -1) {
+        logger_errorf_with_category("SDK", "Failed to set non-blocking mode: %s", strerror(errno));
+        close(client->display_fd);
+        client->display_fd = -1;
+        return -1;
+    }
+
+    tcgetattr(client->display_fd, &options);
+    cfsetispeed(&options, BAUD_RATE);
+    cfsetospeed(&options, BAUD_RATE);
+    options.c_cflag |= (CS8 | CLOCAL | CREAD);
+    options.c_cflag &= ~(PARENB | CSTOPB);
+#ifdef CRTSCTS
+    options.c_cflag &= ~CRTSCTS;
+#endif
+    options.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG);
+    tcsetattr(client->display_fd, TCSANOW, &options);
+
+    clock_gettime(CLOCK_MONOTONIC, &client->last_serial_activity);
+    client->serial_healthy = 1;
+    client->reconnect_attempts = 0;
+
+    return 0;
+}
+
 /* Millennium client implementation */
 struct millennium_client *millennium_client_create(void) {
     struct millennium_client *client = malloc(sizeof(struct millennium_client));
@@ -218,40 +261,16 @@ struct millennium_client *millennium_client_create(void) {
     /* Get current time */
     clock_gettime(CLOCK_MONOTONIC, &client->last_update_time);
     
-    const char *display_device = "/dev/serial/by-id/usb-Arduino_LLC_Millennium_Beta-if00";
-    
-    client->display_fd = open(display_device, O_RDWR | O_NOCTTY);
-    if (client->display_fd == -1) {
-        logger_error_with_category("SDK", "Failed to open display device.");
-        millennium_client_destroy(client);
-        return NULL;
-    }
+    {
+        const char *display_device = "/dev/serial/by-id/usb-Arduino_LLC_Millennium_Beta-if00";
+        strncpy(client->serial_device_path, display_device, sizeof(client->serial_device_path) - 1);
+        client->serial_device_path[sizeof(client->serial_device_path) - 1] = '\0';
 
-    /* Set display_fd to non-blocking mode */
-    int flags = fcntl(client->display_fd, F_GETFL, 0);
-    if (flags == -1) {
-        logger_errorf_with_category("SDK", "Failed to get file descriptor flags: %s", strerror(errno));
-        millennium_client_destroy(client);
-        return NULL;
+        if (open_serial_port(client, client->serial_device_path) != 0) {
+            millennium_client_destroy(client);
+            return NULL;
+        }
     }
-
-    if (fcntl(client->display_fd, F_SETFL, flags | O_NONBLOCK) == -1) {
-        logger_errorf_with_category("SDK", "Failed to set non-blocking mode: %s", strerror(errno));
-        millennium_client_destroy(client);
-        return NULL;
-    }
-
-    struct termios options;
-    tcgetattr(client->display_fd, &options);
-    cfsetispeed(&options, BAUD_RATE);
-    cfsetospeed(&options, BAUD_RATE);
-    options.c_cflag |= (CS8 | CLOCAL | CREAD);
-    options.c_cflag &= ~(PARENB | CSTOPB);
-#ifdef CRTSCTS
-    options.c_cflag &= ~CRTSCTS;
-#endif
-    options.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG);
-    tcsetattr(client->display_fd, TCSANOW, &options);
 
     logger_debug_with_category("SDK", "libre_init");
     int err = baresip_libre_init();
@@ -442,18 +461,83 @@ void millennium_client_hangup(struct millennium_client *client) {
     logger_info_with_category("SDK", "Call terminated.");
 }
 
+void millennium_client_serial_activity(struct millennium_client *client) {
+    if (!client) return;
+    clock_gettime(CLOCK_MONOTONIC, &client->last_serial_activity);
+    if (!client->serial_healthy) {
+        logger_info_with_category("SDK", "Serial link recovered");
+        client->serial_healthy = 1;
+        client->reconnect_attempts = 0;
+    }
+}
+
+int millennium_client_serial_is_healthy(struct millennium_client *client) {
+    if (!client) return 0;
+    return client->serial_healthy;
+}
+
+void millennium_client_check_serial(struct millennium_client *client) {
+    struct timespec now;
+    long elapsed;
+    int backoff;
+
+    if (!client || client->display_fd == -1) return;
+
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    elapsed = now.tv_sec - client->last_serial_activity.tv_sec;
+
+    if (client->serial_healthy && elapsed > SERIAL_WATCHDOG_SECONDS) {
+        logger_warnf_with_category("SDK",
+            "Serial watchdog: no activity for %ld seconds, marking link dead", elapsed);
+        client->serial_healthy = 0;
+        client->reconnect_attempts = 0;
+        client->next_reconnect_time = now;
+    }
+
+    if (!client->serial_healthy) {
+        if (now.tv_sec < client->next_reconnect_time.tv_sec) return;
+
+        logger_infof_with_category("SDK",
+            "Serial reconnect attempt %d", client->reconnect_attempts + 1);
+
+        if (open_serial_port(client, client->serial_device_path) == 0) {
+            logger_info_with_category("SDK", "Serial port reopened successfully");
+
+            /* Re-init coin validator (send 'f' command) */
+            {
+                uint8_t coin_init = 'f';
+                millennium_client_write_to_coin_validator(client, coin_init);
+            }
+
+            /* Refresh display */
+            if (client->display_message) {
+                client->display_dirty = 1;
+            }
+        } else {
+            client->reconnect_attempts++;
+            backoff = 1 << client->reconnect_attempts;
+            if (backoff > SERIAL_MAX_BACKOFF_SECONDS) backoff = SERIAL_MAX_BACKOFF_SECONDS;
+            client->next_reconnect_time.tv_sec = now.tv_sec + backoff;
+            logger_warnf_with_category("SDK",
+                "Serial reconnect failed, next attempt in %d seconds", backoff);
+        }
+    }
+}
+
 void millennium_client_update(struct millennium_client *client) {
     char buffer[1024];
     ssize_t bytes_read;
 
+    if (client->display_fd == -1) return;
+
     /* Read directly from the file descriptor */
     while ((bytes_read = read(client->display_fd, buffer, sizeof(buffer))) > 0) {
+        millennium_client_serial_activity(client);
         string_buffer_append(client, buffer, bytes_read);
         millennium_client_process_event_buffer(client);
     }
 
     if (bytes_read == -1 && errno != EAGAIN && errno != EWOULDBLOCK) {
-        /* Log only if the error is not due to no data being available */
         logger_errorf_with_category("SDK", "Error reading from display_fd: %s", strerror(errno));
     }
 
