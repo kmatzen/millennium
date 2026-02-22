@@ -30,10 +30,6 @@ extern daemon_state_data_t *daemon_state;
 extern millennium_client_t *client;
 
 /* Internal functions */
-static void classic_phone_show_welcome(void);
-static void classic_phone_show_dialing(void);
-static void classic_phone_show_incoming_call(void);
-static void classic_phone_show_call_active(void);
 static void classic_phone_update_display(void);
 static void classic_phone_clear_keypad(void);
 static void classic_phone_add_key(char key);
@@ -44,7 +40,6 @@ static void classic_phone_check_and_call(void);
 static void classic_phone_start_call(void);
 static void classic_phone_end_call(void);
 static void classic_phone_format_number(const char* buffer, char *output);
-static void classic_phone_generate_message(int inserted, int cost, char *output);
 
 /* Classic phone event handlers */
 static int classic_phone_handle_coin(int coin_value, const char *coin_code) {
@@ -86,13 +81,13 @@ static int classic_phone_handle_hook(int hook_up, int hook_down) {
             /* Incoming call - daemon will handle answering, just update our state */
             logger_info_with_category("ClassicPhone", "Handset lifted during incoming call");
             classic_phone_data.call_start_time = time(NULL);
-            classic_phone_show_call_active();
+            classic_phone_update_display();
         } else {
             /* Start new call session */
             classic_phone_data.inserted_cents = 0;
             classic_phone_data.keypad_length = 0;
             classic_phone_data.last_activity = time(NULL);
-            classic_phone_show_welcome();
+            classic_phone_update_display();
         }
     } else if (hook_down) {
         /* Always clear keypad and reset coins on hook down, like original daemon */
@@ -102,7 +97,7 @@ static int classic_phone_handle_hook(int hook_up, int hook_down) {
         if (classic_phone_data.is_in_call) {
             classic_phone_end_call();
         } else {
-            classic_phone_show_welcome();
+            classic_phone_update_display();
         }
     }
     return 0;
@@ -118,13 +113,13 @@ static int classic_phone_handle_call_state(int call_state) {
         /* Handle incoming call - show "Call incoming..." like original daemon */
         classic_phone_data.is_in_call = 1;
         classic_phone_data.call_start_time = time(NULL);
-        classic_phone_show_incoming_call();
+        classic_phone_update_display();
         logger_info_with_category("ClassicPhone", "Incoming call received");
     } else if (call_state == EVENT_CALL_STATE_ACTIVE) {
         /* Handle call established - show "Call active" and "Audio connected" like original daemon */
         classic_phone_data.is_in_call = 1;
         classic_phone_data.call_start_time = time(NULL);
-        classic_phone_show_call_active();
+        classic_phone_update_display();
         logger_info_with_category("ClassicPhone", "Call established");
     } else if (call_state == EVENT_CALL_STATE_INVALID) {
         /* Completely ignore INVALID events during active calls - let Baresip handle call termination */
@@ -139,153 +134,52 @@ static int classic_phone_handle_call_state(int call_state) {
 
 /* Internal function implementations */
 static void classic_phone_on_activation(void) {
-    /* Reset state and show welcome when plugin is activated */
+    /* Reset state and show display when plugin is activated */
     classic_phone_data.inserted_cents = 0;
     classic_phone_data.keypad_length = 0;
     classic_phone_data.is_dialing = 0;
     classic_phone_data.is_in_call = 0;
     classic_phone_data.last_activity = time(NULL);
-    classic_phone_show_welcome();
+    classic_phone_update_display();
 }
 
-static void classic_phone_show_welcome(void) {
-    char line1[21];
-    char line2[21];
-    
-    if (classic_phone_data.inserted_cents > 0) {
-        sprintf(line1, "Have: %dc", classic_phone_data.inserted_cents);
-        sprintf(line2, "Need: %dc", classic_phone_data.call_cost_cents - classic_phone_data.inserted_cents);
-    } else {
-        sprintf(line1, "Insert %dc", classic_phone_data.call_cost_cents);
-        strcpy(line2, "to make a call");
-    }
-    
-    char display_bytes[100];
-    size_t pos = 0;
-    int i;
-    
-    /* Add line1, padded or truncated to 20 characters */
-    for (i = 0; i < 20 && pos < sizeof(display_bytes) - 2; i++) {
-        display_bytes[pos++] = (i < (int)strlen(line1)) ? line1[i] : ' ';
-    }
-    
-    /* Add line feed */
-    display_bytes[pos++] = 0x0A;
-    
-    /* Add line2, padded or truncated to 20 characters */
-    for (i = 0; i < 20 && pos < sizeof(display_bytes) - 1; i++) {
-        display_bytes[pos++] = (i < (int)strlen(line2)) ? line2[i] : ' ';
-    }
-    
-    /* Null terminate */
-    display_bytes[pos] = '\0';
-    
-    millennium_client_set_display(client, display_bytes);
-}
 
-static void classic_phone_show_dialing(void) {
-    char line1[21];
-    char line2[21];
-    
-    classic_phone_format_number(classic_phone_data.keypad_buffer, line1);
-    sprintf(line2, "Dialing...");
-    
-    char display_bytes[100];
-    size_t pos = 0;
-    int i;
-    
-    /* Add line1, padded or truncated to 20 characters */
-    for (i = 0; i < 20 && pos < sizeof(display_bytes) - 2; i++) {
-        display_bytes[pos++] = (i < (int)strlen(line1)) ? line1[i] : ' ';
-    }
-    
-    /* Add line feed */
-    display_bytes[pos++] = 0x0A;
-    
-    /* Add line2, padded or truncated to 20 characters */
-    for (i = 0; i < 20 && pos < sizeof(display_bytes) - 1; i++) {
-        display_bytes[pos++] = (i < (int)strlen(line2)) ? line2[i] : ' ';
-    }
-    
-    /* Null terminate */
-    display_bytes[pos] = '\0';
-    
-    millennium_client_set_display(client, display_bytes);
-}
 
-static void classic_phone_show_incoming_call(void) {
-    char line1[21];
-    char line2[21];
-    
-    strcpy(line1, "Call incoming...");
-    strcpy(line2, "Pick up handset");
-    
-    char display_bytes[100];
-    size_t pos = 0;
-    int i;
-    
-    /* Add line1, padded or truncated to 20 characters */
-    for (i = 0; i < 20 && pos < sizeof(display_bytes) - 2; i++) {
-        display_bytes[pos++] = (i < (int)strlen(line1)) ? line1[i] : ' ';
-    }
-    
-    /* Add line feed */
-    display_bytes[pos++] = 0x0A;
-    
-    /* Add line2, padded or truncated to 20 characters */
-    for (i = 0; i < 20 && pos < sizeof(display_bytes) - 1; i++) {
-        display_bytes[pos++] = (i < (int)strlen(line2)) ? line2[i] : ' ';
-    }
-    
-    /* Null terminate */
-    display_bytes[pos] = '\0';
-    
-    millennium_client_set_display(client, display_bytes);
-}
 
-static void classic_phone_show_call_active(void) {
-    char line1[21];
-    char line2[21];
-    
-    strcpy(line1, "Call active");
-    strcpy(line2, "Audio connected");
-    
-    char display_bytes[100];
-    size_t pos = 0;
-    int i;
-    
-    /* Add line1, padded or truncated to 20 characters */
-    for (i = 0; i < 20 && pos < sizeof(display_bytes) - 2; i++) {
-        display_bytes[pos++] = (i < (int)strlen(line1)) ? line1[i] : ' ';
-    }
-    
-    /* Add line feed */
-    display_bytes[pos++] = 0x0A;
-    
-    /* Add line2, padded or truncated to 20 characters */
-    for (i = 0; i < 20 && pos < sizeof(display_bytes) - 1; i++) {
-        display_bytes[pos++] = (i < (int)strlen(line2)) ? line2[i] : ' ';
-    }
-    
-    /* Null terminate */
-    display_bytes[pos] = '\0';
-    
-    millennium_client_set_display(client, display_bytes);
-}
 
 static void classic_phone_update_display(void) {
     char line1[21];
     char line2[21];
     
-    if (classic_phone_data.keypad_length > 0) {
+    /* Simple state machine for display */
+    if (classic_phone_data.is_in_call) {
+        /* Call is active */
+        strcpy(line1, "Call active");
+        strcpy(line2, "Hang up to end");
+    } else if (classic_phone_data.is_dialing) {
+        /* Dialing a number */
         classic_phone_format_number(classic_phone_data.keypad_buffer, line1);
+        strcpy(line2, "Dialing...");
+    } else if (daemon_state && daemon_state->current_state == DAEMON_STATE_IDLE_DOWN) {
+        /* Receiver is down */
+        strcpy(line1, "Lift receiver");
+        strcpy(line2, "to make a call");
     } else {
-        strcpy(line1, "CLASSIC PHONE");
+        /* Receiver is up - show phone number and coin status */
+        if (classic_phone_data.keypad_length > 0) {
+            classic_phone_format_number(classic_phone_data.keypad_buffer, line1);
+        } else {
+            classic_phone_format_number("", line1);
+        }
+        
+        if (classic_phone_data.inserted_cents > 0) {
+            sprintf(line2, "Have: %dc", classic_phone_data.inserted_cents);
+        } else {
+            sprintf(line2, "Insert %dc", classic_phone_data.call_cost_cents);
+        }
     }
     
-    classic_phone_generate_message(classic_phone_data.inserted_cents, 
-                                  classic_phone_data.call_cost_cents, line2);
-    
+    /* Send to display */
     char display_bytes[100];
     size_t pos = 0;
     int i;
@@ -358,7 +252,7 @@ static void classic_phone_start_call(void) {
     classic_phone_data.is_dialing = 1;
     strcpy(classic_phone_data.current_number, classic_phone_data.keypad_buffer);
     
-    classic_phone_show_dialing();
+    classic_phone_update_display();
     
     /* Consume coins */
     classic_phone_data.inserted_cents -= classic_phone_data.call_cost_cents;
@@ -378,7 +272,7 @@ static void classic_phone_end_call(void) {
     classic_phone_data.inserted_cents = 0;
     
     millennium_client_hangup(client);
-    classic_phone_show_welcome();
+    classic_phone_update_display();
     
     logger_info_with_category("ClassicPhone", "Call ended");
 }
@@ -404,28 +298,6 @@ static void classic_phone_format_number(const char* buffer, char *output) {
             filled[6], filled[7], filled[8], filled[9]);
 }
 
-static void classic_phone_generate_message(int inserted, int cost, char *output) {
-    if (!output) {
-        return;
-    }
-    
-    int remaining = cost - inserted;
-    
-    /* Ensure remaining is not negative */
-    if (remaining < 0) {
-        remaining = 0;
-    }
-    
-    /* Use sprintf for C89 compatibility with proper bounds checking */
-    char temp[32];
-    sprintf(temp, "Insert %02d cents", remaining);
-    /* Copy up to 19 characters to leave room for null terminator */
-    int i;
-    for (i = 0; i < 19 && temp[i] != '\0'; i++) {
-        output[i] = temp[i];
-    }
-    output[i] = '\0';
-}
 
 /* Plugin registration function */
 void register_classic_phone_plugin(void) {

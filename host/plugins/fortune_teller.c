@@ -150,7 +150,11 @@ static void fortune_teller_show_welcome(void) {
     char line1[21];
     char line2[21];
     
-    if (fortune_teller_data.inserted_cents > 0) {
+    /* Check if receiver is down - show lift instruction */
+    if (daemon_state && daemon_state->current_state == DAEMON_STATE_IDLE_DOWN) {
+        strcpy(line1, "Lift receiver");
+        strcpy(line2, "for fortune");
+    } else if (fortune_teller_data.inserted_cents > 0) {
         sprintf(line1, "Have: %dc", fortune_teller_data.inserted_cents);
         sprintf(line2, "Need: %dc", fortune_teller_data.fortune_cost_cents - fortune_teller_data.inserted_cents);
     } else {

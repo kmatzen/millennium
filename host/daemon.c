@@ -275,7 +275,7 @@ void handle_coin_event(coin_event_t *coin_event) {
                     "Coin inserted: %s, value: %d cents, total: %d cents",
                     coin_code_str, coin_value, daemon_state->inserted_cents);
             
-            update_display_with_state();
+            /* Let plugins handle display updates */
         }
         pthread_mutex_unlock(&daemon_state_mutex);
         
@@ -363,7 +363,7 @@ void handle_hook_event(hook_state_change_event_t *hook_event) {
             daemon_state->inserted_cents = 0;
             daemon_state_clear_keypad(daemon_state);
             
-            update_display_with_state();
+            /* Let plugins handle display updates */
         }
     } else if (hook_down) {
         logger_info_with_category("Hook", "Hook down, call ended");
@@ -376,7 +376,7 @@ void handle_hook_event(hook_state_change_event_t *hook_event) {
         daemon_state_clear_keypad(daemon_state);
         daemon_state->inserted_cents = 0;
         
-        update_display_with_state();
+        /* Let plugins handle display updates */
         
         /* Update state */
         daemon_state->current_state = DAEMON_STATE_IDLE_DOWN;
@@ -426,7 +426,7 @@ void handle_keypad_event(keypad_event_t *keypad_event) {
             daemon_state_add_key(daemon_state, key);
             daemon_state_update_activity(daemon_state);
             
-            update_display_with_state();
+            /* Let plugins handle display updates */
         }
         pthread_mutex_unlock(&daemon_state_mutex);
         
@@ -534,8 +534,7 @@ int send_control_command(const char* action) {
             metrics_increment_counter("keypad_clears", 1);
             logger_info_with_category("Control", "Keypad cleared via web portal");
             
-            /* Update physical display */
-            update_display_with_state();
+            /* Let plugins handle display updates */
         } else {
             logger_warn_with_category("Control", "Keypad clear ignored - handset down");
         }
@@ -554,8 +553,7 @@ int send_control_command(const char* action) {
             metrics_increment_counter("keypad_backspaces", 1);
             logger_info_with_category("Control", "Keypad backspace via web portal");
             
-            /* Update physical display */
-            update_display_with_state();
+            /* Let plugins handle display updates */
         } else {
             logger_warn_with_category("Control", "Keypad backspace ignored - handset down or buffer empty");
         }
@@ -610,8 +608,7 @@ int send_control_command(const char* action) {
         metrics_increment_counter("coin_returns", 1);
         logger_info_with_category("Control", "Coins returned via web portal");
         
-        /* Update physical display */
-        update_display_with_state();
+        /* Let plugins handle display updates */
         
         pthread_mutex_unlock(&daemon_state_mutex);
         return 1;
@@ -813,9 +810,9 @@ int main(int argc, char *argv[]) {
     
     /* Metrics collection is now handled in the main loop */
     
-    /* Initialize display */
+    /* Initialize display - plugins will handle their own display */
     pthread_mutex_lock(&daemon_state_mutex);
-    update_display_with_state();
+    /* Let plugins handle display updates */
     pthread_mutex_unlock(&daemon_state_mutex);
     
     /* Initialize event processor */

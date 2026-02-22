@@ -169,7 +169,11 @@ static void jukebox_show_welcome(void) {
     char line1[21];
     char line2[21];
     
-    if (jukebox_data.inserted_cents > 0) {
+    /* Check if receiver is down - show lift instruction */
+    if (daemon_state && daemon_state->current_state == DAEMON_STATE_IDLE_DOWN) {
+        strcpy(line1, "Lift receiver");
+        strcpy(line2, "to play music");
+    } else if (jukebox_data.inserted_cents > 0) {
         sprintf(line1, "Have: %dc", jukebox_data.inserted_cents);
         sprintf(line2, "Need: %dc", jukebox_data.song_cost_cents - jukebox_data.inserted_cents);
     } else {
