@@ -6,6 +6,7 @@
 #include "health_monitor.h"
 #include "plugins.h"
 #include "websocket.h"
+#include "version.h"
 
 #include <sys/socket.h>
 #include <sys/select.h>
@@ -739,6 +740,7 @@ void web_server_setup_api_routes(struct web_server* server) {
     web_server_add_route(server, "POST", "/api/control", web_server_handle_api_control);
     web_server_add_route(server, "GET", "/api/logs", web_server_handle_api_logs);
     web_server_add_route(server, "GET", "/api/plugins", web_server_handle_api_plugins);
+    web_server_add_route(server, "GET", "/api/version", web_server_handle_api_version);
 }
 
 /* Default handlers */
@@ -1277,6 +1279,20 @@ struct http_response web_server_handle_api_plugins(const struct http_request* re
         active_plugin ? active_plugin : "Unknown"
     );
     
+    web_server_strcpy_safe(response.body, json, sizeof(response.body));
+    return response;
+}
+
+struct http_response web_server_handle_api_version(const struct http_request* request) {
+    (void)request;
+    struct http_response response;
+    char json[512];
+    memset(&response, 0, sizeof(response));
+    web_server_strcpy_safe(response.content_type, "application/json", sizeof(response.content_type));
+    response.status_code = 200;
+    snprintf(json, sizeof(json),
+        "{\"version\":\"%s\",\"git_hash\":\"%s\",\"build_time\":\"%s\"}",
+        version_get_string(), version_get_git_hash(), version_get_build_time());
     web_server_strcpy_safe(response.body, json, sizeof(response.body));
     return response;
 }
