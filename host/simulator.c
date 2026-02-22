@@ -198,6 +198,19 @@ void millennium_client_write_command(millennium_client_t *c, uint8_t cmd,
     (void)c; (void)cmd; (void)data; (void)sz;
 }
 
+int millennium_client_serial_is_healthy(millennium_client_t *c) {
+    (void)c;
+    return 1;
+}
+
+void millennium_client_check_serial(millennium_client_t *c) {
+    (void)c;
+}
+
+void millennium_client_serial_activity(millennium_client_t *c) {
+    (void)c;
+}
+
 void millennium_client_process_event_buffer(millennium_client_t *c) { (void)c; }
 
 char *millennium_client_extract_payload(millennium_client_t *c, char t, size_t s) {
