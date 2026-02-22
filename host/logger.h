@@ -23,6 +23,11 @@ typedef struct {
     int log_to_file;
     FILE* file_stream;
     
+    /* Log rotation */
+    long max_file_size;     /* Max bytes before rotation (0 = disabled) */
+    int max_rotated_files;  /* Number of rotated files to keep */
+    long current_file_size; /* Approximate bytes written to current file */
+
     /* In-memory log storage */
     char memory_logs[1000][512];  /* Fixed size array for C89 */
     int memory_logs_count;
@@ -38,6 +43,7 @@ void logger_set_level(log_level_t level);
 void logger_set_log_file(const char* filename);
 void logger_set_log_to_console(int enable);
 void logger_set_log_to_file(int enable);
+void logger_set_rotation(long max_file_size, int max_rotated_files);
 
 /* Logging methods */
 void logger_log(log_level_t level, const char* message);

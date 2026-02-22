@@ -36,6 +36,8 @@ int config_get_call_timeout_seconds(const config_data_t* config);
 const char* config_get_log_level(const config_data_t* config);
 const char* config_get_log_file(const config_data_t* config);
 int config_get_log_to_file(const config_data_t* config);
+int config_get_log_max_size_bytes(const config_data_t* config);
+int config_get_log_max_files(const config_data_t* config);
 
 /* System Configuration */
 int config_get_update_interval_ms(const config_data_t* config);
