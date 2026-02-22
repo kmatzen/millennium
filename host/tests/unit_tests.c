@@ -40,6 +40,17 @@ void millennium_client_check_serial(millennium_client_t *c) { (void)c; }
 void millennium_client_serial_activity(millennium_client_t *c) { (void)c; }
 void list_audio_devices(void) {}
 
+/* Audio tone stubs */
+void audio_tones_init(void) {}
+void audio_tones_cleanup(void) {}
+void audio_tones_play_dial_tone(void) {}
+void audio_tones_play_dtmf(char k) { (void)k; }
+void audio_tones_play_ringback(void) {}
+void audio_tones_play_busy_tone(void) {}
+void audio_tones_play_coin_tone(void) {}
+void audio_tones_stop(void) {}
+int audio_tones_is_playing(void) { return 0; }
+
 /* ── Config tests ───────────────────────────────────────────────── */
 
 static void test_config_defaults(void) {

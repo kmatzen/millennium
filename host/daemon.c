@@ -12,6 +12,7 @@
 #include "plugins.h"
 #include "state_persistence.h"
 #include "display_manager.h"
+#include "audio_tones.h"
 #include <signal.h>
 #include <string.h>
 #include <stdio.h>
@@ -890,6 +891,9 @@ int main(int argc, char *argv[]) {
     event_processor_register_hook_handler(event_processor, handle_hook_event);
     event_processor_register_keypad_handler(event_processor, handle_keypad_event);
     
+    /* Initialize audio tones */
+    audio_tones_init();
+
     /* Initialize plugin system */
     plugins_init();
 
@@ -992,6 +996,9 @@ int main(int argc, char *argv[]) {
         event_processor = NULL;
     }
     
+    /* Cleanup audio tones */
+    audio_tones_cleanup();
+
     /* Cleanup plugin system */
     plugins_cleanup();
     
