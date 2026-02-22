@@ -1,3 +1,4 @@
+#define _POSIX_C_SOURCE 200112L
 #include "metrics.h"
 #include <stdlib.h>
 #include <string.h>
@@ -468,11 +469,11 @@ char *metrics_export_prometheus(void) {
     if (!result) return NULL;
     
     /* Add timestamp */
-    pos += sprintf(result + pos,
+    pos += snprintf(result + pos, len - pos,
         "# HELP millennium_metrics_start_time Start time of the metrics collection\n");
-    pos += sprintf(result + pos,
+    pos += snprintf(result + pos, len - pos,
         "# TYPE millennium_metrics_start_time counter\n");
-    pos += sprintf(result + pos,
+    pos += snprintf(result + pos, len - pos,
         "millennium_metrics_start_time %ld\n\n", (long)g_metrics->start_time);
     
     /* Export counters */
@@ -481,18 +482,18 @@ char *metrics_export_prometheus(void) {
         
         sanitized_name = metrics_sanitize_name(g_metrics->counter_names[i]);
         if (sanitized_name) {
-            pos += sprintf(result + pos,
+            pos += snprintf(result + pos, len - pos,
                 "# HELP %s Counter metric\n", sanitized_name);
-            pos += sprintf(result + pos,
+            pos += snprintf(result + pos, len - pos,
                 "# TYPE %s counter\n", sanitized_name);
-            pos += sprintf(result + pos,
+            pos += snprintf(result + pos, len - pos,
                 "%s %llu\n", sanitized_name, (unsigned long long)g_metrics->counters[i].value);
             free(sanitized_name);
         }
     }
     
     if (g_metrics->counter_count > 0) {
-        pos += sprintf(result + pos, "\n");
+        pos += snprintf(result + pos, len - pos, "\n");
     }
     
     /* Export gauges */
@@ -501,18 +502,18 @@ char *metrics_export_prometheus(void) {
         
         sanitized_name = metrics_sanitize_name(g_metrics->gauge_names[i]);
         if (sanitized_name) {
-            pos += sprintf(result + pos,
+            pos += snprintf(result + pos, len - pos,
                 "# HELP %s Gauge metric\n", sanitized_name);
-            pos += sprintf(result + pos,
+            pos += snprintf(result + pos, len - pos,
                 "# TYPE %s gauge\n", sanitized_name);
-            pos += sprintf(result + pos,
+            pos += snprintf(result + pos, len - pos,
                 "%s %.2f\n", sanitized_name, g_metrics->gauges[i].value);
             free(sanitized_name);
         }
     }
     
     if (g_metrics->gauge_count > 0) {
-        pos += sprintf(result + pos, "\n");
+        pos += snprintf(result + pos, len - pos, "\n");
     }
     
     /* Export histograms */
@@ -523,60 +524,60 @@ char *metrics_export_prometheus(void) {
         if (metrics_get_histogram_stats(g_metrics->histogram_names[i], &stats) == 0) {
             sanitized_name = metrics_sanitize_name(g_metrics->histogram_names[i]);
             if (sanitized_name) {
-                pos += sprintf(result + pos,
+                pos += snprintf(result + pos, len - pos,
                     "# HELP %s_count Histogram count\n", sanitized_name);
-                pos += sprintf(result + pos,
+                pos += snprintf(result + pos, len - pos,
                     "# TYPE %s_count counter\n", sanitized_name);
-                pos += sprintf(result + pos,
+                pos += snprintf(result + pos, len - pos,
                     "%s_count %llu\n", sanitized_name, (unsigned long long)stats.count);
                 
-                pos += sprintf(result + pos,
+                pos += snprintf(result + pos, len - pos,
                     "# HELP %s_sum Histogram sum\n", sanitized_name);
-                pos += sprintf(result + pos,
+                pos += snprintf(result + pos, len - pos,
                     "# TYPE %s_sum counter\n", sanitized_name);
-                pos += sprintf(result + pos,
+                pos += snprintf(result + pos, len - pos,
                     "%s_sum %.2f\n", sanitized_name, stats.sum);
                 
-                pos += sprintf(result + pos,
+                pos += snprintf(result + pos, len - pos,
                     "# HELP %s_min Histogram minimum\n", sanitized_name);
-                pos += sprintf(result + pos,
+                pos += snprintf(result + pos, len - pos,
                     "# TYPE %s_min gauge\n", sanitized_name);
-                pos += sprintf(result + pos,
+                pos += snprintf(result + pos, len - pos,
                     "%s_min %.2f\n", sanitized_name, stats.min);
                 
-                pos += sprintf(result + pos,
+                pos += snprintf(result + pos, len - pos,
                     "# HELP %s_max Histogram maximum\n", sanitized_name);
-                pos += sprintf(result + pos,
+                pos += snprintf(result + pos, len - pos,
                     "# TYPE %s_max gauge\n", sanitized_name);
-                pos += sprintf(result + pos,
+                pos += snprintf(result + pos, len - pos,
                     "%s_max %.2f\n", sanitized_name, stats.max);
                 
-                pos += sprintf(result + pos,
+                pos += snprintf(result + pos, len - pos,
                     "# HELP %s_mean Histogram mean\n", sanitized_name);
-                pos += sprintf(result + pos,
+                pos += snprintf(result + pos, len - pos,
                     "# TYPE %s_mean gauge\n", sanitized_name);
-                pos += sprintf(result + pos,
+                pos += snprintf(result + pos, len - pos,
                     "%s_mean %.2f\n", sanitized_name, stats.mean);
                 
-                pos += sprintf(result + pos,
+                pos += snprintf(result + pos, len - pos,
                     "# HELP %s_median Histogram median\n", sanitized_name);
-                pos += sprintf(result + pos,
+                pos += snprintf(result + pos, len - pos,
                     "# TYPE %s_median gauge\n", sanitized_name);
-                pos += sprintf(result + pos,
+                pos += snprintf(result + pos, len - pos,
                     "%s_median %.2f\n", sanitized_name, stats.median);
                 
-                pos += sprintf(result + pos,
+                pos += snprintf(result + pos, len - pos,
                     "# HELP %s_p95 Histogram 95th percentile\n", sanitized_name);
-                pos += sprintf(result + pos,
+                pos += snprintf(result + pos, len - pos,
                     "# TYPE %s_p95 gauge\n", sanitized_name);
-                pos += sprintf(result + pos,
+                pos += snprintf(result + pos, len - pos,
                     "%s_p95 %.2f\n", sanitized_name, stats.p95);
                 
-                pos += sprintf(result + pos,
+                pos += snprintf(result + pos, len - pos,
                     "# HELP %s_p99 Histogram 99th percentile\n", sanitized_name);
-                pos += sprintf(result + pos,
+                pos += snprintf(result + pos, len - pos,
                     "# TYPE %s_p99 gauge\n", sanitized_name);
-                pos += sprintf(result + pos,
+                pos += snprintf(result + pos, len - pos,
                     "%s_p99 %.2f\n\n", sanitized_name, stats.p99);
                 
                 free(sanitized_name);
@@ -612,60 +613,60 @@ char *metrics_export_json(void) {
         return NULL;
     }
     
-                pos += sprintf(result + pos, "{\n");
-                pos += sprintf(result + pos, "  \"timestamp\": \"%s\",\n", timestamp);
-                pos += sprintf(result + pos, "  \"counters\": {\n");
+                pos += snprintf(result + pos, len - pos, "{\n");
+                pos += snprintf(result + pos, len - pos, "  \"timestamp\": \"%s\",\n", timestamp);
+                pos += snprintf(result + pos, len - pos, "  \"counters\": {\n");
     
     /* Export counters */
     for (i = 0; i < (int)g_metrics->counter_count; i++) {
-        if (i > 0) pos += sprintf(result + pos, ",\n");
-                pos += sprintf(result + pos, "    \"%s\": %llu",
+        if (i > 0) pos += snprintf(result + pos, len - pos, ",\n");
+                pos += snprintf(result + pos, len - pos, "    \"%s\": %llu",
             g_metrics->counter_names[i], (unsigned long long)g_metrics->counters[i].value);
     }
     
-                pos += sprintf(result + pos, "\n  },\n");
-                pos += sprintf(result + pos, "  \"gauges\": {\n");
+                pos += snprintf(result + pos, len - pos, "\n  },\n");
+                pos += snprintf(result + pos, len - pos, "  \"gauges\": {\n");
     
     /* Export gauges */
     for (i = 0; i < (int)g_metrics->gauge_count; i++) {
-        if (i > 0) pos += sprintf(result + pos, ",\n");
-                pos += sprintf(result + pos, "    \"%s\": %.2f",
+        if (i > 0) pos += snprintf(result + pos, len - pos, ",\n");
+                pos += snprintf(result + pos, len - pos, "    \"%s\": %.2f",
             g_metrics->gauge_names[i], g_metrics->gauges[i].value);
     }
     
-                pos += sprintf(result + pos, "\n  },\n");
-                pos += sprintf(result + pos, "  \"histograms\": {\n");
+                pos += snprintf(result + pos, len - pos, "\n  },\n");
+                pos += snprintf(result + pos, len - pos, "  \"histograms\": {\n");
     
     /* Export histograms */
     for (i = 0; i < (int)g_metrics->histogram_count; i++) {
         metrics_histogram_stats_t stats;
         
         if (metrics_get_histogram_stats(g_metrics->histogram_names[i], &stats) == 0) {
-            if (i > 0) pos += sprintf(result + pos, ",\n");
-            pos += sprintf(result + pos, "    \"%s\": {\n",
+            if (i > 0) pos += snprintf(result + pos, len - pos, ",\n");
+            pos += snprintf(result + pos, len - pos, "    \"%s\": {\n",
                 g_metrics->histogram_names[i]);
-            pos += sprintf(result + pos,
+            pos += snprintf(result + pos, len - pos,
                 "      \"count\": %llu,\n", (unsigned long long)stats.count);
-            pos += sprintf(result + pos,
+            pos += snprintf(result + pos, len - pos,
                 "      \"sum\": %.2f,\n", stats.sum);
-            pos += sprintf(result + pos,
+            pos += snprintf(result + pos, len - pos,
                 "      \"min\": %.2f,\n", stats.min);
-            pos += sprintf(result + pos,
+            pos += snprintf(result + pos, len - pos,
                 "      \"max\": %.2f,\n", stats.max);
-            pos += sprintf(result + pos,
+            pos += snprintf(result + pos, len - pos,
                 "      \"mean\": %.2f,\n", stats.mean);
-            pos += sprintf(result + pos,
+            pos += snprintf(result + pos, len - pos,
                 "      \"median\": %.2f,\n", stats.median);
-            pos += sprintf(result + pos,
+            pos += snprintf(result + pos, len - pos,
                 "      \"p95\": %.2f,\n", stats.p95);
-            pos += sprintf(result + pos,
+            pos += snprintf(result + pos, len - pos,
                 "      \"p99\": %.2f\n", stats.p99);
-            pos += sprintf(result + pos, "    }");
+            pos += snprintf(result + pos, len - pos, "    }");
         }
     }
     
-                pos += sprintf(result + pos, "\n  }\n");
-                pos += sprintf(result + pos, "}\n");
+                pos += snprintf(result + pos, len - pos, "\n  }\n");
+                pos += snprintf(result + pos, len - pos, "}\n");
     
     free(timestamp);
     return result;

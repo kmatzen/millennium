@@ -1,4 +1,4 @@
-#define _POSIX_C_SOURCE 199309L
+#define _POSIX_C_SOURCE 200112L
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -174,10 +174,10 @@ static void jukebox_show_welcome(void) {
         strcpy(line1, "Lift receiver");
         strcpy(line2, "to play music");
     } else if (jukebox_data.inserted_cents > 0) {
-        sprintf(line1, "Have: %dc", jukebox_data.inserted_cents);
-        sprintf(line2, "Need: %dc", jukebox_data.song_cost_cents - jukebox_data.inserted_cents);
+        snprintf(line1, sizeof(line1), "Have: %dc", jukebox_data.inserted_cents);
+        snprintf(line2, sizeof(line2), "Need: %dc", jukebox_data.song_cost_cents - jukebox_data.inserted_cents);
     } else {
-        sprintf(line1, "Insert %dc", jukebox_data.song_cost_cents);
+        snprintf(line1, sizeof(line1), "Insert %dc", jukebox_data.song_cost_cents);
         strcpy(line2, "to play music");
     }
     
@@ -270,20 +270,20 @@ static void jukebox_play_song(int song_number) {
     
     const song_info_t *song = &songs[song_number];
     char log_msg[256];
-    sprintf(log_msg, "Playing song: %s by %s", song->title, song->artist);
+    snprintf(log_msg, sizeof(log_msg), "Playing song: %s by %s", song->title, song->artist);
     logger_info_with_category("Jukebox", log_msg);
     
     /* Play the WAV file using ALSA */
     const char* wav_file = songs[song_number].audio_file;
     if (jukebox_play_wav_file(wav_file) == 0) {
         char log_msg[256];
-        sprintf(log_msg, "Started playing WAV file: %s", wav_file);
+        snprintf(log_msg, sizeof(log_msg), "Started playing WAV file: %s", wav_file);
         logger_info_with_category("Jukebox", log_msg);
     } else {
         logger_warn_with_category("Jukebox", "Failed to play WAV file, falling back to beep tones");
         /* Fallback to simple beep if WAV file not available */
         char command[128];
-        sprintf(command, "beep -f 800 -l 200 -n -f 1000 -l 200 -n -f 1200 -l 400 &");
+        snprintf(command, sizeof(command), "beep -f 800 -l 200 -n -f 1000 -l 200 -n -f 1200 -l 400 &");
         system(command);
     }
 }
@@ -330,7 +330,7 @@ static int jukebox_init_alsa(void) {
     err = snd_pcm_open(&jukebox_data.pcm_handle, "default", SND_PCM_STREAM_PLAYBACK, 0);
     if (err < 0) {
         char log_msg[256];
-        sprintf(log_msg, "Cannot open PCM device: %s", snd_strerror(err));
+        snprintf(log_msg, sizeof(log_msg), "Cannot open PCM device: %s", snd_strerror(err));
         logger_error_with_category("Jukebox", log_msg);
         return -1;
     }
@@ -452,7 +452,7 @@ static void* jukebox_audio_thread(void* arg) {
     file = fopen(wav_file, "rb");
     if (!file) {
         char log_msg[256];
-        sprintf(log_msg, "Cannot open WAV file: %s", wav_file);
+        snprintf(log_msg, sizeof(log_msg), "Cannot open WAV file: %s", wav_file);
         logger_error_with_category("Jukebox", log_msg);
         return NULL;
     }

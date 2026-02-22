@@ -1,4 +1,4 @@
-#define _POSIX_C_SOURCE 199309L
+#define _POSIX_C_SOURCE 200112L
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -127,13 +127,14 @@ int plugins_list(char *buffer, size_t buffer_size) {
     int i;
     for (i = 0; i < plugin_count && pos < (int)buffer_size - 1; i++) {
         char temp[256];
-        sprintf(temp, "%s: %s%s\n",
+        snprintf(temp, sizeof(temp), "%s: %s%s\n",
                 plugins[i].name, plugins[i].description,
                 (i == active_plugin_index) ? " (ACTIVE)" : "");
         
         int len = strlen(temp);
         if (pos + len < (int)buffer_size - 1) {
-            strcpy(buffer + pos, temp);
+            strncpy(buffer + pos, temp, buffer_size - pos - 1);
+            buffer[buffer_size - 1] = '\0';
             pos += len;
         }
     }
