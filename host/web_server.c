@@ -5,6 +5,7 @@
 #include "metrics.h"
 #include "health_monitor.h"
 #include "plugins.h"
+#include "websocket.h"
 
 #include <sys/socket.h>
 #include <sys/select.h>
@@ -509,11 +510,26 @@ void web_server_handle_client(struct web_server* server, int client_fd) {
         
         struct http_response response = web_server_process_request(server, &parsed_request);
         
-        if (response.is_streaming) {
-            /* Send streaming response */
+        if (response.status_code == 101) {
+            /* WebSocket upgrade — send handshake then keep fd open */
+            char* response_str = web_server_serialize_response(&response);
+            if (response_str) {
+                send(client_fd, response_str, strlen(response_str), 0);
+                web_server_free(response_str);
+            }
+            if (server->websocket_count < 32) {
+                server->websocket_connections[server->websocket_count++] = client_fd;
+                logger_infof_with_category("WebServer",
+                    "WebSocket client connected (fd=%d, total=%d)",
+                    client_fd, server->websocket_count);
+            } else {
+                logger_warn_with_category("WebServer", "Max WebSocket connections reached");
+                close(client_fd);
+            }
+            return;
+        } else if (response.is_streaming) {
             web_server_send_streaming_response(client_fd, &response);
         } else {
-            /* Send regular response */
             char* response_str = web_server_serialize_response(&response);
             if (response_str) {
                 send(client_fd, response_str, strlen(response_str), 0);
@@ -545,13 +561,29 @@ struct http_response web_server_process_request(struct web_server* server, const
     
     /* Check for WebSocket upgrade */
     if (web_server_is_websocket_upgrade(request)) {
-        response.status_code = 101;
-        web_server_strcpy_safe(response.header_keys[response.header_count], "Upgrade", sizeof(response.header_keys[response.header_count]));
-        web_server_strcpy_safe(response.header_values[response.header_count], "websocket", sizeof(response.header_values[response.header_count]));
-        response.header_count++;
-        web_server_strcpy_safe(response.header_keys[response.header_count], "Connection", sizeof(response.header_keys[response.header_count]));
-        web_server_strcpy_safe(response.header_values[response.header_count], "Upgrade", sizeof(response.header_values[response.header_count]));
-        response.header_count++;
+        const char *ws_key = NULL;
+        char accept_key[64];
+        int hi;
+
+        for (hi = 0; hi < request->header_count; hi++) {
+            if (web_server_strcasecmp(request->header_keys[hi], "Sec-WebSocket-Key") == 0) {
+                ws_key = request->header_values[hi];
+                break;
+            }
+        }
+
+        if (ws_key && ws_compute_accept_key(ws_key, accept_key, sizeof(accept_key)) == 0) {
+            response.status_code = 101;
+            web_server_strcpy_safe(response.header_keys[response.header_count], "Upgrade", sizeof(response.header_keys[response.header_count]));
+            web_server_strcpy_safe(response.header_values[response.header_count], "websocket", sizeof(response.header_values[response.header_count]));
+            response.header_count++;
+            web_server_strcpy_safe(response.header_keys[response.header_count], "Connection", sizeof(response.header_keys[response.header_count]));
+            web_server_strcpy_safe(response.header_values[response.header_count], "Upgrade", sizeof(response.header_values[response.header_count]));
+            response.header_count++;
+            web_server_strcpy_safe(response.header_keys[response.header_count], "Sec-WebSocket-Accept", sizeof(response.header_keys[response.header_count]));
+            web_server_strcpy_safe(response.header_values[response.header_count], accept_key, sizeof(response.header_values[response.header_count]));
+            response.header_count++;
+        }
         return response;
     }
     
@@ -1357,21 +1389,21 @@ void web_server_add_websocket_route(struct web_server* server, const char* path,
 }
 
 void web_server_broadcast_to_websockets(struct web_server* server, const char* message) {
-    if (!server || !message) return;
-    
     int i;
+    if (!server || !message) return;
+
     for (i = 0; i < server->websocket_count; i++) {
         int fd = server->websocket_connections[i];
-        if (send(fd, message, strlen(message), 0) < 0) {
-            /* Connection closed, remove it */
+        if (ws_send_text(fd, message) != 0) {
             close(fd);
-            /* Shift remaining connections */
-            int j;
-            for (j = i; j < server->websocket_count - 1; j++) {
-                server->websocket_connections[j] = server->websocket_connections[j + 1];
+            {
+                int j;
+                for (j = i; j < server->websocket_count - 1; j++) {
+                    server->websocket_connections[j] = server->websocket_connections[j + 1];
+                }
             }
             server->websocket_count--;
-            i--; /* Check this index again */
+            i--;
         }
     }
 }

@@ -25,7 +25,10 @@ metrics.o: metrics.c metrics.h
 metrics_server.o: metrics_server.c metrics_server.h metrics.h logger.h
 	gcc metrics_server.c -o metrics_server.o -c $(CFLAGS) -lpthread
 
-web_server.o: web_server.c web_server.h config.h logger.h metrics.h health_monitor.h
+websocket.o: websocket.c websocket.h
+	gcc websocket.c -o websocket.o -c $(CFLAGS)
+
+web_server.o: web_server.c web_server.h websocket.h config.h logger.h metrics.h health_monitor.h
 	gcc web_server.c -o web_server.o -c $(CFLAGS)
 
 baresip_interface.o: baresip_interface.c baresip_interface.h
@@ -62,8 +65,8 @@ plugins/fortune_teller.o: plugins/fortune_teller.c plugins.h
 plugins/jukebox.o: plugins/jukebox.c plugins.h
 	gcc plugins/jukebox.c -o plugins/jukebox.o -c $(C99_CFLAGS) -lpthread
 
-daemon: daemon.o daemon_state.o millennium_sdk.o baresip_interface.o events.o event_processor.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o plugins.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o state_persistence.o display_manager.o
-	gcc daemon.o daemon_state.o millennium_sdk.o baresip_interface.o events.o event_processor.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o plugins.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o state_persistence.o display_manager.o -o daemon $(LDFLAGS)
+daemon: daemon.o daemon_state.o millennium_sdk.o baresip_interface.o events.o event_processor.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o websocket.o plugins.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o state_persistence.o display_manager.o
+	gcc daemon.o daemon_state.o millennium_sdk.o baresip_interface.o events.o event_processor.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o websocket.o plugins.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o state_persistence.o display_manager.o -o daemon $(LDFLAGS)
 
 # Simulator object file (uses C99 for mixed declarations)
 simulator.o: simulator.c millennium_sdk.h events.h config.h daemon_state.h logger.h metrics.h plugins.h
@@ -84,7 +87,7 @@ simulator: $(SIM_OBJS)
 all: daemon
 
 # Unit test binary
-UNIT_TEST_OBJS = tests/unit_tests.o daemon_state.o events.o event_processor.o config.o logger.o metrics.o plugins.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o state_persistence.o
+UNIT_TEST_OBJS = tests/unit_tests.o daemon_state.o events.o event_processor.o config.o logger.o metrics.o plugins.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o state_persistence.o display_manager.o
 
 tests/unit_tests.o: tests/unit_tests.c tests/test_framework.h config.h daemon_state.h plugins.h logger.h metrics.h millennium_sdk.h
 	gcc tests/unit_tests.c -o tests/unit_tests.o -c $(C99_CFLAGS) -I.

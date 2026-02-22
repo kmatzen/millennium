@@ -77,6 +77,7 @@ static int is_phone_ready_for_operation(void);
 static int keypad_has_space(void);
 static health_status_t check_serial_connection(void);
 static void daemon_save_state(void);
+static void daemon_broadcast_state(const char *event_type);
 static health_status_t check_sip_connection(void);
 static health_status_t check_daemon_activity(void);
 static void update_metrics(void);
@@ -260,6 +261,29 @@ static void daemon_save_state(void) {
     state_persistence_save(&ps, state_file_path);
 }
 
+static void daemon_broadcast_state(const char *event_type) {
+    char msg[512];
+    const char *state_str;
+    const char *plugin_name;
+
+    if (!web_server || !daemon_state) return;
+
+    pthread_mutex_lock(&daemon_state_mutex);
+    state_str = daemon_state_to_string(daemon_state->current_state);
+    plugin_name = plugins_get_active_name();
+    snprintf(msg, sizeof(msg),
+        "{\"event\":\"%s\",\"state\":\"%s\",\"coins\":%d,"
+        "\"keypad\":\"%s\",\"plugin\":\"%s\"}",
+        event_type ? event_type : "update",
+        state_str ? state_str : "UNKNOWN",
+        daemon_state->inserted_cents,
+        daemon_state->keypad_buffer,
+        plugin_name ? plugin_name : "");
+    pthread_mutex_unlock(&daemon_state_mutex);
+
+    web_server_broadcast_to_websockets(web_server, msg);
+}
+
 void handle_coin_event(coin_event_t *coin_event) {
     if (!coin_event) {
         logger_error_with_category("Coin", "Received null coin event");
@@ -305,6 +329,7 @@ void handle_coin_event(coin_event_t *coin_event) {
         if (coin_value > 0) {
             plugins_handle_coin(coin_value, coin_code_str);
             daemon_save_state();
+            daemon_broadcast_state("coin");
         }
     }
     
@@ -348,6 +373,7 @@ void handle_call_state_event(call_state_event_t *call_state_event) {
     plugins_handle_call_state(call_state_event_get_state(call_state_event));
     
     daemon_save_state();
+    daemon_broadcast_state("call_state");
 
     /* Handle coin validator commands outside of mutex */
     if (call_state_event_get_state(call_state_event) == EVENT_CALL_STATE_INCOMING) {
@@ -432,6 +458,7 @@ void handle_hook_event(hook_state_change_event_t *hook_event) {
     }
 
     daemon_save_state();
+    daemon_broadcast_state("hook");
 }
 
 void handle_keypad_event(keypad_event_t *keypad_event) {
@@ -461,6 +488,7 @@ void handle_keypad_event(keypad_event_t *keypad_event) {
         if (isdigit(key)) {
             plugins_handle_keypad(key);
         }
+        daemon_broadcast_state("keypad");
     }
 }
 
