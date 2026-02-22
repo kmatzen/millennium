@@ -10,6 +10,7 @@
 #include "../config.h"
 #include "../metrics.h"
 #include "../display_manager.h"
+#include "../audio_tones.h"
 
 /* Classic phone plugin data */
 typedef struct {
@@ -51,9 +52,10 @@ static void classic_phone_tick(void);
 static int classic_phone_handle_coin(int coin_value, const char *coin_code) {
     /* Only accept coins when phone is ready for operation (IDLE_UP state) */
     if (coin_value > 0 && daemon_state && daemon_state->current_state == DAEMON_STATE_IDLE_UP) {
+        audio_tones_play_coin_tone();
         classic_phone_data.inserted_cents += coin_value;
         classic_phone_data.last_activity = time(NULL);
-        
+
         classic_phone_update_display();
         classic_phone_check_and_call();
         
@@ -70,9 +72,9 @@ static int classic_phone_handle_keypad(char key) {
         return 0;
     }
     
-    /* Only accept keypad input when phone is ready for operation (IDLE_UP state) and has space */
-    if (isdigit(key) && daemon_state && daemon_state->current_state == DAEMON_STATE_IDLE_UP && 
+    if (isdigit(key) && daemon_state && daemon_state->current_state == DAEMON_STATE_IDLE_UP &&
         classic_phone_data.keypad_length < 10) {
+        audio_tones_play_dtmf(key);
         classic_phone_add_key(key);
         classic_phone_data.last_activity = time(NULL);
         classic_phone_update_display();
@@ -84,22 +86,23 @@ static int classic_phone_handle_keypad(char key) {
 static int classic_phone_handle_hook(int hook_up, int hook_down) {
     if (hook_up) {
         if (classic_phone_data.is_in_call) {
-            /* Incoming call - daemon will handle answering, just update our state */
             logger_info_with_category("ClassicPhone", "Handset lifted during incoming call");
+            audio_tones_stop();
             classic_phone_data.call_start_time = time(NULL);
             classic_phone_update_display();
         } else {
-            /* Start new call session */
+            /* Start new call session — play dial tone */
             classic_phone_data.inserted_cents = 0;
             classic_phone_data.keypad_length = 0;
             classic_phone_data.last_activity = time(NULL);
+            audio_tones_play_dial_tone();
             classic_phone_update_display();
         }
     } else if (hook_down) {
-        /* Always clear keypad and reset coins on hook down, like original daemon */
+        audio_tones_stop();
         classic_phone_data.keypad_length = 0;
         classic_phone_data.inserted_cents = 0;
-        
+
         if (classic_phone_data.is_in_call) {
             classic_phone_end_call();
         } else {
@@ -116,13 +119,13 @@ static int classic_phone_handle_call_state(int call_state) {
     logger_info_with_category("ClassicPhone", log_msg);
     
     if (call_state == EVENT_CALL_STATE_INCOMING) {
-        /* Handle incoming call - show "Call incoming..." like original daemon */
+        audio_tones_stop();
         classic_phone_data.is_in_call = 1;
         classic_phone_data.call_start_time = time(NULL);
         classic_phone_update_display();
         logger_info_with_category("ClassicPhone", "Incoming call received");
     } else if (call_state == EVENT_CALL_STATE_ACTIVE) {
-        /* Handle call established - show "Call active" and "Audio connected" like original daemon */
+        audio_tones_stop();
         classic_phone_data.is_in_call = 1;
         classic_phone_data.call_start_time = time(NULL);
         classic_phone_update_display();
