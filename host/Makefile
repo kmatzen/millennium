@@ -49,14 +49,17 @@ state_persistence.o: state_persistence.c state_persistence.h daemon_state.h logg
 display_manager.o: display_manager.c display_manager.h millennium_sdk.h
 	gcc display_manager.c -o display_manager.o -c $(CFLAGS)
 
-daemon.o: daemon.c millennium_sdk.h events.h event_processor.h config.h logger.h health_monitor.h metrics.h metrics_server.h web_server.h plugins.h state_persistence.h display_manager.h
+audio_tones.o: audio_tones.c audio_tones.h logger.h
+	gcc audio_tones.c -o audio_tones.o -c $(CFLAGS) -lm
+
+daemon.o: daemon.c millennium_sdk.h events.h event_processor.h config.h logger.h health_monitor.h metrics.h metrics_server.h web_server.h plugins.h state_persistence.h display_manager.h audio_tones.h
 	gcc daemon.c -o daemon.o -c $(CFLAGS)
 
 # Executables
 plugins.o: plugins.c plugins.h
 	gcc plugins.c -o plugins.o -c $(CFLAGS)
 
-plugins/classic_phone.o: plugins/classic_phone.c plugins.h
+plugins/classic_phone.o: plugins/classic_phone.c plugins.h audio_tones.h
 	gcc plugins/classic_phone.c -o plugins/classic_phone.o -c $(CFLAGS)
 
 plugins/fortune_teller.o: plugins/fortune_teller.c plugins.h
@@ -65,8 +68,8 @@ plugins/fortune_teller.o: plugins/fortune_teller.c plugins.h
 plugins/jukebox.o: plugins/jukebox.c plugins.h
 	gcc plugins/jukebox.c -o plugins/jukebox.o -c $(C99_CFLAGS) -lpthread
 
-daemon: daemon.o daemon_state.o millennium_sdk.o baresip_interface.o events.o event_processor.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o websocket.o plugins.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o state_persistence.o display_manager.o
-	gcc daemon.o daemon_state.o millennium_sdk.o baresip_interface.o events.o event_processor.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o websocket.o plugins.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o state_persistence.o display_manager.o -o daemon $(LDFLAGS)
+daemon: daemon.o daemon_state.o millennium_sdk.o baresip_interface.o events.o event_processor.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o websocket.o plugins.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o state_persistence.o display_manager.o audio_tones.o
+	gcc daemon.o daemon_state.o millennium_sdk.o baresip_interface.o events.o event_processor.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o websocket.o plugins.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o state_persistence.o display_manager.o audio_tones.o -o daemon $(LDFLAGS) -lm
 
 # Simulator object file (uses C99 for mixed declarations)
 simulator.o: simulator.c millennium_sdk.h events.h config.h daemon_state.h logger.h metrics.h plugins.h

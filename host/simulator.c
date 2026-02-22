@@ -9,6 +9,7 @@
 #include "plugins.h"
 #include "state_persistence.h"
 #include "display_manager.h"
+#include "audio_tones.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -197,6 +198,17 @@ void millennium_client_write_command(millennium_client_t *c, uint8_t cmd,
                                      const uint8_t *data, size_t sz) {
     (void)c; (void)cmd; (void)data; (void)sz;
 }
+
+/* Audio tone stubs */
+void audio_tones_init(void) {}
+void audio_tones_cleanup(void) {}
+void audio_tones_play_dial_tone(void) { fprintf(stderr, "[TONE] Dial tone\n"); }
+void audio_tones_play_dtmf(char key) { fprintf(stderr, "[TONE] DTMF %c\n", key); }
+void audio_tones_play_ringback(void) { fprintf(stderr, "[TONE] Ringback\n"); }
+void audio_tones_play_busy_tone(void) { fprintf(stderr, "[TONE] Busy\n"); }
+void audio_tones_play_coin_tone(void) { fprintf(stderr, "[TONE] Coin\n"); }
+void audio_tones_stop(void) { fprintf(stderr, "[TONE] Stop\n"); }
+int audio_tones_is_playing(void) { return 0; }
 
 void millennium_client_process_event_buffer(millennium_client_t *c) { (void)c; }
 
