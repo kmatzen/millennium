@@ -7,6 +7,7 @@
 #include "metrics.h"
 #include "event_processor.h"
 #include "plugins.h"
+#include "state_persistence.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -550,6 +551,39 @@ static int run_scenario(const char *path) {
                     daemon_state_to_string(daemon_state->current_state),
                     daemon_state->inserted_cents,
                     sim_display_line1, sim_display_line2);
+        }
+
+        /* ── save_state <filepath> ─────────────────────────────── */
+        else if (strncmp(cmd, "save_state ", 11) == 0) {
+            persisted_state_t ps;
+            arg = trim(cmd + 11);
+            ps.inserted_cents = daemon_state->inserted_cents;
+            ps.last_state = (int)daemon_state->current_state;
+            strncpy(ps.active_plugin,
+                    plugins_get_active_name() ? plugins_get_active_name() : "",
+                    sizeof(ps.active_plugin) - 1);
+            ps.active_plugin[sizeof(ps.active_plugin) - 1] = '\0';
+            state_persistence_save(&ps, arg);
+        }
+
+        /* ── load_state <filepath> ─────────────────────────────── */
+        else if (strncmp(cmd, "load_state ", 11) == 0) {
+            persisted_state_t ps;
+            arg = trim(cmd + 11);
+            if (state_persistence_load(&ps, arg) == 0) {
+                daemon_state->inserted_cents = ps.inserted_cents;
+                daemon_state->current_state = (daemon_state_t)ps.last_state;
+                if (strlen(ps.active_plugin) > 0) {
+                    plugins_activate(ps.active_plugin);
+                }
+                plugins_tick();
+                sim_drain_events();
+                fprintf(stderr, "  loaded: coins=%d plugin=%s last_state=%d\n",
+                        ps.inserted_cents, ps.active_plugin, ps.last_state);
+            } else {
+                fprintf(stderr, "  FAIL: could not load state from %s\n", arg);
+                failures++;
+            }
         }
 
         /* ── unknown ─────────────────────────────────────────────── */
