@@ -86,8 +86,8 @@ UNIT_TEST_OBJS = tests/unit_tests.o daemon_state.o events.o event_processor.o co
 tests/unit_tests.o: tests/unit_tests.c tests/test_framework.h config.h daemon_state.h plugins.h logger.h metrics.h millennium_sdk.h
 	gcc tests/unit_tests.c -o tests/unit_tests.o -c $(C99_CFLAGS) -I.
 
-# Link ALSA only on Linux (jukebox plugin uses it)
-UNIT_LDFLAGS = $(SIM_LDFLAGS)
+# Unit tests don't use time wrapping; link ALSA on Linux for jukebox
+UNIT_LDFLAGS = -lpthread
 ifeq ($(shell uname -s),Linux)
 UNIT_LDFLAGS += -lasound -lm
 endif
