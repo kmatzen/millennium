@@ -29,7 +29,7 @@ web_server.o: web_server.c web_server.h config.h logger.h metrics.h health_monit
 	gcc web_server.c -o web_server.o -c $(CFLAGS)
 
 baresip_interface.o: baresip_interface.c baresip_interface.h
-	gcc baresip_interface.c -o baresip_interface.o -c $(C99_CFLAGS)
+	gcc baresip_interface.c -o baresip_interface.o -c $(C99_CFLAGS) `pkg-config --cflags libre libbaresip`
 
 events.o: events.c events.h
 	gcc events.c -o events.o -c $(CFLAGS)

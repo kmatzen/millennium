@@ -46,7 +46,8 @@ int plugins_register(const char *name, const char *description,
                     keypad_handler_t keypad_handler,
                     hook_handler_t hook_handler,
                     call_state_handler_t call_state_handler,
-                    activation_handler_t activation_handler) {
+                    activation_handler_t activation_handler,
+                    tick_handler_t tick_handler) {
     if (plugin_count >= MAX_PLUGINS) {
         logger_error_with_category("Plugins", "Maximum number of plugins reached");
         return -1;
@@ -74,6 +75,7 @@ int plugins_register(const char *name, const char *description,
     plugins[plugin_count].handle_hook = hook_handler;
     plugins[plugin_count].handle_call_state = call_state_handler;
     plugins[plugin_count].handle_activation = activation_handler;
+    plugins[plugin_count].handle_tick = tick_handler;
     
     plugin_count++;
     
@@ -177,4 +179,13 @@ int plugins_handle_call_state(int call_state) {
         }
     }
     return -1; /* No active plugin or handler */
+}
+
+void plugins_tick(void) {
+    if (active_plugin_index >= 0 && active_plugin_index < plugin_count) {
+        plugin_t *active_plugin = &plugins[active_plugin_index];
+        if (active_plugin->handle_tick) {
+            active_plugin->handle_tick();
+        }
+    }
 }

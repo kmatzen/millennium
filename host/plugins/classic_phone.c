@@ -8,6 +8,7 @@
 #include "../logger.h"
 #include "../millennium_sdk.h"
 #include "../config.h"
+#include "../metrics.h"
 
 /* Classic phone plugin data */
 typedef struct {
@@ -29,6 +30,9 @@ static classic_phone_data_t classic_phone_data = {0};
 extern daemon_state_data_t *daemon_state;
 extern millennium_client_t *client;
 
+/* Seconds remaining at which the countdown appears on the display */
+#define TIMEOUT_WARNING_SECONDS 60
+
 /* Internal functions */
 static void classic_phone_update_display(void);
 static void classic_phone_clear_keypad(void);
@@ -40,6 +44,7 @@ static void classic_phone_check_and_call(void);
 static void classic_phone_start_call(void);
 static void classic_phone_end_call(void);
 static void classic_phone_format_number(const char* buffer, char *output);
+static void classic_phone_tick(void);
 
 /* Classic phone event handlers */
 static int classic_phone_handle_coin(int coin_value, const char *coin_code) {
@@ -299,6 +304,60 @@ static void classic_phone_format_number(const char* buffer, char *output) {
 }
 
 
+static void classic_phone_tick(void) {
+    int remaining;
+    int minutes;
+    int seconds;
+    char line1[21];
+    char line2[21];
+    char display_bytes[100];
+    size_t pos;
+    int i;
+
+    if (!classic_phone_data.is_in_call) {
+        return;
+    }
+    if (classic_phone_data.call_timeout_seconds <= 0) {
+        return;
+    }
+    if (classic_phone_data.call_start_time == 0) {
+        return;
+    }
+
+    remaining = classic_phone_data.call_timeout_seconds
+              - (int)(time(NULL) - classic_phone_data.call_start_time);
+
+    if (remaining <= 0) {
+        logger_info_with_category("ClassicPhone",
+                                  "Call timeout reached, ending call");
+        metrics_increment_counter("calls_timed_out", 1);
+        classic_phone_end_call();
+        return;
+    }
+
+    if (remaining > TIMEOUT_WARNING_SECONDS) {
+        return;
+    }
+
+    minutes = remaining / 60;
+    seconds = remaining % 60;
+
+    strcpy(line1, "Call active");
+    sprintf(line2, "%d:%02d remaining", minutes, seconds);
+
+    pos = 0;
+    for (i = 0; i < 20 && pos < sizeof(display_bytes) - 2; i++) {
+        display_bytes[pos++] = (i < (int)strlen(line1)) ? line1[i] : ' ';
+    }
+    display_bytes[pos++] = 0x0A;
+    for (i = 0; i < 20 && pos < sizeof(display_bytes) - 1; i++) {
+        display_bytes[pos++] = (i < (int)strlen(line2)) ? line2[i] : ' ';
+    }
+    display_bytes[pos] = '\0';
+
+    millennium_client_set_display(client, display_bytes);
+}
+
 /* Plugin registration function */
 void register_classic_phone_plugin(void) {
     /* Initialize plugin data */
@@ -316,5 +375,6 @@ void register_classic_phone_plugin(void) {
                     classic_phone_handle_keypad,
                     classic_phone_handle_hook,
                     classic_phone_handle_call_state,
-                    classic_phone_on_activation);
+                    classic_phone_on_activation,
+                    classic_phone_tick);
 }
