@@ -8,6 +8,7 @@
 #include "../plugins.h"
 #include "../logger.h"
 #include "../millennium_sdk.h"
+#include "../display_manager.h"
 
 /* ALSA support - only on Linux */
 #ifdef __linux__
@@ -181,78 +182,18 @@ static void jukebox_show_welcome(void) {
         strcpy(line2, "to play music");
     }
     
-    char display_bytes[100];
-    size_t pos = 0;
-    int i;
-    
-    /* Add line1, padded or truncated to 20 characters */
-    for (i = 0; i < 20 && pos < sizeof(display_bytes) - 2; i++) {
-        display_bytes[pos++] = (i < (int)strlen(line1)) ? line1[i] : ' ';
-    }
-    
-    /* Add line feed */
-    display_bytes[pos++] = 0x0A;
-    
-    /* Add line2, padded or truncated to 20 characters */
-    for (i = 0; i < 20 && pos < sizeof(display_bytes) - 1; i++) {
-        display_bytes[pos++] = (i < (int)strlen(line2)) ? line2[i] : ' ';
-    }
-    
-    /* Null terminate */
-    display_bytes[pos] = '\0';
-    
-    millennium_client_set_display(client, display_bytes);
+    display_manager_set_text(line1, line2);
 }
 
 static void jukebox_show_menu(void) {
-    char display_bytes[100];
-    size_t pos = 0;
-    int i;
-    
-    /* Add line1, padded or truncated to 20 characters */
-    for (i = 0; i < 20 && pos < sizeof(display_bytes) - 2; i++) {
-        display_bytes[pos++] = (i < 10) ? "Select Song"[i] : ' ';
-    }
-    
-    /* Add line feed */
-    display_bytes[pos++] = 0x0A;
-    
-    /* Add line2, padded or truncated to 20 characters */
-    for (i = 0; i < 20 && pos < sizeof(display_bytes) - 1; i++) {
-        display_bytes[pos++] = (i < 7) ? "1-9 Keys"[i] : ' ';
-    }
-    
-    /* Null terminate */
-    display_bytes[pos] = '\0';
-    
-    millennium_client_set_display(client, display_bytes);
+    display_manager_set_text("Select Song", "1-9 Keys");
 }
 
 static void jukebox_show_playing(void) {
     if (jukebox_data.selected_song >= 0 && jukebox_data.selected_song < (int)NUM_SONGS) {
         const song_info_t *song = &songs[jukebox_data.selected_song];
         
-        char display_bytes[100];
-        size_t pos = 0;
-        int i;
-        
-        /* Add line1: Song title, padded or truncated to 20 characters */
-        for (i = 0; i < 20 && pos < sizeof(display_bytes) - 2; i++) {
-            display_bytes[pos++] = (i < (int)strlen(song->title)) ? song->title[i] : ' ';
-        }
-        
-        /* Add line feed */
-        display_bytes[pos++] = 0x0A;
-        
-        /* Add line2: Artist name, padded or truncated to 20 characters */
-        for (i = 0; i < 20 && pos < sizeof(display_bytes) - 1; i++) {
-            display_bytes[pos++] = (i < (int)strlen(song->artist)) ? song->artist[i] : ' ';
-        }
-        
-        /* Null terminate */
-        display_bytes[pos] = '\0';
-        
-        millennium_client_set_display(client, display_bytes);
+        display_manager_set_text(song->title, song->artist);
     }
 }
 

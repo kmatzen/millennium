@@ -11,6 +11,7 @@
 #include "event_processor.h"
 #include "plugins.h"
 #include "state_persistence.h"
+#include "display_manager.h"
 #include <signal.h>
 #include <string.h>
 #include <stdio.h>
@@ -807,6 +808,7 @@ int main(int argc, char *argv[]) {
     
     /* Initialize client */
     client = millennium_client_create();
+    display_manager_init(client);
     
     /* Initialize health monitoring */
     health_monitor_register_check("serial_connection", check_serial_connection, 30);
@@ -910,6 +912,7 @@ int main(int argc, char *argv[]) {
         if (++loop_count % 1000 == 0) {
             update_metrics();
             plugins_tick();
+            display_manager_tick();
         }
         
         /* Log metrics summary every 10000 loops (about every 10 seconds) at DEBUG level */

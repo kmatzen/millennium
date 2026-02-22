@@ -7,6 +7,7 @@
 #include "../plugins.h"
 #include "../logger.h"
 #include "../millennium_sdk.h"
+#include "../display_manager.h"
 
 /* Fortune teller plugin data */
 typedef struct {
@@ -162,75 +163,15 @@ static void fortune_teller_show_welcome(void) {
         strcpy(line2, "for your fortune");
     }
     
-    char display_bytes[100];
-    size_t pos = 0;
-    int i;
-    
-    /* Add line1, padded or truncated to 20 characters */
-    for (i = 0; i < 20 && pos < sizeof(display_bytes) - 2; i++) {
-        display_bytes[pos++] = (i < (int)strlen(line1)) ? line1[i] : ' ';
-    }
-    
-    /* Add line feed */
-    display_bytes[pos++] = 0x0A;
-    
-    /* Add line2, padded or truncated to 20 characters */
-    for (i = 0; i < 20 && pos < sizeof(display_bytes) - 1; i++) {
-        display_bytes[pos++] = (i < (int)strlen(line2)) ? line2[i] : ' ';
-    }
-    
-    /* Null terminate */
-    display_bytes[pos] = '\0';
-    
-    millennium_client_set_display(client, display_bytes);
+    display_manager_set_text(line1, line2);
 }
 
 static void fortune_teller_show_menu(void) {
-    char display_bytes[100];
-    size_t pos = 0;
-    int i;
-    
-    /* Add line1, padded or truncated to 20 characters */
-    for (i = 0; i < 20 && pos < sizeof(display_bytes) - 2; i++) {
-        display_bytes[pos++] = (i < 12) ? "Choose Fortune"[i] : ' ';
-    }
-    
-    /* Add line feed */
-    display_bytes[pos++] = 0x0A;
-    
-    /* Add line2, padded or truncated to 20 characters */
-    for (i = 0; i < 20 && pos < sizeof(display_bytes) - 1; i++) {
-        display_bytes[pos++] = (i < 10) ? "1-5 Keys"[i] : ' ';
-    }
-    
-    /* Null terminate */
-    display_bytes[pos] = '\0';
-    
-    millennium_client_set_display(client, display_bytes);
+    display_manager_set_text("Choose Fortune", "1-5 Keys");
 }
 
 static void fortune_teller_show_reading(void) {
-    char display_bytes[100];
-    size_t pos = 0;
-    int i;
-    
-    /* Add line1, padded or truncated to 20 characters */
-    for (i = 0; i < 20 && pos < sizeof(display_bytes) - 2; i++) {
-        display_bytes[pos++] = (i < 7) ? "Reading"[i] : ' ';
-    }
-    
-    /* Add line feed */
-    display_bytes[pos++] = 0x0A;
-    
-    /* Add line2, padded or truncated to 20 characters */
-    for (i = 0; i < 20 && pos < sizeof(display_bytes) - 1; i++) {
-        display_bytes[pos++] = (i < 8) ? "Crystal..."[i] : ' ';
-    }
-    
-    /* Null terminate */
-    display_bytes[pos] = '\0';
-    
-    millennium_client_set_display(client, display_bytes);
+    display_manager_set_text("Reading", "Crystal...");
 }
 
 static void fortune_teller_give_fortune(void) {
@@ -242,28 +183,7 @@ static void fortune_teller_give_fortune(void) {
     const char* fortune = fortune_teller_get_random_fortune(fortune_teller_data.fortune_type);
     const char* category = fortune_categories[fortune_teller_data.fortune_type];
     
-    /* Show fortune category and text */
-    char display_bytes[100];
-    size_t pos = 0;
-    int i;
-    
-    /* Add line1: Category name, padded or truncated to 20 characters */
-    for (i = 0; i < 20 && pos < sizeof(display_bytes) - 2; i++) {
-        display_bytes[pos++] = (i < (int)strlen(category)) ? category[i] : ' ';
-    }
-    
-    /* Add line feed */
-    display_bytes[pos++] = 0x0A;
-    
-    /* Add line2: Fortune text, truncated to 20 characters */
-    for (i = 0; i < 20 && pos < sizeof(display_bytes) - 1; i++) {
-        display_bytes[pos++] = (i < (int)strlen(fortune)) ? fortune[i] : ' ';
-    }
-    
-    /* Null terminate */
-    display_bytes[pos] = '\0';
-    
-    millennium_client_set_display(client, display_bytes);
+    display_manager_set_text(category, fortune);
     
     /* Log the fortune */
     char log_msg[256];
