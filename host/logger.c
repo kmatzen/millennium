@@ -19,6 +19,9 @@ logger_data_t* logger_get_instance(void) {
             g_logger->log_to_console = 1;
             g_logger->log_to_file = 0;
             g_logger->file_stream = NULL;
+            g_logger->max_file_size = 0;
+            g_logger->max_rotated_files = 0;
+            g_logger->current_file_size = 0;
             g_logger->memory_logs_count = 0;
             g_logger->memory_logs_start = 0;
         }
@@ -49,6 +52,10 @@ void logger_set_log_file(const char* filename) {
         logger->file_stream = fopen(filename, "a");
         if (logger->file_stream == NULL) {
             logger->log_to_file = 0;
+            logger->current_file_size = 0;
+        } else {
+            fseek(logger->file_stream, 0, SEEK_END);
+            logger->current_file_size = ftell(logger->file_stream);
         }
     }
 }
@@ -74,12 +81,67 @@ void logger_set_log_to_file(int enable) {
         logger->file_stream = fopen(logger->log_file, "a");
         if (logger->file_stream == NULL) {
             logger->log_to_file = 0;
+            logger->current_file_size = 0;
+        } else {
+            fseek(logger->file_stream, 0, SEEK_END);
+            logger->current_file_size = ftell(logger->file_stream);
         }
     } else {
         if (logger->file_stream != NULL) {
             fclose(logger->file_stream);
             logger->file_stream = NULL;
         }
+    }
+}
+
+void logger_set_rotation(long max_file_size, int max_rotated_files) {
+    logger_data_t* logger = logger_get_instance();
+    if (logger == NULL) {
+        return;
+    }
+    logger->max_file_size = max_file_size;
+    logger->max_rotated_files = (max_rotated_files > 0) ? max_rotated_files : 0;
+}
+
+static void logger_rotate_files(logger_data_t* logger) {
+    char src_path[512];
+    char dst_path[512];
+    int i;
+
+    if (logger->file_stream != NULL) {
+        fclose(logger->file_stream);
+        logger->file_stream = NULL;
+    }
+
+    /* Delete the oldest rotated file if it exists */
+    snprintf(dst_path, sizeof(dst_path), "%s.%d", logger->log_file, logger->max_rotated_files);
+    remove(dst_path);
+
+    /* Shift rotated files: .N-1 -> .N, .N-2 -> .N-1, ... .1 -> .2 */
+    for (i = logger->max_rotated_files - 1; i >= 1; i--) {
+        snprintf(src_path, sizeof(src_path), "%s.%d", logger->log_file, i);
+        snprintf(dst_path, sizeof(dst_path), "%s.%d", logger->log_file, i + 1);
+        rename(src_path, dst_path);
+    }
+
+    /* Rotate current log file to .1 */
+    snprintf(dst_path, sizeof(dst_path), "%s.1", logger->log_file);
+    rename(logger->log_file, dst_path);
+
+    /* Reopen a fresh log file */
+    logger->file_stream = fopen(logger->log_file, "a");
+    logger->current_file_size = 0;
+    if (logger->file_stream == NULL) {
+        logger->log_to_file = 0;
+    }
+}
+
+static void logger_check_rotation(logger_data_t* logger) {
+    if (logger->max_file_size <= 0 || logger->max_rotated_files <= 0) {
+        return;
+    }
+    if (logger->current_file_size >= logger->max_file_size) {
+        logger_rotate_files(logger);
     }
 }
 
@@ -166,8 +228,12 @@ void logger_write_log(log_level_t level, const char* category, const char* messa
     
     /* Output to file */
     if (logger->log_to_file && logger->file_stream != NULL) {
-        fprintf(logger->file_stream, "%s\n", formatted_message);
+        int written = fprintf(logger->file_stream, "%s\n", formatted_message);
         fflush(logger->file_stream);
+        if (written > 0) {
+            logger->current_file_size += written;
+        }
+        logger_check_rotation(logger);
     }
 }
 

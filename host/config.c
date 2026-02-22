@@ -311,6 +311,14 @@ int config_get_log_to_file(const config_data_t* config) {
     return config_get_bool(config, "logging.to_file", 0);
 }
 
+int config_get_log_max_size_bytes(const config_data_t* config) {
+    return config_get_int(config, "logging.max_size_bytes", 1048576);
+}
+
+int config_get_log_max_files(const config_data_t* config) {
+    return config_get_int(config, "logging.max_files", 5);
+}
+
 /* System Configuration */
 int config_get_update_interval_ms(const config_data_t* config) {
     return config_get_int(config, "system.update_interval_ms", 33);

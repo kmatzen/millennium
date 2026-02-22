@@ -751,6 +751,9 @@ int main(int argc, char *argv[]) {
     
     /* Setup logging */
     logger_set_level(logger_parse_level(config_get_log_level(config)));
+    logger_set_rotation(
+        (long)config_get_log_max_size_bytes(config),
+        config_get_log_max_files(config));
     if (config_get_log_to_file(config) && strlen(config_get_log_file(config)) > 0) {
         fprintf(stderr, "Logging to %s\n", config_get_log_file(config));
         logger_set_log_file(config_get_log_file(config));
