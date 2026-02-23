@@ -72,8 +72,6 @@ static void handle_keypad_event(keypad_event_t *keypad_event);
 static void handle_card_event(card_event_t *card_event);
 /* send_control_command is declared in web_server.h */
 static void generate_display_bytes(char *output, size_t output_size);
-static void format_number(const char* buffer, char *output);
-static void generate_message(int inserted, char *output);
 static void update_display(void);
 static int is_phone_ready_for_operation(void);
 static int keypad_has_space(void);
@@ -150,45 +148,6 @@ void generate_display_bytes(char *output, size_t output_size) {
     output[pos] = '\0';
 }
 
-void format_number(const char* buffer, char *output) {
-    char filled[11] = "__________";  /* 10 underscores + null terminator */
-    int len;
-    int i;
-    
-    if (!buffer || !output) {
-        return;
-    }
-    
-    len = strlen(buffer);
-    
-    for (i = 0; i < len && i < 10; i++) {
-        filled[i] = buffer[i];
-    }
-    
-    snprintf(output, 21, "(%c%c%c) %c%c%c-%c%c%c%c",
-             filled[0], filled[1], filled[2],
-             filled[3], filled[4], filled[5],
-             filled[6], filled[7], filled[8], filled[9]);
-}
-
-void generate_message(int inserted, char *output) {
-    if (!output) {
-        return;
-    }
-    
-    int cost_cents = config_get_call_cost_cents(config_get_instance());
-    int remaining = cost_cents - inserted;
-    
-    /* Ensure remaining is not negative */
-    if (remaining < 0) {
-        remaining = 0;
-    }
-    
-    snprintf(output, 32, "Insert %02d cents", remaining);
-    
-    logger_debugf_with_category("Display", "Generated message: %s", output);
-}
-
 /* Helper function to safely copy strings with bounds checking */
 static void safe_strcpy(char *dest, const char *src, size_t dest_size) {
     if (!dest || dest_size == 0) return;
@@ -222,18 +181,6 @@ static void update_display_with_content(const char *line1_content, const char *l
     safe_strcpy(line2, line2_content, sizeof(line2));
     update_display();
 }
-
-/* Helper function to update display with keypad and coin information */
-static void update_display_with_state(void) {
-    if (!daemon_state) return;
-    
-    char formatted_number[32];
-    char message[32];
-    format_number(daemon_state->keypad_buffer, formatted_number);
-    generate_message(daemon_state->inserted_cents, message);
-    update_display_with_content(formatted_number, message);
-}
-
 
 /* Helper function to validate phone state for operations */
 static int is_phone_ready_for_operation(void) {
