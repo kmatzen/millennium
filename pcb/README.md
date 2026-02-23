@@ -72,9 +72,9 @@ eliminating the crosstalk present in the v4 LM386 design.
 | R3    | 1kΩ resistor                  | 1   | Axial                            | Power LED current limit          |
 | C_inA | 100nF ceramic                 | 1   | Axial L3.8mm THT                 | TDA2822 ch A input coupling      |
 | C_inB | 100nF ceramic                 | 1   | Axial L3.8mm THT                 | TDA2822 ch B input coupling      |
-| C_outA| 100µF 16V electrolytic        | 1   | Radial D8mm P2.0mm               | TDA2822 ch A output coupling     |
-| C_outB| 100µF 16V electrolytic        | 1   | Radial D8mm P2.0mm               | TDA2822 ch B output coupling     |
-| C_vcc | 100µF 16V electrolytic        | 1   | Radial D8mm P2.0mm               | TDA2822 Vcc bypass               |
+| C_outA| 100µF 16V electrolytic        | 1   | Radial D8mm P3.8mm                | TDA2822 ch A output coupling     |
+| C_outB| 100µF 16V electrolytic        | 1   | Radial D8mm P3.8mm                | TDA2822 ch B output coupling     |
+| C_vcc | 100µF 16V electrolytic        | 1   | Radial D8mm P3.8mm                | TDA2822 Vcc bypass               |
 | C_ripple | 4.7µF electrolytic         | 1   | Radial D5mm P2.0mm               | TDA2822 ripple rejection         |
 | C_dec | 100nF ceramic                 | 1   | Axial L3.8mm THT                 | TDA2822 Vcc decoupling           |
 | C-*   | 100nF ceramic                 | 5   | Axial L3.8mm THT                 | Decoupling (see below)           |

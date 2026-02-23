@@ -96,13 +96,15 @@ Output includes: component table, net labels, BOM vs schematic comparison, docum
 
 ## Capacitor Package Audit (see #83)
 
-Aligned BOM and README with schematic footprints (THT priority):
+Aligned BOM, README, schematic with Digi-Key availability research:
 
 | Ref | Value | Footprint | Notes |
 |-----|-------|-----------|-------|
-| C_outA, C_outB, C_vcc | 100µF 16V | CP_Radial_D8.0mm_P2.00mm | Was P3.80mm in BOM |
-| C_ripple | 4.7µF | CP_Radial_D5.0mm_P2.00mm | Consistent |
-| C_inA, C_inB, C_dec, C-* | 100nF | C_Axial_L3.8mm_D2.6mm_P7.50mm | Was C_Small/0603; THT |
+| C_outA, C_outB, C_vcc | 100µF 16V | CP_Radial_D8.0mm_P3.80mm | P2mm uncommon for 8mm; P3.8mm matches PCB, Digi-Key stock |
+| C_ripple | 4.7µF | CP_Radial_D5.0mm_P2.00mm | Standard 5×11mm; readily available |
+| C_inA, C_inB, C_dec, C-* | 100nF | C_Axial_L3.8mm_D2.6mm_P7.50mm | KEMET C1046 etc.; THT available |
+
+**Digi-Key research:** 100µF 16V radial — common parts (Panasonic EEU-FC) use 6.3mm/2.5mm; 8mm parts typically 3.5–5mm pitch. Schematic had P2.00mm (not in KiCad lib); PCB uses P3.80mm. Restored P3.80mm for availability.
 
 ---
 
