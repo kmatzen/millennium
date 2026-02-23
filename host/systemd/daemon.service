@@ -13,10 +13,14 @@ ExecStartPre=/bin/bash -c 'until /bin/ping -c1 -W1 8.8.8.8 >/dev/null 2>/dev/nul
 Restart=on-failure
 RestartSec=2
 WorkingDirectory=/tmp
-# Baresip/libre tries to use stdin for UI; systemd gives none. Redirect to avoid epoll errors.
+# Baresip/libre tries to use stdin for UI; systemd gives none.
 StandardInput=null
 StandardOutput=journal
 StandardError=journal
+# Relax hardening: epoll_ctl on fd 0 can fail with EPERM under default systemd
+PrivateDevices=no
+ProtectSystem=no
+NoNewPrivileges=no
 
 [Install]
 WantedBy=default.target
