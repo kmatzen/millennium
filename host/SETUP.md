@@ -118,13 +118,23 @@ Replace the phone number, provider hostname, and password with your actual SIP
 account details. The `transport=tls` and STUN server settings work well with
 Twilio but may differ for other providers.
 
-## 6. ALSA audio configuration
-
-The USB audio card needs a custom ALSA config to split stereo into independent
-mono channels for the handset earpiece and ringer speaker.
+## 6. Clone and build the daemon
 
 ```bash
-sudo cp ~/millennium/host/asoundrc.example /etc/asound.conf
+cd ~
+git clone https://github.com/kmatzen/millennium.git
+cd millennium/host
+make daemon
+```
+
+## 7. ALSA audio configuration
+
+The USB audio card needs a custom ALSA config to split stereo into independent
+mono channels for the handset earpiece and ringer speaker. From the `host/`
+directory (where you just ran `make daemon`):
+
+```bash
+sudo cp asoundrc.example /etc/asound.conf
 ```
 
 Verify the USB audio card is detected as card 1:
@@ -141,15 +151,6 @@ Test audio output:
 ```bash
 speaker-test -D out_left_solo -c1 -twav   # should play through ringer
 speaker-test -D out_right_solo -c1 -twav  # should play through handset
-```
-
-## 7. Clone and build the daemon
-
-```bash
-cd ~
-git clone https://github.com/kmatzen/millennium.git
-cd millennium/host
-make daemon
 ```
 
 ## 8. Configure the daemon

@@ -131,6 +131,7 @@ install: daemon
 	sudo mkdir -p /etc/millennium
 	sudo mkdir -p /var/log/millennium
 	sudo cp daemon.conf.example /etc/millennium/daemon.conf
+	sudo cp asoundrc.example /etc/asound.conf
 	sudo cp daemon /usr/local/bin/millennium-daemon
 	sudo cp systemd/daemon.service /etc/systemd/system/
 	sudo systemctl daemon-reload
