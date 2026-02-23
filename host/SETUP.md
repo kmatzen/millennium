@@ -190,21 +190,22 @@ sudo chown $USER:$USER /var/lib/millennium
 
 ## 10. Install the systemd service
 
-Copy the unit file and edit the paths to match your environment:
+**Development** (running from repo, no `make install`):
 
 ```bash
 mkdir -p ~/.config/systemd/user
-cp systemd/daemon.service ~/.config/systemd/user/
+cp systemd/daemon-dev.service ~/.config/systemd/user/daemon.service
 ```
 
-Edit `~/.config/systemd/user/daemon.service` and update paths as needed.
-Use `/etc/millennium/daemon.conf` for config (create with `sudo cp daemon.conf.example /etc/millennium/daemon.conf`).
-Add `StandardInput=null` to avoid baresip epoll errors when run as a service.
+`daemon-dev.service` uses `%h/millennium/host/daemon` (your home + repo path).
 
-```ini
-ExecStart=/home/YOUR_USER/millennium/host/daemon --config /etc/millennium/daemon.conf
-StandardInput=null
-WorkingDirectory=/home/YOUR_USER/millennium/host
+**Production** (after `make install`): use `daemon.service` which runs from `/usr/local/bin/millennium-daemon`.
+
+Either way, ensure `/etc/millennium/daemon.conf` exists:
+
+```bash
+sudo mkdir -p /etc/millennium
+sudo cp host/daemon.conf.example /etc/millennium/daemon.conf
 ```
 
 Then enable and start the service:
@@ -281,6 +282,13 @@ If you see:
 - **epoll_ctl: EPOLL_CTL_ADD: fd=0 (Operation not permitted)** — Baresip tries to use stdin for UI. Add to your systemd unit:
   ```ini
   StandardInput=null
+  ```
+
+- **No such file or directory** (for millennium-daemon) — You're running from the repo without `make install`. Use the dev service:
+  ```bash
+  cp systemd/daemon-dev.service ~/.config/systemd/user/daemon.service
+  systemctl --user daemon-reload
+  systemctl --user restart daemon.service
   ```
 
 - **Failed to open state file for writing** — Create the state directory and make it writable:
