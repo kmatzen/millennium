@@ -1030,9 +1030,9 @@ struct http_response web_server_handle_api_control(const struct http_request* re
         char* arg_quoted = strstr(request->body, "\"arg\":\"");
         char* arg_num = strstr(request->body, "\"arg\":");
         if (arg_quoted)
-            cents = atoi(arg_quoted + 8); /* "arg":"25" */
+            cents = atoi(arg_quoted + 7); /* "arg":" = 7 chars */
         else if (arg_num)
-            cents = atoi(arg_num + 6);    /* "arg":25 */
+            cents = atoi(arg_num + 6);    /* "arg": = 6 chars */
     }
     
     /* Parse plugin for plugin actions */
