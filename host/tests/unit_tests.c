@@ -388,6 +388,46 @@ static void test_plugins_duplicate_register(void) {
     plugins_cleanup();
 }
 
+/* ── Emergency number tests ────────────────────────────────────── */
+
+static void test_free_number_911(void) {
+    config_data_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    config_set_default_values(&cfg);
+    TEST_ASSERT_EQ_INT(1, config_is_free_number(&cfg, "911"));
+}
+
+static void test_free_number_311(void) {
+    config_data_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    config_set_default_values(&cfg);
+    TEST_ASSERT_EQ_INT(1, config_is_free_number(&cfg, "311"));
+}
+
+static void test_free_number_0(void) {
+    config_data_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    config_set_default_values(&cfg);
+    TEST_ASSERT_EQ_INT(1, config_is_free_number(&cfg, "0"));
+}
+
+static void test_not_free_number(void) {
+    config_data_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    config_set_default_values(&cfg);
+    TEST_ASSERT_EQ_INT(0, config_is_free_number(&cfg, "5551234567"));
+}
+
+static void test_free_number_custom(void) {
+    config_data_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    config_set_default_values(&cfg);
+    config_set_value(&cfg, "call.free_numbers", "211,411");
+    TEST_ASSERT_EQ_INT(1, config_is_free_number(&cfg, "211"));
+    TEST_ASSERT_EQ_INT(1, config_is_free_number(&cfg, "411"));
+    TEST_ASSERT_EQ_INT(0, config_is_free_number(&cfg, "911"));
+}
+
 /* ── Updater tests ─────────────────────────────────────────────── */
 
 static void test_version_compare_equal(void) {
@@ -454,6 +494,13 @@ int main(void) {
     TEST_SUITE_RUN(test_plugins_register_custom);
     TEST_SUITE_RUN(test_plugins_list);
     TEST_SUITE_RUN(test_plugins_duplicate_register);
+
+    TEST_SUITE_BEGIN("Emergency Numbers");
+    TEST_SUITE_RUN(test_free_number_911);
+    TEST_SUITE_RUN(test_free_number_311);
+    TEST_SUITE_RUN(test_free_number_0);
+    TEST_SUITE_RUN(test_not_free_number);
+    TEST_SUITE_RUN(test_free_number_custom);
 
     TEST_SUITE_BEGIN("Updater");
     TEST_SUITE_RUN(test_version_compare_equal);
