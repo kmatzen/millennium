@@ -58,7 +58,7 @@ version.o: version.c version.h
 	gcc version.c -o version.o -c $(CFLAGS) $(VERSION_CFLAGS)
 
 audio_tones.o: audio_tones.c audio_tones.h logger.h
-	gcc audio_tones.c -o audio_tones.o -c $(CFLAGS) -lm
+	gcc audio_tones.c -o audio_tones.o -c $(C99_CFLAGS) -lm
 
 updater.o: updater.c updater.h version.h logger.h
 	gcc updater.c -o updater.o -c $(CFLAGS)
