@@ -119,15 +119,25 @@ To regenerate from KiCad:
 
 ## Known Issues
 
-1. **Speaker output coupling (design flaw)**: The handset earpiece
-   (`speaker_receiver+/-`) and the front ringer speaker (`speaker_front+/-`)
-   share a coupled signal path on the PCB. Audio intended for one speaker
-   bleeds into the other. The ALSA configuration works around this in software
-   by routing left and right channels independently (`out_left_solo` /
-   `out_right_solo`), but crosstalk is still present at the hardware level.
-   A future PCB revision should fully isolate the two speaker output paths.
+1. **Speaker output coupling (design flaw, [#42](https://github.com/kmatzen/millennium/issues/42))**:
+   The handset earpiece (`speaker_receiver+/-`) and the front ringer speaker
+   (`speaker_front+/-`) share a coupled signal path on the PCB. Audio intended
+   for one speaker bleeds into the other. The ALSA configuration works around
+   this in software by routing left and right channels independently
+   (`out_left_solo` / `out_right_solo`), but crosstalk is still present at the
+   hardware level. A future PCB revision should fully isolate the two speaker
+   output paths.
 
-2. **No assembly drawing**: There is no board silkscreen diagram or assembly
+2. **Handset earpiece too quiet (design flaw, [#44](https://github.com/kmatzen/millennium/issues/44))**:
+   The handset earpiece (`speaker_receiver+/-`) is driven directly from the USB
+   audio card's line-level output with no amplification. The LM386 only amplifies
+   the front/ringer speaker path (`speaker_front_pre+/-`). Line-level output is
+   too low for comfortable handset volume. ALSA `softvol` provides up to +24 dB
+   of software gain as a workaround. A future PCB revision should add an
+   amplifier on the handset path (or use a dual-channel amp like TDA2822 to
+   solve both #42 and #44).
+
+3. **No assembly drawing**: There is no board silkscreen diagram or assembly
    guide showing component placement orientation (especially electrolytic cap
    polarity).
 
