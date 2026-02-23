@@ -302,6 +302,32 @@ int config_get_call_timeout_seconds(const config_data_t* config) {
     return config_get_int(config, "call.timeout_seconds", 300);
 }
 
+const char* config_get_free_numbers(const config_data_t* config) {
+    return config_get_string(config, "call.free_numbers", "911,311,0");
+}
+
+int config_is_free_number(const config_data_t* config, const char* number) {
+    const char *list, *p;
+    size_t nlen;
+    if (!number || !*number) return 0;
+    list = config_get_free_numbers(config);
+    if (!list) return 0;
+    nlen = strlen(number);
+    p = list;
+    while (*p) {
+        const char *comma = strchr(p, ',');
+        size_t entry_len = comma ? (size_t)(comma - p) : strlen(p);
+        /* Skip leading whitespace */
+        while (entry_len > 0 && (*p == ' ' || *p == '\t')) { p++; entry_len--; }
+        /* Trim trailing whitespace */
+        while (entry_len > 0 && (p[entry_len-1] == ' ' || p[entry_len-1] == '\t')) { entry_len--; }
+        if (entry_len == nlen && strncmp(p, number, nlen) == 0) return 1;
+        if (!comma) break;
+        p = comma + 1;
+    }
+    return 0;
+}
+
 /* Logging Configuration */
 const char* config_get_log_level(const config_data_t* config) {
     return config_get_string(config, "logging.level", "INFO");

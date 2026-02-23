@@ -1,0 +1,62 @@
+# Test: Emergency calls bypass coin requirement
+# 911, 311, 0 should connect without any coins
+
+# Start with receiver down
+assert_state IDLE_DOWN
+
+# Lift receiver
+hook_up
+assert_state IDLE_UP
+assert_display Insert 50c
+
+# Dial 911 — no coins inserted, should immediately connect
+keys 911
+assert_state CALL_ACTIVE
+assert_display EMERGENCY CALL
+assert_display Hang up to end
+
+# Hang up
+hook_down
+assert_state IDLE_DOWN
+assert_display Lift receiver
+
+# Test another free number: 0 (operator)
+hook_up
+assert_state IDLE_UP
+
+keys 0
+assert_state CALL_ACTIVE
+assert_display EMERGENCY CALL
+
+hook_down
+assert_state IDLE_DOWN
+
+# Test 311
+hook_up
+assert_state IDLE_UP
+
+keys 311
+assert_state CALL_ACTIVE
+assert_display EMERGENCY CALL
+
+hook_down
+assert_state IDLE_DOWN
+
+# Test that a regular number still requires coins
+hook_up
+assert_state IDLE_UP
+
+keys 5551234567
+assert_state IDLE_UP
+assert_no_display Call active
+assert_no_display EMERGENCY
+
+# Now insert coins — call should go through normally
+coin 25
+coin 25
+assert_state CALL_ACTIVE
+assert_display Call active
+assert_no_display EMERGENCY
+
+hook_down
+assert_state IDLE_DOWN

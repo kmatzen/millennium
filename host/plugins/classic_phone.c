@@ -24,6 +24,7 @@ typedef struct {
     char current_number[11];
     int call_timeout_seconds;
     time_t call_start_time;
+    int is_emergency_call;
 } classic_phone_data_t;
 
 static classic_phone_data_t classic_phone_data = {0};
@@ -160,15 +161,22 @@ static void classic_phone_update_display(void) {
     char line1[21];
     char line2[21];
     
-    /* Simple state machine for display */
     if (classic_phone_data.is_in_call) {
-        /* Call is active */
-        strcpy(line1, "Call active");
-        strcpy(line2, "Hang up to end");
+        if (classic_phone_data.is_emergency_call) {
+            strcpy(line1, "EMERGENCY CALL");
+            strcpy(line2, "Hang up to end");
+        } else {
+            strcpy(line1, "Call active");
+            strcpy(line2, "Hang up to end");
+        }
     } else if (classic_phone_data.is_dialing) {
-        /* Dialing a number */
-        classic_phone_format_number(classic_phone_data.keypad_buffer, line1);
-        strcpy(line2, "Dialing...");
+        if (classic_phone_data.is_emergency_call) {
+            classic_phone_format_number(classic_phone_data.keypad_buffer, line1);
+            strcpy(line2, "Emergency...");
+        } else {
+            classic_phone_format_number(classic_phone_data.keypad_buffer, line1);
+            strcpy(line2, "Dialing...");
+        }
     } else if (daemon_state && daemon_state->current_state == DAEMON_STATE_IDLE_DOWN) {
         /* Receiver is down */
         strcpy(line1, "Lift receiver");
@@ -224,39 +232,56 @@ static int classic_phone_has_enough_money(void) {
 }
 
 static int classic_phone_has_complete_number(void) {
-    return classic_phone_data.keypad_length >= 10; /* Require 10-digit number */
+    return classic_phone_data.keypad_length >= 10;
+}
+
+static int classic_phone_is_free_number(void) {
+    char num[12];
+    if (classic_phone_data.keypad_length == 0) return 0;
+    memcpy(num, classic_phone_data.keypad_buffer, (size_t)classic_phone_data.keypad_length);
+    num[classic_phone_data.keypad_length] = '\0';
+    return config_is_free_number(config_get_instance(), num);
 }
 
 static void classic_phone_check_and_call(void) {
-    if (classic_phone_has_enough_money() && 
-        classic_phone_has_complete_number() && 
-        !classic_phone_data.is_dialing && !classic_phone_data.is_in_call) {
-        
+    if (classic_phone_data.is_dialing || classic_phone_data.is_in_call) return;
+
+    if (classic_phone_is_free_number()) {
+        classic_phone_data.is_emergency_call = 1;
+        classic_phone_start_call();
+        return;
+    }
+
+    if (classic_phone_has_enough_money() && classic_phone_has_complete_number()) {
+        classic_phone_data.is_emergency_call = 0;
         classic_phone_start_call();
     }
 }
 
 static void classic_phone_start_call(void) {
+    char log_msg[256];
     classic_phone_data.is_dialing = 1;
     strncpy(classic_phone_data.current_number, classic_phone_data.keypad_buffer, sizeof(classic_phone_data.current_number) - 1);
     classic_phone_data.current_number[sizeof(classic_phone_data.current_number) - 1] = '\0';
-    
+
     classic_phone_update_display();
-    
-    /* Consume coins */
-    classic_phone_data.inserted_cents -= classic_phone_data.call_cost_cents;
-    
-    /* Make the actual call */
+
+    if (!classic_phone_data.is_emergency_call) {
+        classic_phone_data.inserted_cents -= classic_phone_data.call_cost_cents;
+    }
+
     millennium_client_call(client, classic_phone_data.current_number);
-    
-    char log_msg[256];
-    snprintf(log_msg, sizeof(log_msg), "Starting call to %s", classic_phone_data.current_number);
+
+    snprintf(log_msg, sizeof(log_msg), "%s call to %s",
+             classic_phone_data.is_emergency_call ? "Emergency" : "Starting",
+             classic_phone_data.current_number);
     logger_info_with_category("ClassicPhone", log_msg);
 }
 
 static void classic_phone_end_call(void) {
     classic_phone_data.is_dialing = 0;
     classic_phone_data.is_in_call = 0;
+    classic_phone_data.is_emergency_call = 0;
     classic_phone_data.keypad_length = 0;
     classic_phone_data.inserted_cents = 0;
     
@@ -296,6 +321,9 @@ static void classic_phone_tick(void) {
     char line2[21];
 
     if (!classic_phone_data.is_in_call) {
+        return;
+    }
+    if (classic_phone_data.is_emergency_call) {
         return;
     }
     if (classic_phone_data.call_timeout_seconds <= 0) {
