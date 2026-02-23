@@ -1083,6 +1083,7 @@ struct http_response web_server_handle_api_control(const struct http_request* re
 struct http_response web_server_handle_api_logs(const struct http_request* request) {
     struct http_response response;
     memset(&response, 0, sizeof(response));
+    response.status_code = 200;
     web_server_strcpy_safe(response.content_type, "application/json", sizeof(response.content_type));
     
     /* Get log level parameter */
