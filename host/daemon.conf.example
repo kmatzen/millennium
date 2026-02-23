@@ -8,6 +8,17 @@ hardware.baud_rate=9600
 # Call Configuration
 call.cost_cents=50
 call.timeout_seconds=300
+# Comma-separated numbers that can be dialed without coins (emergency/free calls)
+call.free_numbers=911,311,0
+# Seconds of inactivity (handset up, no dialing) before phone resets
+call.idle_timeout_seconds=60
+
+# Card Configuration (magstripe reader)
+card.enabled=true
+# Comma-separated 16-digit card numbers that grant free calling
+card.free_cards=
+# Comma-separated 16-digit card numbers that grant admin access
+card.admin_cards=
 
 # Logging Configuration - BALANCED for audio performance
 logging.level=INFO
@@ -17,12 +28,17 @@ logging.to_file=true
 # System Configuration
 system.update_interval_ms=33
 system.max_retries=3
+# Source directory for OTA updates (git pull + rebuild)
+system.source_dir=/home/matzen/millennium
+
+# State Persistence
+persistence.state_file=/var/lib/millennium/state
 
 # Metrics Server Configuration - DISABLED for single-core optimization
 # Metrics are now collected in the main loop instead of a separate thread
 metrics_server.enabled=false
 metrics_server.port=8080
 
-# Web Server Configuration - NO AUDIO INTERFERENCE
+# Web Server Configuration
 web_server.enabled=true
 web_server.port=8081
