@@ -1,24 +1,25 @@
 #include <SoftwareSerial.h>
 #include <Wire.h>
 
-#define d0 5     // Pin 15 on VFD - green
-#define d1 6     // Pin 13 on VFD - yellow
-#define d2 7     // Pin 11 on VFD - orange
-#define d3 8     // Pin 9 on VFD - red
-#define d4 9     // Pin 7 on VFD - brown
-#define d5 10    // Pin 5 on VFD - black
-#define d6 11    // Pin 3 on VFD - white
-#define d7 12    // Pin 1 on VFD - gray
-#define WR 4     // Pin 17 on VFD - blue
-#define AD 0     // Pin 19 on VFD - violet
-#define RD 1     // Pin 21 on VFD - gray
-#define CS 17    // Pin 23 on VFD - white
-#define TEST 16  // Pin 25 on VFD - black
-#define RESET 13 // Pin 20 on VFD - yellow
+#define I2C_DISPLAY_ADDR 8
 
-const int coinResetPin = 15; // Define the reset pin
-SoftwareSerial coinSerialDevice(14,
-                                23); // RX, TX pins for the serial communication
+#define d0 5
+#define d1 6
+#define d2 7
+#define d3 8
+#define d4 9
+#define d5 10
+#define d6 11
+#define d7 12
+#define WR 4
+#define AD 0
+#define RD 1
+#define CS 17
+#define TEST 16
+#define RESET 13
+
+const int coinResetPin = 15;
+SoftwareSerial coinSerialDevice(14, 23);
 
 byte coinEeprom[] = {
     3,   217, 5,   255, 0,   248, 1,   110, 10,  0,   5,   8,   7,   4,   0,
@@ -39,18 +40,27 @@ byte coinEeprom[] = {
     0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
     0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   49,  48,  50,
     48};
-int scrollDelay = 10;
+
+const unsigned long SERIAL_TIMEOUT_MS = 2000;
+
+static bool waitForSerial() {
+  unsigned long start = millis();
+  while (!SerialUSB.available()) {
+    if (millis() - start > SERIAL_TIMEOUT_MS) return false;
+  }
+  return true;
+}
 
 void setup() {
-  SerialUSB.begin(9600); // 115200);
+  SerialUSB.begin(9600);
 
-  Wire.begin(0);
+  Wire.begin(I2C_DISPLAY_ADDR);
   Wire.onReceive(receiveEvent);
 
   pinMode(coinResetPin, OUTPUT);
   pinMode(14, INPUT);
-  digitalWrite(coinResetPin, HIGH); // Set the reset pin to inactive high
-  coinSerialDevice.begin(600);      // Initialize the SoftwareSerial at 600 baud
+  digitalWrite(coinResetPin, HIGH);
+  coinSerialDevice.begin(600);
 
   pinMode(d0, OUTPUT);
   pinMode(d1, OUTPUT);
@@ -66,10 +76,7 @@ void setup() {
   pinMode(CS, OUTPUT);
   pinMode(TEST, OUTPUT);
   pinMode(RESET, OUTPUT);
-  // pinMode(12,OUTPUT);
 
-  // Default States
-  // digitalWrite(12, HIGH);
   digitalWrite(d0, HIGH);
   digitalWrite(d1, HIGH);
   digitalWrite(d2, HIGH);
@@ -99,33 +106,10 @@ void receiveEvent(int howMany) {
 }
 
 void vfdreset() {
-  // According to an anonymous source, this needs to be done once and a while
-  // because of corrupt characters appearing on the screen. We have confirmed
-  // this. The reset is very fast, you can shorten the delays a bit, but you
-  // will have to play around to see what works for you.
   digitalWrite(RESET, HIGH);
   delay(2);
   digitalWrite(RESET, LOW);
   delay(10);
-}
-
-void vfdtest() {
-  // This will kick off the VFD internal test. Basically just steps through all
-  // the characters built in to the display. Procedure is, hold x5 (VFD Display
-  // pin 25) low for 100ms during a reset. Reset does not start until reset (VFD
-  // Display pin 20) is low again.
-  digitalWrite(TEST, LOW);
-  digitalWrite(RESET, HIGH);
-  delay(50); // This can be shorter, but best results showed this was good.
-  digitalWrite(RESET, LOW);
-  delay(100);   // NO TOUCHY!
-  delay(15000); // This counter is running while the test sequence is running.
-                // Make this longer if you like, the display will keep looping
-                // the test until you restart
-  digitalWrite(RESET, HIGH);
-  delay(10);
-  digitalWrite(RESET, LOW);
-  digitalWrite(TEST, HIGH);
 }
 
 void loop() {
@@ -133,12 +117,10 @@ void loop() {
   if (SerialUSB.available()) {
     byte data = SerialUSB.read();
     if (data == 2) {
-      while (!SerialUSB.available())
-        ;
+      if (!waitForSerial()) return;
       byte num_bytes = SerialUSB.read();
       for (int i = 0; i < num_bytes; ++i) {
-        while (!SerialUSB.available())
-          ;
+        if (!waitForSerial()) return;
         buf[i] = SerialUSB.read();
       }
       delay(100);
@@ -147,15 +129,14 @@ void loop() {
         writeCharacter(buf[i]);
       }
     } else if (data == 3) {
-      while (!SerialUSB.available())
-        ;
+      if (!waitForSerial()) return;
       char data = SerialUSB.read();
 
       if (data == '@') {
         digitalWrite(coinResetPin, LOW);
-        delay(1000); // Wait for a moment with reset line LOW
+        delay(1000);
         digitalWrite(coinResetPin, HIGH);
-        delay(1000); // Delay for a second after resetting (adjust as needed)
+        delay(1000);
       } else {
         coinSerialDevice.write(data);
         delay(100);
@@ -189,14 +170,18 @@ void loop() {
         delay(20);
         coinSerialDevice.write(lowByte(i));
         delay(20);
-        while (!coinSerialDevice.available())
-          ;
-        byte val = coinSerialDevice.read();
-        if (val != coinEeprom[i]) {
-          SerialUSB.write('E');
-          SerialUSB.write(lowByte(i));
-          SerialUSB.write(val);
-          SerialUSB.write(coinEeprom[i]);
+        unsigned long start = millis();
+        while (!coinSerialDevice.available()) {
+          if (millis() - start > SERIAL_TIMEOUT_MS) break;
+        }
+        if (coinSerialDevice.available()) {
+          byte val = coinSerialDevice.read();
+          if (val != coinEeprom[i]) {
+            SerialUSB.write('E');
+            SerialUSB.write(lowByte(i));
+            SerialUSB.write(val);
+            SerialUSB.write(coinEeprom[i]);
+          }
         }
       }
       SerialUSB.write('F');
@@ -211,7 +196,7 @@ void loop() {
 
 void writeCommand(byte v) {
   digitalWrite(AD, HIGH);
-  digitalWrite(WR, HIGH); // Prepare to write
+  digitalWrite(WR, HIGH);
   digitalWrite(CS, LOW);
   digitalWrite(d0, bitRead(v, 0));
   digitalWrite(d1, bitRead(v, 1));
@@ -221,17 +206,16 @@ void writeCommand(byte v) {
   digitalWrite(d5, bitRead(v, 5));
   digitalWrite(d6, bitRead(v, 6));
   digitalWrite(d7, bitRead(v, 7));
-  digitalWrite(WR, LOW); // Write Complete
+  digitalWrite(WR, LOW);
   delay(1);
   digitalWrite(WR, HIGH);
   digitalWrite(CS, HIGH);
   delay(1);
-  // delay(scrollDelay);
 }
 
 void writeCharacter(byte v) {
   digitalWrite(AD, LOW);
-  digitalWrite(WR, HIGH); // Prepare to write
+  digitalWrite(WR, HIGH);
   digitalWrite(CS, LOW);
   digitalWrite(d0, bitRead(v, 0));
   digitalWrite(d1, bitRead(v, 1));
@@ -241,10 +225,9 @@ void writeCharacter(byte v) {
   digitalWrite(d5, bitRead(v, 5));
   digitalWrite(d6, bitRead(v, 6));
   digitalWrite(d7, bitRead(v, 7));
-  digitalWrite(WR, LOW); // Write Complete
+  digitalWrite(WR, LOW);
   delay(1);
   digitalWrite(WR, HIGH);
   digitalWrite(CS, HIGH);
   delay(1);
-  // delay(scrollDelay);
 }
