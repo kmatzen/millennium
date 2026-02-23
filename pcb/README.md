@@ -2,27 +2,13 @@
 
 This directory contains the PCB design files created with [KiCad](https://www.kicad.org/).
 
-## Versions
+## Design History
 
-### phonev4 (current)
-
-The active design. Simplified audio amplification and power supply compared to v2.
-
-### phonev2 (archived)
-
-The original design with dual LM358 op-amp audio circuits. Superseded by v4.
-
-### Changes from v2 to v4
-
-| Area          | v2                              | v4                                    |
-|---------------|---------------------------------|---------------------------------------|
-| Audio amp     | 2x LM358 dual op-amp           | 1x LM386 audio power amplifier       |
-| Power supply  | Raw power connector (J8)        | XL6009 boost converter module (U1)    |
-| Handset jack  | 4-pin header (J5, 4p4c)        | RJ9 jack (J4)                         |
-| Audio jacks   | Pin headers for speaker/mic     | 3.5mm stereo jacks (J5 mic, J7 spk)  |
-| Motor output  | J7 motor connector              | Removed                               |
-| Passives      | 9 resistors, 17 capacitors      | 2 resistors, 9 capacitors             |
-| Decoupling    | 11x 0.1µF axial caps            | 5x 0.1µF (4 SMD + 1 axial)           |
+The current design is **phonev4**. The previous version (v2) used dual LM358
+op-amps for audio, a raw power connector, and pin headers for audio I/O. v4
+replaced the op-amps with a single LM386 power amplifier, added an XL6009 boost
+converter, and switched to RJ9 and 3.5mm jacks. v2 files have been removed from
+the repo.
 
 ## Bill of Materials (phonev4)
 
@@ -104,44 +90,51 @@ voltage. Power is distributed to:
 
 | File              | Description                                  |
 |-------------------|----------------------------------------------|
-| `phonev4.kicad_pro` | KiCad project file (v4, current)           |
+| `phonev4.kicad_pro` | KiCad project file (current)               |
 | `phonev4.kicad_sch` | Schematic                                  |
 | `phonev4.kicad_pcb` | PCB layout                                 |
 | `phonev4.kicad_prl` | KiCad preferences (local)                  |
-| `phonev2.kicad_pro` | KiCad project file (v2, archived)          |
-| `phonev2.kicad_sch` | Schematic (v2)                             |
-| `phonev2.kicad_pcb` | PCB layout (v2)                            |
-| `phonev2.kicad_prl` | KiCad preferences (v2)                     |
-| `phonev4.csv`      | BOM export (currently from v2 — needs update)|
+| `phonev4.csv`      | Bill of materials                           |
 | `phone.kicad_sym`  | Custom symbol library                       |
+| `gerbers/`         | Gerber and drill files sent to JLCPCB       |
 
 ## Manufacturing
 
-The Gerber files were produced from the v4 PCB layout and uploaded to
+The Gerber files in `gerbers/` were produced from the v4 PCB layout and sent to
 [JLCPCB](https://jlcpcb.com) for fabrication.
 
-To reproduce:
+Gerber files included:
+- `phonev4-F_Cu.gbr` / `phonev4-B_Cu.gbr` — Front/back copper layers
+- `phonev4-F_Mask.gbr` / `phonev4-B_Mask.gbr` — Solder mask
+- `phonev4-F_Paste.gbr` / `phonev4-B_Paste.gbr` — Solder paste
+- `phonev4-F_Silkscreen.gbr` / `phonev4-B_Silkscreen.gbr` — Silkscreen
+- `phonev4-Edge_Cuts.gbr` — Board outline
+- `phonev4-PTH.drl` / `phonev4-NPTH.drl` — Plated/non-plated drill files
+- `phonev4-job.gbrjob` — Gerber job file
+
+To regenerate from KiCad:
 1. Open `phonev4.kicad_pro` in KiCad 7+
 2. Use **Plot** (File → Plot) to export Gerber files
 3. Use **Generate Drill Files** for drill data
-4. Upload to your PCB fabricator
 
 ## Known Issues
 
-1. **BOM CSV is stale**: `phonev4.csv` contains the v2 BOM, not v4. Regenerate
-   from KiCad: **Tools → Edit Symbol Fields → Export**.
+1. **Speaker output coupling (design flaw)**: The handset earpiece
+   (`speaker_receiver+/-`) and the front ringer speaker (`speaker_front+/-`)
+   share a coupled signal path on the PCB. Audio intended for one speaker
+   bleeds into the other. The ALSA configuration works around this in software
+   by routing left and right channels independently (`out_left_solo` /
+   `out_right_solo`), but crosstalk is still present at the hardware level.
+   A future PCB revision should fully isolate the two speaker output paths.
 
-2. **No Gerber files in repo**: The exported manufacturing files are not version
-   controlled. Consider adding them or documenting the exact plot settings.
-
-3. **No assembly drawing**: There is no board silkscreen diagram or assembly
+2. **No assembly drawing**: There is no board silkscreen diagram or assembly
    guide showing component placement orientation (especially electrolytic cap
    polarity).
 
-4. **I2C pull-ups**: R1 and R2 (10kΩ to 5V) provide I2C pull-ups. For the short
+3. **I2C pull-ups**: R1 and R2 (10kΩ to 5V) provide I2C pull-ups. For the short
    bus length on-board this should be adequate, but if the bus is extended off-
    board, lower values (4.7kΩ) may be needed.
 
-5. **LM386 gain**: The schematic should be checked to confirm whether the LM386
+4. **LM386 gain**: The schematic should be checked to confirm whether the LM386
    is configured for default gain (20) or boosted gain (200 with cap on pins
    1–8). The gain setting affects speaker volume and distortion.
