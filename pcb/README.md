@@ -106,7 +106,7 @@ eliminating the crosstalk present in the v4 LM386 design.
 
 ### Reverse Polarity Protection (Q1)
 
-A P-channel MOSFET (Si2301 or equivalent) on the incoming 5V rail protects
+A P-channel MOSFET (Si2301 or Si2319; same SOT-23 pinout) on the incoming 5V rail protects
 against accidental reverse-polarity connections. Q1 is placed on the power
 input *before* distribution and *before* feeding U1 IN+. The MOSFET's body
 diode conducts during normal operation with near-zero voltage drop, and blocks
