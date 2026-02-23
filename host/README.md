@@ -2,6 +2,8 @@
 
 This directory contains the software and configuration files needed to run the Millennium payphone daemon on a Raspberry Pi Zero 2 W.
 
+**First-time setup?** See [SETUP.md](SETUP.md) for the full step-by-step guide.
+
 ## Overview
 
 The host software includes:
