@@ -37,7 +37,7 @@ The following must be installed on the Raspberry Pi Zero 2 W:
 
 Audio routing uses pure ALSA configuration (no PipeWire or WirePlumber needed). The USB audio device is a C-Media USB sound card with stereo output. The ALSA config splits this into mono channels so one channel drives the handset earpiece and the other drives the ringer/speaker.
 
-1. Copy the ALSA configuration:
+1. Copy the ALSA configuration (or run `sudo make install`, which includes this):
    ```bash
    sudo cp host/asoundrc.example /etc/asound.conf
    ```
@@ -60,7 +60,7 @@ The config provides several PCM devices:
 make daemon        # Build the full daemon (requires Baresip/libre)
 make test          # Build simulator + unit tests, run both
 make clean         # Remove all build artifacts
-sudo make install  # Install daemon binary and systemd service
+sudo make install  # Install daemon binary, ALSA config, and systemd service
 ```
 
 ## Systemd Setup
