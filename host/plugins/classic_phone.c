@@ -23,6 +23,7 @@ typedef struct {
     time_t last_activity;
     char current_number[11];
     int call_timeout_seconds;
+    int idle_timeout_seconds;
     time_t call_start_time;
     int is_emergency_call;
 } classic_phone_data_t;
@@ -320,6 +321,21 @@ static void classic_phone_tick(void) {
     char line1[21];
     char line2[21];
 
+    /* Idle timeout: if handset is up but no activity, reset */
+    if (!classic_phone_data.is_in_call && !classic_phone_data.is_dialing &&
+        daemon_state && daemon_state->current_state == DAEMON_STATE_IDLE_UP &&
+        classic_phone_data.idle_timeout_seconds > 0) {
+        int idle_secs = (int)(time(NULL) - classic_phone_data.last_activity);
+        if (idle_secs >= classic_phone_data.idle_timeout_seconds) {
+            logger_info_with_category("ClassicPhone", "Idle timeout — resetting");
+            audio_tones_stop();
+            classic_phone_data.keypad_length = 0;
+            classic_phone_data.inserted_cents = 0;
+            classic_phone_data.last_activity = time(NULL);
+            classic_phone_update_display();
+        }
+    }
+
     if (!classic_phone_data.is_in_call) {
         return;
     }
@@ -365,7 +381,8 @@ void register_classic_phone_plugin(void) {
     classic_phone_data.keypad_length = 0;
     classic_phone_data.is_dialing = 0;
     classic_phone_data.is_in_call = 0;
-    classic_phone_data.call_timeout_seconds = config_get_call_timeout_seconds(config_get_instance()); /* Use configurable timeout */
+    classic_phone_data.call_timeout_seconds = config_get_call_timeout_seconds(config_get_instance());
+    classic_phone_data.idle_timeout_seconds = config_get_idle_timeout_seconds(config_get_instance());
     classic_phone_data.last_activity = time(NULL);
     
     plugins_register("Classic Phone",

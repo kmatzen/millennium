@@ -33,6 +33,7 @@ int config_get_call_cost_cents(const config_data_t* config);
 int config_get_call_timeout_seconds(const config_data_t* config);
 const char* config_get_free_numbers(const config_data_t* config);
 int config_is_free_number(const config_data_t* config, const char* number);
+int config_get_idle_timeout_seconds(const config_data_t* config);
 
 /* Logging Configuration */
 const char* config_get_log_level(const config_data_t* config);
