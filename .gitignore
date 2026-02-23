@@ -1,4 +1,5 @@
-Arduino/build
+Arduino/build/**/*.elf
+Arduino/build/**/*.o
 *.so
 *.o
 *.dSYM/
