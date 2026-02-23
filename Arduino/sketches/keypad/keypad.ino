@@ -1,8 +1,15 @@
 #include <Keypad.h>
 #include <MagStripe.h>
 #include <Wire.h>
+#include <avr/wdt.h>
 
 #define I2C_DISPLAY_ADDR 8
+
+/* I2C event prefixes sent to display Arduino */
+#define EVT_KEY        'K'
+#define EVT_HOOK_UP    "HU"
+#define EVT_HOOK_DOWN  "HD"
+#define EVT_CARD       'C'
 
 const int hookUpPin = 5;
 const int hookDownPin = 4;
@@ -38,6 +45,8 @@ void setup() {
   pinMode(hookDownPin, INPUT_PULLUP);
   pinMode(hookCommonPin, OUTPUT);
   digitalWrite(hookCommonPin, HIGH);
+
+  wdt_enable(WDTO_4S);
 }
 
 struct MagstripeData {
@@ -109,11 +118,13 @@ struct MagstripeData parseTrack2(char *rawData, int length) {
 }
 
 void loop() {
+  wdt_reset();
+
   char key = keypad.getKey();
 
   if (key != NO_KEY) {
     Wire.beginTransmission(I2C_DISPLAY_ADDR);
-    Wire.write('K');
+    Wire.write(EVT_KEY);
     Wire.write(key);
     Wire.endTransmission();
   }
@@ -128,7 +139,7 @@ void loop() {
       MagstripeData parsedData = parseTrack2(data, chars);
       if (parsedData.valid && parsedData.pan_len > 0) {
         Wire.beginTransmission(I2C_DISPLAY_ADDR);
-        Wire.write('C');
+        Wire.write(EVT_CARD);
         Wire.write(parsedData.pan, parsedData.pan_len);
         Wire.endTransmission();
       }
@@ -136,7 +147,6 @@ void loop() {
   }
 
   unsigned long now = millis();
-  pinMode(hookCommonPin, OUTPUT);
   digitalWrite(hookCommonPin, LOW);
   if (now - lastHookChange >= DEBOUNCE_MS) {
     if (hookUpState) {
@@ -145,7 +155,7 @@ void loop() {
         hookUpState = false;
         lastHookChange = now;
         Wire.beginTransmission(I2C_DISPLAY_ADDR);
-        Wire.write("HD");
+        Wire.write(EVT_HOOK_DOWN);
         Wire.endTransmission();
       }
     } else {
@@ -154,11 +164,10 @@ void loop() {
         hookUpState = true;
         lastHookChange = now;
         Wire.beginTransmission(I2C_DISPLAY_ADDR);
-        Wire.write("HU");
+        Wire.write(EVT_HOOK_UP);
         Wire.endTransmission();
       }
     }
   }
   digitalWrite(hookCommonPin, HIGH);
-  pinMode(hookCommonPin, INPUT);
 }
