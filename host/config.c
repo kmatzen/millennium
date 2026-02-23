@@ -332,6 +332,45 @@ int config_get_idle_timeout_seconds(const config_data_t* config) {
     return config_get_int(config, "call.idle_timeout_seconds", 60);
 }
 
+/* Card Configuration */
+int config_get_card_enabled(const config_data_t* config) {
+    return config_get_bool(config, "card.enabled", 1);
+}
+
+const char* config_get_card_free_cards(const config_data_t* config) {
+    return config_get_string(config, "card.free_cards", "");
+}
+
+const char* config_get_card_admin_cards(const config_data_t* config) {
+    return config_get_string(config, "card.admin_cards", "");
+}
+
+static int config_card_in_list(const char *list, const char *card_number) {
+    const char *p;
+    size_t clen;
+    if (!card_number || !*card_number || !list) return 0;
+    clen = strlen(card_number);
+    p = list;
+    while (*p) {
+        const char *comma = strchr(p, ',');
+        size_t entry_len = comma ? (size_t)(comma - p) : strlen(p);
+        while (entry_len > 0 && (*p == ' ' || *p == '\t')) { p++; entry_len--; }
+        while (entry_len > 0 && (p[entry_len-1] == ' ' || p[entry_len-1] == '\t')) { entry_len--; }
+        if (entry_len == clen && strncmp(p, card_number, clen) == 0) return 1;
+        if (!comma) break;
+        p = comma + 1;
+    }
+    return 0;
+}
+
+int config_is_free_card(const config_data_t* config, const char* card_number) {
+    return config_card_in_list(config_get_card_free_cards(config), card_number);
+}
+
+int config_is_admin_card(const config_data_t* config, const char* card_number) {
+    return config_card_in_list(config_get_card_admin_cards(config), card_number);
+}
+
 /* Logging Configuration */
 const char* config_get_log_level(const config_data_t* config) {
     return config_get_string(config, "logging.level", "INFO");

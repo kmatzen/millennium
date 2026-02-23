@@ -14,6 +14,7 @@ event_processor_t *event_processor_create(void) {
     processor->call_state_handler = NULL;
     processor->hook_handler = NULL;
     processor->keypad_handler = NULL;
+    processor->card_handler = NULL;
     
     return processor;
 }
@@ -63,6 +64,13 @@ void event_processor_process_event(event_processor_t *processor, event_t *event)
         break;
         
     case EVENT_CARD:
+        if (processor->card_handler) {
+            processor->card_handler((card_event_t *)event);
+        } else {
+            fprintf(stderr, "EventProcessor: No card handler registered\n");
+        }
+        break;
+
     case EVENT_COIN_EEPROM_UPLOAD_START:
     case EVENT_COIN_EEPROM_UPLOAD_END:
     case EVENT_COIN_EEPROM_VALIDATION_START:
@@ -99,5 +107,11 @@ void event_processor_register_hook_handler(event_processor_t *processor, hook_ha
 void event_processor_register_keypad_handler(event_processor_t *processor, keypad_handler_func_t handler) {
     if (processor) {
         processor->keypad_handler = handler;
+    }
+}
+
+void event_processor_register_card_handler(event_processor_t *processor, card_handler_func_t handler) {
+    if (processor) {
+        processor->card_handler = handler;
     }
 }

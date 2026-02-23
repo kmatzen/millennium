@@ -252,7 +252,7 @@ void list_audio_devices(void) {}
 
 void register_jukebox_plugin(void) {
     plugins_register("Jukebox", "Coin-operated music player (stub)",
-                     NULL, NULL, NULL, NULL, NULL, NULL);
+                     NULL, NULL, NULL, NULL, NULL, NULL, NULL);
 }
 
 /* ── Daemon globals (same as daemon.c) ─────────────────────────────── */
@@ -349,6 +349,12 @@ static void sim_handle_call_state(call_state_event_t *ev) {
     plugins_handle_call_state(st);
 }
 
+static void sim_handle_card(card_event_t *ev) {
+    if (!ev || !daemon_state) return;
+    fprintf(stderr, "[CARD] Swipe: %.16s\n", ev->card_number);
+    plugins_handle_card(ev->card_number);
+}
+
 /* Process one event through the handlers */
 static void sim_process_event(event_t *ev) {
     if (!ev) return;
@@ -364,6 +370,9 @@ static void sim_process_event(event_t *ev) {
         break;
     case EVENT_CALL_STATE:
         sim_handle_call_state((call_state_event_t *)ev);
+        break;
+    case EVENT_CARD:
+        sim_handle_card((card_event_t *)ev);
         break;
     default:
         break;
@@ -494,6 +503,14 @@ static int run_scenario(const char *path) {
                 }
                 p++;
             }
+        }
+
+        /* ── card <number> ──────────────────────────────────────── */
+        else if (strncmp(cmd, "card ", 5) == 0) {
+            const char *card_num = cmd + 5;
+            card_event_t *ev = card_event_create(card_num);
+            if (ev) { sim_process_event((event_t *)ev); event_destroy((event_t *)ev); }
+            sim_drain_events();
         }
 
         /* ── call_incoming / call_active ─────────────────────────── */
@@ -635,6 +652,21 @@ static int run_scenario(const char *path) {
             if (count < 1) count = 1;
             { int t; for (t = 0; t < count; t++) display_manager_tick(); }
             sim_drain_events();
+        }
+
+        /* ── config <key> <value> ──────────────────────────────── */
+        else if (strncmp(cmd, "config ", 7) == 0) {
+            char cfg_key[256];
+            char cfg_val[256];
+            const char *p = cmd + 7;
+            int ki = 0;
+            while (*p && *p != ' ' && ki < 255) { cfg_key[ki++] = *p++; }
+            cfg_key[ki] = '\0';
+            while (*p == ' ') p++;
+            strncpy(cfg_val, p, sizeof(cfg_val) - 1);
+            cfg_val[sizeof(cfg_val) - 1] = '\0';
+            config_set_value(config_get_instance(), cfg_key, cfg_val);
+            fprintf(stderr, "  config: %s = %s\n", cfg_key, cfg_val);
         }
 
         /* ── unknown ─────────────────────────────────────────────── */

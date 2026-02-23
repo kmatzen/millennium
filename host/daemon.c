@@ -69,6 +69,7 @@ static void handle_coin_event(coin_event_t *coin_event);
 static void handle_call_state_event(call_state_event_t *call_state_event);
 static void handle_hook_event(hook_state_change_event_t *hook_event);
 static void handle_keypad_event(keypad_event_t *keypad_event);
+static void handle_card_event(card_event_t *card_event);
 /* send_control_command is declared in web_server.h */
 static void generate_display_bytes(char *output, size_t output_size);
 static void format_number(const char* buffer, char *output);
@@ -493,6 +494,20 @@ void handle_keypad_event(keypad_event_t *keypad_event) {
     }
 }
 
+void handle_card_event(card_event_t *card_event) {
+    if (!card_event) {
+        logger_error_with_category("Card", "Received null card event");
+        return;
+    }
+    VALIDATE_BASICS();
+
+    logger_infof_with_category("Card", "Card swiped: %.4s...", card_event->card_number);
+    metrics_increment_counter("card_swipes", 1);
+
+    plugins_handle_card(card_event->card_number);
+    daemon_broadcast_state("card");
+}
+
 /* Implementation of sendControlCommand */
 int send_control_command(const char* action) {
     if (!daemon_state) {
@@ -890,6 +905,7 @@ int main(int argc, char *argv[]) {
     event_processor_register_call_state_handler(event_processor, handle_call_state_event);
     event_processor_register_hook_handler(event_processor, handle_hook_event);
     event_processor_register_keypad_handler(event_processor, handle_keypad_event);
+    event_processor_register_card_handler(event_processor, handle_card_event);
     
     /* Initialize audio tones */
     audio_tones_init();
