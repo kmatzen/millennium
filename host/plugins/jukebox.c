@@ -469,6 +469,7 @@ void register_jukebox_plugin(void) {
                     jukebox_handle_keypad,
                     jukebox_handle_hook,
                     jukebox_handle_call_state,
+                    NULL,
                     jukebox_on_activation,
                     NULL);
 }

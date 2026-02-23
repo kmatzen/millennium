@@ -11,6 +11,7 @@ typedef void (*coin_handler_func_t)(coin_event_t *event);
 typedef void (*call_state_handler_func_t)(call_state_event_t *event);
 typedef void (*hook_handler_func_t)(hook_state_change_event_t *event);
 typedef void (*keypad_handler_func_t)(keypad_event_t *event);
+typedef void (*card_handler_func_t)(card_event_t *event);
 
 /* Event processor structure */
 struct event_processor {
@@ -19,6 +20,7 @@ struct event_processor {
     call_state_handler_func_t call_state_handler;
     hook_handler_func_t hook_handler;
     keypad_handler_func_t keypad_handler;
+    card_handler_func_t card_handler;
 };
 
 /* Function declarations */
@@ -31,5 +33,6 @@ void event_processor_register_coin_handler(event_processor_t *processor, coin_ha
 void event_processor_register_call_state_handler(event_processor_t *processor, call_state_handler_func_t handler);
 void event_processor_register_hook_handler(event_processor_t *processor, hook_handler_func_t handler);
 void event_processor_register_keypad_handler(event_processor_t *processor, keypad_handler_func_t handler);
+void event_processor_register_card_handler(event_processor_t *processor, card_handler_func_t handler);
 
 #endif /* EVENT_PROCESSOR_H */

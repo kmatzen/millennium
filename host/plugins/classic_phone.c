@@ -26,6 +26,8 @@ typedef struct {
     int idle_timeout_seconds;
     time_t call_start_time;
     int is_emergency_call;
+    int is_card_call;
+    char card_number[17];
 } classic_phone_data_t;
 
 static classic_phone_data_t classic_phone_data = {0};
@@ -104,6 +106,8 @@ static int classic_phone_handle_hook(int hook_up, int hook_down) {
         audio_tones_stop();
         classic_phone_data.keypad_length = 0;
         classic_phone_data.inserted_cents = 0;
+        classic_phone_data.is_card_call = 0;
+        classic_phone_data.card_number[0] = '\0';
 
         if (classic_phone_data.is_in_call) {
             classic_phone_end_call();
@@ -143,6 +147,46 @@ static int classic_phone_handle_call_state(int call_state) {
     return 0;
 }
 
+static int classic_phone_handle_card(const char *card_number) {
+    if (!card_number || !daemon_state) return 0;
+
+    if (daemon_state->current_state != DAEMON_STATE_IDLE_UP) {
+        logger_info_with_category("ClassicPhone", "Card swiped but handset is down — ignoring");
+        return 0;
+    }
+
+    if (classic_phone_data.is_dialing || classic_phone_data.is_in_call) {
+        logger_info_with_category("ClassicPhone", "Card swiped during active call — ignoring");
+        return 0;
+    }
+
+    if (!config_get_card_enabled(config_get_instance())) {
+        display_manager_set_text("Cards disabled", "Insert coins");
+        logger_info_with_category("ClassicPhone", "Card swiped but card support is disabled");
+        return 0;
+    }
+
+    if (config_is_free_card(config_get_instance(), card_number)) {
+        classic_phone_data.is_card_call = 1;
+        strncpy(classic_phone_data.card_number, card_number, sizeof(classic_phone_data.card_number) - 1);
+        classic_phone_data.card_number[sizeof(classic_phone_data.card_number) - 1] = '\0';
+        classic_phone_data.last_activity = time(NULL);
+        display_manager_set_text("Card accepted", "Dial number");
+        logger_infof_with_category("ClassicPhone", "Free calling card accepted: %.4s...", card_number);
+        return 1;
+    }
+
+    if (config_is_admin_card(config_get_instance(), card_number)) {
+        display_manager_set_text("Admin card", "Access granted");
+        logger_infof_with_category("ClassicPhone", "Admin card swiped: %.4s...", card_number);
+        return 1;
+    }
+
+    display_manager_set_text("Unknown card", "Try again");
+    logger_infof_with_category("ClassicPhone", "Unrecognized card swiped: %.4s...", card_number);
+    return 0;
+}
+
 /* Internal function implementations */
 static void classic_phone_on_activation(void) {
     /* Restore coins from daemon_state (may have been loaded from persisted state) */
@@ -166,6 +210,9 @@ static void classic_phone_update_display(void) {
         if (classic_phone_data.is_emergency_call) {
             strcpy(line1, "EMERGENCY CALL");
             strcpy(line2, "Hang up to end");
+        } else if (classic_phone_data.is_card_call) {
+            strcpy(line1, "Card call");
+            strcpy(line2, "Hang up to end");
         } else {
             strcpy(line1, "Call active");
             strcpy(line2, "Hang up to end");
@@ -174,6 +221,9 @@ static void classic_phone_update_display(void) {
         if (classic_phone_data.is_emergency_call) {
             classic_phone_format_number(classic_phone_data.keypad_buffer, line1);
             strcpy(line2, "Emergency...");
+        } else if (classic_phone_data.is_card_call) {
+            classic_phone_format_number(classic_phone_data.keypad_buffer, line1);
+            strcpy(line2, "Card dialing...");
         } else {
             classic_phone_format_number(classic_phone_data.keypad_buffer, line1);
             strcpy(line2, "Dialing...");
@@ -253,6 +303,11 @@ static void classic_phone_check_and_call(void) {
         return;
     }
 
+    if (classic_phone_data.is_card_call && classic_phone_has_complete_number()) {
+        classic_phone_start_call();
+        return;
+    }
+
     if (classic_phone_has_enough_money() && classic_phone_has_complete_number()) {
         classic_phone_data.is_emergency_call = 0;
         classic_phone_start_call();
@@ -267,7 +322,7 @@ static void classic_phone_start_call(void) {
 
     classic_phone_update_display();
 
-    if (!classic_phone_data.is_emergency_call) {
+    if (!classic_phone_data.is_emergency_call && !classic_phone_data.is_card_call) {
         classic_phone_data.inserted_cents -= classic_phone_data.call_cost_cents;
     }
 
@@ -283,6 +338,8 @@ static void classic_phone_end_call(void) {
     classic_phone_data.is_dialing = 0;
     classic_phone_data.is_in_call = 0;
     classic_phone_data.is_emergency_call = 0;
+    classic_phone_data.is_card_call = 0;
+    classic_phone_data.card_number[0] = '\0';
     classic_phone_data.keypad_length = 0;
     classic_phone_data.inserted_cents = 0;
     
@@ -339,7 +396,7 @@ static void classic_phone_tick(void) {
     if (!classic_phone_data.is_in_call) {
         return;
     }
-    if (classic_phone_data.is_emergency_call) {
+    if (classic_phone_data.is_emergency_call || classic_phone_data.is_card_call) {
         return;
     }
     if (classic_phone_data.call_timeout_seconds <= 0) {
@@ -391,6 +448,7 @@ void register_classic_phone_plugin(void) {
                     classic_phone_handle_keypad,
                     classic_phone_handle_hook,
                     classic_phone_handle_call_state,
+                    classic_phone_handle_card,
                     classic_phone_on_activation,
                     classic_phone_tick);
 }

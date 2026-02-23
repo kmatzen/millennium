@@ -35,6 +35,13 @@ const char* config_get_free_numbers(const config_data_t* config);
 int config_is_free_number(const config_data_t* config, const char* number);
 int config_get_idle_timeout_seconds(const config_data_t* config);
 
+/* Card Configuration */
+int config_get_card_enabled(const config_data_t* config);
+const char* config_get_card_free_cards(const config_data_t* config);
+const char* config_get_card_admin_cards(const config_data_t* config);
+int config_is_free_card(const config_data_t* config, const char* card_number);
+int config_is_admin_card(const config_data_t* config, const char* card_number);
+
 /* Logging Configuration */
 const char* config_get_log_level(const config_data_t* config);
 const char* config_get_log_file(const config_data_t* config);

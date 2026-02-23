@@ -70,7 +70,7 @@ daemon.o: daemon.c millennium_sdk.h events.h event_processor.h config.h logger.h
 plugins.o: plugins.c plugins.h
 	gcc plugins.c -o plugins.o -c $(CFLAGS)
 
-plugins/classic_phone.o: plugins/classic_phone.c plugins.h audio_tones.h
+plugins/classic_phone.o: plugins/classic_phone.c plugins.h audio_tones.h config.h
 	gcc plugins/classic_phone.c -o plugins/classic_phone.o -c $(CFLAGS)
 
 plugins/fortune_teller.o: plugins/fortune_teller.c plugins.h

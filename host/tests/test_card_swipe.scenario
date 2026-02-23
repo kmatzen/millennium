@@ -1,0 +1,35 @@
+# Test: Magstripe card swipe for free calling
+# Verifies that swiping a registered free-call card allows dialing
+# without inserting coins.
+
+# Configure a free calling card
+config card.free_cards 1234567890123456
+
+# Lift the handset
+hook_up
+assert_display Insert
+
+# Swipe the free calling card
+card 1234567890123456
+assert_display Card accepted
+assert_display Dial number
+
+# Dial a 10-digit number without any coins
+keys 2125551234
+call_active
+assert_display Card call
+assert_display Hang up
+
+# Hang up — resets card state
+hook_down
+
+# Lift again — no card active, back to normal
+hook_up
+assert_display Insert
+
+# Swipe an unregistered card
+card 0000000000000000
+assert_display Unknown card
+
+# Hang up
+hook_down

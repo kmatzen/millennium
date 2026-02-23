@@ -339,7 +339,7 @@ static void test_plugins_register_custom(void) {
 
     TEST_ASSERT_EQ_INT(plugins_register("Test Plugin", "A test",
         test_coin_handler, test_key_handler, test_hook_handler,
-        test_call_handler, test_activation_handler, test_tick_handler), 0);
+        test_call_handler, NULL, test_activation_handler, test_tick_handler), 0);
 
     TEST_ASSERT_EQ_INT(plugins_activate("Test Plugin"), 0);
     TEST_ASSERT_EQ_INT(g_activated, 1);
@@ -380,7 +380,7 @@ static void test_plugins_duplicate_register(void) {
     plugins_init();
 
     TEST_ASSERT_EQ_INT(plugins_register("Classic Phone", "Duplicate",
-        NULL, NULL, NULL, NULL, NULL, NULL), -1);
+        NULL, NULL, NULL, NULL, NULL, NULL, NULL), -1);
 
     millennium_client_destroy(client);
     client = NULL;
@@ -469,6 +469,48 @@ static void test_updater_apply_bad_dir(void) {
     TEST_ASSERT(strstr(updater_get_apply_status(), "git pull failed") != NULL);
 }
 
+/* ── Card config tests ─────────────────────────────────────────── */
+
+static void test_card_enabled_default(void) {
+    config_data_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    config_set_default_values(&cfg);
+    TEST_ASSERT_EQ_INT(1, config_get_card_enabled(&cfg));
+}
+
+static void test_card_free_card_match(void) {
+    config_data_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    config_set_default_values(&cfg);
+    config_set_value(&cfg, "card.free_cards", "1234567890123456,9999888877776666");
+    TEST_ASSERT_EQ_INT(1, config_is_free_card(&cfg, "1234567890123456"));
+    TEST_ASSERT_EQ_INT(1, config_is_free_card(&cfg, "9999888877776666"));
+}
+
+static void test_card_free_card_no_match(void) {
+    config_data_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    config_set_default_values(&cfg);
+    config_set_value(&cfg, "card.free_cards", "1234567890123456");
+    TEST_ASSERT_EQ_INT(0, config_is_free_card(&cfg, "0000000000000000"));
+}
+
+static void test_card_admin_card_match(void) {
+    config_data_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    config_set_default_values(&cfg);
+    config_set_value(&cfg, "card.admin_cards", "ADMIN12345678901");
+    TEST_ASSERT_EQ_INT(1, config_is_admin_card(&cfg, "ADMIN12345678901"));
+}
+
+static void test_card_empty_list(void) {
+    config_data_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    config_set_default_values(&cfg);
+    TEST_ASSERT_EQ_INT(0, config_is_free_card(&cfg, "1234567890123456"));
+    TEST_ASSERT_EQ_INT(0, config_is_admin_card(&cfg, "1234567890123456"));
+}
+
 /* ── Main ───────────────────────────────────────────────────────── */
 
 int main(void) {
@@ -511,6 +553,13 @@ int main(void) {
     TEST_SUITE_RUN(test_free_number_0);
     TEST_SUITE_RUN(test_not_free_number);
     TEST_SUITE_RUN(test_free_number_custom);
+
+    TEST_SUITE_BEGIN("Card Config");
+    TEST_SUITE_RUN(test_card_enabled_default);
+    TEST_SUITE_RUN(test_card_free_card_match);
+    TEST_SUITE_RUN(test_card_free_card_no_match);
+    TEST_SUITE_RUN(test_card_admin_card_match);
+    TEST_SUITE_RUN(test_card_empty_list);
 
     TEST_SUITE_BEGIN("Updater");
     TEST_SUITE_RUN(test_version_compare_equal);
