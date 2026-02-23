@@ -995,7 +995,7 @@ struct http_response web_server_handle_api_control(const struct http_request* re
         }
     }
     
-    /* Parse key for keypad actions */
+    /* Parse key for keypad actions (supports "key" or "arg") */
     char* key_pos = strstr(request->body, "\"key\":\"");
     if (key_pos) {
         char* start = key_pos + 7; /* Length of "key":" */
@@ -1007,12 +1007,32 @@ struct http_response web_server_handle_api_control(const struct http_request* re
                 key[len] = '\0';
             }
         }
+    } else {
+        char* arg_pos = strstr(request->body, "\"arg\":\"");
+        if (arg_pos && key[0] == '\0') {
+            char* start = arg_pos + 7; /* Length of "arg":" */
+            char* end = strchr(start, '"');
+            if (end) {
+                size_t len = end - start;
+                if (len > 0 && len < sizeof(key)) {
+                    memcpy(key, start, len);
+                    key[len] = '\0';
+                }
+            }
+        }
     }
     
-    /* Parse cents for card actions */
+    /* Parse cents for coin_insert (supports "cents" or "arg") */
     char* cents_pos = strstr(request->body, "\"cents\":");
     if (cents_pos) {
         cents = atoi(cents_pos + 8); /* Length of "cents": */
+    } else if (cents == 0) {
+        char* arg_quoted = strstr(request->body, "\"arg\":\"");
+        char* arg_num = strstr(request->body, "\"arg\":");
+        if (arg_quoted)
+            cents = atoi(arg_quoted + 8); /* "arg":"25" */
+        else if (arg_num)
+            cents = atoi(arg_num + 6);    /* "arg":25 */
     }
     
     /* Parse plugin for plugin actions */
