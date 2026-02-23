@@ -78,8 +78,8 @@ eliminating the crosstalk present in the v4 LM386 design.
 | C_ripple | 4.7µF electrolytic         | 1   | Radial D5mm                      | TDA2822 ripple rejection         |
 | C_dec | 100nF ceramic                 | 1   | 0603 SMD                         | TDA2822 Vcc decoupling           |
 | C-*   | 100nF ceramic                 | 5   | SMD / small axial                | Decoupling (see below)           |
-| D1    | PRTR5V0U2X                    | 1   | SOT-23                           | ESD clamp on J4 signal pins (handset) |
-| D2    | PRTR5V0U2X                    | 1   | SOT-23                           | ESD clamp on J1 signal pins (coin TX/RX) |
+| D1    | PRTR5V0U2X                    | 1   | SOT-143 (4-pin)                  | ESD clamp on J4 signal pins (handset) |
+| D2    | PRTR5V0U2X                    | 1   | SOT-143 (4-pin)                  | ESD clamp on J1 signal pins (coin TX/RX) |
 | Q1    | Si2301 P-ch MOSFET            | 1   | SOT-23                           | Reverse polarity protection      |
 | F1    | 1A PTC fuse                   | 1   | Radial D10mm THT                 | Resettable overcurrent fuse      |
 | D3    | Green LED                     | 1   | 5mm THT                          | Power indicator                  |

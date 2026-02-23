@@ -27,7 +27,7 @@ This document captures audit findings for the phonev4 schematic and PCB design, 
 | BOM vs schematic refs | ✓ Fixed | D3, TP1-TP5, U1; see phonev4.csv |
 | Q1 part number | Open | Si2319 vs Si2301; verify pin compatibility |
 | Missing footprints | ✓ Fixed | THT assigned for D3, F1, TP1–TP5 |
-| PRTR package | Open | SOT-143 in schem, BOM SOT-23; verify which used |
+| PRTR package | ✓ Fixed | PRTR5V0U2X is SOT-143 only; BOM/README updated |
 | Test points | ✓ Fixed | TP1-TP5 only; no TX/RX on PCB |
 
 ---
@@ -45,7 +45,7 @@ This document captures audit findings for the phonev4 schematic and PCB design, 
 ### 3. Part Discrepancies
 
 - **Q1**: Schematic shows Si2319CDS, README/BOM specify Si2301. Both are P-ch MOSFETs. Check datasheets for pinout; update schematic symbol or BOM to match the actual part.
-- **D1, D2 (PRTR5V0U2X)**: Schematic footprint SOT-143; BOM says SOT-23. PRTR5V0U2X is available in SOT-143 (4-pin) and possibly SOT-23 variants. Confirm which package is used and align.
+- **D1, D2 (PRTR5V0U2X)**: ✓ Fixed. PRTR5V0U2X is SOT-143 only (Nexperia datasheet). BOM and README updated from SOT-23 to SOT-143.
 
 ### 4. Missing Footprints
 
