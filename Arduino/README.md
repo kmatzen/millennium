@@ -1,64 +1,119 @@
-## Arduino Makefile
+# Arduino Firmware
 
-The `Makefile` in the `Arduino/` directory simplifies building and flashing the Arduino sketches for this project.
+Two Arduino Micro boards (ATmega32U4) run the keypad/peripheral I/O:
+
+| Board             | FQBN                            | Sketch            | Role                                    |
+|-------------------|---------------------------------|-------------------|-----------------------------------------|
+| Millennium Alpha  | `arduino:avr:millennium_alpha`  | `sketches/keypad` | 4x7 keypad, magstripe reader, hook switch |
+| Millennium Beta   | `arduino:avr:millennium_beta`   | `sketches/display`| VFD display, coin validator, I2C→USB bridge |
+
+See [PINOUT.md](PINOUT.md) for complete pin assignments, I2C protocol, and serial command reference.
+
+## Pre-built Firmware
+
+Pre-built hex files are checked in under `build/`:
+
+```
+build/keypad/keypad.ino.hex    # Flash to Millennium Alpha
+build/display/display.ino.hex  # Flash to Millennium Beta
+```
+
+These can be flashed directly without compiling:
+
+```bash
+arduino-cli upload -p /dev/serial/by-id/usb-Arduino_LLC_Millennium_Alpha-if00 \
+    --fqbn arduino:avr:millennium_alpha --input-dir ./build/keypad
+
+arduino-cli upload -p /dev/serial/by-id/usb-Arduino_LLC_Millennium_Beta-if00 \
+    --fqbn arduino:avr:millennium_beta --input-dir ./build/display
+```
+
+## Building from Source
 
 ### Prerequisites
 
-- Install [arduino-cli](https://arduino.github.io/arduino-cli).
-- Configure `arduino-cli.yaml` for your environment (e.g., library paths, board URLs).
+- [arduino-cli](https://arduino.github.io/arduino-cli) in your `PATH`
+  (or set `ARDUINO_CLI=/path/to/arduino-cli`)
+- Arduino AVR core: `arduino-cli core install arduino:avr`
+- The custom board definitions must be appended to the Arduino AVR
+  `boards.txt` (see [Custom Board Definitions](#custom-board-definitions) below)
 
-### Custom Firmware
+### Build and Flash
 
-The Arduino devices used in this project have custom firmware flashed to uniquely identify them. This allows consistent identification of devices under `/dev/serial/by-id/`. If you’re using different Arduinos, update the `DISPLAY_DEVICE` and `KEYPAD_DEVICE` paths accordingly.
+```bash
+make build              # Compile both sketches → build/
+make install            # Flash both to connected Arduinos
+make install_keypad     # Flash keypad only
+make install_display    # Flash display only
+make clean              # Remove build artifacts
+```
 
-### Variables
+If `arduino-cli` is not in your `PATH`:
 
-The Makefile uses the following variables:
-- **`DISPLAY_DEVICE`**: Path to the display's serial device, e.g., `/dev/serial/by-id/usb-Arduino_LLC_Millennium_Beta-if00`.
-- **`KEYPAD_DEVICE`**: Path to the keypad's serial device, e.g., `/dev/serial/by-id/usb-Arduino_LLC_Millennium_Alpha-if00`.
-- **`DISPLAY_FQBN`**: Fully Qualified Board Name for the display (e.g., `arduino:avr:millennium_beta`).
-- **`KEYPAD_FQBN`**: Fully Qualified Board Name for the keypad (e.g., `arduino:avr:millennium_alpha`).
+```bash
+make build ARDUINO_CLI=/home/matzen/bin/arduino-cli
+```
 
-### Makefile Targets
+### Verifying a Build
 
-- **Build Targets**:
-  - `build/keypad/keypad.ino.elf`: Compiles the keypad sketch.
-  - `build/display/display.ino.elf`: Compiles the display sketch.
+The build is reproducible — recompiling from the same source with the same
+arduino-cli and AVR core version produces identical hex files.
 
-- **Install Targets**:
-  - `install_keypad`: Uploads the keypad sketch to the device at `$(KEYPAD_DEVICE)`.
-  - `install_display`: Uploads the display sketch to the device at `$(DISPLAY_DEVICE)`.
+## Custom Board Definitions
 
-- **Aggregate Targets**:
-  - `build`: Builds both sketches.
-  - `install`: Installs both sketches.
+The two boards are Arduino Micro clones with custom USB product names and
+PIDs so the Pi can distinguish them via `/dev/serial/by-id/`. The custom
+entries must be appended to:
 
-### Usage
+```
+~/.arduino15/packages/arduino/hardware/avr/1.8.6/boards.txt
+```
 
-1. **Build the sketches**:
-   ```bash
-   make build
-   ```
+Key differences from stock Arduino Micro:
 
-2. **Install the sketches**:
-   ```bash
-   make install
-   ```
+| Property         | Stock Micro    | Millennium Alpha   | Millennium Beta    |
+|------------------|----------------|--------------------|--------------------|
+| USB PID (app)    | 0x0037         | 0x0045             | 0x0046             |
+| USB PID (boot)   | 0x8037         | 0x8045             | 0x8046             |
+| Product name     | Arduino Micro  | Millennium Alpha   | Millennium Beta    |
 
-3. **Install individual sketches**:
-   - For the keypad:
-     ```bash
-     make install_keypad
-     ```
-   - For the display:
-     ```bash
-     make install_display
-     ```
+The full board definition entries are documented in [PINOUT.md](PINOUT.md#custom-board-definitions).
 
-4. **Clean up build files**:
-   If necessary, manually delete the `build/` directory.
+### Custom Bootloaders
 
-### Notes
-- The custom firmware flashed onto the Arduino devices ensures unique identification via `/dev/serial/by-id/`. If you are not using the same custom firmware, you may need to manually identify and specify the correct serial devices.
-- Update the `DISPLAY_FQBN` and `KEYPAD_FQBN` as necessary for your specific board configurations.
-- Ensure the Arduino devices are connected and accessible before running the `install` commands.
+The `boards.txt` entries reference custom bootloader hex files
+(`Caterina-Micro-Millennium-Alpha.hex`, `Caterina-Micro-Millennium-Beta.hex`)
+that encode the custom VID/PID. These bootloader hex files were never built —
+the boards currently run with stock Micro bootloaders that were already flashed
+at the factory. The custom VID/PID only takes effect when the sketch is running
+(not during the bootloader's 8-second window).
+
+To build custom bootloaders (requires LUFA library and `avr-gcc`):
+
+```bash
+cd ~/.arduino15/packages/arduino/hardware/avr/1.8.6/bootloaders/caterina
+make VID=0x2341 PID=0x8045 TARGET=Caterina-Micro-Millennium-Alpha
+make VID=0x2341 PID=0x8046 TARGET=Caterina-Micro-Millennium-Beta
+```
+
+This requires the [LUFA 111009](https://github.com/abcminiuser/lufa) library
+installed at the path referenced in the Makefile
+(`../../../../../../LUFA/LUFA-111009` relative to the bootloader directory).
+
+## Directory Structure
+
+```
+Arduino/
+├── Makefile                    # Build and flash targets
+├── arduino-cli.yaml            # arduino-cli configuration
+├── PINOUT.md                   # Pin assignments and protocol reference
+├── build/
+│   ├── keypad/keypad.ino.hex   # Pre-built keypad firmware
+│   └── display/display.ino.hex # Pre-built display firmware
+├── sketches/
+│   ├── keypad/keypad.ino       # Keypad Arduino source
+│   └── display/display.ino     # Display Arduino source
+└── libraries/
+    ├── Keypad/                 # Keypad matrix library
+    └── MagStripe/              # Magnetic stripe reader library
+```
