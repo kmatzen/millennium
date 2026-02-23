@@ -477,11 +477,12 @@ int millennium_client_serial_is_healthy(struct millennium_client *client) {
 }
 
 void millennium_client_check_serial(struct millennium_client *client) {
+    if (!client || client->display_fd == -1) return;
+
+#if SERIAL_WATCHDOG_ENABLED
     struct timespec now;
     long elapsed;
     int backoff;
-
-    if (!client || client->display_fd == -1) return;
 
     clock_gettime(CLOCK_MONOTONIC, &now);
     elapsed = now.tv_sec - client->last_serial_activity.tv_sec;
@@ -522,6 +523,7 @@ void millennium_client_check_serial(struct millennium_client *client) {
                 "Serial reconnect failed, next attempt in %d seconds", backoff);
         }
     }
+#endif /* SERIAL_WATCHDOG_ENABLED - disabled until keepalive (issue #59) */
 }
 
 void millennium_client_update(struct millennium_client *client) {

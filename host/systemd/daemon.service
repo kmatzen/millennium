@@ -5,13 +5,18 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-# Run the binary directly (no shell needed)
-ExecStart=/home/matzen/millennium/host/daemon --config /home/matzen/millennium/host/daemon.conf
-# Optional: wait for network before starting (use absolute path + correct bash)
-ExecStartPre=/bin/bash -c 'until /bin/ping -c1 -W1 8.8.8.8 >/dev/null; do sleep 1; done'
+# Use /etc/millennium/daemon.conf (run: sudo cp daemon.conf.example /etc/millennium/daemon.conf)
+# For development: use full path to binary, e.g. /home/USER/millennium/host/daemon
+ExecStart=/usr/local/bin/millennium-daemon --config /etc/millennium/daemon.conf
+# Optional: wait for network before starting
+ExecStartPre=/bin/bash -c 'until /bin/ping -c1 -W1 8.8.8.8 >/dev/null 2>/dev/null; do sleep 1; done'
 Restart=on-failure
 RestartSec=2
-WorkingDirectory=/home/matzen/millennium/host
+WorkingDirectory=/tmp
+# Baresip/libre tries to use stdin for UI; systemd gives none. Redirect to avoid epoll errors.
+StandardInput=null
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=default.target
