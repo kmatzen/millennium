@@ -1,8 +1,8 @@
 #ifndef MILLENNIUM_SDK_H
 #define MILLENNIUM_SDK_H
 
-#include <stdint.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <time.h>
 
 /* Forward declarations */
@@ -99,6 +99,9 @@ void millennium_client_serial_activity(struct millennium_client *client);
 
 /* Utility functions */
 void list_audio_devices(void);
+
+/* SIP registration status (0=unknown, 1=registered, -1=failed). last_error may be NULL. */
+void millennium_sdk_get_sip_status(int *registered, char *last_error, size_t last_error_size);
 
 /* Constants */
 #define BAUD_RATE B9600

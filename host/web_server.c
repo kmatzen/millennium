@@ -937,20 +937,34 @@ struct http_response web_server_handle_api_state(const struct http_request* requ
     memset(&response, 0, sizeof(response));
     web_server_strcpy_safe(response.content_type, "application/json", sizeof(response.content_type));
     
-    char json[512];
+    char json[768];
     struct daemon_state_info state_info = get_daemon_state_info();
     
+    /* Escape sip_last_error for JSON (simple backslash-quote escape) */
+    char escaped_error[256];
+    const char *src;
+    char *dst;
+    for (src = state_info.sip_last_error, dst = escaped_error; *src && (size_t)(dst - escaped_error) < sizeof(escaped_error) - 2; src++) {
+        if (*src == '"' || *src == '\\') *dst++ = '\\';
+        *dst++ = *src;
+    }
+    *dst = '\0';
+
     snprintf(json, sizeof(json),
         "{"
         "\"current_state\":%d,"
         "\"inserted_cents\":%d,"
         "\"keypad_buffer\":\"%s\","
-        "\"last_activity\":%ld"
+        "\"last_activity\":%ld,"
+        "\"sip_registered\":%d,"
+        "\"sip_last_error\":\"%s\""
         "}",
         state_info.current_state,
         state_info.inserted_cents,
         state_info.keypad_buffer,
-        state_info.last_activity);
+        state_info.last_activity,
+        state_info.sip_registered,
+        escaped_error);
     
     web_server_strcpy_safe(response.body, json, sizeof(response.body));
     return response;

@@ -21,6 +21,8 @@ struct daemon_state_info {
     int inserted_cents;
     char keypad_buffer[64];
     time_t last_activity;
+    int sip_registered;       /* 0=unknown, 1=ok, -1=failed */
+    char sip_last_error[128]; /* Last registration error if failed */
 };
 
 /* HTTP Request structure */

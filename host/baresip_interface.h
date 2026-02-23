@@ -106,7 +106,12 @@ struct ua *baresip_call_get_ua(struct call *call);
 /* Event functions */
 void baresip_bevent_register(baresip_ua_event_handler_t handler, void *arg);
 struct call *baresip_bevent_get_call(const struct bevent *event);
+struct ua *baresip_bevent_get_ua(const struct bevent *event);
+const char *baresip_bevent_get_text(const struct bevent *event);
 const char *baresip_uag_event_str(enum baresip_ua_event ev);
+
+/* UA registration status */
+int baresip_ua_isregistered(const struct ua *ua);
 
 /* Audio device listing */
 struct le *baresip_ausrcl_head(void);
