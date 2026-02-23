@@ -103,7 +103,7 @@ void list_audio_devices(void);
 /* Constants */
 #define BAUD_RATE B9600
 #define ASYNC_WORKERS 4
-#define SERIAL_WATCHDOG_SECONDS 30
+#define SERIAL_WATCHDOG_SECONDS 300
 #define SERIAL_MAX_BACKOFF_SECONDS 60
 
 #endif /* MILLENNIUM_SDK_H */

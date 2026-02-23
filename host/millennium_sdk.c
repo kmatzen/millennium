@@ -774,6 +774,8 @@ void millennium_client_set_ua(struct millennium_client *client, void *ua) {
 void millennium_client_write_command(struct millennium_client *client, uint8_t command, const uint8_t *data, size_t data_size) {
     logger_debugf_with_category("SDK", "Writing command to display: %d", command);
 
+    if (!client) return;
+
     /* Step 1: Write the command */
     while (1) {
         ssize_t bytes_written = write(client->display_fd, &command, 1);
@@ -822,4 +824,7 @@ void millennium_client_write_command(struct millennium_client *client, uint8_t c
 
         logger_debugf_with_category("SDK", "Successfully wrote %lu bytes of data to display.", (unsigned long)total_bytes_written);
     }
+
+    /* Any successful write counts as serial activity for the watchdog */
+    millennium_client_serial_activity(client);
 }
