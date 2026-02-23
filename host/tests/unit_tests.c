@@ -459,6 +459,16 @@ static void test_version_no_update_initially(void) {
     TEST_ASSERT_NULL((void *)updater_get_latest_version());
 }
 
+static void test_updater_apply_null_dir(void) {
+    TEST_ASSERT_EQ_INT(-1, updater_apply(NULL));
+    TEST_ASSERT(strstr(updater_get_apply_status(), "no source") != NULL);
+}
+
+static void test_updater_apply_bad_dir(void) {
+    TEST_ASSERT_EQ_INT(-1, updater_apply("/nonexistent/path/to/repo"));
+    TEST_ASSERT(strstr(updater_get_apply_status(), "git pull failed") != NULL);
+}
+
 /* ── Main ───────────────────────────────────────────────────────── */
 
 int main(void) {
@@ -509,6 +519,8 @@ int main(void) {
     TEST_SUITE_RUN(test_version_compare_patch);
     TEST_SUITE_RUN(test_version_compare_with_v_prefix);
     TEST_SUITE_RUN(test_version_no_update_initially);
+    TEST_SUITE_RUN(test_updater_apply_null_dir);
+    TEST_SUITE_RUN(test_updater_apply_bad_dir);
 
     TEST_REPORT();
 }
