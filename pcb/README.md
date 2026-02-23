@@ -42,7 +42,7 @@ eliminating the crosstalk present in the v4 LM386 design.
 | 3   | IN_A       | `speaker_front_pre+` via C_inA |
 | 4   | IN_B       | `speaker_receiver_pre+` via C_inB |
 | 5   | OUT_B      | → C_outB → `speaker_receiver+` |
-| 6   | V+         | `5v`                         |
+| 6   | V+         | `5V_MAIN`                    |
 | 7   | RIPPLE     | → C_ripple (4.7µF) to GND   |
 | 8   | NC         | Not connected                |
 
@@ -65,7 +65,7 @@ eliminating the crosstalk present in the v4 LM386 design.
 | A1    | Arduino Micro (keypad)        | 1   | Socket headers                   | Millennium Alpha board           |
 | A2    | Arduino Micro (display)       | 1   | Socket headers                   | Millennium Beta board            |
 | A3    | Raspberry Pi Zero WH          | 1   | ADA3708 footprint                | Adafruit ADA3708                 |
-| U1    | XL6009 boost converter        | 1   | Module                           | 5V output                        |
+| U1    | XL6009 boost converter        | 1   | Module                           | 12V output (from 5V input), coin validator supply |
 | U2    | TDA2822M                      | 1   | DIP-8                            | Dual audio amplifier             |
 | R1    | 4.7kΩ resistor                | 1   | Axial                            | I2C pull-up (SDA)                |
 | R2    | 4.7kΩ resistor                | 1   | Axial                            | I2C pull-up (SCL)                |
@@ -78,8 +78,8 @@ eliminating the crosstalk present in the v4 LM386 design.
 | C_ripple | 4.7µF electrolytic         | 1   | Radial D5mm                      | TDA2822 ripple rejection         |
 | C_dec | 100nF ceramic                 | 1   | 0603 SMD                         | TDA2822 Vcc decoupling           |
 | C-*   | 100nF ceramic                 | 5   | SMD / small axial                | Decoupling (see below)           |
-| D1    | PRTR5V0U2X                    | 1   | SOT-23                           | ESD protection on J4 (RJ9)      |
-| D2    | PRTR5V0U2X                    | 1   | SOT-23                           | ESD protection on J1 (coin)     |
+| D1    | PRTR5V0U2X                    | 1   | SOT-23                           | ESD clamp on J4 signal pins (handset) |
+| D2    | PRTR5V0U2X                    | 1   | SOT-23                           | ESD clamp on J1 signal pins (coin TX/RX) |
 | Q1    | Si2301 P-ch MOSFET            | 1   | SOT-23                           | Reverse polarity protection      |
 | F1    | 1A PTC fuse                   | 1   | 1812 SMD                         | Resettable overcurrent fuse      |
 | LED1  | Green LED                     | 1   | 0805 SMD                         | Power indicator                  |
@@ -90,7 +90,7 @@ eliminating the crosstalk present in the v4 LM386 design.
 | J5    | Microphone                    | 1   | 3.5mm stereo jack                | Handset mic input                |
 | J6    | Card reader                   | 1   | 2x7 pin header                   | 14-pin for magstripe reader     |
 | J7    | Speaker                       | 1   | 3.5mm stereo jack                | Stereo audio from USB card      |
-| TP1-7 | Test points                   | 7   | Through-hole pad                 | 5V, 3.3V, GND, SDA, SCL, TX, RX |
+| TP1-6 | Test points                   | 6   | Through-hole pad                 | 5V_MAIN, 3.3V, GND, SDA, SCL, 12V_COIN (see Test Points section) |
 
 ### Decoupling Capacitors (C-*)
 
@@ -106,35 +106,40 @@ eliminating the crosstalk present in the v4 LM386 design.
 
 ### Reverse Polarity Protection (Q1)
 
-A P-channel MOSFET (Si2301 or equivalent) on the power input protects against
-accidental reverse-polarity connections. The MOSFET's body diode conducts during
-normal operation with near-zero voltage drop, and blocks current when polarity
-is reversed.
+A P-channel MOSFET (Si2301 or equivalent) on the incoming 5V rail protects
+against accidental reverse-polarity connections. Q1 is placed on the power
+input *before* distribution and *before* feeding U1 IN+. The MOSFET's body
+diode conducts during normal operation with near-zero voltage drop, and blocks
+current when polarity is reversed.
 
 ### ESD Protection (D1, D2)
 
-TVS diode arrays (PRTR5V0U2X) on the RJ9 handset connector (J4) and coin
-validator header (J1) clamp ESD transients that could enter through externally
-accessible connectors. These protect the Arduino I/O pins from static discharge
-through the handset or coin slot.
+TVS diode arrays (PRTR5V0U2X) protect signal lines, not power rails. Each array
+clamps signal pins to VCC (5V) and GND, limiting ESD transients that could
+enter through externally accessible connectors. D1 protects J4 (handset mic+,
+speaker_receiver+); D2 protects J1 (coin validator TX/RX). These keep Arduino
+I/O pins within safe voltage limits during static discharge.
 
 ### Overcurrent Protection (F1)
 
-A 1A resettable PTC fuse on the 5V output of the boost converter limits current
-in case of a downstream short. The fuse self-resets when the fault is cleared.
+A 1A resettable PTC fuse (F1) is placed on the incoming 5V rail, in series
+with Q1, before power distribution and before U1. It protects the entire board
+(including the boost converter input) from downstream shorts. The fuse
+self-resets when the fault is cleared.
 
 ### Power Indicator (LED1, R3)
 
-A green LED on the 5V rail provides visual confirmation that the board is powered,
-useful when debugging inside the payphone enclosure.
+A green LED on the 5V_MAIN rail provides visual confirmation that the board is
+powered, useful when debugging inside the payphone enclosure.
 
 ## Connector Pinouts
 
 ### J1 — Coin Validator (2x5)
 
-See the coin validator documentation for the serial protocol. The PCB routes
-SoftwareSerial (600 baud) from the display Arduino pins 14 (RX) and 23 (TX),
-plus a reset line from pin 15.
+The coin validator is powered from the 12V_COIN rail (U1 output). The PCB
+routes SoftwareSerial (600 baud) from the display Arduino pins 14 (RX) and 23
+(TX), plus a reset line from pin 15. See the coin validator documentation for
+the serial protocol.
 
 ### J2 — Keypad (2x10)
 
@@ -178,28 +183,43 @@ resistors (R1, R2) to 5V on both lines — the standard recommended value for
 
 ## Power Distribution
 
-The XL6009 boost converter (U1) provides regulated 5V from the phone line
-voltage. Power flows through Q1 (reverse polarity protection) and F1 (fuse),
-then distributes to:
+The board is powered from an external 5V supply. Power flows as follows:
 
-- Both Arduino Micro boards (5V pin)
-- Raspberry Pi Zero WH (5V via GPIO header)
-- VFD display (5V logic supply; VFD filament uses its own internal supply)
-- TDA2822M amplifier
-- Coin validator (5V)
-- MagStripe reader (5V via Arduino)
+1. **Incoming 5V** enters the board and passes through:
+   - Q1 (reverse polarity protection)
+   - F1 (PTC fuse)
+2. **5V_MAIN rail** (after Q1 and F1) distributes to:
+   - Both Arduino Micro boards (5V pin)
+   - Raspberry Pi Zero WH (5V via GPIO header)
+   - VFD display (5V logic supply; VFD filament uses its own internal supply)
+   - TDA2822M amplifier (pin 6)
+   - MagStripe reader (5V via Arduino)
+   - U1 IN+ (boost converter input)
+
+3. **12V_COIN rail**: U1 (XL6009) boosts 5V → 12V. XL6009 pins: IN+ = 5V_MAIN,
+   IN- = GND, OUT- = GND, OUT+ = 12V_COIN. The 12V_COIN rail powers the coin
+   validator only (J1). Nothing else on the board uses 12V.
 
 ## Test Points
 
-| Label | Signal | Purpose                           |
-|-------|--------|-----------------------------------|
-| TP1   | 5V     | Main power rail                   |
-| TP2   | 3.3V   | Pi's 3.3V output (if accessible)  |
-| TP3   | GND    | Ground reference                  |
-| TP4   | SDA    | I2C data                          |
-| TP5   | SCL    | I2C clock                         |
-| TP6   | TX     | USB serial TX (display → Pi)      |
-| TP7   | RX     | USB serial RX (Pi → display)      |
+| Label | Signal   | Purpose                           |
+|-------|----------|-----------------------------------|
+| TP1   | 5V_MAIN  | Main 5V power rail                |
+| TP2   | 3.3V     | Pi's 3.3V output (if accessible)  |
+| TP3   | GND      | Ground reference                  |
+| TP4   | SDA      | I2C data (Arduino ↔ Arduino)      |
+| TP5   | SCL      | I2C clock                         |
+| TP6   | 12V_COIN | Boosted 12V rail for coin validator |
+
+**Note on USB connectivity**: Arduino ↔ Pi communication is via USB through an
+external hub. There are no discrete USB serial TX/RX nets on the PCB; TP6 and
+TP7 in older docs referred to USB serial, but that path does not exist as PCB
+nets. Only the test points above (5V_MAIN, GND, 12V_COIN, I2C) are actual PCB
+nets.
+
+## Schematic Audit
+
+Run `python3 audit_schematic.py` to check component/BOM alignment, net labels, and documentation consistency. See `AUDIT.md` for findings and action items.
 
 ## Files
 
@@ -212,6 +232,8 @@ then distributes to:
 | `phonev4.csv`      | Bill of materials (updated)                 |
 | `phone.kicad_sym`  | Custom symbol library (xl6009, TDA2822M)   |
 | `gerbers/`         | Gerber files from previous v4 fabrication   |
+| `audit_schematic.py` | Python script to audit schematic vs BOM vs README |
+| `AUDIT.md`         | Audit findings and action items             |
 
 ## Manufacturing
 
@@ -254,27 +276,35 @@ schematic editor:
 
 6. **TDA2822 GND (pin 2)**: Connect to `gnd`.
 
-7. **TDA2822 V+ (pin 6)**: Connect to `5v` via C_vcc and C_dec bypass caps.
+7. **TDA2822 V+ (pin 6)**: Connect to `5V_MAIN` via C_vcc and C_dec bypass caps.
 
 8. **TDA2822 RIPPLE (pin 7)**: Connect via C_ripple (4.7µF) to `gnd`.
 
 ### Protection circuit wiring
 
-1. **Q1 (reverse polarity)**: Insert between XL6009 OUT+ and the 5V
-   distribution bus. Gate to OUT+, source to OUT+, drain to 5V bus.
+1. **Q1 (reverse polarity)**: Place on the incoming 5V rail *before* distribution
+   and *before* U1. Source to incoming 5V, drain to 5V_MAIN bus, gate to source
+   (or appropriate pull-down for PMOS). Protects the entire board including U1
+   input.
 
-2. **F1 (fuse)**: Insert in series between Q1 drain and the 5V bus.
+2. **F1 (fuse)**: Insert in series on the incoming 5V rail, before Q1 or between
+   Q1 drain and 5V_MAIN distribution. Protects the 5V supply and boost converter
+   input from overcurrent.
 
-3. **D1 (ESD on J4)**: Connect across J4 signal pins to GND/5V.
+3. **D1 (ESD on J4)**: Connect across J4 signal pins (mic+, speaker_receiver+);
+   clamp to 5V_MAIN and GND. Protects signal lines, not power.
 
-4. **D2 (ESD on J1)**: Connect across J1 signal pins to GND/5V.
+4. **D2 (ESD on J1)**: Connect across J1 signal pins (coin TX/RX); clamp to
+   5V_MAIN and GND. Protects signal lines, not power.
 
-5. **LED1 + R3**: Connect from 5V through R3 (1kΩ) through LED1 to GND.
+5. **LED1 + R3**: Connect from 5V_MAIN through R3 (1kΩ) through LED1 to GND.
 
 ### Test points
 
-Add test point symbols connected to: 5V, 3.3V, GND, SDA, SCL, TX (USB serial),
-RX (USB serial).
+Add test point symbols connected to: 5V_MAIN, 3.3V, GND, SDA, SCL, 12V_COIN.
+Do not add TX/RX test points for USB serial; Arduino ↔ Pi communication uses
+USB through an external hub, so there are no discrete USB serial nets on the
+PCB.
 
 ## Known Issues (resolved by this revision)
 
@@ -301,3 +331,54 @@ RX (USB serial).
 
 4. **Mounting holes**: Consider adding M3 mounting holes at board corners for
    mechanical support inside the payphone enclosure.
+
+## Circuit Improvement Ideas
+
+Ideas for future revisions, ordered by likely impact.
+
+### High priority
+
+1. **Bulk capacitor on 5V input** — Add a 470–1000 µF electrolytic (16–25V) on
+   the 5V rail (after Q1/F1, before distribution). Smooths supply during Pi boot
+   current spikes and audio peaks.
+
+2. **Bulk capacitor on 12V_COIN** — Add 100–220 µF (25V) near J1 (coin validator).
+   Coin validators draw current spikes when the motor runs; the bulk cap reduces
+   rail droop.
+
+3. **Series resistor on coin validator reset** — If the Arduino drives the reset
+   line directly to J1, add a 100–220 Ω series resistor. Limits fault current and
+   reduces coupling.
+
+### Medium priority
+
+4. **I2C series resistors** — Add 22–33 Ω series resistors on SDA/SCL at each
+   Arduino I2C port. Dampens ringing if cable lengths increase or in noisy
+   environments.
+
+5. **XL6009 thermal** — The 5V→12V boost at ~50–100 mA can get warm in a confined
+   enclosure. Use adequate copper around the module; consider a small heatsink if
+   airflow is limited.
+
+6. **Undervoltage handling** — The bulk input cap (item 1) helps. If the 5V supply
+   is marginal during boot, consider explicit UVLO or reset sequencing for
+   critical loads.
+
+### Lower priority
+
+7. **ESD on audio jacks** — J5 (mic) and J7 (speaker) are externally accessible.
+   Consider PRTR5V0U2X or similar TVS on their signal pins for robustness.
+
+8. **Power LED brightness** — If LED1 is too bright in a dark payphone, increase
+   R3 (e.g., 2–4.7 kΩ) for dimmer indication.
+
+9. **TDA2822M gain flexibility** — Add DNP footprints for optional input
+   attenuation resistors so gain can be tuned without a respin.
+
+### Documentation / mechanical
+
+10. **Connector keying** — Verify J1 (coin validator) is keyed to prevent reverse
+    insertion. Document pin-1 orientation clearly.
+
+11. **Pi power path** — Document whether the Pi receives 5V only from the GPIO
+    header or also via USB; affects power sequencing and fault behavior.

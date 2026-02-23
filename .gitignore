@@ -18,5 +18,7 @@ host/simulator
 host/*.log
 *.pch
 pcb/*.lck
+pcb/erc_report.txt
+pcb/drc_report.txt
 host/unit_tests
 host/daemon-override.conf.tmp
