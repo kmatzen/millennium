@@ -2,7 +2,7 @@
 1;"A1";"Arduino_Micro_Socket";1;"Arduino_Micro_Socket (keypad)";;;
 2;"A2";"Arduino_Micro_Socket";1;"Arduino_Micro_Socket (display)";;;
 3;"A3";"ADA3708_RPI-ZERO";1;"ADA3708 (Raspberry Pi Zero WH)";;;
-4;"U1";"-";1;"XL6009 boost converter";;;
+4;"U1";"XL6009_module";1;"XL6009 boost converter (12V for coin validator)";;;
 5;"U2";"DIP-8";1;"TDA2822M dual audio amplifier";;;
 6;"R1,R2";"R_Axial_DIN0204_L3.6mm_D1.6mm_P7.62mm_Horizontal";2;"4.7k";;;
 7;"C_outA";"CP_Radial_D8.0mm_P3.80mm";1;"100uF 16V (TDA2822 ch A output coupling)";;;
@@ -16,9 +16,9 @@
 15;"D1";"SOT-23";1;"PRTR5V0U2X (ESD protection, J4 RJ9)";;;
 16;"D2";"SOT-23";1;"PRTR5V0U2X (ESD protection, J1 coin)";;;
 17;"Q1";"SOT-23";1;"Si2301 P-ch MOSFET (reverse polarity protection)";;;
-18;"F1";"Fuse_1812";1;"1A PTC resettable fuse";;;
-19;"LED1";"LED_0805";1;"Green power indicator LED";;;
-20;"R3";"R_0805";1;"1k (LED current limit)";;;
+18;"F1";"Fuse_Radial_D10.0mm_P5.00mm";1;"1A PTC resettable fuse (radial THT)";;;
+19;"D3";"LED_D5.0mm";1;"Green power indicator LED (5mm THT)";;;
+20;"R3";"R_Axial_DIN0204";1;"1k (LED current limit)";;;
 21;"J1";"PinHeader_2x05_P2.54mm_Vertical";1;"coin";;;
 22;"J2";"PinHeader_2x10_P2.54mm_Vertical";1;"keypad";;;
 23;"J3";"PinHeader_2x13_P2.54mm_Vertical";1;"display";;;
@@ -26,4 +26,4 @@
 25;"J5";"3.5mm_Stereo";1;"mic";;;
 26;"J6";"PinHeader_2x07_P2.54mm_Vertical";1;"card_reader";;;
 27;"J7";"3.5mm_Stereo";1;"speaker";;;
-28;"TP1-TP7";"TestPoint";7;"Test points (5V, 3.3V, GND, SDA, SCL, TX, RX)";;;
+28;"TP1-TP5";"TestPoint_Loop_D2.50mm_Drill1.0mm";5;"Test points THT (5V_MAIN, Pi 3.3V, GND, SDA, SCL)";;;
