@@ -69,7 +69,7 @@ eliminating the crosstalk present in the v4 LM386 design.
 | U2    | TDA2822M                      | 1   | DIP-8                            | Dual audio amplifier             |
 | R1    | 4.7kΩ resistor                | 1   | Axial                            | I2C pull-up (SDA)                |
 | R2    | 4.7kΩ resistor                | 1   | Axial                            | I2C pull-up (SCL)                |
-| R3    | 1kΩ resistor                  | 1   | 0805 SMD                         | Power LED current limit          |
+| R3    | 1kΩ resistor                  | 1   | Axial                            | Power LED current limit          |
 | C_inA | 100nF ceramic                 | 1   | SMD / small axial                | TDA2822 ch A input coupling      |
 | C_inB | 100nF ceramic                 | 1   | SMD / small axial                | TDA2822 ch B input coupling      |
 | C_outA| 100µF 16V electrolytic        | 1   | Radial D8mm                      | TDA2822 ch A output coupling     |
@@ -81,8 +81,8 @@ eliminating the crosstalk present in the v4 LM386 design.
 | D1    | PRTR5V0U2X                    | 1   | SOT-23                           | ESD clamp on J4 signal pins (handset) |
 | D2    | PRTR5V0U2X                    | 1   | SOT-23                           | ESD clamp on J1 signal pins (coin TX/RX) |
 | Q1    | Si2301 P-ch MOSFET            | 1   | SOT-23                           | Reverse polarity protection      |
-| F1    | 1A PTC fuse                   | 1   | 1812 SMD                         | Resettable overcurrent fuse      |
-| LED1  | Green LED                     | 1   | 0805 SMD                         | Power indicator                  |
+| F1    | 1A PTC fuse                   | 1   | Radial D10mm THT                 | Resettable overcurrent fuse      |
+| D3    | Green LED                     | 1   | 5mm THT                          | Power indicator                  |
 | J1    | Coin validator                | 1   | 2x5 pin header                   | 10-pin IDC                      |
 | J2    | Keypad                        | 1   | 2x10 pin header                  | 20-pin IDC                      |
 | J3    | VFD display                   | 1   | 2x13 pin header                  | 26-pin IDC                      |
@@ -90,7 +90,7 @@ eliminating the crosstalk present in the v4 LM386 design.
 | J5    | Microphone                    | 1   | 3.5mm stereo jack                | Handset mic input                |
 | J6    | Card reader                   | 1   | 2x7 pin header                   | 14-pin for magstripe reader     |
 | J7    | Speaker                       | 1   | 3.5mm stereo jack                | Stereo audio from USB card      |
-| TP1-6 | Test points                   | 6   | Through-hole pad                 | 5V_MAIN, 3.3V, GND, SDA, SCL, 12V_COIN (see Test Points section) |
+| TP1-5 | Test points                   | 5   | Through-hole loop D2.5mm         | 5V_MAIN, Pi 3.3V, GND, SDA, SCL (see Test Points section) |
 
 ### Decoupling Capacitors (C-*)
 
@@ -127,7 +127,7 @@ with Q1, before power distribution and before U1. It protects the entire board
 (including the boost converter input) from downstream shorts. The fuse
 self-resets when the fault is cleared.
 
-### Power Indicator (LED1, R3)
+### Power Indicator (D3, R3)
 
 A green LED on the 5V_MAIN rail provides visual confirmation that the board is
 powered, useful when debugging inside the payphone enclosure.
@@ -297,7 +297,7 @@ schematic editor:
 4. **D2 (ESD on J1)**: Connect across J1 signal pins (coin TX/RX); clamp to
    5V_MAIN and GND. Protects signal lines, not power.
 
-5. **LED1 + R3**: Connect from 5V_MAIN through R3 (1kΩ) through LED1 to GND.
+5. **D3 + R3**: Connect from 5V_MAIN through R3 (1kΩ) through D3 to GND.
 
 ### Test points
 
@@ -369,7 +369,7 @@ Ideas for future revisions, ordered by likely impact.
 7. **ESD on audio jacks** — J5 (mic) and J7 (speaker) are externally accessible.
    Consider PRTR5V0U2X or similar TVS on their signal pins for robustness.
 
-8. **Power LED brightness** — If LED1 is too bright in a dark payphone, increase
+8. **Power LED brightness** — If D3 is too bright in a dark payphone, increase
    R3 (e.g., 2–4.7 kΩ) for dimmer indication.
 
 9. **TDA2822M gain flexibility** — Add DNP footprints for optional input
