@@ -179,11 +179,13 @@ With the custom board definitions flashed, the display Arduino appears as
 ls /dev/serial/by-id/
 ```
 
-## 9. Create the log directory
+## 9. Create the log and state directories
 
 ```bash
 sudo mkdir -p /var/log/millennium
 sudo chown $USER:$USER /var/log/millennium
+sudo mkdir -p /var/lib/millennium
+sudo chown $USER:$USER /var/lib/millennium
 ```
 
 ## 10. Install the systemd service
@@ -195,12 +197,13 @@ mkdir -p ~/.config/systemd/user
 cp systemd/daemon.service ~/.config/systemd/user/
 ```
 
-Edit `~/.config/systemd/user/daemon.service` and update `ExecStart`,
-`WorkingDirectory`, and the `--config` path to match where you cloned the repo
-and installed the config file:
+Edit `~/.config/systemd/user/daemon.service` and update paths as needed.
+Use `/etc/millennium/daemon.conf` for config (create with `sudo cp daemon.conf.example /etc/millennium/daemon.conf`).
+Add `StandardInput=null` to avoid baresip epoll errors when run as a service.
 
 ```ini
 ExecStart=/home/YOUR_USER/millennium/host/daemon --config /etc/millennium/daemon.conf
+StandardInput=null
 WorkingDirectory=/home/YOUR_USER/millennium/host
 ```
 
@@ -264,6 +267,28 @@ Or use the OTA update feature from the web dashboard if the `system.source_dir`
 config points to the local repo.
 
 ## Troubleshooting
+
+### Config, epoll, or state file errors
+
+If you see:
+- **Could not load config file** — Copy the config and ensure the path exists:
+  ```bash
+  sudo mkdir -p /etc/millennium
+  sudo cp host/daemon.conf.example /etc/millennium/daemon.conf
+  ```
+  Update the systemd unit to use `--config /etc/millennium/daemon.conf`.
+
+- **epoll_ctl: EPOLL_CTL_ADD: fd=0 (Operation not permitted)** — Baresip tries to use stdin for UI. Add to your systemd unit:
+  ```ini
+  StandardInput=null
+  ```
+
+- **Failed to open state file for writing** — Create the state directory and make it writable:
+  ```bash
+  sudo mkdir -p /var/lib/millennium
+  sudo chown $USER:$USER /var/lib/millennium
+  ```
+  Or set `MILLENNIUM_STATE_FILE=/home/$USER/.local/state/millennium` in the environment.
 
 ### Serial port not found
 

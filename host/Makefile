@@ -130,18 +130,20 @@ clean:
 install: daemon
 	sudo mkdir -p /etc/millennium
 	sudo mkdir -p /var/log/millennium
+	sudo mkdir -p /var/lib/millennium
+	@if command -v logname >/dev/null 2>&1; then sudo chown $$(logname):$$(logname) /var/lib/millennium 2>/dev/null || true; fi
 	sudo cp daemon.conf.example /etc/millennium/daemon.conf
 	sudo cp asoundrc.example /etc/asound.conf
 	sudo cp daemon /usr/local/bin/millennium-daemon
 	sudo cp systemd/daemon.service /etc/systemd/system/
 	sudo systemctl daemon-reload
-	sudo systemctl enable millennium-daemon.service
+	sudo systemctl enable daemon.service
 
 uninstall:
-	sudo systemctl stop millennium-daemon.service
-	sudo systemctl disable millennium-daemon.service
+	sudo systemctl stop daemon.service
+	sudo systemctl disable daemon.service
 	sudo rm -f /usr/local/bin/millennium-daemon
-	sudo rm -f /etc/systemd/system/millennium-daemon.service
+	sudo rm -f /etc/systemd/system/daemon.service
 	sudo systemctl daemon-reload
 
 .PHONY: all clean install uninstall test unit_tests

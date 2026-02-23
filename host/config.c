@@ -103,6 +103,14 @@ int config_load_from_environment(config_data_t* config) {
         config_set_value(config, "logging.file", log_file);
     }
     
+    /* State persistence (used when config file fails to load) */
+    {
+        const char *state_file = getenv("MILLENNIUM_STATE_FILE");
+        if (state_file != NULL) {
+            config_set_value(config, "persistence.state_file", state_file);
+        }
+    }
+    
     return 1;
 }
 

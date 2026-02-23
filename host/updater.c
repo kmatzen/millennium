@@ -147,7 +147,7 @@ int updater_apply(const char *source_dir) {
 
     snprintf(apply_status, sizeof(apply_status), "Restarting daemon...");
     logger_info_with_category("Updater", "Restarting daemon via systemd");
-    run_command("sudo systemctl restart millennium-daemon.service");
+    run_command("sudo systemctl restart daemon.service");
 
     snprintf(apply_status, sizeof(apply_status), "Update applied successfully");
     return 0;
