@@ -94,6 +94,18 @@ Output includes: component table, net labels, BOM vs schematic comparison, docum
 
 ---
 
+## Capacitor Package Audit (see #83)
+
+Aligned BOM and README with schematic footprints (THT priority):
+
+| Ref | Value | Footprint | Notes |
+|-----|-------|-----------|-------|
+| C_outA, C_outB, C_vcc | 100µF 16V | CP_Radial_D8.0mm_P2.00mm | Was P3.80mm in BOM |
+| C_ripple | 4.7µF | CP_Radial_D5.0mm_P2.00mm | Consistent |
+| C_inA, C_inB, C_dec, C-* | 100nF | C_Axial_L3.8mm_D2.6mm_P7.50mm | Was C_Small/0603; THT |
+
+---
+
 ## Related Documentation
 
 - `README.md` — Power distribution, protection circuits, BOM, schematic change checklist
