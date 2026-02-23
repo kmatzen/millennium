@@ -96,3 +96,59 @@ int updater_is_update_available(void) {
     if (!checked) return 0;
     return updater_compare_versions(latest_version, version_get_string()) > 0;
 }
+
+static char apply_status[256] = "No update attempted";
+
+const char *updater_get_apply_status(void) {
+    return apply_status;
+}
+
+static int run_command(const char *cmd) {
+    int rc;
+    char log_msg[512];
+    snprintf(log_msg, sizeof(log_msg), "Running: %s", cmd);
+    logger_info_with_category("Updater", log_msg);
+    rc = system(cmd);
+    if (rc != 0) {
+        snprintf(log_msg, sizeof(log_msg), "Command failed (exit %d): %s", rc, cmd);
+        logger_warn_with_category("Updater", log_msg);
+    }
+    return rc;
+}
+
+int updater_apply(const char *source_dir) {
+    char cmd[512];
+
+    if (!source_dir || !*source_dir) {
+        snprintf(apply_status, sizeof(apply_status), "Error: no source directory specified");
+        return -1;
+    }
+
+    snprintf(apply_status, sizeof(apply_status), "Pulling latest code...");
+    snprintf(cmd, sizeof(cmd), "cd '%s' && git pull --ff-only origin main 2>&1", source_dir);
+    if (run_command(cmd) != 0) {
+        snprintf(apply_status, sizeof(apply_status), "Error: git pull failed");
+        return -1;
+    }
+
+    snprintf(apply_status, sizeof(apply_status), "Building...");
+    snprintf(cmd, sizeof(cmd), "cd '%s/host' && make clean && make daemon 2>&1", source_dir);
+    if (run_command(cmd) != 0) {
+        snprintf(apply_status, sizeof(apply_status), "Error: build failed");
+        return -1;
+    }
+
+    snprintf(apply_status, sizeof(apply_status), "Installing and restarting...");
+    snprintf(cmd, sizeof(cmd), "cd '%s/host' && sudo make install 2>&1", source_dir);
+    if (run_command(cmd) != 0) {
+        snprintf(apply_status, sizeof(apply_status), "Error: install failed");
+        return -1;
+    }
+
+    snprintf(apply_status, sizeof(apply_status), "Restarting daemon...");
+    logger_info_with_category("Updater", "Restarting daemon via systemd");
+    run_command("sudo systemctl restart millennium-daemon.service");
+
+    snprintf(apply_status, sizeof(apply_status), "Update applied successfully");
+    return 0;
+}

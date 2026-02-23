@@ -26,4 +26,20 @@ const char *updater_get_latest_version(void);
 /* Returns 1 if the latest version is newer than the running version. */
 int updater_is_update_available(void);
 
+/*
+ * Apply an update: git pull, rebuild, then restart the daemon via
+ * systemd.  The function builds the new binary before restarting so
+ * that a failed build does not interrupt service.
+ *
+ * source_dir: absolute path to the repo checkout (e.g. /home/matzen/millennium)
+ *
+ * Returns  0 on success (note: successful restart means this function
+ *          never returns — systemd kills the old process).
+ * Returns -1 if git pull or build fails (daemon continues running).
+ */
+int updater_apply(const char *source_dir);
+
+/* Get a human-readable status message from the last updater_apply call. */
+const char *updater_get_apply_status(void);
+
 #endif /* UPDATER_H */

@@ -743,6 +743,7 @@ void web_server_setup_api_routes(struct web_server* server) {
     web_server_add_route(server, "GET", "/api/plugins", web_server_handle_api_plugins);
     web_server_add_route(server, "GET", "/api/version", web_server_handle_api_version);
     web_server_add_route(server, "GET", "/api/check-update", web_server_handle_api_check_update);
+    web_server_add_route(server, "POST", "/api/update", web_server_handle_api_update);
     web_server_add_route(server, "GET", "/", web_server_handle_dashboard);
 }
 
@@ -1323,6 +1324,27 @@ struct http_response web_server_handle_api_check_update(const struct http_reques
     return response;
 }
 
+struct http_response web_server_handle_api_update(const struct http_request* request) {
+    (void)request;
+    struct http_response response;
+    char json[512];
+    const char *source_dir;
+    int rc;
+    memset(&response, 0, sizeof(response));
+    web_server_strcpy_safe(response.content_type, "application/json", sizeof(response.content_type));
+
+    source_dir = config_get_string(config_get_instance(), "system.source_dir", "/home/matzen/millennium");
+    rc = updater_apply(source_dir);
+
+    snprintf(json, sizeof(json),
+        "{\"success\":%s,\"status\":\"%s\"}",
+        rc == 0 ? "true" : "false",
+        updater_get_apply_status());
+    web_server_strcpy_safe(response.body, json, sizeof(response.body));
+    response.status_code = rc == 0 ? 200 : 500;
+    return response;
+}
+
 struct http_response web_server_handle_dashboard(const struct http_request* request) {
     (void)request;
     struct http_response response;
@@ -1377,8 +1399,17 @@ struct http_response web_server_handle_dashboard(const struct http_request* requ
         "</div></div>"
 
         "<div class=\"card\"><h2>System</h2>"
-        "<button class=\"btn\" onclick=\"api('/api/check-update').then(d=>document.getElementById('upd').textContent="
-        "d.update_available?'Update: '+d.latest_version:'Up to date')\">Check Updates</button>"
+        "<button class=\"btn\" onclick=\"api('/api/check-update').then(d=>{"
+        "var s=d.update_available?'Update: '+d.latest_version:'Up to date';"
+        "document.getElementById('upd').textContent=s;"
+        "document.getElementById('apply-btn').style.display=d.update_available?'inline-block':'none';"
+        "})\">Check Updates</button>"
+        "<button id=\"apply-btn\" class=\"btn\" style=\"display:none;background:#53d769\" "
+        "onclick=\"if(confirm('Apply update and restart daemon?')){"
+        "document.getElementById('upd').textContent='Updating...';"
+        "post('/api/update',{}).then(d=>document.getElementById('upd').textContent=d.status)"
+        ".catch(()=>document.getElementById('upd').textContent='Connection lost (restarting)');"
+        "}\">Apply Update</button>"
         "<span id=\"upd\" style=\"font-size:12px;margin-left:8px\"></span>"
         "<hr style=\"border-color:#0f3460;margin:12px 0\">"
         "<button class=\"btn secondary\" onclick=\"api('/api/health').then(d=>alert(JSON.stringify(d,null,2)))\">Health</button>"
