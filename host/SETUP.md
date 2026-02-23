@@ -278,9 +278,9 @@ If you see:
   ```
   Update the systemd unit to use `--config /etc/millennium/daemon.conf`.
 
-- **epoll_ctl: EPOLL_CTL_ADD: fd=0 (Operation not permitted)** — Baresip's stdio module listens on stdin. Comment it out in `~/.baresip/config`:
+- **epoll_ctl: EPOLL_CTL_ADD: fd=0 (Operation not permitted)** — Baresip's stdio module listens on stdin. Comment it out in `~/.baresip/config` (the line may have spaces: `module stdio.so`):
   ```
-  # module stdio.so
+  sed -i.bak 's/^\([[:space:]]*\)module\([[:space:]]\+\)stdio\.so/\1# module\2stdio.so/' ~/.baresip/config
   ```
   Then restart: `sudo systemctl restart daemon.service`
 

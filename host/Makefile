@@ -141,8 +141,8 @@ install: daemon
 	sudo cp asoundrc.example /etc/asound.conf
 	sudo cp daemon /usr/local/bin/millennium-daemon
 	sudo cp systemd/daemon.service /etc/systemd/system/
-	@if [ -f $$HOME/.baresip/config ] && grep -q '^module stdio\.so' $$HOME/.baresip/config 2>/dev/null; then \
-		sed -i.bak 's/^module stdio\.so/# module stdio.so/' $$HOME/.baresip/config; \
+	@if [ -f $$HOME/.baresip/config ] && grep -qE '^[[:space:]]*module[[:space:]]*stdio\.so' $$HOME/.baresip/config 2>/dev/null; then \
+		sed -i.bak 's/^[[:space:]]*module[[:space:]]*stdio\.so/# module stdio.so/' $$HOME/.baresip/config; \
 		echo "Commented out stdio module in ~/.baresip/config (backup: .bak)"; \
 	fi
 	sudo mkdir -p /etc/systemd/system/daemon.service.d
