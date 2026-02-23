@@ -244,6 +244,12 @@ systemctl --user disable audio-mux.service
 4. **Web dashboard**: Open `http://<pi-ip>:8081` in a browser. You should see
    the phone state, active plugin, and health status.
 
+5. **API integration test**: From the Pi (or any machine that can reach it):
+   ```bash
+   cd ~/millennium/host && make api-test
+   # Or: HOST=192.168.86.145 ./tests/api_test.sh
+   ```
+
 ## Updating
 
 To update the daemon after pulling new code:
