@@ -128,6 +128,7 @@ clean:
 	rm -rf *.o daemon simulator unit_tests plugins/*.o tests/*.o
 
 install: daemon
+	sudo systemctl stop daemon.service 2>/dev/null || true
 	sudo mkdir -p /etc/millennium
 	sudo mkdir -p /var/log/millennium
 	sudo mkdir -p /var/lib/millennium
@@ -137,7 +138,9 @@ install: daemon
 	sudo cp daemon /usr/local/bin/millennium-daemon
 	sudo cp systemd/daemon.service /etc/systemd/system/
 	sudo systemctl daemon-reload
+	sudo systemctl unmask daemon.service 2>/dev/null || true
 	sudo systemctl enable daemon.service
+	sudo systemctl start daemon.service
 
 uninstall:
 	sudo systemctl stop daemon.service

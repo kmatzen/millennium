@@ -283,6 +283,15 @@ If you see:
   StandardInput=null
   ```
 
+- **Unit file daemon.service is masked** — Unmask before enabling: `sudo systemctl unmask daemon.service`, then run `make install` again.
+
+- **No such file or directory** (for millennium-daemon) — You're running from the repo without `make install`. Use the dev service:
+  ```bash
+  cp systemd/daemon-dev.service ~/.config/systemd/user/daemon.service
+  systemctl --user daemon-reload
+  systemctl --user restart daemon.service
+  ```
+
 - **Failed to open state file for writing** — Create the state directory and make it writable:
   ```bash
   sudo mkdir -p /var/lib/millennium
