@@ -283,6 +283,13 @@ If you see:
   StandardInput=null
   ```
 
+- **conf_configure failed / SEGV** — Daemon needs to run as the user who has `~/.baresip/` (accounts, config). `make install` creates an override with your user. If you installed without make, create `/etc/systemd/system/daemon.service.d/override.conf`:
+  ```ini
+  [Service]
+  User=YOUR_USERNAME
+  ```
+  Then `sudo systemctl daemon-reload` and `sudo systemctl restart daemon.service`.
+
 - **Unit file daemon.service is masked** — Unmask before enabling: `sudo systemctl unmask daemon.service`, then run `make install` again.
 
 - **No such file or directory** (for millennium-daemon) — You're running from the repo without `make install`. Use the dev service:

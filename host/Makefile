@@ -128,6 +128,10 @@ clean:
 	rm -rf *.o daemon simulator unit_tests plugins/*.o tests/*.o
 
 install: daemon
+	@systemctl --user stop daemon.service 2>/dev/null || true
+	@systemctl --user disable daemon.service 2>/dev/null || true
+	@rm -f $$HOME/.config/systemd/user/daemon.service 2>/dev/null || true
+	@systemctl --user daemon-reload 2>/dev/null || true
 	sudo systemctl stop daemon.service 2>/dev/null || true
 	sudo mkdir -p /etc/millennium
 	sudo mkdir -p /var/log/millennium
@@ -137,6 +141,8 @@ install: daemon
 	sudo cp asoundrc.example /etc/asound.conf
 	sudo cp daemon /usr/local/bin/millennium-daemon
 	sudo cp systemd/daemon.service /etc/systemd/system/
+	sudo mkdir -p /etc/systemd/system/daemon.service.d
+	@echo '[Service]' > /tmp/daemon-override.conf; echo 'User='$$(logname) >> /tmp/daemon-override.conf; sudo cp /tmp/daemon-override.conf /etc/systemd/system/daemon.service.d/override.conf
 	sudo systemctl daemon-reload
 	sudo systemctl unmask daemon.service 2>/dev/null || true
 	sudo systemctl enable daemon.service
@@ -146,6 +152,7 @@ uninstall:
 	sudo systemctl stop daemon.service
 	sudo systemctl disable daemon.service
 	sudo rm -f /usr/local/bin/millennium-daemon
+	sudo rm -rf /etc/systemd/system/daemon.service.d
 	sudo rm -f /etc/systemd/system/daemon.service
 	sudo systemctl daemon-reload
 

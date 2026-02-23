@@ -5,7 +5,7 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-# Use /etc/millennium/daemon.conf (run: sudo cp daemon.conf.example /etc/millennium/daemon.conf)
+# Run as user who has ~/.baresip/ (accounts, config). make install creates daemon.service.d/override.conf with User=<you>
 # For development: use full path to binary, e.g. /home/USER/millennium/host/daemon
 ExecStart=/usr/local/bin/millennium-daemon --config /etc/millennium/daemon.conf
 # Optional: wait for network before starting
