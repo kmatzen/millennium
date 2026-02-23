@@ -6,17 +6,21 @@ Wants=network-online.target
 [Service]
 Type=simple
 # Run as user who has ~/.baresip/ (accounts, config). make install creates daemon.service.d/override.conf with User=<you>
-# For development: use full path to binary, e.g. /home/USER/millennium/host/daemon
-ExecStart=/usr/local/bin/millennium-daemon --config /etc/millennium/daemon.conf
+# Wrapper: redirect stdin before exec. Baresip/libre epolls fd 0; systemd's fd 0 causes EPERM and SEGV.
+ExecStart=/bin/sh -c 'exec 0</dev/null; exec /usr/local/bin/millennium-daemon --config /etc/millennium/daemon.conf'
 # Optional: wait for network before starting
 ExecStartPre=/bin/bash -c 'until /bin/ping -c1 -W1 8.8.8.8 >/dev/null 2>/dev/null; do sleep 1; done'
 Restart=on-failure
 RestartSec=2
 WorkingDirectory=/tmp
-# Baresip/libre tries to use stdin for UI; systemd gives none. Redirect to avoid epoll errors.
+# Baresip/libre tries to use stdin for UI; systemd gives none.
 StandardInput=null
 StandardOutput=journal
 StandardError=journal
+# Relax hardening: epoll_ctl on fd 0 can fail with EPERM under default systemd
+PrivateDevices=no
+ProtectSystem=no
+NoNewPrivileges=no
 
 [Install]
 WantedBy=default.target

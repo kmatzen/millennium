@@ -278,10 +278,11 @@ If you see:
   ```
   Update the systemd unit to use `--config /etc/millennium/daemon.conf`.
 
-- **epoll_ctl: EPOLL_CTL_ADD: fd=0 (Operation not permitted)** — Baresip tries to use stdin for UI. Add to your systemd unit:
-  ```ini
-  StandardInput=null
+- **epoll_ctl: EPOLL_CTL_ADD: fd=0 (Operation not permitted)** — Baresip's stdio module listens on stdin. Comment it out in `~/.baresip/config` (the line may have spaces: `module stdio.so`):
   ```
+  sed -i.bak 's/^\([[:space:]]*\)module\([[:space:]]\+\)stdio\.so/\1# module\2stdio.so/' ~/.baresip/config
+  ```
+  Then restart: `sudo systemctl restart daemon.service`
 
 - **conf_configure failed / SEGV** — Daemon needs to run as the user who has `~/.baresip/` (accounts, config). `make install` creates an override with your user. If you installed without make, create `/etc/systemd/system/daemon.service.d/override.conf`:
   ```ini

@@ -20,6 +20,7 @@
 #include <time.h>
 #include <ctype.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <pthread.h>
 #include <stdarg.h>
 
@@ -734,6 +735,16 @@ static void update_metrics(void) {
 }
 
 int main(int argc, char *argv[]) {
+    /* Redirect stdin to /dev/null so baresip/libre does not try to epoll fd 0.
+     * When run under systemd, fd 0 can trigger "Operation not permitted" and SEGV. */
+    {
+        int devnull = open("/dev/null", O_RDONLY);
+        if (devnull >= 0) {
+            dup2(devnull, STDIN_FILENO);
+            if (devnull != STDIN_FILENO) close(devnull);
+        }
+    }
+
     config_data_t* config = config_get_instance();
     /* health_monitor_t* health_monitor = health_monitor_get_instance(); */
     int loop_count = 0;
