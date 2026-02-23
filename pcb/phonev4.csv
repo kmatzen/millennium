@@ -15,7 +15,7 @@
 14;"C-arduino1,C-arduino-display1,C-card1,C-coin1,C-raspi1";"C_Small";5;"100nF";;;
 15;"D1";"SOT-143";1;"PRTR5V0U2X (ESD protection, J4 RJ9, 4-pin only)";;;
 16;"D2";"SOT-143";1;"PRTR5V0U2X (ESD protection, J1 coin, 4-pin only)";;;
-17;"Q1";"SOT-23";1;"Si2301 P-ch MOSFET (reverse polarity protection)";;;
+17;"Q1";"SOT-23";1;"Si2301/Si2319 P-ch MOSFET (reverse polarity; pin-compatible)";;;
 18;"F1";"Fuse_Radial_D10.0mm_P5.00mm";1;"1A PTC resettable fuse (radial THT)";;;
 19;"D3";"LED_D5.0mm";1;"Green power indicator LED (5mm THT)";;;
 20;"R3";"R_Axial_DIN0204";1;"1k (LED current limit)";;;
