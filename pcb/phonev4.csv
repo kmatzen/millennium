@@ -13,8 +13,8 @@
 12;"C_ripple";"CP_Radial_D5.0mm_P2.00mm";1;"4.7uF (TDA2822 ripple rejection)";;;
 13;"C_dec";"0603";1;"100nF (TDA2822 Vcc decoupling)";;;
 14;"C-arduino1,C-arduino-display1,C-card1,C-coin1,C-raspi1";"C_Small";5;"100nF";;;
-15;"D1";"SOT-23";1;"PRTR5V0U2X (ESD protection, J4 RJ9)";;;
-16;"D2";"SOT-23";1;"PRTR5V0U2X (ESD protection, J1 coin)";;;
+15;"D1";"SOT-143";1;"PRTR5V0U2X (ESD protection, J4 RJ9, 4-pin only)";;;
+16;"D2";"SOT-143";1;"PRTR5V0U2X (ESD protection, J1 coin, 4-pin only)";;;
 17;"Q1";"SOT-23";1;"Si2301 P-ch MOSFET (reverse polarity protection)";;;
 18;"F1";"Fuse_Radial_D10.0mm_P5.00mm";1;"1A PTC resettable fuse (radial THT)";;;
 19;"D3";"LED_D5.0mm";1;"Green power indicator LED (5mm THT)";;;
