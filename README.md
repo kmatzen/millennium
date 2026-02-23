@@ -17,7 +17,7 @@ This project reimagines the functionality of the Nortel Millennium telephone by 
 - **Raspberry Pi Zero 2 W**: Manages the system, runs the VoIP stack, and interfaces with the original hardware.
 - **Arduinos**: Control the keypad, display, and other peripherals.
 - **Custom PCB**: Consolidates the connections between components.
-- **Host Software**: Includes a daemon, systemd configurations, and custom Lua scripts for audio management.
+- **Host Software**: Includes a daemon, plugin system, web dashboard, and ALSA audio configuration.
 - **Preserved Hardware**: The original display, keypad, coin acceptor, magstripe reader, handset, and ringer speaker are retained and functional.
 
 <img src="IMG_5137.JPG" alt="photo of modified phone" style="height:400px;">
@@ -40,7 +40,7 @@ This project reimagines the functionality of the Nortel Millennium telephone by 
 - **`Arduino/`**: Contains Arduino sketches and a Makefile for building and flashing firmware.
 - **`case/`**: Contains 3D model files (`.blend` and `.stl`) for a custom enclosure, if needed.
 - **`pcb/`**: Includes KiCad project files and exported manufacturing files for the custom PCB.
-- **`host/`**: Contains software for the Raspberry Pi, including a daemon, systemd configurations, and a WirePlumber Lua script.
+- **`host/`**: Contains software for the Raspberry Pi, including the daemon, plugin system, web dashboard, and ALSA audio configuration.
 
 ---
 
@@ -55,8 +55,8 @@ This project reimagines the functionality of the Nortel Millennium telephone by 
 ### 3. Host Software
 - Build and configure the software on the Raspberry Pi Zero 2 W:
   - Compile the daemon using the provided `Makefile`.
-  - Install the WirePlumber Lua script as described in the [host README](host/README.md).
-  - Set up systemd user services for automated startup.
+  - Install the ALSA audio configuration as described in the [host README](host/README.md).
+  - Set up the systemd service for automated startup.
 
 ## Resources
 
