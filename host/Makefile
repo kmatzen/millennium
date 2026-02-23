@@ -146,7 +146,7 @@ install: daemon
 		echo "Commented out stdio module in ~/.baresip/config (backup: .bak)"; \
 	fi
 	sudo mkdir -p /etc/systemd/system/daemon.service.d
-	@echo '[Service]' > /tmp/daemon-override.conf; echo 'User='$$(logname) >> /tmp/daemon-override.conf; sudo cp /tmp/daemon-override.conf /etc/systemd/system/daemon.service.d/override.conf
+	@printf '[Service]\nUser=%s\n' "$$(logname 2>/dev/null || whoami)" > daemon-override.conf.tmp && sudo cp daemon-override.conf.tmp /etc/systemd/system/daemon.service.d/override.conf; rm -f daemon-override.conf.tmp
 	sudo systemctl daemon-reload
 	sudo systemctl unmask daemon.service 2>/dev/null || true
 	sudo systemctl enable daemon.service

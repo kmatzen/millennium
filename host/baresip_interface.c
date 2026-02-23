@@ -127,17 +127,40 @@ struct ua *baresip_call_get_ua(struct call *call) {
     return call_get_ua(call);
 }
 
-/* Event functions */
+/* Event functions - thunk to bridge enum baresip_ua_event <-> enum ua_event */
+static baresip_ua_event_handler_t g_bevent_handler;
+static void *g_bevent_arg;
+
+static void bevent_thunk(enum ua_event ev, struct bevent *event, void *arg) {
+    (void)arg;
+    if (g_bevent_handler)
+        g_bevent_handler((enum baresip_ua_event)ev, event, g_bevent_arg);
+}
+
 void baresip_bevent_register(baresip_ua_event_handler_t handler, void *arg) {
-    bevent_register(handler, arg);
+    g_bevent_handler = handler;
+    g_bevent_arg = arg;
+    bevent_register(bevent_thunk, NULL);
 }
 
 struct call *baresip_bevent_get_call(const struct bevent *event) {
     return bevent_get_call(event);
 }
 
+struct ua *baresip_bevent_get_ua(const struct bevent *event) {
+    return bevent_get_ua(event);
+}
+
+const char *baresip_bevent_get_text(const struct bevent *event) {
+    return bevent_get_text(event);
+}
+
 const char *baresip_uag_event_str(enum baresip_ua_event ev) {
     return uag_event_str((enum ua_event)ev);
+}
+
+int baresip_ua_isregistered(const struct ua *ua) {
+    return ua_isregistered(ua) ? 1 : 0;
 }
 
 /* Audio device listing */

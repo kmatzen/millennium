@@ -937,20 +937,34 @@ struct http_response web_server_handle_api_state(const struct http_request* requ
     memset(&response, 0, sizeof(response));
     web_server_strcpy_safe(response.content_type, "application/json", sizeof(response.content_type));
     
-    char json[512];
+    char json[768];
     struct daemon_state_info state_info = get_daemon_state_info();
     
+    /* Escape sip_last_error for JSON (simple backslash-quote escape) */
+    char escaped_error[256];
+    const char *src;
+    char *dst;
+    for (src = state_info.sip_last_error, dst = escaped_error; *src && (size_t)(dst - escaped_error) < sizeof(escaped_error) - 2; src++) {
+        if (*src == '"' || *src == '\\') *dst++ = '\\';
+        *dst++ = *src;
+    }
+    *dst = '\0';
+
     snprintf(json, sizeof(json),
         "{"
         "\"current_state\":%d,"
         "\"inserted_cents\":%d,"
         "\"keypad_buffer\":\"%s\","
-        "\"last_activity\":%ld"
+        "\"last_activity\":%ld,"
+        "\"sip_registered\":%d,"
+        "\"sip_last_error\":\"%s\""
         "}",
         state_info.current_state,
         state_info.inserted_cents,
         state_info.keypad_buffer,
-        state_info.last_activity);
+        state_info.last_activity,
+        state_info.sip_registered,
+        escaped_error);
     
     web_server_strcpy_safe(response.body, json, sizeof(response.body));
     return response;
@@ -981,7 +995,7 @@ struct http_response web_server_handle_api_control(const struct http_request* re
         }
     }
     
-    /* Parse key for keypad actions */
+    /* Parse key for keypad actions (supports "key" or "arg") */
     char* key_pos = strstr(request->body, "\"key\":\"");
     if (key_pos) {
         char* start = key_pos + 7; /* Length of "key":" */
@@ -993,12 +1007,32 @@ struct http_response web_server_handle_api_control(const struct http_request* re
                 key[len] = '\0';
             }
         }
+    } else {
+        char* arg_pos = strstr(request->body, "\"arg\":\"");
+        if (arg_pos && key[0] == '\0') {
+            char* start = arg_pos + 7; /* Length of "arg":" */
+            char* end = strchr(start, '"');
+            if (end) {
+                size_t len = end - start;
+                if (len > 0 && len < sizeof(key)) {
+                    memcpy(key, start, len);
+                    key[len] = '\0';
+                }
+            }
+        }
     }
     
-    /* Parse cents for card actions */
+    /* Parse cents for coin_insert (supports "cents" or "arg") */
     char* cents_pos = strstr(request->body, "\"cents\":");
     if (cents_pos) {
         cents = atoi(cents_pos + 8); /* Length of "cents": */
+    } else if (cents == 0) {
+        char* arg_quoted = strstr(request->body, "\"arg\":\"");
+        char* arg_num = strstr(request->body, "\"arg\":");
+        if (arg_quoted)
+            cents = atoi(arg_quoted + 7); /* "arg":" = 7 chars */
+        else if (arg_num)
+            cents = atoi(arg_num + 6);    /* "arg": = 6 chars */
     }
     
     /* Parse plugin for plugin actions */

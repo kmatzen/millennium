@@ -30,6 +30,11 @@ static void string_buffer_append(struct millennium_client *client, const char *d
 static void string_buffer_ensure_capacity(struct millennium_client *client, size_t needed);
 static int open_serial_port(struct millennium_client *client, const char *device);
 
+/* SIP registration state: 0=unknown, 1=ok, -1=fail */
+static int g_sip_registered = 0;
+static char g_sip_last_error[256] = {0};
+static pthread_mutex_t g_sip_mutex = PTHREAD_MUTEX_INITIALIZER;
+
 /* Event queue implementation */
 static void event_queue_push(struct millennium_client *client, void *event) {
     struct event_queue_node *node = malloc(sizeof(struct event_queue_node));
@@ -126,6 +131,36 @@ static void ua_event_handler(enum baresip_ua_event ev, struct bevent *event, voi
     call_state_event_t *call_event;
     
     logger_infof_with_category("SDK", "UA event: %s", baresip_uag_event_str(ev));
+
+    /* Track SIP registration state for health check */
+    if (ev == BARESIP_UA_EVENT_REGISTER_OK) {
+        pthread_mutex_lock(&g_sip_mutex);
+        g_sip_registered = 1;
+        g_sip_last_error[0] = '\0';
+        pthread_mutex_unlock(&g_sip_mutex);
+    } else if (ev == BARESIP_UA_EVENT_REGISTER_FAIL) {
+        pthread_mutex_lock(&g_sip_mutex);
+        g_sip_registered = -1;
+        ua = baresip_bevent_get_ua(event);
+        if (ua) {
+            struct account *acc = baresip_ua_account(ua);
+            const char *aor = acc ? baresip_account_aor(acc) : NULL;
+            const char *text = baresip_bevent_get_text(event);
+            if (text && text[0]) {
+                logger_warnf_with_category("SDK", "SIP registration failed%s%s (%.64s)",
+                    aor ? ": " : "", aor ? aor : "unknown", text);
+                snprintf(g_sip_last_error, sizeof(g_sip_last_error), "%.128s", text);
+            } else {
+                logger_warnf_with_category("SDK", "SIP registration failed%s%s",
+                    aor ? ": " : "", aor ? aor : "");
+                snprintf(g_sip_last_error, sizeof(g_sip_last_error), "Registration failed%s",
+                    aor ? "" : " (no account)");
+            }
+        } else {
+            g_sip_last_error[0] = '\0';
+        }
+        pthread_mutex_unlock(&g_sip_mutex);
+    }
     
     if (client) {
         call = baresip_bevent_get_call(event);
@@ -182,6 +217,16 @@ void list_audio_devices(void) {
             logger_infof_with_category("SDK", "Player: %s", baresip_auplay_name(auplay));
         }
     }
+}
+
+void millennium_sdk_get_sip_status(int *registered, char *last_error, size_t last_error_size) {
+    pthread_mutex_lock(&g_sip_mutex);
+    if (registered) *registered = g_sip_registered;
+    if (last_error && last_error_size > 0) {
+        strncpy(last_error, g_sip_last_error, last_error_size - 1);
+        last_error[last_error_size - 1] = '\0';
+    }
+    pthread_mutex_unlock(&g_sip_mutex);
 }
 
 /* Open (or reopen) the serial port, configuring termios. Returns 0 on success. */

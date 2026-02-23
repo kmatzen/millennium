@@ -19,3 +19,4 @@ host/*.log
 *.pch
 pcb/*.lck
 host/unit_tests
+host/daemon-override.conf.tmp

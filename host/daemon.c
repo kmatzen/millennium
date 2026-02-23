@@ -106,6 +106,8 @@ struct daemon_state_info get_daemon_state_info(void) {
         strcpy(info.keypad_buffer, "");
         info.last_activity = time(NULL);
     }
+
+    millennium_sdk_get_sip_status(&info.sip_registered, info.sip_last_error, sizeof(info.sip_last_error));
     
     return info;
 }
@@ -687,9 +689,11 @@ health_status_t check_serial_connection(void) {
 }
 
 health_status_t check_sip_connection(void) {
-    /* This would check if the SIP connection is active */
-    /* For now, we'll return healthy */
-    return HEALTH_STATUS_HEALTHY;
+    int registered = 0;
+    millennium_sdk_get_sip_status(&registered, NULL, 0);
+    if (registered == 1) return HEALTH_STATUS_HEALTHY;
+    if (registered == -1) return HEALTH_STATUS_CRITICAL;
+    return HEALTH_STATUS_UNKNOWN;
 }
 
 health_status_t check_daemon_activity(void) {

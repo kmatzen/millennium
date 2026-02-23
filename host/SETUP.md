@@ -19,15 +19,9 @@ sudo apt install build-essential git libasound2-dev libssl-dev cmake
 
 ## 2. User setup
 
-The daemon runs as a user-level systemd service. Enable lingering so services
-start at boot without requiring a login session:
-
-```bash
-sudo loginctl enable-linger $USER
-```
-
-Add your user to the `dialout` and `audio` groups (needed for serial ports and
-ALSA):
+The daemon runs as a system-wide systemd service but executes as your user
+(to access `~/.baresip/`). Add your user to the `dialout` and `audio` groups
+(needed for serial ports and ALSA):
 
 ```bash
 sudo usermod -aG dialout,audio $USER
@@ -87,9 +81,9 @@ audio_txmode        thread
 audio_buffer        60-160
 audio_buffer_mode   adaptive
 
-# Modules — only load what we need
+# Modules — only load what we need (stdio commented: daemon has no stdin)
 module_path         /usr/local/lib/arm-linux-gnueabihf/baresip/modules
-module              stdio.so
+# module              stdio.so
 module              g711.so
 module              auconv.so
 module              auresamp.so
@@ -190,36 +184,34 @@ sudo chown $USER:$USER /var/lib/millennium
 
 ## 10. Install the systemd service
 
-Copy the unit file and edit the paths to match your environment:
+**Production** (recommended): Use `make install` for a system-wide service that
+starts at boot:
+
+```bash
+cd ~/millennium/host
+make install
+```
+
+This installs the daemon to `/usr/local/bin/millennium-daemon`, creates
+`/etc/systemd/system/daemon.service` with an override to run as your user,
+comments out the baresip stdio module (if present), and starts the service.
+Check status:
+
+```bash
+sudo systemctl status daemon.service
+```
+
+**Development** (running from repo, no `make install`): Use the dev service:
 
 ```bash
 mkdir -p ~/.config/systemd/user
-cp systemd/daemon.service ~/.config/systemd/user/
-```
-
-Edit `~/.config/systemd/user/daemon.service` and update paths as needed.
-Use `/etc/millennium/daemon.conf` for config (create with `sudo cp daemon.conf.example /etc/millennium/daemon.conf`).
-Add `StandardInput=null` to avoid baresip epoll errors when run as a service.
-
-```ini
-ExecStart=/home/YOUR_USER/millennium/host/daemon --config /etc/millennium/daemon.conf
-StandardInput=null
-WorkingDirectory=/home/YOUR_USER/millennium/host
-```
-
-Then enable and start the service:
-
-```bash
+cp systemd/daemon-dev.service ~/.config/systemd/user/daemon.service
 systemctl --user daemon-reload
 systemctl --user enable daemon.service
 systemctl --user start daemon.service
 ```
 
-Check that it's running:
-
-```bash
-systemctl --user status daemon.service
-```
+Ensure `/etc/millennium/daemon.conf` exists: `sudo cp daemon.conf.example /etc/millennium/daemon.conf`.
 
 The web dashboard should now be accessible at `http://<pi-ip>:8081`.
 
@@ -260,11 +252,12 @@ To update the daemon after pulling new code:
 cd ~/millennium/host
 git pull
 make clean && make daemon
-systemctl --user restart daemon.service
+sudo make install
 ```
 
 Or use the OTA update feature from the web dashboard if the `system.source_dir`
-config points to the local repo.
+config points to the local repo. If using the dev service (systemctl --user),
+use `systemctl --user restart daemon.service` instead.
 
 ## Troubleshooting
 
@@ -279,10 +272,10 @@ If you see:
   Update the systemd unit to use `--config /etc/millennium/daemon.conf`.
 
 - **epoll_ctl: EPOLL_CTL_ADD: fd=0 (Operation not permitted)** — Baresip's stdio module listens on stdin. Comment it out in `~/.baresip/config` (the line may have spaces: `module stdio.so`):
+  ```bash
+  sed -i.bak 's/^[[:space:]]*module[[:space:]]*stdio\.so/# module stdio.so/' ~/.baresip/config
+  sudo systemctl restart daemon.service
   ```
-  sed -i.bak 's/^\([[:space:]]*\)module\([[:space:]]\+\)stdio\.so/\1# module\2stdio.so/' ~/.baresip/config
-  ```
-  Then restart: `sudo systemctl restart daemon.service`
 
 - **conf_configure failed / SEGV** — Daemon needs to run as the user who has `~/.baresip/` (accounts, config). `make install` creates an override with your user. If you installed without make, create `/etc/systemd/system/daemon.service.d/override.conf`:
   ```ini
@@ -334,18 +327,25 @@ If the daemon log shows a serial open error:
 2. Verify credentials in `~/.baresip/accounts`
 3. Check the daemon log for Baresip error messages:
    ```bash
-   journalctl --user -u daemon.service --no-pager -n 50
+   journalctl -u daemon.service --no-pager -n 100 | grep -iE 'reg|sip|403'
    ```
 4. Try running Baresip standalone to isolate SIP issues:
    ```bash
    baresip
    ```
+5. Check the web dashboard `/api/state` — it shows `sip_registered` (1=ok, -1=failed)
+   and `sip_last_error` with the provider's message.
+6. **Twilio 403 Forbidden**: Common causes:
+   - Wrong `auth_user` or `auth_pass` in `~/.baresip/accounts`
+   - Credentials List username/password in Twilio Console don't match
+   - SIP domain (e.g. `matzen-test.sip.twilio.com`) not set up or mismatched
+   - Verify in Twilio Console → Voice → SIP Trunking → Credential List
 
 ### Daemon crashes or restarts repeatedly
 
 1. Check the log for the crash reason:
    ```bash
-   journalctl --user -u daemon.service --no-pager -n 100
+   sudo journalctl -u daemon.service --no-pager -n 100
    ```
 2. Check available disk space: `df -h` — the log file can grow if
    `logging.to_file=true`
