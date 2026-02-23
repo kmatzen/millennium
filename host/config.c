@@ -328,6 +328,10 @@ int config_is_free_number(const config_data_t* config, const char* number) {
     return 0;
 }
 
+int config_get_idle_timeout_seconds(const config_data_t* config) {
+    return config_get_int(config, "call.idle_timeout_seconds", 60);
+}
+
 /* Logging Configuration */
 const char* config_get_log_level(const config_data_t* config) {
     return config_get_string(config, "logging.level", "INFO");

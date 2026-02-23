@@ -1,0 +1,30 @@
+# Test: Idle timeout resets phone after inactivity
+# Default idle timeout is 60 seconds
+
+# Lift receiver
+hook_up
+assert_state IDLE_UP
+assert_display Insert 50c
+
+# Insert coins and dial some digits
+coin 25
+keys 555
+assert_display Have: 25c
+assert_display (555) ___-____
+
+# Wait long enough for idle timeout (simulator uses 5s timeout)
+wait 65
+
+# After timeout, coins and keypad should be cleared
+assert_display Insert 50c
+assert_display (___) ___-____
+
+# The phone should still be in IDLE_UP (handset is still up)
+assert_state IDLE_UP
+
+# Can start a new interaction
+coin 25
+assert_display Have: 25c
+
+hook_down
+assert_state IDLE_DOWN
