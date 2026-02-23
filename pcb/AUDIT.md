@@ -23,12 +23,12 @@ This document captures audit findings for the phonev4 schematic and PCB design, 
 
 | Category | Status | Action |
 |----------|--------|--------|
-| Power labels (5v, 12v) | Mismatch | Rename to 5V_MAIN, 12V_COIN per README |
-| BOM vs schematic refs | D3/LED1, TP6/TP7 | Align references; update BOM for TP6=12V_COIN |
-| Q1 part number | Si2319 vs Si2301 | Verify pin compatibility; update schematic or BOM |
-| Missing footprints | D3, F1, TP1–TP5 | Assign footprints in schematic |
-| PRTR package | SOT-143 in schem | BOM says SOT-23; PRTR5V0U2X has both — verify |
-| Test points TP6/TP7 | Removed per docs | BOM still lists TX/RX; add TP6=12V_COIN, remove TP7 |
+| Power labels (5v, 12v) | ✓ Fixed | Renamed to 5V_MAIN, 12V_COIN |
+| BOM vs schematic refs | ✓ Fixed | D3, TP1-TP5, U1; see phonev4.csv |
+| Q1 part number | Open | Si2319 vs Si2301; verify pin compatibility |
+| Missing footprints | ✓ Fixed | THT assigned for D3, F1, TP1–TP5 |
+| PRTR package | Open | SOT-143 in schem, BOM SOT-23; verify which used |
+| Test points | ✓ Fixed | TP1-TP5 only; no TX/RX on PCB |
 
 ---
 
@@ -36,17 +36,11 @@ This document captures audit findings for the phonev4 schematic and PCB design, 
 
 ### 1. Net Labels vs Documentation
 
-- **Schematic**: Uses `5v`, `12v`, `gnd`
-- **README**: Specifies `5V_MAIN`, `12V_COIN`, `gnd`
-- **Action**: In KiCad schematic, use Find and Replace to rename:
-  - `5v` → `5V_MAIN`
-  - `12v` → `12V_COIN` (ensure XL6009 OUT+ is labeled)
+- **Status:** ✓ Fixed. Schematic and PCB use `5V_MAIN`, `12V_COIN`, `gnd`.
 
-### 2. BOM (phonev4.csv) Updates Required
+### 2. BOM (phonev4.csv)
 
-- **LED1 vs D3**: Schematic uses D3 for the power LED. Either rename D3→LED1 in schematic, or update BOM to use D3.
-- **TP6, TP7**: BOM lists TP1–TP7 (TX, RX). Per README, USB is via external hub — no TX/RX nets. Replace with TP6=12V_COIN. Remove TP7 or repurpose.
-- **U1 footprint**: BOM shows "-" for U1 footprint; schematic has `misc_footprints:XL6009_module`. Confirm BOM row.
+- **Status:** ✓ Aligned. D3, TP1-TP5, F1/Fuse_Radial, R3/R_Axial, U1/XL6009_module.
 
 ### 3. Part Discrepancies
 
@@ -55,16 +49,11 @@ This document captures audit findings for the phonev4 schematic and PCB design, 
 
 ### 4. Missing Footprints
 
-| Ref | Value | BOM Footprint | Schematic | Action |
-|-----|-------|---------------|-----------|--------|
-| D3/LED1 | Green LED | LED_0805 | (none) | Assign LED_0805 or equivalent |
-| F1 | 1A PTC | Fuse_1812 | (none) | Assign Fuse_1812 |
-| TP1–TP5 | Test points | TestPoint | (none) | Assign test point footprint |
-| TP6 | 12V_COIN | (add) | (add) | Add test point for 12V_COIN |
+- **Status:** ✓ Fixed. THT footprints assigned: D3 (LED_D5.0mm), F1 (Fuse_Radial_D10mm), TP1–TP5 (TestPoint_Loop).
 
 ### 5. Wiring Verification (Manual)
 
-Per README "Schematic Changes Required in KiCad":
+Per README "Schematic Changes Required in KiCad". Verify in KiCad: open schematic, highlight nets (Ctrl+click), trace power flow.
 
 - [ ] Q1 on incoming 5V rail, before F1 and U1
 - [ ] F1 in series on incoming 5V
@@ -72,6 +61,8 @@ Per README "Schematic Changes Required in KiCad":
 - [ ] D1, D2 clamp signal pins to 5V_MAIN and GND (not power rails)
 - [ ] TDA2822 V+ from 5V_MAIN
 - [ ] No TX/RX nets for Arduino–Pi path (USB via hub)
+
+**How to verify:** In KiCad schematic, use Edit → Find to locate each component. Inspect wire connectivity; net names (5V_MAIN, 12V_COIN, gnd) appear on wires. Run "Update PCB from Schematic" to sync; DRC will flag any copper issues.
 
 ### 6. Connector Pinouts
 
