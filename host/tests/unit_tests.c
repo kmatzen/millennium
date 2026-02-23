@@ -6,6 +6,7 @@
 #include "../logger.h"
 #include "../metrics.h"
 #include "../millennium_sdk.h"
+#include "../updater.h"
 #include <stdlib.h>
 
 /* ── Stubs for linker (plugins.c references these) ──────────────── */
@@ -387,6 +388,37 @@ static void test_plugins_duplicate_register(void) {
     plugins_cleanup();
 }
 
+/* ── Updater tests ─────────────────────────────────────────────── */
+
+static void test_version_compare_equal(void) {
+    TEST_ASSERT_EQ_INT(0, updater_compare_versions("1.0.0", "1.0.0"));
+}
+
+static void test_version_compare_major(void) {
+    TEST_ASSERT(updater_compare_versions("2.0.0", "1.0.0") > 0);
+    TEST_ASSERT(updater_compare_versions("1.0.0", "2.0.0") < 0);
+}
+
+static void test_version_compare_minor(void) {
+    TEST_ASSERT(updater_compare_versions("1.2.0", "1.1.0") > 0);
+    TEST_ASSERT(updater_compare_versions("1.1.0", "1.2.0") < 0);
+}
+
+static void test_version_compare_patch(void) {
+    TEST_ASSERT(updater_compare_versions("1.0.2", "1.0.1") > 0);
+    TEST_ASSERT(updater_compare_versions("1.0.1", "1.0.2") < 0);
+}
+
+static void test_version_compare_with_v_prefix(void) {
+    TEST_ASSERT_EQ_INT(0, updater_compare_versions("v1.0.0", "1.0.0"));
+    TEST_ASSERT(updater_compare_versions("v2.0.0", "v1.0.0") > 0);
+}
+
+static void test_version_no_update_initially(void) {
+    TEST_ASSERT_EQ_INT(0, updater_is_update_available());
+    TEST_ASSERT_NULL((void *)updater_get_latest_version());
+}
+
 /* ── Main ───────────────────────────────────────────────────────── */
 
 int main(void) {
@@ -422,6 +454,14 @@ int main(void) {
     TEST_SUITE_RUN(test_plugins_register_custom);
     TEST_SUITE_RUN(test_plugins_list);
     TEST_SUITE_RUN(test_plugins_duplicate_register);
+
+    TEST_SUITE_BEGIN("Updater");
+    TEST_SUITE_RUN(test_version_compare_equal);
+    TEST_SUITE_RUN(test_version_compare_major);
+    TEST_SUITE_RUN(test_version_compare_minor);
+    TEST_SUITE_RUN(test_version_compare_patch);
+    TEST_SUITE_RUN(test_version_compare_with_v_prefix);
+    TEST_SUITE_RUN(test_version_no_update_initially);
 
     TEST_REPORT();
 }

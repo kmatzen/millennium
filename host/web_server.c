@@ -7,6 +7,7 @@
 #include "plugins.h"
 #include "websocket.h"
 #include "version.h"
+#include "updater.h"
 
 #include <sys/socket.h>
 #include <sys/select.h>
@@ -741,6 +742,8 @@ void web_server_setup_api_routes(struct web_server* server) {
     web_server_add_route(server, "GET", "/api/logs", web_server_handle_api_logs);
     web_server_add_route(server, "GET", "/api/plugins", web_server_handle_api_plugins);
     web_server_add_route(server, "GET", "/api/version", web_server_handle_api_version);
+    web_server_add_route(server, "GET", "/api/check-update", web_server_handle_api_check_update);
+    web_server_add_route(server, "GET", "/", web_server_handle_dashboard);
 }
 
 /* Default handlers */
@@ -1294,6 +1297,121 @@ struct http_response web_server_handle_api_version(const struct http_request* re
         "{\"version\":\"%s\",\"git_hash\":\"%s\",\"build_time\":\"%s\"}",
         version_get_string(), version_get_git_hash(), version_get_build_time());
     web_server_strcpy_safe(response.body, json, sizeof(response.body));
+    return response;
+}
+
+struct http_response web_server_handle_api_check_update(const struct http_request* request) {
+    (void)request;
+    struct http_response response;
+    char json[512];
+    const char *latest;
+    memset(&response, 0, sizeof(response));
+    web_server_strcpy_safe(response.content_type, "application/json", sizeof(response.content_type));
+    response.status_code = 200;
+
+    updater_check();
+    latest = updater_get_latest_version();
+
+    snprintf(json, sizeof(json),
+        "{\"current_version\":\"%s\",\"latest_version\":\"%s\","
+        "\"update_available\":%s,\"git_hash\":\"%s\"}",
+        version_get_string(),
+        latest ? latest : "unknown",
+        updater_is_update_available() ? "true" : "false",
+        version_get_git_hash());
+    web_server_strcpy_safe(response.body, json, sizeof(response.body));
+    return response;
+}
+
+struct http_response web_server_handle_dashboard(const struct http_request* request) {
+    (void)request;
+    struct http_response response;
+    memset(&response, 0, sizeof(response));
+    response.status_code = 200;
+    web_server_strcpy_safe(response.content_type, "text/html", sizeof(response.content_type));
+
+    snprintf(response.body, sizeof(response.body),
+        "<!DOCTYPE html><html><head>"
+        "<meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+        "<title>Millennium Payphone</title>"
+        "<style>"
+        "*{margin:0;padding:0;box-sizing:border-box}"
+        "body{font-family:-apple-system,system-ui,sans-serif;background:#1a1a2e;color:#e0e0e0;min-height:100vh}"
+        ".header{background:#16213e;padding:16px 24px;border-bottom:1px solid #0f3460;display:flex;justify-content:space-between;align-items:center}"
+        ".header h1{font-size:20px;color:#e94560}"
+        ".ver{font-size:12px;color:#888}"
+        ".grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;padding:20px}"
+        ".card{background:#16213e;border-radius:8px;padding:20px;border:1px solid #0f3460}"
+        ".card h2{font-size:14px;color:#e94560;margin-bottom:12px;text-transform:uppercase;letter-spacing:1px}"
+        ".state{font-size:28px;font-weight:700;color:#53d769;margin:8px 0}"
+        ".display-box{background:#0a0a1a;border:1px solid #333;border-radius:4px;padding:12px;font-family:'Courier New',monospace;font-size:16px;color:#0f0;min-height:56px;margin:8px 0}"
+        ".metric{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #0f3460}"
+        ".metric:last-child{border:none}"
+        ".metric .label{color:#888}.metric .value{font-weight:600}"
+        ".btn{background:#e94560;color:#fff;border:none;padding:8px 16px;border-radius:4px;cursor:pointer;font-size:13px;margin:4px}"
+        ".btn:hover{background:#c73652}"
+        ".btn.secondary{background:#0f3460}.btn.secondary:hover{background:#16213e}"
+        ".status-dot{display:inline-block;width:8px;height:8px;border-radius:50%%;margin-right:6px}"
+        ".dot-green{background:#53d769}.dot-yellow{background:#f5a623}.dot-red{background:#e94560}"
+        "#log{background:#0a0a1a;border:1px solid #333;border-radius:4px;padding:8px;font-family:monospace;font-size:11px;color:#aaa;max-height:200px;overflow-y:auto}"
+        "</style></head><body>"
+
+        "<div class=\"header\"><h1>Millennium Payphone</h1>"
+        "<span class=\"ver\" id=\"ver\">v%s (%s)</span></div>"
+
+        "<div class=\"grid\">"
+
+        "<div class=\"card\"><h2>Phone State</h2>"
+        "<div class=\"state\" id=\"state\">Connecting...</div>"
+        "<div class=\"display-box\" id=\"vfd\">-- -- -- -- -- -- -- --</div>"
+        "<div class=\"metric\"><span class=\"label\">Coins</span><span class=\"value\" id=\"coins\">--</span></div>"
+        "<div class=\"metric\"><span class=\"label\">Keypad</span><span class=\"value\" id=\"keypad\">--</span></div>"
+        "<div class=\"metric\"><span class=\"label\">Plugin</span><span class=\"value\" id=\"plugin\">--</span></div>"
+        "</div>"
+
+        "<div class=\"card\"><h2>Controls</h2>"
+        "<button class=\"btn\" onclick=\"api('/api/check-update').then(d=>document.getElementById('upd').textContent="
+        "d.update_available?'Update: '+d.latest_version:'Up to date')\">Check Updates</button>"
+        "<span id=\"upd\" style=\"font-size:12px;margin-left:8px\"></span>"
+        "<hr style=\"border-color:#0f3460;margin:12px 0\">"
+        "<button class=\"btn secondary\" onclick=\"api('/api/health').then(d=>alert(JSON.stringify(d,null,2)))\">Health</button>"
+        "<button class=\"btn secondary\" onclick=\"api('/api/metrics').then(d=>alert(JSON.stringify(d,null,2)))\">Metrics</button>"
+        "</div>"
+
+        "<div class=\"card\"><h2>Live Events</h2>"
+        "<div id=\"log\"></div></div>"
+
+        "</div>"
+
+        "<script>"
+        "function api(u){return fetch(u).then(r=>r.json())}"
+        "var ws,log=document.getElementById('log');"
+        "function connect(){"
+        "ws=new WebSocket('ws://'+location.host+'/ws');"
+        "ws.onmessage=function(e){"
+        "try{var d=JSON.parse(e.data);"
+        "if(d.state)document.getElementById('state').textContent=d.state;"
+        "if(d.coins!==undefined)document.getElementById('coins').textContent=d.coins+'c';"
+        "if(d.keypad!==undefined)document.getElementById('keypad').textContent=d.keypad||'(empty)';"
+        "if(d.plugin)document.getElementById('plugin').textContent=d.plugin;"
+        "var p=document.createElement('div');"
+        "p.textContent=new Date().toLocaleTimeString()+' '+d.event;"
+        "log.prepend(p);"
+        "if(log.children.length>50)log.lastChild.remove();"
+        "}catch(x){}};"
+        "ws.onclose=function(){setTimeout(connect,2000)};"
+        "}"
+        "connect();"
+        "api('/api/state').then(function(d){"
+        "document.getElementById('state').textContent=d.state||'Unknown';"
+        "document.getElementById('coins').textContent=(d.inserted_cents||0)+'c';"
+        "document.getElementById('keypad').textContent=d.keypad_buffer||'(empty)';"
+        "}).catch(function(){});"
+        "</script>"
+
+        "</body></html>",
+        version_get_string(), version_get_git_hash());
+
     return response;
 }
 

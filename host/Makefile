@@ -33,7 +33,7 @@ metrics_server.o: metrics_server.c metrics_server.h metrics.h logger.h
 websocket.o: websocket.c websocket.h
 	gcc websocket.c -o websocket.o -c $(CFLAGS)
 
-web_server.o: web_server.c web_server.h websocket.h config.h logger.h metrics.h health_monitor.h version.h
+web_server.o: web_server.c web_server.h websocket.h config.h logger.h metrics.h health_monitor.h version.h updater.h
 	gcc web_server.c -o web_server.o -c $(CFLAGS)
 
 baresip_interface.o: baresip_interface.c baresip_interface.h
@@ -60,6 +60,9 @@ version.o: version.c version.h
 audio_tones.o: audio_tones.c audio_tones.h logger.h
 	gcc audio_tones.c -o audio_tones.o -c $(CFLAGS) -lm
 
+updater.o: updater.c updater.h version.h logger.h
+	gcc updater.c -o updater.o -c $(CFLAGS)
+
 daemon.o: daemon.c millennium_sdk.h events.h event_processor.h config.h logger.h health_monitor.h metrics.h metrics_server.h web_server.h plugins.h state_persistence.h display_manager.h audio_tones.h
 	gcc daemon.c -o daemon.o -c $(CFLAGS)
 
@@ -76,8 +79,8 @@ plugins/fortune_teller.o: plugins/fortune_teller.c plugins.h
 plugins/jukebox.o: plugins/jukebox.c plugins.h
 	gcc plugins/jukebox.c -o plugins/jukebox.o -c $(C99_CFLAGS) -lpthread
 
-daemon: daemon.o daemon_state.o millennium_sdk.o baresip_interface.o events.o event_processor.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o websocket.o plugins.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o state_persistence.o display_manager.o version.o audio_tones.o
-	gcc daemon.o daemon_state.o millennium_sdk.o baresip_interface.o events.o event_processor.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o websocket.o plugins.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o state_persistence.o display_manager.o version.o audio_tones.o -o daemon $(LDFLAGS) -lm
+daemon: daemon.o daemon_state.o millennium_sdk.o baresip_interface.o events.o event_processor.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o websocket.o plugins.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o state_persistence.o display_manager.o version.o audio_tones.o updater.o
+	gcc daemon.o daemon_state.o millennium_sdk.o baresip_interface.o events.o event_processor.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o websocket.o plugins.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o state_persistence.o display_manager.o version.o audio_tones.o updater.o -o daemon $(LDFLAGS) -lm
 
 # Simulator object file (uses C99 for mixed declarations)
 simulator.o: simulator.c millennium_sdk.h events.h config.h daemon_state.h logger.h metrics.h plugins.h
@@ -98,9 +101,9 @@ simulator: $(SIM_OBJS)
 all: daemon
 
 # Unit test binary
-UNIT_TEST_OBJS = tests/unit_tests.o daemon_state.o events.o event_processor.o config.o logger.o metrics.o plugins.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o state_persistence.o display_manager.o version.o
+UNIT_TEST_OBJS = tests/unit_tests.o daemon_state.o events.o event_processor.o config.o logger.o metrics.o plugins.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o state_persistence.o display_manager.o version.o updater.o
 
-tests/unit_tests.o: tests/unit_tests.c tests/test_framework.h config.h daemon_state.h plugins.h logger.h metrics.h millennium_sdk.h
+tests/unit_tests.o: tests/unit_tests.c tests/test_framework.h config.h daemon_state.h plugins.h logger.h metrics.h millennium_sdk.h updater.h
 	gcc tests/unit_tests.c -o tests/unit_tests.o -c $(C99_CFLAGS) -I.
 
 # Unit tests don't use time wrapping; link ALSA on Linux for jukebox
