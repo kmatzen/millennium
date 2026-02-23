@@ -435,23 +435,18 @@ void handle_hook_event(hook_state_change_event_t *hook_event) {
         daemon_state->current_state = DAEMON_STATE_IDLE_DOWN;
         daemon_state_update_activity(daemon_state);
     }
+    int resulting_state = (int)daemon_state->current_state;
     pthread_mutex_unlock(&daemon_state_mutex);
     
     /* Let active plugin handle the hook event */
     plugins_handle_hook(hook_up, hook_down);
     
-    /* Handle external calls outside of mutex */
+    /* Handle external calls outside of mutex using snapshot taken above */
     if (hook_up) {
-        /* Check what state we ended up in after the mutex section */
-        pthread_mutex_lock(&daemon_state_mutex);
-        if (daemon_state->current_state == DAEMON_STATE_CALL_ACTIVE) {
-            pthread_mutex_unlock(&daemon_state_mutex);
+        if (resulting_state == DAEMON_STATE_CALL_ACTIVE) {
             millennium_client_answer_call(client);
-        } else if (daemon_state->current_state == DAEMON_STATE_IDLE_UP) {
-            pthread_mutex_unlock(&daemon_state_mutex);
+        } else if (resulting_state == DAEMON_STATE_IDLE_UP) {
             millennium_client_write_to_coin_validator(client, 'a');
-        } else {
-            pthread_mutex_unlock(&daemon_state_mutex);
         }
     } else if (hook_down) {
         millennium_client_hangup(client);

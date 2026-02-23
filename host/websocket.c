@@ -170,8 +170,8 @@ uint8_t *ws_encode_text_frame(const char *payload, size_t payload_len, size_t *f
 }
 
 int ws_decode_frame(const uint8_t *data, size_t data_len,
-                    uint8_t *payload_out, size_t *payload_len,
-                    size_t *bytes_consumed) {
+                    uint8_t *payload_out, size_t payload_out_size,
+                    size_t *payload_len, size_t *bytes_consumed) {
     int opcode;
     int masked;
     size_t plen, offset;
@@ -195,6 +195,8 @@ int ws_decode_frame(const uint8_t *data, size_t data_len,
              | ((size_t)data[8] << 8)  | data[9];
         offset = 10;
     }
+
+    if (plen > payload_out_size) return -1;
 
     if (masked) {
         if (data_len < offset + 4) return -1;
