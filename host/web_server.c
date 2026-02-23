@@ -1369,7 +1369,14 @@ struct http_response web_server_handle_dashboard(const struct http_request* requ
         "<div class=\"metric\"><span class=\"label\">Plugin</span><span class=\"value\" id=\"plugin\">--</span></div>"
         "</div>"
 
-        "<div class=\"card\"><h2>Controls</h2>"
+        "<div class=\"card\"><h2>Plugins</h2>"
+        "<div style=\"display:flex;gap:6px;flex-wrap:wrap\">"
+        "<button class=\"btn\" onclick=\"post('/api/control',{action:'activate_plugin',plugin:'Classic Phone'})\">Classic Phone</button>"
+        "<button class=\"btn\" onclick=\"post('/api/control',{action:'activate_plugin',plugin:'Fortune Teller'})\">Fortune Teller</button>"
+        "<button class=\"btn\" onclick=\"post('/api/control',{action:'activate_plugin',plugin:'Jukebox'})\">Jukebox</button>"
+        "</div></div>"
+
+        "<div class=\"card\"><h2>System</h2>"
         "<button class=\"btn\" onclick=\"api('/api/check-update').then(d=>document.getElementById('upd').textContent="
         "d.update_available?'Update: '+d.latest_version:'Up to date')\">Check Updates</button>"
         "<span id=\"upd\" style=\"font-size:12px;margin-left:8px\"></span>"
@@ -1385,6 +1392,7 @@ struct http_response web_server_handle_dashboard(const struct http_request* requ
 
         "<script>"
         "function api(u){return fetch(u).then(r=>r.json())}"
+        "function post(u,b){return fetch(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)}).then(r=>r.json())}"
         "var ws,log=document.getElementById('log');"
         "function connect(){"
         "ws=new WebSocket('ws://'+location.host+'/ws');"
