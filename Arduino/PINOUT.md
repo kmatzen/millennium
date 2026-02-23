@@ -32,7 +32,7 @@ definitions only change the USB VID/PID so the Pi can distinguish them via
 | 18 (A0)     | PF7            | Keypad col 4         | I/O          | Extra columns (A-P keys)           |
 | 19 (A1)     | PF6            | Keypad col 5         | I/O          | Extra columns (A-P keys)           |
 | 20 (A2)     | PF5            | Keypad col 6         | I/O          | Extra columns (A-P keys)           |
-| 21 (A3)     | PF4            | Hook common pin      | Output/Input | Toggled each loop — see note       |
+| 21 (A3)     | PF4            | Hook common pin      | Output       | Driven LOW to scan, HIGH at idle   |
 | 22 (A4)     | PF1 (ADC1)     | MagStripe CLS (card present) | Input |                                    |
 | 2 (SDA)     | PD1            | I2C SDA (master)     | I/O          | To display Arduino                 |
 | 3 (SCL)     | PD0            | I2C SCL (master)     | I/O          | To display Arduino                 |
@@ -44,9 +44,9 @@ uses the native USB peripheral, not the hardware UART on pins 0/1. So
 `Serial1` (PD2/PD3) is free and there is no conflict between the MagStripe
 interrupt pins and USB communication. This is correct.
 
-**Hook switch technique**: Pin 21 is driven LOW as OUTPUT to scan the hook
-switch, then immediately set to INPUT to avoid holding the line. This works but
-has no debounce — rapid hook toggling could produce spurious events.
+**Hook switch technique**: Pin 21 is configured as OUTPUT in `setup()` and
+driven LOW to scan the hook switch, then returned HIGH. A 50 ms debounce timer
+prevents spurious events from switch bounce.
 
 **4x7 keypad matrix**: Columns 3–6 map keys A–P which are not standard phone
 keys. The daemon only processes `0`–`9`, `*`, `#`, so these extra keys are
@@ -161,38 +161,30 @@ reflash the bootloader (e.g., after bricking), you would need to either:
 
 ## Known Issues and Recommendations
 
-1. **I2C address 0 is the general call address**. While this works when only two
-   devices are on the bus, address 0 has special meaning in the I2C spec and could
-   cause issues if other devices are added. Recommend changing to a specific address
-   (e.g., `Wire.begin(8)` on the display and `Wire.beginTransmission(8)` on the
-   keypad).
+1. ~~**I2C address 0 is the general call address**~~. **Resolved** — display
+   Arduino now uses `Wire.begin(8)` (`I2C_DISPLAY_ADDR`), and the keypad
+   addresses it as `Wire.beginTransmission(8)`.
 
-2. **No hook switch debounce**. The hook switch is polled every `loop()` iteration
-   with no delay or debounce filtering. Physical switches can bounce for 5–20 ms.
-   Recommend adding a simple timer-based debounce (e.g., require the state to be
-   stable for 50 ms before reporting a change).
+2. ~~**No hook switch debounce**~~. **Resolved** — `keypad.ino` now uses a 50 ms
+   timer-based debounce (`DEBOUNCE_MS`) before reporting hook state changes.
 
-3. **`parseTrack2` has no bounds checking**. The `while` loops searching for
-   sentinel characters (`;`, `=`, `?`) will run off the end of the buffer if the
-   card data is malformed. Recommend adding a length check in each loop.
+3. ~~**`parseTrack2` has no bounds checking**~~. **Resolved** — all sentinel
+   search loops use the `length` parameter as an upper bound.
 
-4. **`receiveEvent` ISR writes to `SerialUSB`**. Writing to the USB serial buffer
-   from an ISR context may not be safe on all AVR USB implementations. In practice
-   this works because the ATmega32U4's USB peripheral buffers writes, but it's
-   fragile.
+4. ~~**`receiveEvent` ISR writes to `SerialUSB`**~~. **Resolved** — `receiveEvent`
+   now writes to a lock-free ring buffer; `loop()` drains it to `SerialUSB`.
 
-5. **Blocking serial reads in `display.ino`**. The `while (!SerialUSB.available())`
-   loops have no timeout and will hang the Arduino indefinitely if the Pi stops
-   sending mid-command. Recommend adding a timeout.
+5. ~~**Blocking serial reads in `display.ino`**~~. **Resolved** — `waitForSerial()`
+   implements a 2-second timeout (`SERIAL_TIMEOUT_MS`).
 
-6. **No watchdog timer**. Neither Arduino enables the watchdog, so a firmware hang
-   (e.g., from issue #5) requires a physical power cycle to recover.
+6. ~~**No watchdog timer**~~. **Resolved** — both sketches enable a 4-second
+   watchdog (`WDTO_4S`) in `setup()` and pet it every `loop()` iteration (and
+   inside the long EEPROM program/verify loops in `display.ino`).
 
-7. **Dead code**. The `#if 0` debug blocks in `keypad.ino` and the `vfdtest()`
-   function in `display.ino` (defined but never called) should be cleaned up or
-   moved behind a compile-time debug flag.
+7. ~~**Dead code**~~. **Resolved** — `#if 0` debug blocks and unused `vfdtest()`
+   have been removed.
 
-8. **Coin EEPROM data is hardcoded**. The 256-byte `coinEeprom[]` array in
-   `display.ino` configures the coin validator for specific coin types. This
-   should be documented (which coins, which denominations) and ideally made
-   configurable or at least clearly labeled.
+8. ~~**Coin EEPROM data is hardcoded**~~. **Resolved** — `coinEeprom[]` in
+   `display.ino` now has a block comment documenting the structure: global config,
+   per-coin-type acceptance windows (nickel, dime, quarter, dollar), calibration
+   block, and hardware provenance (TRC-6500).

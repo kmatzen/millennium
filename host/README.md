@@ -67,6 +67,11 @@ sudo make install  # Install daemon binary, ALSA config, and systemd service
 
 ```bash
 sudo make install
-sudo systemctl enable millennium-daemon
-sudo systemctl start millennium-daemon
+```
+
+This installs the daemon and enables the `daemon.service` unit. The service
+runs system-wide but as your user (for `~/.baresip/`). Check status:
+
+```bash
+sudo systemctl status daemon.service
 ```

@@ -568,7 +568,7 @@ void millennium_client_check_serial(struct millennium_client *client) {
                 "Serial reconnect failed, next attempt in %d seconds", backoff);
         }
     }
-#endif /* SERIAL_WATCHDOG_ENABLED - disabled until keepalive (issue #59) */
+#endif /* SERIAL_WATCHDOG_ENABLED */
 }
 
 void millennium_client_update(struct millennium_client *client) {
@@ -614,7 +614,8 @@ void millennium_client_process_event_buffer(struct millennium_client *client) {
         for (i = 0; i < client->input_buffer_size; i++) {
             char c = client->input_buffer[i];
             if (c == '@' || c == 'K' || c == 'C' || c == 'V' || c == 'A' || 
-                c == 'B' || c == 'D' || c == 'E' || c == 'F' || c == 'H') {
+                c == 'B' || c == 'D' || c == 'E' || c == 'F' || c == 'H' ||
+                c == EVENT_TYPE_HEARTBEAT) {
                 event_start = i;
                 break;
             }
@@ -674,6 +675,7 @@ char *millennium_client_extract_payload(struct millennium_client *client, char e
     case EVENT_TYPE_COIN_UPLOAD_END:
     case EVENT_TYPE_COIN_VALIDATION_START:
     case EVENT_TYPE_COIN_VALIDATION_END:
+    case EVENT_TYPE_HEARTBEAT:
         payload_length = 0;
         break;
     default:
@@ -730,6 +732,8 @@ void millennium_client_create_and_queue_event_char(struct millennium_client *cli
         uint8_t actual = (uint8_t)payload[2];
         coin_eeprom_validation_error_t *event = coin_eeprom_validation_error_create(addr, expected, actual);
         if (event) event_queue_push(client, (void *)event);
+    } else if (event_type == EVENT_TYPE_HEARTBEAT) {
+        /* Silently consumed; serial_activity was already updated on read */
     } else {
         logger_warnf_with_category("SDK", "Unknown event type: %c", event_type);
     }

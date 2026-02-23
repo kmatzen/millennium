@@ -17,6 +17,7 @@ struct call;
 #define EVENT_TYPE_COIN_VALIDATION_END 'F'
 #define EVENT_TYPE_EEPROM_ERROR 'E'
 #define EVENT_TYPE_HOOK 'H'
+#define EVENT_TYPE_HEARTBEAT 'P'
 #define EVENT_TYPE_CALL_STATE '1'
 
 /* Event type enumeration */

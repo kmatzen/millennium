@@ -106,9 +106,8 @@ void millennium_sdk_get_sip_status(int *registered, char *last_error, size_t las
 /* Constants */
 #define BAUD_RATE B9600
 #define ASYNC_WORKERS 4
-#define SERIAL_WATCHDOG_SECONDS 300
+#define SERIAL_WATCHDOG_SECONDS 60
 #define SERIAL_MAX_BACKOFF_SECONDS 60
-/* Disabled until keepalive is implemented (issue #59) */
-#define SERIAL_WATCHDOG_ENABLED 0
+#define SERIAL_WATCHDOG_ENABLED 1
 
 #endif /* MILLENNIUM_SDK_H */
