@@ -28,13 +28,15 @@ uint8_t *ws_encode_text_frame(const char *payload, size_t payload_len, size_t *f
 /*
  * Decode a WebSocket frame from raw bytes.
  * Returns the opcode, writes the unmasked payload into `payload_out`
- * (must be >= data_len), and the payload length into *payload_len.
- * Returns -1 if the frame is incomplete or invalid.
+ * (up to `payload_out_size` bytes), and the actual payload length
+ * into *payload_len.
+ * Returns -1 if the frame is incomplete, invalid, or payload exceeds
+ * the output buffer.
  * *bytes_consumed is set to the total frame size read from `data`.
  */
 int ws_decode_frame(const uint8_t *data, size_t data_len,
-                    uint8_t *payload_out, size_t *payload_len,
-                    size_t *bytes_consumed);
+                    uint8_t *payload_out, size_t payload_out_size,
+                    size_t *payload_len, size_t *bytes_consumed);
 
 /*
  * Send a WebSocket text frame on a file descriptor.
