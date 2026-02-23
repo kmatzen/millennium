@@ -160,4 +160,11 @@ uninstall:
 	sudo rm -f /etc/systemd/system/daemon.service
 	sudo systemctl daemon-reload
 
-.PHONY: all clean install uninstall test unit_tests
+# API integration test (requires live daemon)
+# Usage: make api-test [HOST=localhost]  e.g. make api-test HOST=192.168.86.145
+HOST ?= localhost
+api-test:
+	@chmod +x tests/api_test.sh
+	@HOST=$(HOST) ./tests/api_test.sh $(HOST)
+
+.PHONY: all clean install uninstall test unit_tests api-test
