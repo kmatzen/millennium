@@ -12,7 +12,7 @@ and notes from the current build.
 | Display microcontroller      | Arduino Micro (custom)   | "Millennium Beta" board def     |
 | USB audio card               | C-Media CM109 (Unitek Y-247A) | USB class-compliant, stereo out + mono mic in |
 | USB hub                      | Huasheng USB2.0 HUB      | 2 hubs daisy-chained for 3 ports |
-| Boost converter              | XL6009 module            | Converts phone line voltage to 5V |
+| Boost converter              | XL6009 module            | Boosts 5V → 12V for coin validator only |
 | Custom PCB                   | phonev4                  | Connects all peripherals        |
 | VFD display                  | Noritake CU20026SCPB-T23A | 20×2 character VFD             |
 | Coin validator               | Original Millennium part | 600 baud serial protocol        |
@@ -57,27 +57,32 @@ Inside the payphone, cables route from the original hardware to the custom PCB:
 | Speaker audio      | USB audio card out  | PCB J7 (3.5mm jack)    | 3.5mm stereo  |
 | USB (display)      | PCB Arduino Beta    | Pi via USB hub          | Micro-USB     |
 | USB (audio)        | USB audio card      | Pi via USB hub          | USB-A         |
-| Power              | Phone line pair     | PCB XL6009 input        | Screw terminal |
+| Power              | 5V supply           | PCB power input (5V)     | Screw terminal |
 
 ## Power
 
-Phone line voltage (typically 48V DC on-hook, varies) enters the XL6009
-boost converter module which outputs regulated 5V. The 5V rail powers
-everything: both Arduinos, the Raspberry Pi (via GPIO 5V pins), the VFD
-display logic, and the audio amplifier.
+The board is powered from an external 5V supply. The 5V_MAIN rail powers
+everything except the coin validator: both Arduinos, the Raspberry Pi (via
+GPIO 5V pins), the VFD display logic, the audio amplifier (TDA2822M), the
+card reader, and the USB hub. The coin validator requires 12V; the XL6009
+(U1) boost converter generates 12V_COIN from 5V input, and that rail feeds
+only the coin validator.
 
 Total estimated current draw:
 
-| Component              | Current (typical) |
-|------------------------|-------------------|
-| Raspberry Pi Zero W    | 150 mA            |
-| Arduino Micro × 2      | 50 mA each        |
-| VFD display            | 100 mA            |
-| USB audio card         | 50 mA             |
-| Coin validator         | 50 mA             |
-| Audio amplifier        | 50–200 mA (playing) |
-| USB hub                | 50 mA             |
-| **Total**              | **~550–700 mA**   |
+| Rail        | Component              | Current (typical) |
+|-------------|------------------------|-------------------|
+| 5V_MAIN     | Raspberry Pi Zero W    | 150 mA            |
+| 5V_MAIN     | Arduino Micro × 2      | 50 mA each        |
+| 5V_MAIN     | VFD display            | 100 mA            |
+| 5V_MAIN     | USB audio card         | 50 mA             |
+| 5V_MAIN     | Audio amplifier        | 50–200 mA (playing) |
+| 5V_MAIN     | USB hub                | 50 mA             |
+| 5V_MAIN     | **Subtotal**           | **~550–700 mA**   |
+| 12V_COIN    | Coin validator (via U1)| ~50 mA            |
+
+The external 5V supply must provide enough current for both 5V_MAIN loads and
+the XL6009 input (which draws from 5V to produce 12V_COIN for the coin validator).
 
 ## Thermal
 
