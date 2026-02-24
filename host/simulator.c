@@ -334,16 +334,29 @@ static void sim_handle_keypad(keypad_event_t *ev) {
 
 static void sim_handle_call_state(call_state_event_t *ev) {
     call_state_t st;
+    int phone_down, phone_up;
     if (!ev || !daemon_state) return;
     st = call_state_event_get_state(ev);
+    phone_down = (daemon_state->current_state == DAEMON_STATE_IDLE_DOWN);
+    phone_up = (daemon_state->current_state == DAEMON_STATE_IDLE_UP);
 
-    if (st == EVENT_CALL_STATE_INCOMING &&
-        daemon_state->current_state == DAEMON_STATE_IDLE_DOWN) {
+    if (st == EVENT_CALL_STATE_INCOMING && (phone_down || phone_up)) {
+        /* #92: Accept incoming when handset down or up */
         daemon_state->current_state = DAEMON_STATE_CALL_INCOMING;
         daemon_state_update_activity(daemon_state);
     } else if (st == EVENT_CALL_STATE_ACTIVE) {
         daemon_state->current_state = DAEMON_STATE_CALL_ACTIVE;
         daemon_state_update_activity(daemon_state);
+    } else if (st == EVENT_CALL_STATE_INVALID) {
+        /* #90: Remote hung up */
+        if (daemon_state->current_state == DAEMON_STATE_CALL_ACTIVE ||
+            daemon_state->current_state == DAEMON_STATE_CALL_INCOMING) {
+            daemon_state_clear_keypad(daemon_state);
+            daemon_state->inserted_cents = 0;
+            daemon_state->current_state = DAEMON_STATE_IDLE_UP;
+            daemon_state_update_activity(daemon_state);
+            sim_call_active = 0;
+        }
     }
 
     plugins_handle_call_state(st);
@@ -525,6 +538,13 @@ static int run_scenario(const char *path) {
                 "CALL_ESTABLISHED", NULL, EVENT_CALL_STATE_ACTIVE);
             if (ev) { sim_process_event((event_t *)ev); event_destroy((event_t *)ev); }
             sim_call_active = 1;
+            sim_drain_events();
+        }
+        else if (strcmp(cmd, "call_ended") == 0) {
+            call_state_event_t *ev = call_state_event_create(
+                "CALL_CLOSED", NULL, EVENT_CALL_STATE_INVALID);
+            if (ev) { sim_process_event((event_t *)ev); event_destroy((event_t *)ev); }
+            sim_call_active = 0;
             sim_drain_events();
         }
 

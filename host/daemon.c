@@ -291,6 +291,8 @@ void handle_coin_event(coin_event_t *coin_event) {
 }
 
 void handle_call_state_event(call_state_event_t *call_state_event) {
+    int need_hangup_sync = 0;
+    
     if (!call_state_event) {
         logger_error_with_category("Call", "Received null call state event");
         return;
@@ -300,8 +302,10 @@ void handle_call_state_event(call_state_event_t *call_state_event) {
     pthread_mutex_lock(&daemon_state_mutex);
     int is_incoming = (call_state_event_get_state(call_state_event) == EVENT_CALL_STATE_INCOMING);
     int phone_down = (daemon_state->current_state == DAEMON_STATE_IDLE_DOWN);
+    int phone_up = (daemon_state->current_state == DAEMON_STATE_IDLE_UP);
     
-    if (is_incoming && phone_down) {
+    /* #92: Accept incoming when handset down (ring) or up (e.g. interrupt dialing) */
+    if (is_incoming && (phone_down || phone_up)) {
         
         logger_info_with_category("Call", "Incoming call received");
         metrics_increment_counter("calls_incoming", 1);
@@ -320,11 +324,31 @@ void handle_call_state_event(call_state_event_t *call_state_event) {
         
         daemon_state->current_state = DAEMON_STATE_CALL_ACTIVE;
         daemon_state_update_activity(daemon_state);
+    } else if (call_state_event_get_state(call_state_event) == EVENT_CALL_STATE_INVALID) {
+        /* #90: Remote hung up - transition out of call state */
+        if (daemon_state->current_state == DAEMON_STATE_CALL_ACTIVE ||
+            daemon_state->current_state == DAEMON_STATE_CALL_INCOMING) {
+            logger_info_with_category("Call", "Call ended by remote party");
+            metrics_increment_counter("calls_ended", 1);
+            daemon_state_clear_keypad(daemon_state);
+            daemon_state->inserted_cents = 0;
+            daemon_state->current_state = DAEMON_STATE_IDLE_UP; /* Handset still up */
+            daemon_state_update_activity(daemon_state);
+            /* Flag for post-unlock: sync SDK and coin validator */
+            need_hangup_sync = 1;
+        }
     }
     pthread_mutex_unlock(&daemon_state_mutex);
     
     /* Let active plugin handle the call state event */
     plugins_handle_call_state(call_state_event_get_state(call_state_event));
+    
+    /* #90: Sync with SDK when remote hung up */
+    if (need_hangup_sync) {
+        millennium_client_hangup(client);
+        millennium_client_write_to_coin_validator(client, 'c');
+        millennium_client_write_to_coin_validator(client, 'z');
+    }
     
     daemon_save_state();
     daemon_broadcast_state("call_state");

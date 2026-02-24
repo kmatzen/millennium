@@ -137,11 +137,10 @@ static int classic_phone_handle_call_state(int call_state) {
         classic_phone_update_display();
         logger_info_with_category("ClassicPhone", "Call established");
     } else if (call_state == EVENT_CALL_STATE_INVALID) {
-        /* Completely ignore INVALID events during active calls - let Baresip handle call termination */
+        /* #90: Remote hung up - reset call state and display */
         if (classic_phone_data.is_dialing || classic_phone_data.is_in_call) {
-            logger_info_with_category("ClassicPhone", "Call state invalid during active call - ignoring (let Baresip handle termination)");
-        } else {
-            logger_info_with_category("ClassicPhone", "Call state invalid but not in call - ignoring");
+            logger_info_with_category("ClassicPhone", "Call ended by remote party - resetting");
+            classic_phone_end_call();
         }
     }
     return 0;
