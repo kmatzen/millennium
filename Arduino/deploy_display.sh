@@ -57,8 +57,7 @@ else
 fi
 fi
 
-# Step 3: Flash on remote. Stop daemon, power-cycle display Arduino via uhubctl (Huasheng hub
-# supports per-port toggle), then arduino-cli upload which handles 32U4 reset/port dance.
+# Step 3: Flash on remote. Power-cycle, race to flash in bootloader window (~8s before sketch).
 FP="${FLASH_PORT:-/dev/serial/by-id/usb-Arduino_LLC_Millennium_Beta-if00}"
 echo "  Step 3: Flashing display Arduino on $REMOTE..."
 ssh "$REMOTE" "bash -l -c '
@@ -66,28 +65,24 @@ ssh "$REMOTE" "bash -l -c '
   sudo systemctl stop daemon.service 2>/dev/null || true
   sleep 2
   if command -v uhubctl >/dev/null 2>&1; then
-    echo \"  Power-cycling display Arduino (uhubctl port 2 on Huasheng hub)...\"
+    echo \"  Power-cycling display Arduino (uhubctl port 2)...\"
     sudo uhubctl -l 1-1 -a cycle -p 2 -f
-    echo \"  Catching device as soon as it appears (~1s after power-on)...\"
-    for i in \$(seq 1 100); do
-      [ -e \$FP ] && break
-      sleep 0.1
-    done
   else
     sleep 2
   fi
-  cd $REPO_DIR/Arduino
-  export PATH=\"\$HOME/bin:\$PATH\"
-  command -v arduino-cli >/dev/null 2>&1 || { echo \"  arduino-cli not found\"; exit 1; }
-  echo \"  Sending flash-mode (silent) then spamming upload until success...\"
-  python3 -c '\''import serial,sys; s=serial.Serial(sys.argv[1],9600); s.write(bytes([0xff])); s.close()'\'' "\$FP" 2>/dev/null || true
+  echo \"  Racing to catch bootloader (~8s window)...\"
   rc=1
-  for i in \$(seq 1 40); do
-    if arduino-cli upload -p \"\$FP\" --fqbn arduino:avr:micro --input-dir ./build/display sketches/display; then
-      rc=0
-      break
+  cd $REPO_DIR/Arduino
+  for i in \$(seq 1 200); do
+    if [ -e \$FP ]; then
+      PORT=\$(readlink -f \$FP 2>/dev/null || echo \$FP)
+      if avrdude -p atmega32u4 -c avr109 -P \"\$PORT\" -b 57600 -U flash:w:build/display/display.ino.hex:i 2>/dev/null; then
+        echo \"  Flash succeeded (attempt \$i)\"
+        rc=0
+        break
+      fi
     fi
-    sleep 0.2
+    sleep 0.1
   done
   sudo systemctl start daemon.service 2>/dev/null || true
   exit \$rc
