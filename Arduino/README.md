@@ -52,18 +52,16 @@ make clean              # Remove build artifacts
 flash the display Arduino so it stays in sync with the daemon. Always build with
 `arduino:avr:millennium_beta` so the board keeps its "Millennium Beta" USB identity.
 
-From your dev machine, sync and deploy on the remote device (Pi with Arduino connected):
+**Recommended: build on macOS, sync, flash on Pi**
 ```bash
 ./Arduino/deploy_display.sh [user@host]
-# Default: matzen@192.168.86.145 (see host/DEVICE_TEST.md)
+# Builds locally, syncs (git pull on remote), prompts to put Arduino in bootloader mode,
+# then flashes with avrdude. Default host: matzen@192.168.86.145 (see host/DEVICE_TEST.md)
 ```
 
-Or SSH in and run locally:
-```bash
-ssh matzen@192.168.86.145 'cd millennium && git pull && cd Arduino && make install_display'
-```
+The script triggers the bootloader via the 1200-baud trick (open port at 1200 baud, close — no physical reset needed), then flashes with avrdude. Install on Pi: `sudo apt install avrdude`. FLASH_PORT should be the display Arduino's serial port (e.g. `/dev/serial/by-id/usb-Arduino_LLC_Millennium_Beta-if00` or `/dev/ttyACM0`).
 
-On macOS (when flashing a locally connected Arduino): `make install_display DISPLAY_DEVICE=/dev/cu.usbmodem*` (use the actual port from `ls /dev/cu.usb*`).
+If build fails (arduino-cli.yaml has Linux paths): `BUILD_CONFIG=0 make build_display`. If hex not pushed: `VIA_SCP=1`.
 
 If `arduino-cli` is not in your `PATH`:
 
