@@ -88,7 +88,15 @@ ssh "$REMOTE" "
     sleep 0.5
   fi
   BOOT_PORT=
+  for i in \$(seq 1 40); do
+    [ -e \"\$SKETCH_PORT\" ] || break
+    sleep 0.05
+  done
   for i in \$(seq 1 100); do
+    if [ -e \"\$SKETCH_PORT\" ]; then
+      BOOT_PORT=\$SKETCH_PORT
+      break
+    fi
     after=\$(ls -1 /dev/ttyACM* 2>/dev/null | sort -u)
     new=\$(comm -13 <(echo \"\$before\") <(echo \"\$after\") 2>/dev/null | head -1)
     [ -n \"\$new\" ] && [ -e \"\$new\" ] && BOOT_PORT=\"\$new\" && break
@@ -98,7 +106,7 @@ ssh "$REMOTE" "
     echo '  Bootloader port not detected, falling back to sketch port (may fail)'
     BOOT_PORT=\$SKETCH_PORT
   else
-    echo \"  Bootloader detected on \$BOOT_PORT\"
+    echo \"  Bootloader on \$BOOT_PORT\"
   fi
   make flash_display FLASH_PORT=\"\$BOOT_PORT\" SKIP_TRIGGER=1
   rc=\$?
