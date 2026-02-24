@@ -70,7 +70,7 @@ ssh "$REMOTE" "bash -l -c '
     sudo uhubctl -l 1-1 -a cycle -p 2 -f
     echo \"  Catching device as soon as it appears (~1s after power-on)...\"
     for i in \$(seq 1 100); do
-      [ -e $FP ] && break
+      [ -e \$FP ] && break
       sleep 0.1
     done
   else
@@ -79,7 +79,9 @@ ssh "$REMOTE" "bash -l -c '
   cd $REPO_DIR/Arduino
   export PATH=\"\$HOME/bin:\$PATH\"
   command -v arduino-cli >/dev/null 2>&1 || { echo \"  arduino-cli not found\"; exit 1; }
-  echo \"  Uploading to \$FP...\"
+  echo \"  Sending flash-mode (silent) then uploading...\"
+  python3 -c '\''import serial,sys; s=serial.Serial(sys.argv[1],9600); s.write(bytes([0xff])); s.close()'\'' "\$FP" 2>/dev/null || true
+  sleep 0.5
   arduino-cli upload -p \"\$FP\" --fqbn arduino:avr:micro --input-dir ./build/display sketches/display
   rc=\$?
   sudo systemctl start daemon.service 2>/dev/null || true
