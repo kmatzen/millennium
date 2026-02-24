@@ -193,6 +193,7 @@ void config_set_default_values(config_data_t* config) {
     
     config_set_value(config, "call.cost_cents", "50");
     config_set_value(config, "call.timeout_seconds", "300");
+    config_set_value(config, "call.e164_prefix", "1");
     
     config_set_value(config, "logging.level", "INFO");
     config_set_value(config, "logging.file", "");
@@ -309,6 +310,10 @@ int config_get_call_cost_cents(const config_data_t* config) {
 
 int config_get_call_timeout_seconds(const config_data_t* config) {
     return config_get_int(config, "call.timeout_seconds", 300);
+}
+
+const char* config_get_call_e164_prefix(const config_data_t* config) {
+    return config_get_string(config, "call.e164_prefix", "1");
 }
 
 const char* config_get_free_numbers(const config_data_t* config) {

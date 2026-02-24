@@ -116,11 +116,28 @@ static int run_command(const char *cmd) {
     return rc;
 }
 
+/* Reject paths with shell metacharacters to prevent injection (#101) */
+static int path_is_safe(const char *path) {
+    const char *p;
+    if (!path) return 0;
+    for (p = path; *p; p++) {
+        char c = *p;
+        if (c == '\'' || c == '"' || c == ';' || c == '&' || c == '|' ||
+            c == '$' || c == '`' || c == '\n' || c == '\r' || c == '*' || c == '?')
+            return 0;
+    }
+    return 1;
+}
+
 int updater_apply(const char *source_dir) {
     char cmd[512];
 
     if (!source_dir || !*source_dir) {
         snprintf(apply_status, sizeof(apply_status), "Error: no source directory specified");
+        return -1;
+    }
+    if (!path_is_safe(source_dir)) {
+        snprintf(apply_status, sizeof(apply_status), "Error: source_dir contains invalid characters");
         return -1;
     }
 

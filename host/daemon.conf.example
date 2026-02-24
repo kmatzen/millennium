@@ -8,6 +8,8 @@ hardware.baud_rate=9600
 # Call Configuration
 call.cost_cents=50
 call.timeout_seconds=300
+# E.164 country code prefix (e.g. 1=US, 44=UK). Empty = no prefix (#107)
+call.e164_prefix=1
 # Comma-separated numbers that can be dialed without coins (emergency/free calls)
 call.free_numbers=911,311,0
 # Seconds of inactivity (handset up, no dialing) before phone resets

@@ -4,6 +4,7 @@
 #include "millennium_sdk.h"
 #include "events.h"
 #include "baresip_interface.h"
+#include "config.h"
 #include "logger.h"
 #include <errno.h>
 #include <fcntl.h>
@@ -451,8 +452,14 @@ void millennium_client_call(struct millennium_client *client, const char *number
     char *uric;
     int err;
     struct call *call;
+    const char *prefix;
     
-    snprintf(target, sizeof(target), "+1%s", number);
+    prefix = config_get_call_e164_prefix(config_get_instance());
+    if (prefix && *prefix) {
+        snprintf(target, sizeof(target), "+%s%s", prefix, number);
+    } else {
+        snprintf(target, sizeof(target), "%s", number);
+    }
 
     logger_debugf_with_category("SDK", "ua: %p", client->ua);
     

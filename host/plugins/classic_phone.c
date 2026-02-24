@@ -38,6 +38,8 @@ extern millennium_client_t *client;
 
 /* Seconds remaining at which the countdown appears on the display */
 #define TIMEOUT_WARNING_SECONDS 60
+/* Max duration for emergency/card calls - no infinite calls (#106) */
+#define EMERGENCY_CALL_MAX_SECONDS 3600
 
 /* Internal functions */
 static void classic_phone_update_display(void);
@@ -396,7 +398,14 @@ static void classic_phone_tick(void) {
     if (!classic_phone_data.is_in_call) {
         return;
     }
+    /* Emergency/card calls: apply max duration cap (#106) */
     if (classic_phone_data.is_emergency_call || classic_phone_data.is_card_call) {
+        int elapsed = (int)(time(NULL) - classic_phone_data.call_start_time);
+        if (elapsed >= EMERGENCY_CALL_MAX_SECONDS) {
+            logger_info_with_category("ClassicPhone", "Emergency/card call max duration reached");
+            metrics_increment_counter("calls_timed_out", 1);
+            classic_phone_end_call();
+        }
         return;
     }
     if (classic_phone_data.call_timeout_seconds <= 0) {

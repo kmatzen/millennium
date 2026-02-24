@@ -197,9 +197,10 @@ const char* logger_level_to_string(log_level_t level) {
     }
 }
 
+/* formatted_message is 512 chars; truncation may cut UTF-8 mid-char (#108) */
 void logger_write_log(log_level_t level, const char* category, const char* message) {
     logger_data_t* logger = logger_get_instance();
-    char timestamp[64];  /* Increased buffer size for timestamp */
+    char timestamp[64];
     char formatted_message[512];
     const char* level_str;
     

@@ -921,9 +921,11 @@ struct http_response web_server_handle_api_config(const struct http_request* req
     char escaped_device[128];
     char escaped_level[32];
     char escaped_file[256];
+    char escaped_e164[16];
     web_server_json_escape(config_get_display_device(config), escaped_device, sizeof(escaped_device));
     web_server_json_escape(config_get_log_level(config), escaped_level, sizeof(escaped_level));
     web_server_json_escape(config_get_log_file(config), escaped_file, sizeof(escaped_file));
+    web_server_json_escape(config_get_call_e164_prefix(config), escaped_e164, sizeof(escaped_e164));
     char json[2048];
     snprintf(json, sizeof(json),
         "{"
@@ -933,7 +935,8 @@ struct http_response web_server_handle_api_config(const struct http_request* req
         "},"
         "\"call\":{"
         "\"cost_cents\":%d,"
-        "\"timeout_seconds\":%d"
+        "\"timeout_seconds\":%d,"
+        "\"e164_prefix\":\"%s\""
         "},"
         "\"logging\":{"
         "\"level\":\"%s\","
@@ -957,6 +960,7 @@ struct http_response web_server_handle_api_config(const struct http_request* req
         config_get_baud_rate(config),
         config_get_call_cost_cents(config),
         config_get_call_timeout_seconds(config),
+        escaped_e164,
         escaped_level,
         escaped_file,
         config_get_log_to_file(config) ? "true" : "false",

@@ -28,8 +28,8 @@ typedef struct {
     int max_rotated_files;  /* Number of rotated files to keep */
     long current_file_size; /* Approximate bytes written to current file */
 
-    /* In-memory log storage */
-    char memory_logs[1000][512];  /* Fixed size array for C89 */
+    /* In-memory log storage (512-char entries; truncation may cut UTF-8 mid-char (#108)) */
+    char memory_logs[1000][512];
     int memory_logs_count;
     int memory_logs_start;  /* For circular buffer behavior */
 } logger_data_t;
