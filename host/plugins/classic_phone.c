@@ -133,13 +133,20 @@ static int classic_phone_handle_call_state(int call_state) {
         logger_info_with_category("ClassicPhone", "Incoming call received");
     } else if (call_state == EVENT_CALL_STATE_ACTIVE) {
         audio_tones_stop();
+        classic_phone_data.is_dialing = 0;  /* Call connected - no longer dialing */
         classic_phone_data.is_in_call = 1;
         classic_phone_data.call_start_time = time(NULL);
         classic_phone_update_display();
         logger_info_with_category("ClassicPhone", "Call established");
     } else if (call_state == EVENT_CALL_STATE_INVALID) {
-        /* #90: Remote hung up - reset call state and display */
-        if (classic_phone_data.is_dialing || classic_phone_data.is_in_call) {
+        if (classic_phone_data.is_dialing) {
+            /* #91: Call failed during dial - refund and show failure */
+            classic_phone_data.inserted_cents += classic_phone_data.call_cost_cents;
+            classic_phone_data.is_dialing = 0;
+            display_manager_set_text("Call failed", "Coins refunded");
+            logger_info_with_category("ClassicPhone", "Call failed - coins refunded");
+        } else if (classic_phone_data.is_in_call) {
+            /* #90: Remote hung up - reset call state */
             logger_info_with_category("ClassicPhone", "Call ended by remote party - resetting");
             classic_phone_end_call();
         }

@@ -325,16 +325,21 @@ void handle_call_state_event(call_state_event_t *call_state_event) {
         daemon_state->current_state = DAEMON_STATE_CALL_ACTIVE;
         daemon_state_update_activity(daemon_state);
     } else if (call_state_event_get_state(call_state_event) == EVENT_CALL_STATE_INVALID) {
-        /* #90: Remote hung up - transition out of call state */
-        if (daemon_state->current_state == DAEMON_STATE_CALL_ACTIVE ||
-            daemon_state->current_state == DAEMON_STATE_CALL_INCOMING) {
+        /* #90/#91: Call ended - remote hung up or call failed during dial */
+        if (daemon_state->current_state == DAEMON_STATE_CALL_ACTIVE) {
             logger_info_with_category("Call", "Call ended by remote party");
             metrics_increment_counter("calls_ended", 1);
             daemon_state_clear_keypad(daemon_state);
             daemon_state->inserted_cents = 0;
-            daemon_state->current_state = DAEMON_STATE_IDLE_UP; /* Handset still up */
+            daemon_state->current_state = DAEMON_STATE_IDLE_UP;
             daemon_state_update_activity(daemon_state);
-            /* Flag for post-unlock: sync SDK and coin validator */
+            need_hangup_sync = 1;
+        } else if (daemon_state->current_state == DAEMON_STATE_CALL_INCOMING) {
+            /* #91: Call failed during dial - don't clear coins (refund via plugin) */
+            logger_info_with_category("Call", "Call failed during dial");
+            daemon_state_clear_keypad(daemon_state);
+            daemon_state->current_state = DAEMON_STATE_IDLE_UP;
+            daemon_state_update_activity(daemon_state);
             need_hangup_sync = 1;
         }
     }
