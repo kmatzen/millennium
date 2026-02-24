@@ -9,7 +9,7 @@
 #      REPO_DIR=    repo path on remote (default: millennium)
 #      SKIP_BUILD=1 skip local build (hex already committed)
 #      VIA_SCP=1    copy hex via scp instead of git (use when hex not yet pushed)
-#      FLASH_PORT=  avrdude port on remote (default: /dev/ttyACM0 when in bootloader)
+#      FLASH_PORT=  serial port on remote (default: by-id usb-Arduino_LLC_Millennium_Beta-if00)
 
 set -e
 
@@ -58,60 +58,44 @@ fi
 fi
 
 # Step 3: Flash on remote. Stop daemon, power-cycle display Arduino via uhubctl (Huasheng hub
-# supports per-port toggle), trigger bootloader via 1200-baud, then avrdude. Use by-id path
-# since tty number can change after uhubctl cycle. Restart daemon after.
+# supports per-port toggle), then arduino-cli upload which handles 32U4 reset/port dance.
 FP="${FLASH_PORT:-/dev/serial/by-id/usb-Arduino_LLC_Millennium_Beta-if00}"
 echo "  Step 3: Flashing display Arduino on $REMOTE..."
-ssh "$REMOTE" "
+ssh "$REMOTE" "bash -l -c '
   sudo systemctl stop daemon.service 2>/dev/null || true
   sleep 2
   if command -v uhubctl >/dev/null 2>&1; then
-    echo '  Power-cycling display Arduino (uhubctl port 2 on Huasheng hub)...'
+    echo \"  Power-cycling display Arduino (uhubctl port 2 on Huasheng hub)...\"
     sudo uhubctl -l 1-1 -a cycle -p 2 -f
-    echo '  Waiting for device to reappear...'
-    for i in 1 2 3 4 5 6 7 8 9 10; do
-      [ -e $FP ] && break
-      sleep 1
+    echo \"  Catching bootloader (stock Micro identity, ~8s window)...\"
+    BOOT_PORT=
+    for i in \$(seq 1 80); do
+      for p in /dev/serial/by-id/usb-Arduino_LLC_Arduino_Micro* \
+               /dev/serial/by-id/usb-2341_8037* 2>/dev/null; do
+        [ -e \"\$p\" ] && BOOT_PORT=\"\$p\" && break 2
+      done
+      [ -n \"\$BOOT_PORT\" ] && break
+      sleep 0.1
     done
+    if [ -z \"\$BOOT_PORT\" ]; then
+      echo \"  Bootloader missed, waiting for sketch (Millennium Beta)...\"
+      for i in 1 2 3 4 5 6 7 8 9 10; do
+        [ -e $FP ] && BOOT_PORT=$FP && break
+        sleep 1
+      done
+    fi
+    FP=\${BOOT_PORT:-$FP}
   else
     sleep 2
   fi
   cd $REPO_DIR/Arduino
-  SKETCH_PORT=\$(readlink -f $FP 2>/dev/null || echo $FP)
-  [ -z \"\$SKETCH_PORT\" ] && SKETCH_PORT=$FP
-  before=\$(ls -1 /dev/ttyACM* 2>/dev/null | sort -u)
-  echo \"  Triggering bootloader (1200 baud on \$SKETCH_PORT)...\"
-  if command -v python3 >/dev/null 2>&1; then
-    python3 -c \"import serial,time; s=serial.Serial('\$SKETCH_PORT',1200); s.setDTR(False); s.close(); time.sleep(0.5)\" 2>/dev/null || true
-  else
-    stty -F \$SKETCH_PORT 1200 2>/dev/null || true
-    sleep 0.5
-  fi
-  BOOT_PORT=
-  for i in \$(seq 1 40); do
-    [ -e \"\$SKETCH_PORT\" ] || break
-    sleep 0.05
-  done
-  for i in \$(seq 1 100); do
-    if [ -e \"\$SKETCH_PORT\" ]; then
-      BOOT_PORT=\$SKETCH_PORT
-      break
-    fi
-    after=\$(ls -1 /dev/ttyACM* 2>/dev/null | sort -u)
-    new=\$(comm -13 <(echo \"\$before\") <(echo \"\$after\") 2>/dev/null | head -1)
-    [ -n \"\$new\" ] && [ -e \"\$new\" ] && BOOT_PORT=\"\$new\" && break
-    sleep 0.05
-  done
-  if [ -z \"\$BOOT_PORT\" ]; then
-    echo '  Bootloader port not detected, falling back to sketch port (may fail)'
-    BOOT_PORT=\$SKETCH_PORT
-  else
-    echo \"  Bootloader on \$BOOT_PORT\"
-  fi
-  make flash_display FLASH_PORT=\"\$BOOT_PORT\" SKIP_TRIGGER=1
+  export PATH=\"\$HOME/bin:\$PATH\"
+  command -v arduino-cli >/dev/null 2>&1 || { echo \"  arduino-cli not found\"; exit 1; }
+  echo \"  Uploading to \$FP...\"
+  arduino-cli upload -p \"\$FP\" --fqbn arduino:avr:micro --input-dir ./build/display sketches/display
   rc=\$?
   sudo systemctl start daemon.service 2>/dev/null || true
   exit \$rc
-"
+'"
 
 echo "Done."
