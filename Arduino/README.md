@@ -55,12 +55,11 @@ flash the display Arduino so it stays in sync with the daemon. Always build with
 **Recommended: build on macOS, sync, flash on Pi**
 ```bash
 ./Arduino/deploy_display.sh [user@host]
-# Builds locally, syncs (git pull on remote), triggers bootloader via 1200-baud,
-# discovers the new bootloader port, then flashes with avrdude (-b 57600).
+# Builds locally, syncs (git pull on remote), then arduino-cli upload (handles 32U4 reset).
 # Default host: matzen@192.168.86.145 (see host/DEVICE_TEST.md)
 ```
 
-The script stops the daemon, power-cycles the display Arduino via uhubctl (Huasheng hub supports per-port toggle), triggers bootloader via 1200-baud, then flashes with avrdude. Install on Pi: `sudo apt install avrdude uhubctl`. Uses `/dev/serial/by-id/usb-Arduino_LLC_Millennium_Beta-if00` (port can change after uhubctl cycle).
+The script stops the daemon, power-cycles the display Arduino via uhubctl (Huasheng hub supports per-port toggle), sends CMD_FLASH_MODE (0xFF) to silence the sketch's serial output, then uploads with `arduino-cli`. **Bootstrap**: devices running older firmware need one manual flash (e.g. `make install_display` with Arduino connected to a Mac) to get the flash-mode support. Install on Pi: `sudo apt install arduino-cli uhubctl`. Uses `/dev/serial/by-id/usb-Arduino_LLC_Millennium_Beta-if00` (port can change after uhubctl cycle).
 
 If build fails (arduino-cli.yaml has Linux paths): `BUILD_CONFIG=0 make build_display`. If hex not pushed: `VIA_SCP=1`.
 
