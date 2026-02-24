@@ -1,0 +1,26 @@
+# Test: Remote party hangs up first (#90)
+# Verifies that when the remote party hangs up, daemon/display transition
+# correctly instead of staying stuck on "Call active".
+
+hook_up
+assert_state IDLE_UP
+assert_display Insert 50c
+
+# Insert coins and dial
+coin 25
+coin 25
+assert_display Have: 50c
+keys 5551234567
+assert_display Call active
+assert_state CALL_ACTIVE
+
+# Simulate remote party hanging up (call_ended = EVENT_CALL_STATE_INVALID)
+call_ended
+assert_no_display Call active
+assert_state IDLE_UP
+assert_display Insert 50c
+
+# User puts handset down
+hook_down
+assert_state IDLE_DOWN
+assert_display Lift receiver

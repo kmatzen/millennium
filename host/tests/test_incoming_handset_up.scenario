@@ -1,0 +1,22 @@
+# Test: Incoming call when handset is up (#92)
+# Verifies that incoming calls are accepted when user has handset up
+# (e.g. about to dial or mid-dial), not just when handset is down.
+
+hook_up
+assert_state IDLE_UP
+assert_display Insert 50c
+
+# Inject incoming call while handset is up - should be accepted (#92)
+call_incoming
+assert_state CALL_INCOMING
+assert_display Call
+
+# Answer by simulating call active (as if user answered)
+call_active
+assert_state CALL_ACTIVE
+assert_display Call active
+
+# Hang up
+hook_down
+assert_state IDLE_DOWN
+assert_display Lift receiver
