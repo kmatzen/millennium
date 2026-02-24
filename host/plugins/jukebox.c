@@ -9,6 +9,7 @@
 #include "../logger.h"
 #include "../millennium_sdk.h"
 #include "../display_manager.h"
+#include "../audio_tones.h"
 
 /* ALSA support - only on Linux */
 #ifdef __linux__
@@ -221,11 +222,9 @@ static void jukebox_play_song(int song_number) {
         snprintf(log_msg, sizeof(log_msg), "Started playing WAV file: %s", wav_file);
         logger_info_with_category("Jukebox", log_msg);
     } else {
-        logger_warn_with_category("Jukebox", "Failed to play WAV file, falling back to beep tones");
-        /* Fallback to simple beep if WAV file not available */
-        char command[128];
-        snprintf(command, sizeof(command), "beep -f 800 -l 200 -n -f 1000 -l 200 -n -f 1200 -l 400 &");
-        system(command);
+        logger_warn_with_category("Jukebox", "Failed to play WAV file, falling back to tone");
+        /* Use in-process tone (no external beep dep); no-op if ALSA unavailable (#130) */
+        audio_tones_play_coin_tone();
     }
 }
 
