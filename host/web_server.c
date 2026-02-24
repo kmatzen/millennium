@@ -1429,15 +1429,22 @@ struct http_response web_server_handle_api_update(const struct http_request* req
     memset(&response, 0, sizeof(response));
     web_server_strcpy_safe(response.content_type, "application/json", sizeof(response.content_type));
 
+    /* #118: Non-blocking - don't block web server for minutes */
     source_dir = config_get_string(config_get_instance(), "system.source_dir", "/home/matzen/millennium");
-    rc = updater_apply(source_dir);
+    rc = updater_apply_async(source_dir);
 
-    snprintf(json, sizeof(json),
-        "{\"success\":%s,\"status\":\"%s\"}",
-        rc == 0 ? "true" : "false",
-        updater_get_apply_status());
+    if (rc == 0 && updater_is_applying()) {
+        snprintf(json, sizeof(json),
+            "{\"success\":true,\"status\":\"Applying update in background. Daemon will restart when complete.\",\"accepted\":true}");
+        response.status_code = 202;  /* Accepted */
+    } else {
+        snprintf(json, sizeof(json),
+            "{\"success\":%s,\"status\":\"%s\"}",
+            rc == 0 ? "true" : "false",
+            updater_get_apply_status());
+        response.status_code = rc == 0 ? 200 : 500;
+    }
     web_server_strcpy_safe(response.body, json, sizeof(response.body));
-    response.status_code = rc == 0 ? 200 : 500;
     return response;
 }
 
