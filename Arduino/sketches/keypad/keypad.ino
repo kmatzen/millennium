@@ -1,3 +1,8 @@
+/*
+ * Millennium Alpha (keypad) firmware.
+ * Build with FQBN arduino:avr:millennium_alpha so the board identifies as
+ * "Millennium Alpha" on USB (/dev/serial/by-id/usb-Arduino_LLC_Millennium_Alpha-if00).
+ */
 #include <Keypad.h>
 #include <MagStripe.h>
 #include <Wire.h>

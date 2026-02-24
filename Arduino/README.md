@@ -48,6 +48,23 @@ make install_display    # Flash display only
 make clean              # Remove build artifacts
 ```
 
+**When display firmware changes** (e.g. after merging a PR that touches `sketches/display/`):
+flash the display Arduino so it stays in sync with the daemon. Always build with
+`arduino:avr:millennium_beta` so the board keeps its "Millennium Beta" USB identity.
+
+From your dev machine, sync and deploy on the remote device (Pi with Arduino connected):
+```bash
+./Arduino/deploy_display.sh [user@host]
+# Default: matzen@192.168.86.145 (see host/DEVICE_TEST.md)
+```
+
+Or SSH in and run locally:
+```bash
+ssh matzen@192.168.86.145 'cd millennium && git pull && cd Arduino && make install_display'
+```
+
+On macOS (when flashing a locally connected Arduino): `make install_display DISPLAY_DEVICE=/dev/cu.usbmodem*` (use the actual port from `ls /dev/cu.usb*`).
+
 If `arduino-cli` is not in your `PATH`:
 
 ```bash

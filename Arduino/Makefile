@@ -4,8 +4,9 @@ CONFIG_FILE = arduino-cli.yaml
 DISPLAY_FQBN = arduino:avr:millennium_beta
 KEYPAD_FQBN  = arduino:avr:millennium_alpha
 
-DISPLAY_DEVICE = $(shell realpath /dev/serial/by-id/usb-Arduino_LLC_Millennium_Beta-if00 2>/dev/null)
-KEYPAD_DEVICE  = $(shell realpath /dev/serial/by-id/usb-Arduino_LLC_Millennium_Alpha-if00 2>/dev/null)
+# Override with DISPLAY_DEVICE=/dev/cu.usbmodemXXX on macOS if needed
+DISPLAY_DEVICE ?= $(shell realpath /dev/serial/by-id/usb-Arduino_LLC_Millennium_Beta-if00 2>/dev/null)
+KEYPAD_DEVICE ?= $(shell realpath /dev/serial/by-id/usb-Arduino_LLC_Millennium_Alpha-if00 2>/dev/null)
 
 .PHONY: build install install_keypad install_display clean
 

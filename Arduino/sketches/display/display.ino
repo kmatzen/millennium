@@ -1,3 +1,8 @@
+/*
+ * Millennium Beta (display) firmware.
+ * Build with FQBN arduino:avr:millennium_beta so the board identifies as
+ * "Millennium Beta" on USB (/dev/serial/by-id/usb-Arduino_LLC_Millennium_Beta-if00).
+ */
 #include <SoftwareSerial.h>
 #include <Wire.h>
 #include <avr/wdt.h>
