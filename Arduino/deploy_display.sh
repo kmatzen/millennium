@@ -62,6 +62,7 @@ fi
 FP="${FLASH_PORT:-/dev/serial/by-id/usb-Arduino_LLC_Millennium_Beta-if00}"
 echo "  Step 3: Flashing display Arduino on $REMOTE..."
 ssh "$REMOTE" "bash -l -c '
+  FP=$FP
   sudo systemctl stop daemon.service 2>/dev/null || true
   sleep 2
   if command -v uhubctl >/dev/null 2>&1; then
