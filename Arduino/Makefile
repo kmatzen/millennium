@@ -42,7 +42,7 @@ ifneq ($(SKIP_TRIGGER),1)
 	@sleep 2
 endif
 	@echo "Flashing..."
-	avrdude -p atmega32u4 -c avr109 -P $(FLASH_PORT) -F -U flash:w:build/display/display.ino.hex:i
+	avrdude -p atmega32u4 -c avr109 -P $(FLASH_PORT) -b 57600 -U flash:w:build/display/display.ino.hex:i
 
 install: build
 	$(ARDUINO_CLI) upload -p $(DISPLAY_DEVICE) --fqbn $(DISPLAY_FQBN) \
