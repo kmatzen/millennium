@@ -80,6 +80,18 @@ size_t web_server_strlen_safe(const char* str) {
     return strlen(str);
 }
 
+/* JSON escape: escape " and \ for safe embedding in JSON string values */
+static void web_server_json_escape(const char* src, char* dest, size_t dest_size) {
+    const char* s;
+    char* d;
+    if (!src || !dest || dest_size == 0) return;
+    for (s = src, d = dest; *s && (size_t)(d - dest) < dest_size - 2; s++) {
+        if (*s == '"' || *s == '\\') *d++ = '\\';
+        *d++ = *s;
+    }
+    *d = '\0';
+}
+
 /* Memory management */
 void* web_server_malloc(size_t size) {
     return malloc(size);
@@ -945,15 +957,11 @@ struct http_response web_server_handle_api_state(const struct http_request* requ
     char json[768];
     struct daemon_state_info state_info = get_daemon_state_info();
     
-    /* Escape sip_last_error for JSON (simple backslash-quote escape) */
+    /* Escape strings for JSON (prevent injection from keypad_buffer, sip_last_error) */
+    char escaped_keypad[128];
     char escaped_error[256];
-    const char *src;
-    char *dst;
-    for (src = state_info.sip_last_error, dst = escaped_error; *src && (size_t)(dst - escaped_error) < sizeof(escaped_error) - 2; src++) {
-        if (*src == '"' || *src == '\\') *dst++ = '\\';
-        *dst++ = *src;
-    }
-    *dst = '\0';
+    web_server_json_escape(state_info.keypad_buffer, escaped_keypad, sizeof(escaped_keypad));
+    web_server_json_escape(state_info.sip_last_error, escaped_error, sizeof(escaped_error));
 
     snprintf(json, sizeof(json),
         "{"
@@ -966,7 +974,7 @@ struct http_response web_server_handle_api_state(const struct http_request* requ
         "}",
         state_info.current_state,
         state_info.inserted_cents,
-        state_info.keypad_buffer,
+        escaped_keypad,
         state_info.last_activity,
         state_info.sip_registered,
         escaped_error);
@@ -981,7 +989,7 @@ struct http_response web_server_handle_api_control(const struct http_request* re
     response.status_code = 200;
     web_server_strcpy_safe(response.content_type, "application/json", sizeof(response.content_type));
     
-    char json[512];
+    char json[1024];
     char action[64] = "unknown";
     char key[16] = "";
     char plugin[64] = "";
@@ -1106,6 +1114,12 @@ struct http_response web_server_handle_api_control(const struct http_request* re
         snprintf(message, sizeof(message), "Unknown action: %s", action);
     }
     
+    /* Escape for JSON to prevent injection when action/message contain " or \ */
+    char escaped_action[128];
+    char escaped_message[512];
+    web_server_json_escape(action, escaped_action, sizeof(escaped_action));
+    web_server_json_escape(message, escaped_message, sizeof(escaped_message));
+    
     snprintf(json, sizeof(json),
         "{"
         "\"success\":%s,"
@@ -1113,8 +1127,8 @@ struct http_response web_server_handle_api_control(const struct http_request* re
         "\"message\":\"%s\""
         "}",
         success ? "true" : "false",
-        action,
-        message);
+        escaped_action,
+        escaped_message);
     
     web_server_strcpy_safe(response.body, json, sizeof(response.body));
     return response;
