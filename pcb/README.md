@@ -38,7 +38,7 @@ eliminating the crosstalk present in the v4 LM386 design.
 | Pin | Function   | Net                          |
 |-----|------------|------------------------------|
 | 1   | OUT_A      | → C_outA → `speaker_front+`  |
-| 2   | GND        | `gnd`                        |
+| 2   | GND        | `GND`                        |
 | 3   | IN_A       | `speaker_front_pre+` via C_inA |
 | 4   | IN_B       | `speaker_receiver_pre+` via C_inB |
 | 5   | OUT_B      | → C_outB → `speaker_receiver+` |
@@ -159,8 +159,8 @@ to-VFD-pin mapping with wire colors.
 |-----|---------------------|
 | 1   | `mic+`              |
 | 2   | `speaker_receiver+` |
-| 3   | `gnd`               |
-| 4   | `gnd`               |
+| 3   | `GND`               |
+| 4   | `GND`               |
 
 ### J6 — Card Reader (2x7)
 
@@ -173,7 +173,7 @@ RDT/data (pin 0), RCL/clock (pin 1).
 |---------|------------------------|-------------------------|
 | Tip     | `speaker_receiver_pre+`| → TDA2822 ch B → handset |
 | Ring    | `speaker_front_pre+`   | → TDA2822 ch A → ringer  |
-| Sleeve  | `gnd`                  | Ground                   |
+| Sleeve  | `GND`                  | Ground                   |
 
 ## I2C Bus
 
@@ -234,6 +234,8 @@ Run `python3 audit_schematic.py` to check component/BOM alignment, net labels, a
 | `gerbers/`         | Gerber files from previous v4 fabrication   |
 | `audit_schematic.py` | Python script to audit schematic vs BOM vs README |
 | `AUDIT.md`         | Audit findings and action items             |
+| `UNUSED_PINS.md`   | List of unconnected pins (ERC)               |
+| `SCHEMATIC_LAYOUT.md` | Proposed subsection layout for schematic reorganization |
 
 ## Manufacturing
 
@@ -274,11 +276,11 @@ schematic editor:
 5. **TDA2822 OUT_B (pin 5)**: Connect via output coupling cap C_outB to
    `speaker_receiver+` (handset earpiece via J4).
 
-6. **TDA2822 GND (pin 2)**: Connect to `gnd`.
+6. **TDA2822 GND (pin 2)**: Connect to `GND`.
 
 7. **TDA2822 V+ (pin 6)**: Connect to `5V_MAIN` via C_vcc and C_dec bypass caps.
 
-8. **TDA2822 RIPPLE (pin 7)**: Connect via C_ripple (4.7µF) to `gnd`.
+8. **TDA2822 RIPPLE (pin 7)**: Connect via C_ripple (4.7µF) to `GND`.
 
 ### Protection circuit wiring
 

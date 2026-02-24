@@ -36,7 +36,7 @@ This document captures audit findings for the phonev4 schematic and PCB design, 
 
 ### 1. Net Labels vs Documentation
 
-- **Status:** ✓ Fixed. Schematic and PCB use `5V_MAIN`, `12V_COIN`, `gnd`.
+- **Status:** ✓ Fixed. Schematic and PCB use `5V_MAIN`, `12V_COIN`, `GND`.
 
 ### 2. BOM (phonev4.csv)
 
@@ -55,14 +55,14 @@ This document captures audit findings for the phonev4 schematic and PCB design, 
 
 Per README "Schematic Changes Required in KiCad". Verify in KiCad: open schematic, highlight nets (Ctrl+click), trace power flow.
 
-- [ ] Q1 on incoming 5V rail, before F1 and U1
-- [ ] F1 in series on incoming 5V
-- [ ] U1 IN+ from 5V_MAIN, OUT+ to 12V_COIN, feeding J1 only
-- [ ] D1, D2 clamp signal pins to 5V_MAIN and GND (not power rails)
-- [ ] TDA2822 V+ from 5V_MAIN
-- [ ] No TX/RX nets for Arduino–Pi path (USB via hub)
+- [x] Q1 on incoming 5V rail — Q1 S (pin 2) shares net with F1 pin 2; Q1 D (pin 3) to U1 IN+ (BOOST_IN+)
+- [x] F1 in series on incoming 5V — F1 pin 1 on 5V_MAIN; F1 pin 2 to Q1 S
+- [x] U1 IN+ from boost input, OUT+ to 12V_COIN — U1 pin 4 (OUT+) to J1 pin 9, C-coin1
+- [x] D1, D2 clamp signal pins to 5V_MAIN and GND — D1/D2 VCC on 5V_MAIN, GND on GND; coin_rx/coin_tx through D2
+- [x] TDA2822 V+ from 5V_MAIN (fixed via 5V_MAIN label on U2 V+ net)
+- [x] No TX/RX nets for Arduino–Pi path — USB via external hub; no discrete serial nets on PCB
 
-**How to verify:** In KiCad schematic, use Edit → Find to locate each component. Inspect wire connectivity; net names (5V_MAIN, 12V_COIN, gnd) appear on wires. Run "Update PCB from Schematic" to sync; DRC will flag any copper issues.
+**How to verify:** In KiCad schematic, use Edit → Find to locate each component. Inspect wire connectivity; net names (5V_MAIN, 12V_COIN, GND) appear on wires. Run "Update PCB from Schematic" to sync; DRC will flag any copper issues.
 
 ### 6. Connector Pinouts
 
@@ -72,10 +72,10 @@ Verify J1 (coin validator) pinout includes 12V_COIN and GND for the validator su
 
 Running `kicad-cli sch erc` and `kicad-cli pcb drc` produces reports. Representative findings:
 
-**ERC** (199 violations in last run):
+**ERC** (154 violations in current run):
 - Unconnected pins on J2, J6, A1, A2, A3 (unused keypad/header/GPIO pins — many are intentional)
 - `power_pin_not_driven` on A1 5V, GND; A2; U2 V+ — power symbols may need correct net assignment
-- Review `erc_report.txt` and suppress expected violations via ERC exclusions where appropriate
+- Add "No connect" (X) markers in KiCad Schematic Editor on intentional NC pins (see UNUSED_PINS.md) to suppress pin_not_connected warnings
 
 **DRC** (27 violations):
 - `lib_footprint_issues`: Footprint libraries (Connector_IDC, Capacitor_THT, etc.) not in default path — configure KiCad fp lib table or use project-local libs
