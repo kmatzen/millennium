@@ -140,6 +140,8 @@ install: daemon
 	sudo cp daemon.conf.example /etc/millennium/daemon.conf
 	sudo cp asoundrc.example /etc/asound.conf
 	sudo cp daemon /usr/local/bin/millennium-daemon
+	sudo mkdir -p /usr/local/share/millennium
+	sudo cp web_portal.html /usr/local/share/millennium/
 	sudo cp systemd/daemon.service /etc/systemd/system/
 	@if [ -f $$HOME/.baresip/config ] && grep -qE '^[[:space:]]*module[[:space:]]*stdio\.so' $$HOME/.baresip/config 2>/dev/null; then \
 		sed -i.bak 's/^[[:space:]]*module[[:space:]]*stdio\.so/# module stdio.so/' $$HOME/.baresip/config; \
@@ -156,6 +158,7 @@ uninstall:
 	sudo systemctl stop daemon.service
 	sudo systemctl disable daemon.service
 	sudo rm -f /usr/local/bin/millennium-daemon
+	sudo rm -rf /usr/local/share/millennium
 	sudo rm -rf /etc/systemd/system/daemon.service.d
 	sudo rm -f /etc/systemd/system/daemon.service
 	sudo systemctl daemon-reload
