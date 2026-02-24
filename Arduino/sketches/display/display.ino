@@ -9,6 +9,7 @@
 #define CMD_COIN_CTRL     0x03
 #define CMD_COIN_PROGRAM  0x04
 #define CMD_COIN_VERIFY   0x05
+#define CMD_KEEPALIVE     0x06  /* Pi->Arduino: no-op, resets serial watchdog (#59) */
 
 /* I2C event prefixes (keypad -> display -> Pi) */
 #define EVT_KEY        'K'
@@ -252,6 +253,8 @@ void loop() {
         }
       }
       SerialUSB.write('F');
+    } else if (data == CMD_KEEPALIVE) {
+      /* No-op: Pi sends this when idle to keep serial watchdog from false-triggering */
     }
   }
   if (coinSerialDevice.available()) {
