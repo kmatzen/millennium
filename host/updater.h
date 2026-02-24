@@ -12,13 +12,16 @@
 int updater_compare_versions(const char *a, const char *b);
 
 /*
- * Check GitHub for the latest release tag.
- * Uses curl (must be installed) to query the GitHub Releases API.
- * Stores result internally; subsequent calls return the cached value
- * until updater_check() is called again.
- * Returns 0 on success, -1 on failure.
+ * Check GitHub for the latest release tag (blocking; blocks up to 10s).
+ * Prefer updater_check_async() for HTTP handlers.
  */
 int updater_check(void);
+
+/* #119: Non-blocking. Starts background check if idle; returns immediately. */
+void updater_check_async(void);
+
+/* Returns 1 if a check is in progress. */
+int updater_is_checking(void);
 
 /* Returns the cached latest version string, or NULL if never checked. */
 const char *updater_get_latest_version(void);

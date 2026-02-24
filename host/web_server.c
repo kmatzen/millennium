@@ -1404,15 +1404,17 @@ struct http_response web_server_handle_api_check_update(const struct http_reques
     web_server_strcpy_safe(response.content_type, "application/json", sizeof(response.content_type));
     response.status_code = 200;
 
-    updater_check();
+    /* #119: Non-blocking - don't block HTTP handler for curl timeout */
+    updater_check_async();
     latest = updater_get_latest_version();
 
     snprintf(json, sizeof(json),
         "{\"current_version\":\"%s\",\"latest_version\":\"%s\","
-        "\"update_available\":%s,\"git_hash\":\"%s\"}",
+        "\"update_available\":%s,\"checking\":%s,\"git_hash\":\"%s\"}",
         version_get_string(),
-        latest ? latest : "unknown",
+        latest ? latest : (updater_is_checking() ? "" : "unknown"),
         updater_is_update_available() ? "true" : "false",
+        updater_is_checking() ? "true" : "false",
         version_get_git_hash());
     web_server_strcpy_safe(response.body, json, sizeof(response.body));
     return response;
