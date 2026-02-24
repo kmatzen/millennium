@@ -79,11 +79,16 @@ ssh "$REMOTE" "bash -l -c '
   cd $REPO_DIR/Arduino
   export PATH=\"\$HOME/bin:\$PATH\"
   command -v arduino-cli >/dev/null 2>&1 || { echo \"  arduino-cli not found\"; exit 1; }
-  echo \"  Sending flash-mode (silent) then uploading...\"
+  echo \"  Sending flash-mode (silent) then spamming upload until success...\"
   python3 -c '\''import serial,sys; s=serial.Serial(sys.argv[1],9600); s.write(bytes([0xff])); s.close()'\'' "\$FP" 2>/dev/null || true
-  sleep 0.5
-  arduino-cli upload -p \"\$FP\" --fqbn arduino:avr:micro --input-dir ./build/display sketches/display
-  rc=\$?
+  rc=1
+  for i in \$(seq 1 40); do
+    if arduino-cli upload -p \"\$FP\" --fqbn arduino:avr:micro --input-dir ./build/display sketches/display; then
+      rc=0
+      break
+    fi
+    sleep 0.2
+  done
   sudo systemctl start daemon.service 2>/dev/null || true
   exit \$rc
 '"
