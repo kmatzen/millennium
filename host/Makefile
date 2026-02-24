@@ -172,4 +172,9 @@ api-test:
 device-test:
 	$(MAKE) api-test HOST=192.168.86.145
 
-.PHONY: all clean install uninstall test unit_tests api-test device-test
+# Break/fuzz tests - verify JSON injection resistance, invalid input handling
+break-test:
+	@chmod +x tests/break_test.sh
+	@HOST=$(HOST) ./tests/break_test.sh $(HOST)
+
+.PHONY: all clean install uninstall test unit_tests api-test device-test break-test
