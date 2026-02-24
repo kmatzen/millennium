@@ -91,6 +91,7 @@ static void sim_parse_display(const char *message) {
 static int sim_call_pending  = 0;
 static int sim_call_active   = 0;
 static int sim_hangup_called = 0;
+static int sim_sip_registered = 1;  /* 1=registered (default), 0=unavailable */
 
 /* ── Millennium SDK stubs ──────────────────────────────────────────── */
 
@@ -240,6 +241,13 @@ void millennium_client_create_and_queue_event_ptr(millennium_client_t *c, void *
 
 void millennium_client_write_to_display(millennium_client_t *c, const char *m) {
     (void)c; (void)m;
+}
+
+/* SIP status stub: controlled by sip_registered scenario command (#94) */
+void millennium_sdk_get_sip_status(int *registered, char *last_error, size_t last_error_size) {
+    if (registered) *registered = sim_sip_registered;
+    if (last_error && last_error_size > 0) last_error[0] = '\0';
+    (void)last_error_size;
 }
 
 logger_level_t millennium_logger_parse_level(const char *s) { (void)s; return LOGGER_INFO; }
@@ -447,6 +455,8 @@ static int run_scenario(const char *path) {
         fprintf(stderr, "ERROR: cannot open scenario file: %s\n", path);
         return 1;
     }
+
+    sim_sip_registered = 1;  /* default: SIP registered for each scenario */
 
     while (fgets(line, sizeof(line), f)) {
         line_num++;
@@ -672,6 +682,14 @@ static int run_scenario(const char *path) {
             if (count < 1) count = 1;
             { int t; for (t = 0; t < count; t++) display_manager_tick(); }
             sim_drain_events();
+        }
+
+        /* ── sip_registered <0|1> (#94) ──────────────────────────── */
+        else if (strncmp(cmd, "sip_registered ", 15) == 0) {
+            const char *p = cmd + 15;
+            while (*p == ' ') p++;
+            sim_sip_registered = (*p == '1') ? 1 : 0;
+            fprintf(stderr, "  sip_registered = %d\n", sim_sip_registered);
         }
 
         /* ── config <key> <value> ──────────────────────────────── */

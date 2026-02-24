@@ -1,0 +1,21 @@
+# Test: #94 SIP pre-check — paid call refused when SIP not registered
+# sip_registered 0 simulates SIP unavailable
+
+sip_registered 0
+hook_up
+assert_state IDLE_UP
+assert_display Insert 50c
+
+# Insert coins and dial; call should be refused with "SIP unavailable"
+coin 25
+coin 25
+assert_display Have: 50c
+keys 5551234567
+assert_display SIP unavailable
+assert_display Check connection
+assert_state IDLE_UP
+
+# Coins and number remain in plugin state; display shows error until next update
+
+hook_down
+assert_state IDLE_DOWN
