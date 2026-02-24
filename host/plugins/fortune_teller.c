@@ -3,11 +3,15 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include <unistd.h>
 #include "../plugins.h"
 #include "../logger.h"
 #include "../millennium_sdk.h"
 #include "../display_manager.h"
+
+/* Delay states: non-blocking fortune flow (#114) */
+#define FT_STATE_IDLE 0
+#define FT_STATE_READING 1
+#define FT_STATE_SHOWING 2
 
 /* Fortune teller plugin data */
 typedef struct {
@@ -16,6 +20,8 @@ typedef struct {
     int fortune_type;
     int is_ready;
     time_t last_activity;
+    int delay_state;
+    time_t delay_until;
 } fortune_teller_data_t;
 
 static fortune_teller_data_t fortune_teller_data = {0};
@@ -105,7 +111,6 @@ static int fortune_teller_handle_keypad(char key) {
         fortune_teller_data.fortune_type = key - '1'; /* Convert to 0-4 */
         fortune_teller_data.inserted_cents -= fortune_teller_data.fortune_cost_cents;
         fortune_teller_data.is_ready = 0;
-        
         fortune_teller_give_fortune();
     }
     return 0;
@@ -139,10 +144,10 @@ static int fortune_teller_handle_call_state(int call_state) {
 
 /* Internal function implementations */
 static void fortune_teller_on_activation(void) {
-    /* Reset state and show welcome when plugin is activated */
     fortune_teller_data.inserted_cents = 0;
     fortune_teller_data.fortune_type = 0;
     fortune_teller_data.is_ready = 0;
+    fortune_teller_data.delay_state = FT_STATE_IDLE;
     fortune_teller_data.last_activity = time(NULL);
     fortune_teller_show_welcome();
 }
@@ -176,28 +181,30 @@ static void fortune_teller_show_reading(void) {
 
 static void fortune_teller_give_fortune(void) {
     fortune_teller_show_reading();
-    
-    /* Simulate mystical reading time */
-    sleep(2);
-    
-    const char* fortune = fortune_teller_get_random_fortune(fortune_teller_data.fortune_type);
-    const char* category = fortune_categories[fortune_teller_data.fortune_type];
-    
-    display_manager_set_text(category, fortune);
-    
-    /* Log the fortune */
-    char log_msg[256];
-    snprintf(log_msg, sizeof(log_msg), "Fortune given: %s - %s", category, fortune);
-    logger_info_with_category("FortuneTeller", log_msg);
-    
-    /* Reset for next fortune */
-    fortune_teller_data.inserted_cents = 0;
-    fortune_teller_data.fortune_type = 0;
-    fortune_teller_data.is_ready = 0;
-    
-    /* Return to welcome after a delay */
-    sleep(3);
-    fortune_teller_show_welcome();
+    fortune_teller_data.delay_state = FT_STATE_READING;
+    fortune_teller_data.delay_until = time(NULL) + 2;
+}
+
+static void fortune_teller_tick(void) {
+    time_t now = time(NULL);
+    if (fortune_teller_data.delay_state == FT_STATE_READING && now >= fortune_teller_data.delay_until) {
+        const char* fortune = fortune_teller_get_random_fortune(fortune_teller_data.fortune_type);
+        const char* category = fortune_categories[fortune_teller_data.fortune_type];
+        display_manager_set_text(category, fortune);
+        {
+            char log_msg[256];
+            snprintf(log_msg, sizeof(log_msg), "Fortune given: %s - %s", category, fortune);
+            logger_info_with_category("FortuneTeller", log_msg);
+        }
+        fortune_teller_data.inserted_cents = 0;
+        fortune_teller_data.fortune_type = 0;
+        fortune_teller_data.is_ready = 0;
+        fortune_teller_data.delay_state = FT_STATE_SHOWING;
+        fortune_teller_data.delay_until = now + 3;
+    } else if (fortune_teller_data.delay_state == FT_STATE_SHOWING && now >= fortune_teller_data.delay_until) {
+        fortune_teller_data.delay_state = FT_STATE_IDLE;
+        fortune_teller_show_welcome();
+    }
 }
 
 static const char* fortune_teller_get_random_fortune(int category) {
@@ -240,5 +247,5 @@ void register_fortune_teller_plugin(void) {
                     fortune_teller_handle_call_state,
                     NULL,
                     fortune_teller_on_activation,
-                    NULL);
+                    fortune_teller_tick);
 }
