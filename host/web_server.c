@@ -566,6 +566,14 @@ struct http_response web_server_process_request(struct web_server* server, const
         return response;
     }
     
+    /* When paused (e.g. during audio), reject requests (#122) */
+    if (server->paused) {
+        response.status_code = 503;
+        web_server_strcpy_safe(response.content_type, "application/json", sizeof(response.content_type));
+        web_server_strcpy_safe(response.body, "{\"error\":\"Server paused for audio\"}", sizeof(response.body));
+        return response;
+    }
+    
     /* Apply rate limiting for API endpoints */
     if (strncmp(request->path, "/api/", 5) == 0) {
         if (!web_server_check_rate_limit(server, request->client_ip, request->path)) {
