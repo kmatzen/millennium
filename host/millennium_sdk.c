@@ -562,7 +562,7 @@ void millennium_client_check_serial(struct millennium_client *client) {
         if (open_serial_port(client, client->serial_device_path) == 0) {
             logger_info_with_category("SDK", "Serial port reopened successfully");
 
-            /* Re-init coin validator (send 'f' command) */
+            /* Re-init coin validator (send 'f' command). See docs/COIN_VALIDATOR.md (#110) */
             {
                 uint8_t coin_init = 'f';
                 millennium_client_write_to_coin_validator(client, coin_init);
