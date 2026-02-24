@@ -123,10 +123,13 @@ static void string_buffer_ensure_capacity(struct millennium_client *client, size
 }
 
 static void string_buffer_append(struct millennium_client *client, const char *data, size_t len) {
+    size_t needed;
     if (!client || !data || len == 0) return;
     
-    string_buffer_ensure_capacity(client, client->input_buffer_size + len + 1);
-    if (client->input_buffer) {
+    needed = client->input_buffer_size + len + 1;
+    string_buffer_ensure_capacity(client, needed);
+    /* Only append if we have space (realloc may have failed) (#128) */
+    if (client->input_buffer && needed <= client->input_buffer_capacity) {
         memcpy(client->input_buffer + client->input_buffer_size, data, len);
         client->input_buffer_size += len;
         client->input_buffer[client->input_buffer_size] = '\0';
