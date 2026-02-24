@@ -33,15 +33,16 @@ install_display: build/display/display.ino.hex
 	$(ARDUINO_CLI) upload -p $(DISPLAY_DEVICE) --fqbn $(DISPLAY_FQBN) \
 		sketches/display $(BUILD_ARGS) --input-dir ./build/display
 
-# Flash display with avrdude. Triggers bootloader via 1200-baud (Caterina): open port at
-# 1200 baud, close — board resets into bootloader. Then avrdude uploads.
+# Flash display with avrdude. SKIP_TRIGGER=1 if caller already did 1200-baud (e.g. deploy script).
 FLASH_PORT ?= /dev/ttyACM0
 flash_display: build/display/display.ino.hex
+ifneq ($(SKIP_TRIGGER),1)
 	@echo "Triggering bootloader (1200 baud on $(FLASH_PORT))..."
 	@stty -F $(FLASH_PORT) 1200 2>/dev/null || true
 	@sleep 2
+endif
 	@echo "Flashing..."
-	avrdude -p atmega32u4 -c avr109 -P $(FLASH_PORT) -U flash:w:build/display/display.ino.hex:i
+	avrdude -p atmega32u4 -c avr109 -P $(FLASH_PORT) -b 57600 -U flash:w:build/display/display.ino.hex:i
 
 install: build
 	$(ARDUINO_CLI) upload -p $(DISPLAY_DEVICE) --fqbn $(DISPLAY_FQBN) \

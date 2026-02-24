@@ -79,7 +79,7 @@ eliminating the crosstalk present in the v4 LM386 design.
 | C_dec | 100nF ceramic                 | 1   | Axial L3.8mm THT                 | TDA2822 Vcc decoupling           |
 | C-*   | 100nF ceramic                 | 5   | Axial L3.8mm THT                 | Decoupling (see below)           |
 | D1    | PRTR5V0U2X                    | 1   | SOT-143 (4-pin)                  | ESD clamp on J4 signal pins (handset) |
-| D2    | PRTR5V0U2X                    | 1   | SOT-143 (4-pin)                  | ESD clamp on J1 signal pins (coin TX/RX) |
+| D2    | PRTR5V0U2X                    | 1   | SOT-143 (4-pin)                  | ESD clamp on speaker_front+ (ringer); I/O2 unconnected |
 | Q1    | Si2301 P-ch MOSFET            | 1   | SOT-23                           | Reverse polarity protection      |
 | F1    | 1A PTC fuse                   | 1   | Radial D10mm THT                 | Resettable overcurrent fuse      |
 | D3    | Green LED                     | 1   | 5mm THT                          | Power indicator                  |
@@ -117,8 +117,8 @@ current when polarity is reversed.
 TVS diode arrays (PRTR5V0U2X) protect signal lines, not power rails. Each array
 clamps signal pins to VCC (5V) and GND, limiting ESD transients that could
 enter through externally accessible connectors. D1 protects J4 (handset mic+,
-speaker_receiver+); D2 protects J1 (coin validator TX/RX). These keep Arduino
-I/O pins within safe voltage limits during static discharge.
+speaker_receiver+); D2 protects speaker_front+ (ringer output). D2 pin 3
+(I/O2) is unconnected and available for future use.
 
 ### Overcurrent Protection (F1)
 
@@ -234,6 +234,7 @@ Run `python3 audit_schematic.py` to check component/BOM alignment, net labels, a
 | `gerbers/`         | Gerber files from previous v4 fabrication   |
 | `audit_schematic.py` | Python script to audit schematic vs BOM vs README |
 | `AUDIT.md`         | Audit findings and action items             |
+| `SCHEMATIC_D2_CHANGES.md` | Step-by-step instructions to rewire D2 from coin to speaker outputs |
 
 ## Manufacturing
 
@@ -294,8 +295,8 @@ schematic editor:
 3. **D1 (ESD on J4)**: Connect across J4 signal pins (mic+, speaker_receiver+);
    clamp to 5V_MAIN and GND. Protects signal lines, not power.
 
-4. **D2 (ESD on J1)**: Connect across J1 signal pins (coin TX/RX); clamp to
-   5V_MAIN and GND. Protects signal lines, not power.
+4. **D2 (ESD on ringer)**: Connect D2 I/O1 to speaker_front+ (TDA2822 ch A
+   output). Clamp to 5V_MAIN and GND. D2 I/O2 is unconnected.
 
 5. **D3 + R3**: Connect from 5V_MAIN through R3 (1kΩ) through D3 to GND.
 
