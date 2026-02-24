@@ -125,6 +125,7 @@ struct web_server* web_server_create(int port) {
     if (!server) return NULL;
     
     memset(server, 0, sizeof(struct web_server));
+    pthread_mutex_init(&server->websocket_mutex, NULL);
     server->port = port;
     server->running = 0;
     server->should_stop = 0;
@@ -148,6 +149,7 @@ void web_server_destroy(struct web_server* server) {
     if (!server) return;
     
     web_server_stop(server);
+    pthread_mutex_destroy(&server->websocket_mutex);
     web_server_free(server);
 }
 
@@ -531,6 +533,7 @@ void web_server_handle_client(struct web_server* server, int client_fd) {
                 send(client_fd, response_str, strlen(response_str), 0);
                 web_server_free(response_str);
             }
+            pthread_mutex_lock(&server->websocket_mutex);
             if (server->websocket_count < 32) {
                 server->websocket_connections[server->websocket_count++] = client_fd;
                 logger_infof_with_category("WebServer",
@@ -540,6 +543,7 @@ void web_server_handle_client(struct web_server* server, int client_fd) {
                 logger_warn_with_category("WebServer", "Max WebSocket connections reached");
                 close(client_fd);
             }
+            pthread_mutex_unlock(&server->websocket_mutex);
             return;
         } else if (response.is_streaming) {
             web_server_send_streaming_response(client_fd, &response);
@@ -1654,6 +1658,7 @@ void web_server_broadcast_to_websockets(struct web_server* server, const char* m
     int i;
     if (!server || !message) return;
 
+    pthread_mutex_lock(&server->websocket_mutex);
     for (i = 0; i < server->websocket_count; i++) {
         int fd = server->websocket_connections[i];
         if (ws_send_text(fd, message) != 0) {
@@ -1668,6 +1673,7 @@ void web_server_broadcast_to_websockets(struct web_server* server, const char* m
             i--;
         }
     }
+    pthread_mutex_unlock(&server->websocket_mutex);
 }
 
 /* Streaming response implementation */

@@ -37,42 +37,52 @@ static pthread_mutex_t g_sip_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 /* Event queue implementation */
 static void event_queue_push(struct millennium_client *client, void *event) {
-    struct event_queue_node *node = malloc(sizeof(struct event_queue_node));
+    struct event_queue_node *node;
+    if (!client || !event) return;
+    node = malloc(sizeof(struct event_queue_node));
     if (!node) {
         logger_error_with_category("SDK", "Failed to allocate memory for event queue node");
         return;
     }
-    
     node->event = event;
     node->next = NULL;
-    
+    pthread_mutex_lock(&client->event_queue_mutex);
     if (client->event_queue_tail) {
         client->event_queue_tail->next = node;
     } else {
         client->event_queue_head = node;
     }
     client->event_queue_tail = node;
+    pthread_mutex_unlock(&client->event_queue_mutex);
 }
 
 static void *event_queue_pop(struct millennium_client *client) {
+    struct event_queue_node *node;
+    void *event;
+    if (!client) return NULL;
+    pthread_mutex_lock(&client->event_queue_mutex);
     if (!client->event_queue_head) {
+        pthread_mutex_unlock(&client->event_queue_mutex);
         return NULL;
     }
-    
-    struct event_queue_node *node = client->event_queue_head;
-    void *event = node->event;
-    
+    node = client->event_queue_head;
+    event = node->event;
     client->event_queue_head = node->next;
     if (!client->event_queue_head) {
         client->event_queue_tail = NULL;
     }
-    
+    pthread_mutex_unlock(&client->event_queue_mutex);
     free(node);
     return event;
 }
 
 static int event_queue_empty(struct millennium_client *client) {
-    return client->event_queue_head == NULL;
+    int empty;
+    if (!client) return 1;
+    pthread_mutex_lock(&client->event_queue_mutex);
+    empty = (client->event_queue_head == NULL);
+    pthread_mutex_unlock(&client->event_queue_mutex);
+    return empty;
 }
 
 static void event_queue_clear(struct millennium_client *client) {
@@ -294,6 +304,7 @@ struct millennium_client *millennium_client_create(void) {
     
     /* Initialize all fields */
     memset(client, 0, sizeof(struct millennium_client));
+    pthread_mutex_init(&client->event_queue_mutex, NULL);
     client->display_fd = -1;
     client->is_open = 0;
     client->input_buffer_capacity = 1024;
@@ -395,15 +406,14 @@ struct millennium_client *millennium_client_create(void) {
 void millennium_client_destroy(struct millennium_client *client) {
     if (client) {
         millennium_client_close(client);
-        
+        event_queue_clear(client);
+        pthread_mutex_destroy(&client->event_queue_mutex);
         if (client->input_buffer) {
             free(client->input_buffer);
         }
         if (client->display_message) {
             free(client->display_message);
         }
-        
-        event_queue_clear(client);
         free(client);
     }
 }

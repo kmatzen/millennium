@@ -91,7 +91,8 @@ struct web_server {
     int static_is_file[16];  /* 1 if using file path, 0 if using content */
     int static_count;
     
-    /* WebSocket connections */
+    /* WebSocket connections (#116: mutex protects against data race with broadcast) */
+    pthread_mutex_t websocket_mutex;
     int websocket_connections[32];
     int websocket_count;
     websocket_handler_t websocket_handler;

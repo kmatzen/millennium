@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <time.h>
+#include <pthread.h>
 
 /* Forward declarations */
 struct millennium_client;
@@ -31,7 +32,8 @@ typedef struct millennium_client {
     size_t input_buffer_size;
     size_t input_buffer_capacity;
     
-    /* Event queue - simple linked list implementation */
+    /* Event queue - simple linked list (#117: mutex for Baresip/main race) */
+    pthread_mutex_t event_queue_mutex;
     struct event_queue_node {
         void *event;
         struct event_queue_node *next;
