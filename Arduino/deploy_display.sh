@@ -71,6 +71,8 @@ ssh "$REMOTE" "bash -l -c '
     BOOT_PORT=
     for i in \$(seq 1 80); do
       for p in /dev/serial/by-id/usb-Arduino_LLC_Arduino_Micro* \
+               /dev/serial/by-id/usb-2341_0037* \
+               /dev/serial/by-id/usb-2341_8036* \
                /dev/serial/by-id/usb-2341_8037*; do
         [ -e \"\$p\" ] && BOOT_PORT=\"\$p\" && break 2
       done
@@ -78,7 +80,8 @@ ssh "$REMOTE" "bash -l -c '
       sleep 0.1
     done
     if [ -z \"\$BOOT_PORT\" ]; then
-      echo \"  Bootloader missed, waiting for sketch (Millennium Beta)...\"
+      echo \"  Bootloader missed (saw: \$(ls /dev/serial/by-id/ 2>/dev/null | tr '\\n' ' '))\"
+      echo \"  Waiting for sketch (Millennium Beta)...\"
       for i in 1 2 3 4 5 6 7 8 9 10; do
         [ -e $FP ] && BOOT_PORT=$FP && break
         sleep 1
