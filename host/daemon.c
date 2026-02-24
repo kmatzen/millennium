@@ -834,7 +834,7 @@ int main(int argc, char *argv[]) {
         web_server = web_server_create(config_get_web_server_port(config));
         
         /* Add the web portal as a file route (streaming) */
-        web_server_add_file_route(web_server, "/", "web_portal.html", "text/html");
+        web_server_add_file_route(web_server, "/", "/usr/local/share/millennium/web_portal.html", "text/html");
         
         web_server_start(web_server);
         logger_infof_with_category("Daemon", "Web server started on port %d", 
