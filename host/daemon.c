@@ -457,6 +457,9 @@ void handle_keypad_event(keypad_event_t *keypad_event) {
     VALIDATE_BASICS();
     
     char key = keypad_event_get_key(keypad_event);
+    int in_call = (daemon_state->current_state == DAEMON_STATE_CALL_ACTIVE ||
+                   daemon_state->current_state == DAEMON_STATE_CALL_INCOMING);
+    
     if (isdigit(key)) {
         pthread_mutex_lock(&daemon_state_mutex);
         
@@ -472,10 +475,12 @@ void handle_keypad_event(keypad_event_t *keypad_event) {
         }
         pthread_mutex_unlock(&daemon_state_mutex);
         
-        /* Let active plugin handle the keypad event */
-        if (isdigit(key)) {
-            plugins_handle_keypad(key);
-        }
+        plugins_handle_keypad(key);
+        daemon_broadcast_state("keypad");
+    } else if (in_call && (key == '*' || key == '#')) {
+        /* #95: Pass * and # to plugin for DTMF during call */
+        metrics_increment_counter("keypad_presses", 1);
+        plugins_handle_keypad(key);
         daemon_broadcast_state("keypad");
     }
 }

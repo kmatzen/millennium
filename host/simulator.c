@@ -94,6 +94,7 @@ static void sim_parse_display(const char *message) {
 static int sim_call_pending  = 0;
 static int sim_call_active   = 0;
 static int sim_hangup_called = 0;
+static int sim_sip_registered = 1;  /* 1=registered (default), 0=unavailable */
 
 /* ── Millennium SDK stubs ──────────────────────────────────────────── */
 
@@ -193,6 +194,12 @@ void millennium_client_hangup(millennium_client_t *c) {
     sim_hangup_called = 1;
 }
 
+int millennium_client_send_dtmf(millennium_client_t *c, char key) {
+    (void)c;
+    if (sim_call_active) fprintf(stderr, "[DTMF] %c\n", key);
+    return sim_call_active ? 0 : -1;
+}
+
 void millennium_client_set_ua(millennium_client_t *c, void *ua) {
     (void)c; (void)ua;
 }
@@ -251,6 +258,13 @@ void millennium_client_create_and_queue_event_ptr(millennium_client_t *c, void *
 
 void millennium_client_write_to_display(millennium_client_t *c, const char *m) {
     (void)c; (void)m;
+}
+
+/* SIP status stub: controlled by sip_registered scenario command (#94) */
+void millennium_sdk_get_sip_status(int *registered, char *last_error, size_t last_error_size) {
+    if (registered) *registered = sim_sip_registered;
+    if (last_error && last_error_size > 0) last_error[0] = '\0';
+    (void)last_error_size;
 }
 
 logger_level_t millennium_logger_parse_level(const char *s) { (void)s; return LOGGER_INFO; }
@@ -330,8 +344,11 @@ static void sim_handle_hook(hook_state_change_event_t *ev) {
 
 static void sim_handle_keypad(keypad_event_t *ev) {
     char key;
+    int in_call;
     if (!ev || !daemon_state) return;
     key = keypad_event_get_key(ev);
+    in_call = (daemon_state->current_state == DAEMON_STATE_CALL_ACTIVE ||
+               daemon_state->current_state == DAEMON_STATE_CALL_INCOMING);
 
     if (isdigit(key) &&
         daemon_state->current_state == DAEMON_STATE_IDLE_UP &&
@@ -339,6 +356,9 @@ static void sim_handle_keypad(keypad_event_t *ev) {
 
         daemon_state_add_key(daemon_state, key);
         daemon_state_update_activity(daemon_state);
+        plugins_handle_keypad(key);
+    } else if (in_call && (isdigit(key) || key == '*' || key == '#')) {
+        /* #95: Pass keys to plugin for DTMF during call */
         plugins_handle_keypad(key);
     }
 }
@@ -458,6 +478,8 @@ static int run_scenario(const char *path) {
         fprintf(stderr, "ERROR: cannot open scenario file: %s\n", path);
         return 1;
     }
+
+    sim_sip_registered = 1;  /* default: SIP registered for each scenario */
 
     while (fgets(line, sizeof(line), f)) {
         line_num++;
@@ -683,6 +705,14 @@ static int run_scenario(const char *path) {
             if (count < 1) count = 1;
             { int t; for (t = 0; t < count; t++) display_manager_tick(); }
             sim_drain_events();
+        }
+
+        /* ── sip_registered <0|1> (#94) ──────────────────────────── */
+        else if (strncmp(cmd, "sip_registered ", 15) == 0) {
+            const char *p = cmd + 15;
+            while (*p == ' ') p++;
+            sim_sip_registered = (*p == '1') ? 1 : 0;
+            fprintf(stderr, "  sip_registered = %d\n", sim_sip_registered);
         }
 
         /* ── config <key> <value> ──────────────────────────────── */

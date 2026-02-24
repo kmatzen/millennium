@@ -72,7 +72,12 @@ static int classic_phone_handle_coin(int coin_value, const char *coin_code) {
 
 static int classic_phone_handle_keypad(char key) {
     if (classic_phone_data.is_in_call) {
-        /* In call - could handle DTMF here */
+        /* #95: Send DTMF to Baresip for IVR/voicemail navigation */
+        if (client && (isdigit((unsigned char)key) || key == '*' || key == '#')) {
+            if (millennium_client_send_dtmf(client, key) == 0) {
+                audio_tones_play_dtmf(key);  /* Local feedback */
+            }
+        }
         return 0;
     }
     
@@ -324,6 +329,18 @@ static void classic_phone_check_and_call(void) {
 
 static void classic_phone_start_call(void) {
     char log_msg[256];
+    int sip_registered = 0;
+
+    /* #94: For paid calls, check SIP registration before attempting */
+    if (!classic_phone_data.is_emergency_call && !classic_phone_data.is_card_call) {
+        millennium_sdk_get_sip_status(&sip_registered, NULL, 0);
+        if (sip_registered != 1) {
+            display_manager_set_text("SIP unavailable", "Check connection");
+            logger_warn_with_category("ClassicPhone", "Call refused - SIP not registered");
+            return;
+        }
+    }
+
     classic_phone_data.is_dialing = 1;
     strncpy(classic_phone_data.current_number, classic_phone_data.keypad_buffer, sizeof(classic_phone_data.current_number) - 1);
     classic_phone_data.current_number[sizeof(classic_phone_data.current_number) - 1] = '\0';
