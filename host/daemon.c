@@ -212,7 +212,8 @@ static void daemon_save_state(void) {
             sizeof(ps.active_plugin) - 1);
     ps.active_plugin[sizeof(ps.active_plugin) - 1] = '\0';
 
-    state_persistence_save(&ps, state_file_path);
+    state_persistence_save(&ps, state_file_path,
+        config_get_persistence_fsync(config_get_instance()));
 }
 
 static void daemon_broadcast_state(const char *event_type) {

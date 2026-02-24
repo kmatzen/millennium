@@ -6,7 +6,7 @@
 #include <string.h>
 #include <unistd.h>
 
-int state_persistence_save(const persisted_state_t *state, const char *filepath) {
+int state_persistence_save(const persisted_state_t *state, const char *filepath, int use_fsync) {
     FILE *f;
     char tmp_path[512];
     int fd;
@@ -27,9 +27,9 @@ int state_persistence_save(const persisted_state_t *state, const char *filepath)
     fprintf(f, "active_plugin=%s\n", state->active_plugin);
 
     fflush(f);
-    fd = fileno(f);
-    if (fd >= 0) {
-        fsync(fd);
+    if (use_fsync) {
+        fd = fileno(f);
+        if (fd >= 0) fsync(fd);
     }
     fclose(f);
 

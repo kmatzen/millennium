@@ -203,6 +203,7 @@ void config_set_default_values(config_data_t* config) {
     
     config_set_value(config, "metrics_server.enabled", "false");
     config_set_value(config, "metrics_server.port", "8080");
+    config_set_value(config, "persistence.fsync", "true");
 }
 
 char* config_trim(const char* str, char* result, size_t result_size) {
@@ -403,6 +404,10 @@ int config_get_log_max_files(const config_data_t* config) {
 /* State Persistence Configuration */
 const char* config_get_state_file(const config_data_t* config) {
     return config_get_string(config, "persistence.state_file", "/var/lib/millennium/state");
+}
+
+int config_get_persistence_fsync(const config_data_t* config) {
+    return config_get_bool(config, "persistence.fsync", 1);
 }
 
 /* System Configuration */

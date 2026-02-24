@@ -607,7 +607,7 @@ static int run_scenario(const char *path) {
                     plugins_get_active_name() ? plugins_get_active_name() : "",
                     sizeof(ps.active_plugin) - 1);
             ps.active_plugin[sizeof(ps.active_plugin) - 1] = '\0';
-            state_persistence_save(&ps, arg);
+            state_persistence_save(&ps, arg, 1);
         }
 
         /* ── load_state <filepath> ─────────────────────────────── */

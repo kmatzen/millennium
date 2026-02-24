@@ -51,6 +51,7 @@ int config_get_log_max_files(const config_data_t* config);
 
 /* State Persistence Configuration */
 const char* config_get_state_file(const config_data_t* config);
+int config_get_persistence_fsync(const config_data_t* config);
 
 /* System Configuration */
 int config_get_update_interval_ms(const config_data_t* config);
