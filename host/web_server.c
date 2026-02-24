@@ -1217,33 +1217,33 @@ struct http_response web_server_handle_api_logs(const struct http_request* reque
             }
         }
         
-        /* Simple log parsing - just escape and include */
-        char escaped_message[256];
-        char* src = log_buffer[i];
-        char* dst = escaped_message;
-        size_t dst_remaining = sizeof(escaped_message) - 1;
-        
-        while (*src && dst_remaining > 0) {
-            if (*src == '"') {
-                *dst++ = '\'';
-                dst_remaining--;
-            } else if (*src == '\n' || *src == '\r') {
-                *dst++ = ' ';
-                dst_remaining--;
-            } else {
-                *dst++ = *src;
-                dst_remaining--;
+        /* JSON-escape log message: ", \, and control chars (#112) */
+        char escaped_message[512];
+        {
+            char *src = log_buffer[i];
+            char *dst = escaped_message;
+            size_t dst_remaining = sizeof(escaped_message) - 1;
+            while (*src && dst_remaining > 2) {
+                if (*src == '"' || *src == '\\') {
+                    *dst++ = '\\';
+                    *dst++ = *src;
+                    dst_remaining -= 2;
+                } else if (*src == '\n' || *src == '\r' || (unsigned char)*src < 32) {
+                    *dst++ = ' ';
+                    dst_remaining--;
+                } else {
+                    *dst++ = *src;
+                    dst_remaining--;
+                }
+                src++;
             }
-            src++;
-        }
-        *dst = '\0';
-        
-        /* Truncate if too long */
-        if (strlen(escaped_message) > 200) {
-            escaped_message[197] = '.';
-            escaped_message[198] = '.';
-            escaped_message[199] = '.';
-            escaped_message[200] = '\0';
+            *dst = '\0';
+            if (strlen(escaped_message) > 400) {
+                escaped_message[397] = '.';
+                escaped_message[398] = '.';
+                escaped_message[399] = '.';
+                escaped_message[400] = '\0';
+            }
         }
         
         /* Extract timestamp and level from the log message */
@@ -1310,9 +1310,12 @@ struct http_response web_server_handle_api_logs(const struct http_request* reque
             }
         }
         
+        /* Escape log_level for JSON (parsed from log, could have special chars) */
+        char escaped_level[32];
+        web_server_json_escape(log_level, escaped_level, sizeof(escaped_level));
         written = snprintf(ptr, remaining,
             "{\"timestamp\":%ld,\"level\":\"%s\",\"message\":\"%s\"}",
-            log_timestamp, log_level, escaped_message);
+            log_timestamp, escaped_level, escaped_message);
         if (written > 0 && (size_t)written < remaining) {
             ptr += written;
             remaining -= written;
