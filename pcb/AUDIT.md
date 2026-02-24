@@ -59,6 +59,7 @@ Per README "Schematic Changes Required in KiCad". Verify in KiCad: open schemati
 - [ ] F1 in series on incoming 5V
 - [ ] U1 IN+ from 5V_MAIN, OUT+ to 12V_COIN, feeding J1 only
 - [ ] D1, D2 clamp signal pins to 5V_MAIN and GND (not power rails)
+- [ ] D2: I/O1 → speaker_front+; I/O2 unconnected (see SCHEMATIC_D2_CHANGES.md)
 - [ ] TDA2822 V+ from 5V_MAIN
 - [ ] No TX/RX nets for Arduino–Pi path (USB via hub)
 

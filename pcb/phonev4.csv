@@ -14,7 +14,7 @@
 13;"C_dec";"C_Axial_L3.8mm_D2.6mm_P7.50mm";1;"100nF (TDA2822 Vcc decoupling, THT)";;;
 14;"C-arduino1,C-arduino-display1,C-card1,C-coin1,C-raspi1";"C_Axial_L3.8mm_D2.6mm_P7.50mm";5;"100nF decoupling (THT)";;;
 15;"D1";"SOT-143";1;"PRTR5V0U2X (ESD protection, J4 RJ9, 4-pin only)";;;
-16;"D2";"SOT-143";1;"PRTR5V0U2X (ESD protection, J1 coin, 4-pin only)";;;
+16;"D2";"SOT-143";1;"PRTR5V0U2X (ESD protection, speaker_front+; I/O2 free)";;;
 17;"Q1";"SOT-23";1;"Si2301/Si2319 P-ch MOSFET (reverse polarity; pin-compatible)";;;
 18;"F1";"Fuse_Radial_D10.0mm_P5.00mm";1;"1A PTC resettable fuse (radial THT)";;;
 19;"D3";"LED_D5.0mm";1;"Green power indicator LED (5mm THT)";;;
