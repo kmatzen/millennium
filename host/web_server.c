@@ -1056,22 +1056,27 @@ struct http_response web_server_handle_api_control(const struct http_request* re
         }
     }
     
-    /* Parse cents for coin_insert (supports "cents" or "arg") */
+    /* Parse cents for coin_insert (supports "cents" or "arg") - use strtol to avoid
+     * atoi overflow/undefined behavior (#129) */
     {
+        char* parse_start = NULL;
         char* cents_pos = strstr(request->body, "\"cents\":");
         if (cents_pos) {
-            cents = atoi(cents_pos + 8); /* Length of "cents": */
-        } else if (cents == 0) {
+            parse_start = cents_pos + 8; /* Length of "cents": */
+        } else {
             char* arg_quoted = strstr(request->body, "\"arg\":\"");
             char* arg_num = strstr(request->body, "\"arg\":");
             if (arg_quoted)
-                cents = atoi(arg_quoted + 7); /* "arg":" = 7 chars */
+                parse_start = arg_quoted + 7;
             else if (arg_num)
-                cents = atoi(arg_num + 6);    /* "arg": = 6 chars */
+                parse_start = arg_num + 6;
         }
-        /* Validate: reject negative, zero, or unreasonably large values (#129) */
-        if (cents < 1 || cents > 999) {
-            cents = 0;
+        if (parse_start) {
+            char* endptr;
+            long val = strtol(parse_start, &endptr, 10);
+            if (endptr != parse_start && val >= 1 && val <= 999 && val <= 0x7FFFFFFF) {
+                cents = (int)val;
+            }
         }
     }
     

@@ -272,17 +272,17 @@ char *metrics_server_generate_metrics_response(metrics_server_t *server) {
     prometheus_data = metrics_export_prometheus();
     if (!prometheus_data) return NULL;
     
-    /* Exact size: header (~120) + body + null - no truncation (#133) */
+    /* Exact size: header + body + null - no truncation (#133).
+     * Header max ~130 bytes (Content-Length can add digits); 256 is safe. */
     {
         size_t body_len = strlen(prometheus_data);
-        response_len = 200 + body_len;
+        response_len = 256 + body_len + 1;
     }
     response = malloc(response_len);
     if (!response) {
         free(prometheus_data);
         return NULL;
     }
-    
     snprintf(response, response_len,
         "HTTP/1.1 200 OK\r\n"
         "Content-Type: text/plain; version=0.0.4; charset=utf-8\r\n"
