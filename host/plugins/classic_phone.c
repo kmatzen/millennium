@@ -147,6 +147,7 @@ static int classic_phone_handle_call_state(int call_state) {
         if (classic_phone_data.is_dialing) {
             /* #91: Call failed during dial - refund and show failure */
             classic_phone_data.inserted_cents += classic_phone_data.call_cost_cents;
+            plugins_adjust_inserted_cents(classic_phone_data.call_cost_cents);  /* #109: sync daemon_state */
             classic_phone_data.is_dialing = 0;
             display_manager_set_text("Call failed", "Coins refunded");
             logger_info_with_category("ClassicPhone", "Call failed - coins refunded");
@@ -348,6 +349,7 @@ static void classic_phone_start_call(void) {
 
     if (!classic_phone_data.is_emergency_call && !classic_phone_data.is_card_call) {
         classic_phone_data.inserted_cents -= classic_phone_data.call_cost_cents;
+        plugins_adjust_inserted_cents(-classic_phone_data.call_cost_cents);  /* #109: sync daemon_state */
     }
 
     millennium_client_call(client, classic_phone_data.current_number);

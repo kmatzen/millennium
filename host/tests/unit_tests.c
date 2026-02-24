@@ -42,6 +42,14 @@ void millennium_client_check_serial(millennium_client_t *c) { (void)c; }
 void millennium_client_serial_activity(millennium_client_t *c) { (void)c; }
 void list_audio_devices(void) {}
 
+/* #109: Keep daemon_state in sync when plugin deducts/refunds */
+void plugins_adjust_inserted_cents(int delta) {
+    if (daemon_state) {
+        daemon_state->inserted_cents += delta;
+        if (daemon_state->inserted_cents < 0) daemon_state->inserted_cents = 0;
+    }
+}
+
 /* SIP status stub (classic_phone calls this for paid-call pre-check) */
 void millennium_sdk_get_sip_status(int *registered, char *last_error, size_t last_error_size) {
     if (registered) *registered = 1;

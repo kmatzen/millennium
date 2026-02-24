@@ -90,6 +90,16 @@ time_t get_daemon_start_time(void) {
     return daemon_start_time;
 }
 
+/* #109: Keep daemon_state.inserted_cents in sync when plugin deducts/refunds */
+void plugins_adjust_inserted_cents(int delta) {
+    if (!daemon_state) return;
+    pthread_mutex_lock(&daemon_state_mutex);
+    daemon_state->inserted_cents += delta;
+    if (daemon_state->inserted_cents < 0) daemon_state->inserted_cents = 0;
+    daemon_state_update_activity(daemon_state);
+    pthread_mutex_unlock(&daemon_state_mutex);
+}
+
 struct daemon_state_info get_daemon_state_info(void) {
     struct daemon_state_info info;
     memset(&info, 0, sizeof(info));
