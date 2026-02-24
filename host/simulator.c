@@ -3,6 +3,9 @@
 #include "events.h"
 #include "config.h"
 #include "daemon_state.h"
+
+/* Forward declaration for stubs that run before daemon_state is initialized */
+extern daemon_state_data_t *daemon_state;
 #include "logger.h"
 #include "metrics.h"
 #include "event_processor.h"
@@ -210,6 +213,14 @@ void millennium_client_check_serial(millennium_client_t *c) {
 
 void millennium_client_serial_activity(millennium_client_t *c) {
     (void)c;
+}
+
+/* #109: Keep daemon_state in sync when plugin deducts/refunds */
+void plugins_adjust_inserted_cents(int delta) {
+    if (daemon_state) {
+        daemon_state->inserted_cents += delta;
+        if (daemon_state->inserted_cents < 0) daemon_state->inserted_cents = 0;
+    }
 }
 
 /* Audio tone stubs */

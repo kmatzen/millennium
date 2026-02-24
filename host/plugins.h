@@ -41,6 +41,9 @@ int plugins_activate(const char *plugin_name);
 const char* plugins_get_active_name(void);
 int plugins_list(char *buffer, size_t buffer_size);
 
+/* #109: Sync inserted_cents when plugin deducts/refunds (e.g. call cost). */
+void plugins_adjust_inserted_cents(int delta);
+
 /* Plugin event handler functions */
 int plugins_handle_coin(int coin_value, const char *coin_code);
 int plugins_handle_keypad(char key);

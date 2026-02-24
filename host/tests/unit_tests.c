@@ -41,6 +41,14 @@ void millennium_client_check_serial(millennium_client_t *c) { (void)c; }
 void millennium_client_serial_activity(millennium_client_t *c) { (void)c; }
 void list_audio_devices(void) {}
 
+/* #109: Keep daemon_state in sync when plugin deducts/refunds */
+void plugins_adjust_inserted_cents(int delta) {
+    if (daemon_state) {
+        daemon_state->inserted_cents += delta;
+        if (daemon_state->inserted_cents < 0) daemon_state->inserted_cents = 0;
+    }
+}
+
 /* Audio tone stubs */
 void audio_tones_init(void) {}
 void audio_tones_cleanup(void) {}
