@@ -20,6 +20,8 @@
 #include <time.h>
 #include <ctype.h>
 #include <unistd.h>
+#include <sys/select.h>
+#include <sys/time.h>
 #include <fcntl.h>
 #include <pthread.h>
 #include <stdarg.h>
@@ -911,6 +913,14 @@ int main(int argc, char *argv[]) {
         if (event) {
             event_processor_process_event(event_processor, event);
             event_destroy(event);
+        } else {
+            /* No event: yield to reduce CPU when idle (#115) */
+            {
+                struct timeval tv;
+                tv.tv_sec = 0;
+                tv.tv_usec = 1000;
+                select(0, NULL, NULL, NULL, &tv);
+            }
         }
         
         /* Update metrics and tick plugins (every 1000 loops = ~1 second) */

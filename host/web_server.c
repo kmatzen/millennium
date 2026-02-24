@@ -842,12 +842,15 @@ struct http_response web_server_handle_api_health(const struct http_request* req
     health_check_t checks[32];
     int checks_count = health_monitor_get_all_checks(checks, 32);
     
+    char escaped_overall[32];
+    web_server_json_escape(health_monitor_status_to_string(overall_status),
+                          escaped_overall, sizeof(escaped_overall));
     char json[2048];
     char* ptr = json;
     size_t remaining = sizeof(json);
     
     int written = snprintf(ptr, remaining, "{\"overall_status\":\"%s\",\"checks\":{", 
-                          health_monitor_status_to_string(overall_status));
+                          escaped_overall);
     if (written > 0 && (size_t)written < remaining) {
         ptr += written;
         remaining -= written;
@@ -855,7 +858,14 @@ struct http_response web_server_handle_api_health(const struct http_request* req
     
     int i;
     int first = 1;
-    for (i = 0; i < checks_count && remaining > 100; i++) {
+    for (i = 0; i < checks_count && remaining > 200; i++) {
+        char escaped_name[64];
+        char escaped_status[32];
+        char escaped_message[256];
+        web_server_json_escape(checks[i].name, escaped_name, sizeof(escaped_name));
+        web_server_json_escape(health_monitor_status_to_string(checks[i].last_status),
+                              escaped_status, sizeof(escaped_status));
+        web_server_json_escape(checks[i].last_message, escaped_message, sizeof(escaped_message));
         if (!first) {
             written = snprintf(ptr, remaining, ",");
             if (written > 0 && (size_t)written < remaining) {
@@ -863,13 +873,9 @@ struct http_response web_server_handle_api_health(const struct http_request* req
                 remaining -= written;
             }
         }
-        
         written = snprintf(ptr, remaining,
             "\"%s\":{\"status\":\"%s\",\"message\":\"%s\",\"last_check\":%ld}",
-            checks[i].name,
-            health_monitor_status_to_string(checks[i].last_status),
-            checks[i].last_message,
-            checks[i].last_check_time);
+            escaped_name, escaped_status, escaped_message, checks[i].last_check_time);
         if (written > 0 && (size_t)written < remaining) {
             ptr += written;
             remaining -= written;
@@ -900,6 +906,12 @@ struct http_response web_server_handle_api_config(const struct http_request* req
         return response;
     }
     
+    char escaped_device[128];
+    char escaped_level[32];
+    char escaped_file[256];
+    web_server_json_escape(config_get_display_device(config), escaped_device, sizeof(escaped_device));
+    web_server_json_escape(config_get_log_level(config), escaped_level, sizeof(escaped_level));
+    web_server_json_escape(config_get_log_file(config), escaped_file, sizeof(escaped_file));
     char json[2048];
     snprintf(json, sizeof(json),
         "{"
@@ -929,12 +941,12 @@ struct http_response web_server_handle_api_config(const struct http_request* req
         "\"port\":%d"
         "}"
         "}",
-        config_get_display_device(config),
+        escaped_device,
         config_get_baud_rate(config),
         config_get_call_cost_cents(config),
         config_get_call_timeout_seconds(config),
-        config_get_log_level(config),
-        config_get_log_file(config),
+        escaped_level,
+        escaped_file,
         config_get_log_to_file(config) ? "true" : "false",
         config_get_update_interval_ms(config),
         config_get_max_retries(config),
@@ -1037,16 +1049,22 @@ struct http_response web_server_handle_api_control(const struct http_request* re
     }
     
     /* Parse cents for coin_insert (supports "cents" or "arg") */
-    char* cents_pos = strstr(request->body, "\"cents\":");
-    if (cents_pos) {
-        cents = atoi(cents_pos + 8); /* Length of "cents": */
-    } else if (cents == 0) {
-        char* arg_quoted = strstr(request->body, "\"arg\":\"");
-        char* arg_num = strstr(request->body, "\"arg\":");
-        if (arg_quoted)
-            cents = atoi(arg_quoted + 7); /* "arg":" = 7 chars */
-        else if (arg_num)
-            cents = atoi(arg_num + 6);    /* "arg": = 6 chars */
+    {
+        char* cents_pos = strstr(request->body, "\"cents\":");
+        if (cents_pos) {
+            cents = atoi(cents_pos + 8); /* Length of "cents": */
+        } else if (cents == 0) {
+            char* arg_quoted = strstr(request->body, "\"arg\":\"");
+            char* arg_num = strstr(request->body, "\"arg\":");
+            if (arg_quoted)
+                cents = atoi(arg_quoted + 7); /* "arg":" = 7 chars */
+            else if (arg_num)
+                cents = atoi(arg_num + 6);    /* "arg": = 6 chars */
+        }
+        /* Validate: reject negative, zero, or unreasonably large values (#129) */
+        if (cents < 1 || cents > 999) {
+            cents = 0;
+        }
     }
     
     /* Parse plugin for plugin actions */
@@ -1088,10 +1106,14 @@ struct http_response web_server_handle_api_control(const struct http_request* re
         success = send_control_command("keypad_backspace");
         snprintf(message, sizeof(message), "%s", success ? "Keypad backspace" : "Failed to simulate backspace");
     } else if (strcmp(action, "coin_insert") == 0) {
-        char cmd[32];
-        snprintf(cmd, sizeof(cmd), "coin_insert:%d", cents);
-        success = send_control_command(cmd);
-        snprintf(message, sizeof(message), success ? "Coin inserted: %d¢" : "Failed to insert coin", cents);
+        if (cents < 1 || cents > 999) {
+            snprintf(message, sizeof(message), "Invalid cents: must be 1-999");
+        } else {
+            char cmd[32];
+            snprintf(cmd, sizeof(cmd), "coin_insert:%d", cents);
+            success = send_control_command(cmd);
+            snprintf(message, sizeof(message), success ? "Coin inserted: %d¢" : "Failed to insert coin", cents);
+        }
     } else if (strcmp(action, "coin_return") == 0) {
         success = send_control_command("coin_return");
         snprintf(message, sizeof(message), "%s", success ? "Coins returned" : "Failed to return coins");

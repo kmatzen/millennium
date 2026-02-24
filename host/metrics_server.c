@@ -272,7 +272,11 @@ char *metrics_server_generate_metrics_response(metrics_server_t *server) {
     prometheus_data = metrics_export_prometheus();
     if (!prometheus_data) return NULL;
     
-    response_len = strlen(prometheus_data) + 200; /* Extra space for headers */
+    /* Exact size: header (~120) + body + null - no truncation (#133) */
+    {
+        size_t body_len = strlen(prometheus_data);
+        response_len = 200 + body_len;
+    }
     response = malloc(response_len);
     if (!response) {
         free(prometheus_data);

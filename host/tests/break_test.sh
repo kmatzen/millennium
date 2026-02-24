@@ -50,6 +50,14 @@ run "POST control with quote in plugin name" \
 run "POST control handset_up" \
     "curl -s -X POST $BASE/api/control -H 'Content-Type: application/json' -d '{\"action\":\"handset_up\"}'" "json"
 
+# coin_insert validation (#129): reject invalid cents, response must be valid JSON
+run "POST coin_insert invalid cents (negative)" \
+    "curl -s -X POST $BASE/api/control -H 'Content-Type: application/json' -d '{\"action\":\"coin_insert\",\"cents\":-5}'" "json"
+run "POST coin_insert invalid cents (huge)" \
+    "curl -s -X POST $BASE/api/control -H 'Content-Type: application/json' -d '{\"action\":\"coin_insert\",\"cents\":999999}'" "json"
+run "POST coin_insert valid" \
+    "curl -s -X POST $BASE/api/control -H 'Content-Type: application/json' -d '{\"action\":\"coin_insert\",\"cents\":25}'" "json"
+
 # Bad input - daemon should not crash
 run "POST control invalid JSON" "curl -s -X POST $BASE/api/control -H 'Content-Type: application/json' -d 'not json'"
 run "POST control empty body" "curl -s -X POST $BASE/api/control -H 'Content-Type: application/json' -d ''"
