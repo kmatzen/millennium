@@ -41,6 +41,13 @@ void millennium_client_check_serial(millennium_client_t *c) { (void)c; }
 void millennium_client_serial_activity(millennium_client_t *c) { (void)c; }
 void list_audio_devices(void) {}
 
+/* SIP status stub (classic_phone calls this for paid-call pre-check) */
+void millennium_sdk_get_sip_status(int *registered, char *last_error, size_t last_error_size) {
+    if (registered) *registered = 1;
+    if (last_error && last_error_size > 0) last_error[0] = '\0';
+    (void)last_error_size;
+}
+
 /* Audio tone stubs */
 void audio_tones_init(void) {}
 void audio_tones_cleanup(void) {}
