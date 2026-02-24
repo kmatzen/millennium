@@ -167,4 +167,9 @@ api-test:
 	@chmod +x tests/api_test.sh
 	@HOST=$(HOST) ./tests/api_test.sh $(HOST)
 
-.PHONY: all clean install uninstall test unit_tests api-test
+# Run API test against the remote device (matzen@192.168.86.145)
+# Override: make device-test HOST=other-ip
+device-test:
+	$(MAKE) api-test HOST=192.168.86.145
+
+.PHONY: all clean install uninstall test unit_tests api-test device-test

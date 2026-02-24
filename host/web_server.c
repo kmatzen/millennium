@@ -780,6 +780,7 @@ struct http_response web_server_handle_api_status(const struct http_request* req
     (void)request; /* Suppress unused parameter warning */
     struct http_response response;
     memset(&response, 0, sizeof(response));
+    response.status_code = 200;
     web_server_strcpy_safe(response.content_type, "application/json", sizeof(response.content_type));
     
     /* Calculate actual uptime */
@@ -804,6 +805,7 @@ struct http_response web_server_handle_api_metrics(const struct http_request* re
     (void)request; /* Suppress unused parameter warning */
     struct http_response response;
     memset(&response, 0, sizeof(response));
+    response.status_code = 200;
     web_server_strcpy_safe(response.content_type, "application/json", sizeof(response.content_type));
     
     /* Use C89 metrics API - simplified version */
@@ -821,6 +823,7 @@ struct http_response web_server_handle_api_health(const struct http_request* req
     (void)request; /* Suppress unused parameter warning */
     struct http_response response;
     memset(&response, 0, sizeof(response));
+    response.status_code = 200;
     web_server_strcpy_safe(response.content_type, "application/json", sizeof(response.content_type));
     
     health_status_t overall_status = health_monitor_get_overall_status();
@@ -876,6 +879,7 @@ struct http_response web_server_handle_api_config(const struct http_request* req
     (void)request; /* Suppress unused parameter warning */
     struct http_response response;
     memset(&response, 0, sizeof(response));
+    response.status_code = 200;
     web_server_strcpy_safe(response.content_type, "application/json", sizeof(response.content_type));
     
     config_data_t* config = config_get_instance();
@@ -935,6 +939,7 @@ struct http_response web_server_handle_api_state(const struct http_request* requ
     (void)request; /* Suppress unused parameter warning */
     struct http_response response;
     memset(&response, 0, sizeof(response));
+    response.status_code = 200;
     web_server_strcpy_safe(response.content_type, "application/json", sizeof(response.content_type));
     
     char json[768];
@@ -973,6 +978,7 @@ struct http_response web_server_handle_api_state(const struct http_request* requ
 struct http_response web_server_handle_api_control(const struct http_request* request) {
     struct http_response response;
     memset(&response, 0, sizeof(response));
+    response.status_code = 200;
     web_server_strcpy_safe(response.content_type, "application/json", sizeof(response.content_type));
     
     char json[512];
@@ -1286,6 +1292,7 @@ struct http_response web_server_handle_api_plugins(const struct http_request* re
     (void)request; /* Suppress unused parameter warning */
     struct http_response response;
     memset(&response, 0, sizeof(response));
+    response.status_code = 200;
     web_server_strcpy_safe(response.content_type, "application/json", sizeof(response.content_type));
     
     char json[1024];
