@@ -496,8 +496,13 @@ int send_control_command(const char* action) {
     }
     
     if (strcmp(command, "start_call") == 0) {
-        /* Simulate starting a call by changing state */
         pthread_mutex_lock(&daemon_state_mutex);
+        if (daemon_state->current_state == DAEMON_STATE_CALL_ACTIVE ||
+            daemon_state->current_state == DAEMON_STATE_CALL_INCOMING) {
+            pthread_mutex_unlock(&daemon_state_mutex);
+            logger_warn_with_category("Control", "start_call ignored - call already active (#102)");
+            return 0;
+        }
         daemon_state->current_state = DAEMON_STATE_CALL_INCOMING;
         daemon_state_update_activity(daemon_state);
         metrics_set_gauge("current_state", (double)daemon_state->current_state);
@@ -653,8 +658,20 @@ int send_control_command(const char* action) {
         return 1;
         
     } else if (strcmp(command, "activate_plugin") == 0) {
-        /* Activate a plugin */
-        if (strlen(arg) > 0) {
+        if (strlen(arg) == 0) {
+            logger_warn_with_category("Control", "Plugin activation command missing plugin name");
+            return 0;
+        }
+        /* Reject plugin switch during call - prevents orphaned state (#97, #102) */
+        pthread_mutex_lock(&daemon_state_mutex);
+        if (daemon_state->current_state == DAEMON_STATE_CALL_ACTIVE ||
+            daemon_state->current_state == DAEMON_STATE_CALL_INCOMING) {
+            pthread_mutex_unlock(&daemon_state_mutex);
+            logger_warn_with_category("Control", "Plugin switch ignored - call in progress");
+            return 0;
+        }
+        pthread_mutex_unlock(&daemon_state_mutex);
+        {
             int result = plugins_activate(arg);
             if (result == 0) {
                 logger_infof_with_category("Control", "Plugin %s activated via web portal", arg);
@@ -663,9 +680,6 @@ int send_control_command(const char* action) {
                 logger_warnf_with_category("Control", "Failed to activate plugin %s", arg);
                 return 0;
             }
-        } else {
-            logger_warn_with_category("Control", "Plugin activation command missing plugin name");
-            return 0;
         }
     }
     
