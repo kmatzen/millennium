@@ -95,13 +95,23 @@ static char *string_duplicate(const char *src) {
     return dst;
 }
 
+#define MAX_INPUT_BUFFER_SIZE (256 * 1024)  /* 256KB cap to prevent unbounded growth (#127) */
+
 static void string_buffer_ensure_capacity(struct millennium_client *client, size_t needed) {
+    if (needed > MAX_INPUT_BUFFER_SIZE) {
+        logger_warn_with_category("SDK", "Input buffer would exceed cap, discarding");
+        client->input_buffer_size = 0;
+        if (client->input_buffer) client->input_buffer[0] = '\0';
+        return;
+    }
     if (needed >= client->input_buffer_capacity) {
         size_t new_capacity = client->input_buffer_capacity * 2;
         if (new_capacity < needed) {
             new_capacity = needed + 1;
         }
-        
+        if (new_capacity > MAX_INPUT_BUFFER_SIZE) {
+            new_capacity = MAX_INPUT_BUFFER_SIZE;
+        }
         char *new_buffer = realloc(client->input_buffer, new_capacity);
         if (new_buffer) {
             client->input_buffer = new_buffer;
