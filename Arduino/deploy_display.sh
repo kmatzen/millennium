@@ -80,8 +80,7 @@ ssh "$REMOTE" "bash -l -c '
       sleep 0.1
     done
     if [ -z \"\$BOOT_PORT\" ]; then
-      echo \"  Bootloader missed (saw: \$(ls /dev/serial/by-id/ 2>/dev/null | tr '\\n' ' '))\"
-      echo \"  Waiting for sketch (Millennium Beta)...\"
+      echo \"  Bootloader missed, waiting for sketch (Millennium Beta)...\"
       for i in 1 2 3 4 5 6 7 8 9 10; do
         [ -e $FP ] && BOOT_PORT=$FP && break
         sleep 1
