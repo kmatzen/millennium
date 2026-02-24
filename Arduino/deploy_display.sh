@@ -71,7 +71,7 @@ ssh "$REMOTE" "bash -l -c '
     BOOT_PORT=
     for i in \$(seq 1 80); do
       for p in /dev/serial/by-id/usb-Arduino_LLC_Arduino_Micro* \
-               /dev/serial/by-id/usb-2341_8037* 2>/dev/null; do
+               /dev/serial/by-id/usb-2341_8037*; do
         [ -e \"\$p\" ] && BOOT_PORT=\"\$p\" && break 2
       done
       [ -n \"\$BOOT_PORT\" ] && break
