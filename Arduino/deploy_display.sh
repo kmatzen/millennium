@@ -67,26 +67,11 @@ ssh "$REMOTE" "bash -l -c '
   if command -v uhubctl >/dev/null 2>&1; then
     echo \"  Power-cycling display Arduino (uhubctl port 2 on Huasheng hub)...\"
     sudo uhubctl -l 1-1 -a cycle -p 2 -f
-    echo \"  Catching bootloader (stock Micro identity, ~8s window)...\"
-    BOOT_PORT=
-    for i in \$(seq 1 80); do
-      for p in /dev/serial/by-id/usb-Arduino_LLC_Arduino_Micro* \
-               /dev/serial/by-id/usb-2341_0037* \
-               /dev/serial/by-id/usb-2341_8036* \
-               /dev/serial/by-id/usb-2341_8037*; do
-        [ -e \"\$p\" ] && BOOT_PORT=\"\$p\" && break 2
-      done
-      [ -n \"\$BOOT_PORT\" ] && break
+    echo \"  Catching device as soon as it appears (~1s after power-on)...\"
+    for i in \$(seq 1 100); do
+      [ -e $FP ] && break
       sleep 0.1
     done
-    if [ -z \"\$BOOT_PORT\" ]; then
-      echo \"  Bootloader missed, waiting for sketch (Millennium Beta)...\"
-      for i in 1 2 3 4 5 6 7 8 9 10; do
-        [ -e $FP ] && BOOT_PORT=$FP && break
-        sleep 1
-      done
-    fi
-    FP=\${BOOT_PORT:-$FP}
   else
     sleep 2
   fi
