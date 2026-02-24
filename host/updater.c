@@ -148,9 +148,67 @@ int updater_is_update_available(void) {
 }
 
 static char apply_status[256] = "No update attempted";
+static int apply_state = 0;  /* 0=idle, 1=applying */
+static char apply_source_dir[512] = {0};
+static pthread_mutex_t apply_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 const char *updater_get_apply_status(void) {
-    return apply_status;
+    const char *s;
+    pthread_mutex_lock(&apply_mutex);
+    s = apply_status;
+    pthread_mutex_unlock(&apply_mutex);
+    return s;
+}
+
+/* #118: Run apply in background; returns immediately. */
+static void *apply_thread_func(void *arg) {
+    (void)arg;
+    int rc = updater_apply(apply_source_dir);
+    if (rc != 0) {
+        pthread_mutex_lock(&apply_mutex);
+        apply_state = 0;
+        pthread_mutex_unlock(&apply_mutex);
+    }
+    /* On success, systemctl restart kills us before we get here */
+    return NULL;
+}
+
+/* #118: Non-blocking. Starts apply in background; returns immediately. */
+int updater_apply_async(const char *source_dir) {
+    pthread_t th;
+    if (!source_dir || !*source_dir) {
+        pthread_mutex_lock(&apply_mutex);
+        snprintf(apply_status, sizeof(apply_status), "Error: no source directory specified");
+        pthread_mutex_unlock(&apply_mutex);
+        return -1;
+    }
+    pthread_mutex_lock(&apply_mutex);
+    if (apply_state == 1) {
+        pthread_mutex_unlock(&apply_mutex);
+        return 0;  /* Already applying */
+    }
+    strncpy(apply_source_dir, source_dir, sizeof(apply_source_dir) - 1);
+    apply_source_dir[sizeof(apply_source_dir) - 1] = '\0';
+    apply_state = 1;
+    snprintf(apply_status, sizeof(apply_status), "Applying update in background...");
+    pthread_mutex_unlock(&apply_mutex);
+    if (pthread_create(&th, NULL, apply_thread_func, NULL) == 0) {
+        pthread_detach(th);
+        return 0;
+    }
+    pthread_mutex_lock(&apply_mutex);
+    apply_state = 0;
+    snprintf(apply_status, sizeof(apply_status), "Error: failed to start apply thread");
+    pthread_mutex_unlock(&apply_mutex);
+    return -1;
+}
+
+int updater_is_applying(void) {
+    int s;
+    pthread_mutex_lock(&apply_mutex);
+    s = (apply_state == 1);
+    pthread_mutex_unlock(&apply_mutex);
+    return s;
 }
 
 static int run_command(const char *cmd) {
@@ -170,35 +228,53 @@ int updater_apply(const char *source_dir) {
     char cmd[512];
 
     if (!source_dir || !*source_dir) {
+        pthread_mutex_lock(&apply_mutex);
         snprintf(apply_status, sizeof(apply_status), "Error: no source directory specified");
+        pthread_mutex_unlock(&apply_mutex);
         return -1;
     }
 
+    pthread_mutex_lock(&apply_mutex);
     snprintf(apply_status, sizeof(apply_status), "Pulling latest code...");
+    pthread_mutex_unlock(&apply_mutex);
     snprintf(cmd, sizeof(cmd), "cd '%s' && git pull --ff-only origin main 2>&1", source_dir);
     if (run_command(cmd) != 0) {
+        pthread_mutex_lock(&apply_mutex);
         snprintf(apply_status, sizeof(apply_status), "Error: git pull failed");
+        pthread_mutex_unlock(&apply_mutex);
         return -1;
     }
 
+    pthread_mutex_lock(&apply_mutex);
     snprintf(apply_status, sizeof(apply_status), "Building...");
+    pthread_mutex_unlock(&apply_mutex);
     snprintf(cmd, sizeof(cmd), "cd '%s/host' && make clean && make daemon 2>&1", source_dir);
     if (run_command(cmd) != 0) {
+        pthread_mutex_lock(&apply_mutex);
         snprintf(apply_status, sizeof(apply_status), "Error: build failed");
+        pthread_mutex_unlock(&apply_mutex);
         return -1;
     }
 
+    pthread_mutex_lock(&apply_mutex);
     snprintf(apply_status, sizeof(apply_status), "Installing and restarting...");
+    pthread_mutex_unlock(&apply_mutex);
     snprintf(cmd, sizeof(cmd), "cd '%s/host' && sudo make install 2>&1", source_dir);
     if (run_command(cmd) != 0) {
+        pthread_mutex_lock(&apply_mutex);
         snprintf(apply_status, sizeof(apply_status), "Error: install failed");
+        pthread_mutex_unlock(&apply_mutex);
         return -1;
     }
 
+    pthread_mutex_lock(&apply_mutex);
     snprintf(apply_status, sizeof(apply_status), "Restarting daemon...");
+    pthread_mutex_unlock(&apply_mutex);
     logger_info_with_category("Updater", "Restarting daemon via systemd");
     run_command("sudo systemctl restart daemon.service");
 
+    pthread_mutex_lock(&apply_mutex);
     snprintf(apply_status, sizeof(apply_status), "Update applied successfully");
+    pthread_mutex_unlock(&apply_mutex);
     return 0;
 }
