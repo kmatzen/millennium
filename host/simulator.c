@@ -191,6 +191,12 @@ void millennium_client_hangup(millennium_client_t *c) {
     sim_hangup_called = 1;
 }
 
+int millennium_client_send_dtmf(millennium_client_t *c, char key) {
+    (void)c;
+    if (sim_call_active) fprintf(stderr, "[DTMF] %c\n", key);
+    return sim_call_active ? 0 : -1;
+}
+
 void millennium_client_set_ua(millennium_client_t *c, void *ua) {
     (void)c; (void)ua;
 }
@@ -327,8 +333,11 @@ static void sim_handle_hook(hook_state_change_event_t *ev) {
 
 static void sim_handle_keypad(keypad_event_t *ev) {
     char key;
+    int in_call;
     if (!ev || !daemon_state) return;
     key = keypad_event_get_key(ev);
+    in_call = (daemon_state->current_state == DAEMON_STATE_CALL_ACTIVE ||
+               daemon_state->current_state == DAEMON_STATE_CALL_INCOMING);
 
     if (isdigit(key) &&
         daemon_state->current_state == DAEMON_STATE_IDLE_UP &&
@@ -336,6 +345,9 @@ static void sim_handle_keypad(keypad_event_t *ev) {
 
         daemon_state_add_key(daemon_state, key);
         daemon_state_update_activity(daemon_state);
+        plugins_handle_keypad(key);
+    } else if (in_call && (isdigit(key) || key == '*' || key == '#')) {
+        /* #95: Pass keys to plugin for DTMF during call */
         plugins_handle_keypad(key);
     }
 }

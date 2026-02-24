@@ -1,0 +1,13 @@
+# Test: #95 DTMF during call - keys sent to Baresip for IVR/voicemail
+# When in CALL_ACTIVE, keypresses should send DTMF (simulator logs [DTMF] X)
+
+hook_up
+coin 25
+coin 25
+keys 5551234567
+call_active
+
+# Press keys during call - should trigger DTMF (no assertion; stderr shows [DTMF] 1, [DTMF] 2)
+keys 12
+
+hook_down
