@@ -6,9 +6,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <pthread.h>
 
 static char latest_version[64] = {0};
-static int  checked = 0;
+static int  check_state = 0;  /* 0=idle, 1=checking, 2=checked */
+static pthread_mutex_t check_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static int parse_version(const char *s, int *major, int *minor, int *patch) {
     if (!s) return -1;
@@ -29,16 +31,13 @@ int updater_compare_versions(const char *a, const char *b) {
     return a_pat - b_pat;
 }
 
-int updater_check(void) {
+/* Blocking implementation (runs in background thread) */
+static int do_check(void) {
     FILE *fp;
     char buf[4096];
     const char *tag;
     size_t len;
 
-    /*
-     * Query GitHub Releases API.  curl is available on Raspberry Pi OS
-     * by default; the -s flag suppresses progress, -m limits timeout.
-     */
     fp = popen("curl -s -m 10 "
                "https://api.github.com/repos/kmatzen/millennium/releases/latest"
                " 2>/dev/null", "r");
@@ -55,20 +54,15 @@ int updater_check(void) {
     }
     buf[len] = '\0';
 
-    /*
-     * Minimal JSON extraction: find "tag_name" : "vX.Y.Z"
-     * Full JSON parsing is overkill for a single field.
-     */
     tag = strstr(buf, "\"tag_name\"");
     if (!tag) {
         logger_debug_with_category("Updater", "No tag_name in GitHub response (may have no releases)");
         return -1;
     }
 
-    /* Advance past the key and colon to the value */
     tag = strchr(tag + 10, '"');
     if (!tag) return -1;
-    tag++; /* skip opening quote */
+    tag++;
 
     {
         const char *end = strchr(tag, '"');
@@ -77,7 +71,6 @@ int updater_check(void) {
         latest_version[end - tag] = '\0';
     }
 
-    checked = 1;
     {
         char log_msg[128];
         snprintf(log_msg, sizeof(log_msg),
@@ -88,13 +81,70 @@ int updater_check(void) {
     return 0;
 }
 
+static void *check_thread_func(void *arg) {
+    (void)arg;
+    int rc = do_check();
+    pthread_mutex_lock(&check_mutex);
+    check_state = 2;  /* checked */
+    if (rc != 0) latest_version[0] = '\0';
+    pthread_mutex_unlock(&check_mutex);
+    return NULL;
+}
+
+/* #119: Non-blocking. Starts background check if idle; returns immediately. */
+void updater_check_async(void) {
+    pthread_t th;
+    pthread_mutex_lock(&check_mutex);
+    if (check_state == 0) {
+        check_state = 1;
+        pthread_mutex_unlock(&check_mutex);
+        if (pthread_create(&th, NULL, check_thread_func, NULL) == 0) {
+            pthread_detach(th);
+        } else {
+            pthread_mutex_lock(&check_mutex);
+            check_state = 0;
+            pthread_mutex_unlock(&check_mutex);
+        }
+    } else {
+        pthread_mutex_unlock(&check_mutex);
+    }
+}
+
+/* Returns 1 if a check is in progress (curl running in background). */
+int updater_is_checking(void) {
+    int s;
+    pthread_mutex_lock(&check_mutex);
+    s = (check_state == 1);
+    pthread_mutex_unlock(&check_mutex);
+    return s;
+}
+
+/* Legacy blocking API; prefer updater_check_async for HTTP handlers. */
+int updater_check(void) {
+    int rc = do_check();
+    pthread_mutex_lock(&check_mutex);
+    check_state = 2;
+    if (rc != 0) latest_version[0] = '\0';
+    pthread_mutex_unlock(&check_mutex);
+    return rc;
+}
+
 const char *updater_get_latest_version(void) {
-    return checked ? latest_version : NULL;
+    const char *v = NULL;
+    pthread_mutex_lock(&check_mutex);
+    if (check_state == 2 && latest_version[0]) v = latest_version;
+    pthread_mutex_unlock(&check_mutex);
+    return v;
 }
 
 int updater_is_update_available(void) {
-    if (!checked) return 0;
-    return updater_compare_versions(latest_version, version_get_string()) > 0;
+    const char *lv;
+    int avail = 0;
+    pthread_mutex_lock(&check_mutex);
+    lv = (check_state == 2 && latest_version[0]) ? latest_version : NULL;
+    pthread_mutex_unlock(&check_mutex);
+    if (lv) avail = updater_compare_versions(lv, version_get_string()) > 0;
+    return avail;
 }
 
 static char apply_status[256] = "No update attempted";
