@@ -469,6 +469,11 @@ static void test_updater_apply_bad_dir(void) {
     TEST_ASSERT(strstr(updater_get_apply_status(), "git pull failed") != NULL);
 }
 
+static void test_updater_apply_unsafe_path(void) {
+    TEST_ASSERT_EQ_INT(-1, updater_apply("/tmp'; rm -rf / #"));
+    TEST_ASSERT(strstr(updater_get_apply_status(), "invalid") != NULL);
+}
+
 /* ── Card config tests ─────────────────────────────────────────── */
 
 static void test_card_enabled_default(void) {
@@ -570,6 +575,7 @@ int main(void) {
     TEST_SUITE_RUN(test_version_no_update_initially);
     TEST_SUITE_RUN(test_updater_apply_null_dir);
     TEST_SUITE_RUN(test_updater_apply_bad_dir);
+    TEST_SUITE_RUN(test_updater_apply_unsafe_path);
 
     TEST_REPORT();
 }
