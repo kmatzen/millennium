@@ -84,6 +84,7 @@ void *millennium_client_next_event(struct millennium_client *client);
 void millennium_client_call(struct millennium_client *client, const char *number);
 void millennium_client_answer_call(struct millennium_client *client);
 void millennium_client_hangup(struct millennium_client *client);
+int millennium_client_send_dtmf(struct millennium_client *client, char key);
 void millennium_client_set_ua(struct millennium_client *client, void *ua);
 
 /* Internal functions */

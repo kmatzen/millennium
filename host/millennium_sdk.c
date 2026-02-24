@@ -519,6 +519,13 @@ void millennium_client_hangup(struct millennium_client *client) {
     logger_info_with_category("SDK", "Call terminated.");
 }
 
+int millennium_client_send_dtmf(struct millennium_client *client, char key) {
+    if (!client || !client->ua) return -1;
+    struct call *call = baresip_ua_call((struct ua *)client->ua);
+    if (!call) return -1;
+    return baresip_call_send_digit(call, key);
+}
+
 void millennium_client_serial_activity(struct millennium_client *client) {
     if (!client) return;
     clock_gettime(CLOCK_MONOTONIC, &client->last_serial_activity);

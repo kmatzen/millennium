@@ -127,6 +127,10 @@ struct ua *baresip_call_get_ua(struct call *call) {
     return call_get_ua(call);
 }
 
+int baresip_call_send_digit(struct call *call, char key) {
+    return call_send_digit(call, key);
+}
+
 /* Event functions - thunk to bridge enum baresip_ua_event <-> enum ua_event */
 static baresip_ua_event_handler_t g_bevent_handler;
 static void *g_bevent_arg;

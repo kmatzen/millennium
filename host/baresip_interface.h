@@ -102,6 +102,7 @@ int baresip_account_uri_complete_strdup(struct account *account, char **uri, con
 
 /* Call functions */
 struct ua *baresip_call_get_ua(struct call *call);
+int baresip_call_send_digit(struct call *call, char key);
 
 /* Event functions */
 void baresip_bevent_register(baresip_ua_event_handler_t handler, void *arg);

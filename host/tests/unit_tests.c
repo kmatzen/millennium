@@ -24,6 +24,7 @@ void millennium_client_set_display(millennium_client_t *c, const char *m) { (voi
 void millennium_client_call(millennium_client_t *c, const char *n) { (void)c; (void)n; }
 void millennium_client_answer_call(millennium_client_t *c) { (void)c; }
 void millennium_client_hangup(millennium_client_t *c) { (void)c; }
+int millennium_client_send_dtmf(millennium_client_t *c, char key) { (void)c; (void)key; return 0; }
 void millennium_client_update(millennium_client_t *c) { (void)c; }
 void *millennium_client_next_event(millennium_client_t *c) { (void)c; return NULL; }
 void millennium_client_write_to_display(millennium_client_t *c, const char *m) { (void)c; (void)m; }
