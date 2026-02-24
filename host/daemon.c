@@ -890,10 +890,16 @@ int main(int argc, char *argv[]) {
                 plugins_activate(ps.active_plugin);
             }
 
-            if (ps.last_state == (int)DAEMON_STATE_CALL_ACTIVE) {
+            if (ps.last_state == (int)DAEMON_STATE_CALL_ACTIVE ||
+                ps.last_state == (int)DAEMON_STATE_CALL_INCOMING) {
                 logger_warn_with_category("Daemon",
-                    "Unclean shutdown detected: last state was CALL_ACTIVE");
+                    "Unclean shutdown detected: resetting to IDLE_DOWN (#96)");
                 metrics_increment_counter("unclean_shutdowns", 1);
+                /* No SIP call exists after restart; ensure state is IDLE_DOWN */
+                pthread_mutex_lock(&daemon_state_mutex);
+                daemon_state->current_state = DAEMON_STATE_IDLE_DOWN;
+                daemon_state_update_activity(daemon_state);
+                pthread_mutex_unlock(&daemon_state_mutex);
             }
         }
     }

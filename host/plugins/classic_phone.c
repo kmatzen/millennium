@@ -108,6 +108,7 @@ static int classic_phone_handle_hook(int hook_up, int hook_down) {
         classic_phone_data.inserted_cents = 0;
         classic_phone_data.is_card_call = 0;
         classic_phone_data.card_number[0] = '\0';
+        classic_phone_data.is_dialing = 0;  /* #93: clear on hang-up during dialing */
 
         if (classic_phone_data.is_in_call) {
             classic_phone_end_call();
