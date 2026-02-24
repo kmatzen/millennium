@@ -771,8 +771,10 @@ int main(int argc, char *argv[]) {
     }
     
     if (!config_load_from_file(config, config_file)) {
-        logger_warnf_with_category("Config", "Could not load config file: %s, using environment variables", config_file);
+        logger_warnf_with_category("Config", "Could not load config file: %s, using environment/defaults (#113)", config_file);
         config_load_from_environment(config);
+    } else {
+        logger_infof_with_category("Config", "Config loaded from %s", config_file);
     }
     
     if (!config_validate(config)) {

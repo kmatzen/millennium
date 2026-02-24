@@ -80,6 +80,8 @@ byte coinEeprom[] = {
     0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   49,  48,  50,
     48};
 
+/* I2C rx buffer: 64 bytes. Wire lib on AVR uses 32-byte hw buffer.
+ * Host must keep commands under this limit (#134). */
 #define I2C_BUF_SIZE 64
 static volatile byte i2cBuf[I2C_BUF_SIZE];
 static volatile byte i2cHead = 0, i2cTail = 0;

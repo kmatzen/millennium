@@ -3,7 +3,9 @@
 
 /*
  * Audio tone generator for payphone feedback sounds.
- * Uses ALSA on Linux; no-ops on other platforms.
+ * Uses ALSA on Linux; no-ops on other platforms (macOS, etc.).
+ * When built without HAVE_ALSA, init/cleanup and all play_* functions
+ * are safe no-ops and do nothing (#131).
  */
 
 /* Initialize the tone subsystem (opens ALSA device). Call once at startup. */

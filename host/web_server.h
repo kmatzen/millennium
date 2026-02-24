@@ -107,6 +107,9 @@ struct web_server* web_server_create(int port);
 void web_server_destroy(struct web_server* server);
 void web_server_start(struct web_server* server);
 void web_server_stop(struct web_server* server);
+/* Pause/resume: when paused, API requests return 503. Use during audio to avoid
+ * web traffic disrupting playback. Behavior during calls: same — all requests
+ * rejected until resume (#111). */
 void web_server_pause(struct web_server* server);
 void web_server_resume(struct web_server* server);
 int web_server_is_running(const struct web_server* server);

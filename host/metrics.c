@@ -516,21 +516,18 @@ int metrics_reset_all(void) {
     return 0;
 }
 
+#define METRICS_EXPORT_INITIAL_SIZE 8192
+#define METRICS_EXPORT_MAX_SIZE (256 * 1024)
+
 char *metrics_export_prometheus(void) {
     char *result = NULL;
     int i;
-    size_t len = 0;
+    size_t len = METRICS_EXPORT_INITIAL_SIZE;
     size_t pos = 0;
     
     if (!g_metrics) return NULL;
     
     pthread_mutex_lock(&metrics_mutex);
-    
-    /* Calculate approximate size needed */
-    len = 1024; /* Base size */
-    len += g_metrics->counter_count * 100;
-    len += g_metrics->gauge_count * 100;
-    len += g_metrics->histogram_count * 500;
     
     result = malloc(len);
     if (!result) {
@@ -538,7 +535,18 @@ char *metrics_export_prometheus(void) {
         return NULL;
     }
     
+    /* Helper: grow buffer when low on space (#121) */
+    #define GROW_IF_NEEDED() do { \
+        if (pos + 512 >= len && len < METRICS_EXPORT_MAX_SIZE) { \
+            size_t new_len = len * 2; \
+            if (new_len > METRICS_EXPORT_MAX_SIZE) new_len = METRICS_EXPORT_MAX_SIZE; \
+            char *tmp = realloc(result, new_len); \
+            if (tmp) { result = tmp; len = new_len; } \
+        } \
+    } while (0)
+    
     /* Add timestamp */
+    GROW_IF_NEEDED();
     pos += snprintf(result + pos, len - pos,
         "# HELP millennium_metrics_start_time Start time of the metrics collection\n");
     pos += snprintf(result + pos, len - pos,
@@ -549,7 +557,7 @@ char *metrics_export_prometheus(void) {
     /* Export counters */
     for (i = 0; i < (int)g_metrics->counter_count; i++) {
         char *sanitized_name;
-        
+        GROW_IF_NEEDED();
         sanitized_name = metrics_sanitize_name(g_metrics->counter_names[i]);
         if (sanitized_name) {
             pos += snprintf(result + pos, len - pos,
@@ -569,7 +577,7 @@ char *metrics_export_prometheus(void) {
     /* Export gauges */
     for (i = 0; i < (int)g_metrics->gauge_count; i++) {
         char *sanitized_name;
-        
+        GROW_IF_NEEDED();
         sanitized_name = metrics_sanitize_name(g_metrics->gauge_names[i]);
         if (sanitized_name) {
             pos += snprintf(result + pos, len - pos,
@@ -592,6 +600,7 @@ char *metrics_export_prometheus(void) {
         char *sanitized_name;
         
         if (metrics_get_histogram_stats_unlocked(g_metrics->histogram_names[i], &stats) == 0) {
+            GROW_IF_NEEDED();
             sanitized_name = metrics_sanitize_name(g_metrics->histogram_names[i]);
             if (sanitized_name) {
                 pos += snprintf(result + pos, len - pos,
@@ -655,6 +664,7 @@ char *metrics_export_prometheus(void) {
         }
     }
     
+    #undef GROW_IF_NEEDED
     pthread_mutex_unlock(&metrics_mutex);
     return result;
 }
