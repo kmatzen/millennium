@@ -125,6 +125,7 @@ the Pi.
 | Coin cmd| `0x03` + byte                  | Send byte to coin validator (`@` = reset) |
 | EEPROM  | `0x04`                         | Program coin validator EEPROM (256 bytes) |
 | Verify  | `0x05`                         | Read back and verify coin validator EEPROM|
+| Keepalive | `0x06`                       | No-op; resets serial watchdog when idle (#59) |
 
 ### Coin Validator → Pi
 

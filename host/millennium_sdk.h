@@ -108,7 +108,9 @@ void millennium_sdk_get_sip_status(int *registered, char *last_error, size_t las
 #define BAUD_RATE B9600
 #define ASYNC_WORKERS 4
 #define SERIAL_WATCHDOG_SECONDS 60
+#define SERIAL_KEEPALIVE_INTERVAL 30   /* (#59) send keepalive when idle this long */
 #define SERIAL_MAX_BACKOFF_SECONDS 60
 #define SERIAL_WATCHDOG_ENABLED 1
+#define CMD_KEEPALIVE 0x06  /* Pi->Arduino: no-op, resets watchdog activity timer */
 
 #endif /* MILLENNIUM_SDK_H */

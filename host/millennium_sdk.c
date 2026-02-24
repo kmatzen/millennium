@@ -552,6 +552,12 @@ void millennium_client_check_serial(struct millennium_client *client) {
     clock_gettime(CLOCK_MONOTONIC, &now);
     elapsed = now.tv_sec - client->last_serial_activity.tv_sec;
 
+    /* (#59) Send periodic keepalive when idle to avoid false watchdog triggers.
+     * Arduino consumes CMD_KEEPALIVE (0x06) as no-op; write_command updates last_serial_activity. */
+    if (client->serial_healthy && elapsed >= SERIAL_KEEPALIVE_INTERVAL && elapsed < SERIAL_WATCHDOG_SECONDS) {
+        millennium_client_write_command(client, CMD_KEEPALIVE, NULL, 0);
+    }
+
     if (client->serial_healthy && elapsed > SERIAL_WATCHDOG_SECONDS) {
         logger_warnf_with_category("SDK",
             "Serial watchdog: no activity for %ld seconds, marking link dead", elapsed);

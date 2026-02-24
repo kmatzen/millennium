@@ -48,6 +48,21 @@ make install_display    # Flash display only
 make clean              # Remove build artifacts
 ```
 
+**When display firmware changes** (e.g. after merging a PR that touches `sketches/display/`):
+flash the display Arduino so it stays in sync with the daemon. Always build with
+`arduino:avr:millennium_beta` so the board keeps its "Millennium Beta" USB identity.
+
+**Recommended: build on macOS, sync, flash on Pi**
+```bash
+./Arduino/deploy_display.sh [user@host]
+# Builds locally, syncs (git pull on remote), prompts to put Arduino in bootloader mode,
+# then flashes with avrdude. Default host: matzen@192.168.86.145 (see host/DEVICE_TEST.md)
+```
+
+The script triggers the bootloader via the 1200-baud trick (open port at 1200 baud, close — no physical reset needed), then flashes with avrdude. Install on Pi: `sudo apt install avrdude`. FLASH_PORT should be the display Arduino's serial port (e.g. `/dev/serial/by-id/usb-Arduino_LLC_Millennium_Beta-if00` or `/dev/ttyACM0`).
+
+If build fails (arduino-cli.yaml has Linux paths): `BUILD_CONFIG=0 make build_display`. If hex not pushed: `VIA_SCP=1`.
+
 If `arduino-cli` is not in your `PATH`:
 
 ```bash
