@@ -78,11 +78,10 @@ eliminating the crosstalk present in the v4 LM386 design.
 | C_ripple | 4.7µF electrolytic         | 1   | Radial D5mm P2.0mm               | TDA2822 ripple rejection         |
 | C_dec | 100nF ceramic                 | 1   | Axial L3.8mm THT                 | TDA2822 Vcc decoupling           |
 | C-*   | 100nF ceramic                 | 5   | Axial L3.8mm THT                 | Decoupling (see below)           |
-| D1    | PRTR5V0U2X                    | 1   | SOT-143 (4-pin)                  | ESD clamp on J4 signal pins (handset) |
-| D2    | PRTR5V0U2X                    | 1   | SOT-143 (4-pin)                  | ESD clamp on speaker_front+ (ringer); I/O2 unconnected |
+| D1–D3 | P6KE6.8CA                     | 3   | DO-15 (THT axial)               | TVS clamp signal lines to GND (600W bidirectional)    |
 | Q1    | Si2301 P-ch MOSFET            | 1   | SOT-23                           | Reverse polarity protection      |
 | F1    | 1A PTC fuse                   | 1   | Radial D10mm THT                 | Resettable overcurrent fuse      |
-| D3    | Green LED                     | 1   | 5mm THT                          | Power indicator                  |
+| D4    | Green LED                     | 1   | 5mm THT                          | Power indicator                  |
 | J1    | Coin validator                | 1   | 2x5 pin header                   | 10-pin IDC                      |
 | J2    | Keypad                        | 1   | 2x10 pin header                  | 20-pin IDC                      |
 | J3    | VFD display                   | 1   | 2x13 pin header                  | 26-pin IDC                      |
@@ -112,13 +111,13 @@ input *before* distribution and *before* feeding U1 IN+. The MOSFET's body
 diode conducts during normal operation with near-zero voltage drop, and blocks
 current when polarity is reversed.
 
-### ESD Protection (D1, D2)
+### ESD / TVS Protection (D1, D2, D3)
 
-TVS diode arrays (PRTR5V0U2X) protect signal lines, not power rails. Each array
-clamps signal pins to VCC (5V) and GND, limiting ESD transients that could
-enter through externally accessible connectors. D1 protects J4 (handset mic+,
-speaker_receiver+); D2 protects speaker_front+ (ringer output). D2 pin 3
-(I/O2) is unconnected and available for future use.
+Three P6KE6.8CA TVS diodes (600W bidirectional, THT DO-15) protect signal
+lines from ESD and transients. Each clamps between the protected signal and
+GND—one pin to signal, one to GND. D1 protects J4 (handset); D2 protects
+speaker_front+ (ringer output from TDA2822); D3 protects the third signal
+line. These protect against back-EMF and ESD on external connectors.
 
 ### Overcurrent Protection (F1)
 
@@ -127,7 +126,7 @@ with Q1, before power distribution and before U1. It protects the entire board
 (including the boost converter input) from downstream shorts. The fuse
 self-resets when the fault is cleared.
 
-### Power Indicator (D3, R3)
+### Power Indicator (D4, R3)
 
 A green LED on the 5V_MAIN rail provides visual confirmation that the board is
 powered, useful when debugging inside the payphone enclosure.
@@ -230,11 +229,13 @@ Run `python3 audit_schematic.py` to check component/BOM alignment, net labels, a
 | `phonev4.kicad_pcb` | PCB layout (needs re-layout for new parts) |
 | `phonev4.kicad_prl` | KiCad preferences (local)                  |
 | `phonev4.csv`      | Bill of materials (updated)                 |
-| `phone.kicad_sym`  | Custom symbol library (xl6009, TDA2822M)   |
+| `phone.kicad_sym`  | Custom symbol library (xl6009, TDA2822M, P6KE6.8CA) |
+| `footprints.pretty/` | Project footprint lib (F1: Fuse_Radial_D10.0mm_P5.00mm) |
+| `fp-lib-table` | Footprint library table (includes project footprints) |
 | `gerbers/`         | Gerber files from previous v4 fabrication   |
 | `audit_schematic.py` | Python script to audit schematic vs BOM vs README |
 | `AUDIT.md`         | Audit findings and action items             |
-| `SCHEMATIC_D2_CHANGES.md` | Step-by-step instructions to rewire D2 from coin to speaker outputs |
+| `SCHEMATIC_D2_CHANGES.md` | TVS diode wiring (D1, D2, D3 P6KE6.8CA) and net reference |
 
 ## Manufacturing
 
@@ -292,13 +293,11 @@ schematic editor:
    Q1 drain and 5V_MAIN distribution. Protects the 5V supply and boost converter
    input from overcurrent.
 
-3. **D1 (ESD on J4)**: Connect across J4 signal pins (mic+, speaker_receiver+);
-   clamp to 5V_MAIN and GND. Protects signal lines, not power.
+3. **D1, D2, D3 (TVS)**: P6KE6.8CA bidirectional TVS. Each: pin 1 → GND,
+   pin 2 → protected signal (e.g. speaker_receiver+, speaker_front+, or
+   other external signal). Protects signal lines, not power.
 
-4. **D2 (ESD on ringer)**: Connect D2 I/O1 to speaker_front+ (TDA2822 ch A
-   output). Clamp to 5V_MAIN and GND. D2 I/O2 is unconnected.
-
-5. **D3 + R3**: Connect from 5V_MAIN through R3 (1kΩ) through D3 to GND.
+4. **D4 + R3**: Connect from 5V_MAIN through R3 (1kΩ) through D4 to GND.
 
 ### Test points
 
@@ -370,7 +369,7 @@ Ideas for future revisions, ordered by likely impact.
 7. **ESD on audio jacks** — J5 (mic) and J7 (speaker) are externally accessible.
    Consider PRTR5V0U2X or similar TVS on their signal pins for robustness.
 
-8. **Power LED brightness** — If D3 is too bright in a dark payphone, increase
+8. **Power LED brightness** — If D4 is too bright in a dark payphone, increase
    R3 (e.g., 2–4.7 kΩ) for dimmer indication.
 
 9. **TDA2822M gain flexibility** — Add DNP footprints for optional input

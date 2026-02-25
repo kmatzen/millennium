@@ -24,10 +24,10 @@ This document captures audit findings for the phonev4 schematic and PCB design, 
 | Category | Status | Action |
 |----------|--------|--------|
 | Power labels (5v, 12v) | ✓ Fixed | Renamed to 5V_MAIN, 12V_COIN |
-| BOM vs schematic refs | ✓ Fixed | D3, TP1-TP5, U1; see phonev4.csv |
+| BOM vs schematic refs | ✓ Fixed | D1–D4, TP1-TP5, U1; see phonev4.csv |
 | Q1 part number | ✓ Doc | Si2319/Si2301 pin-compatible (G-S-D); either acceptable |
-| Missing footprints | ✓ Fixed | THT assigned for D3, F1, TP1–TP5 |
-| PRTR package | ✓ Fixed | PRTR5V0U2X is SOT-143 only; BOM/README updated |
+| Missing footprints | ✓ Fixed | THT assigned for D4, F1, TP1–TP5 |
+| TVS diodes | ✓ Fixed | D1, D2, D3 P6KE6.8CA DO-15; D4 Green LED 5mm |
 | Test points | ✓ Fixed | TP1-TP5 only; no TX/RX on PCB |
 
 ---
@@ -40,16 +40,17 @@ This document captures audit findings for the phonev4 schematic and PCB design, 
 
 ### 2. BOM (phonev4.csv)
 
-- **Status:** ✓ Aligned. D3, TP1-TP5, F1/Fuse_Radial, R3/R_Axial, U1/XL6009_module.
+- **Status:** ✓ Aligned. D1–D4, TP1-TP5, F1/Fuse_Radial, R3/R_Axial, U1/XL6009_module.
 
 ### 3. Part Discrepancies
 
 - **Q1**: Schematic Si2319CDS, BOM Si2301. Both P-ch, SOT-23, identical pinout (Gate-Source-Drain). Pin-compatible; use whichever is available.
-- **D1, D2 (PRTR5V0U2X)**: ✓ Fixed. PRTR5V0U2X is SOT-143 only (Nexperia datasheet). BOM and README updated from SOT-23 to SOT-143.
+- **D1, D2, D3 (P6KE6.8CA)**: ✓ All three TVS diodes use P6KE6.8CA (600W bidirectional, DO-15 THT). Each clamps signal to GND.
+- **D4 (Green LED)**: Power indicator LED, 5mm THT.
 
 ### 4. Missing Footprints
 
-- **Status:** ✓ Fixed. THT footprints assigned: D3 (LED_D5.0mm), F1 (Fuse_Radial_D10mm), TP1–TP5 (TestPoint_Loop).
+- **Status:** ✓ Fixed. THT footprints assigned: D4 (LED_D5.0mm), F1 (footprints:Fuse_Radial_D10.0mm_P5.00mm), TP1–TP5 (TestPoint_Loop).
 
 ### 5. Wiring Verification (Manual)
 
@@ -58,8 +59,8 @@ Per README "Schematic Changes Required in KiCad". Verify in KiCad: open schemati
 - [ ] Q1 on incoming 5V rail, before F1 and U1
 - [ ] F1 in series on incoming 5V
 - [ ] U1 IN+ from 5V_MAIN, OUT+ to 12V_COIN, feeding J1 only
-- [ ] D1, D2 clamp signal pins to 5V_MAIN and GND (not power rails)
-- [ ] D2: I/O1 → speaker_front+; I/O2 unconnected (see SCHEMATIC_D2_CHANGES.md)
+- [ ] D1, D2, D3 clamp signal pins to GND (not power rails)
+- [ ] D2: P6KE6.8CA pin 1 → GND, pin 2 → speaker_front+ (see SCHEMATIC_D2_CHANGES.md)
 - [ ] TDA2822 V+ from 5V_MAIN
 - [ ] No TX/RX nets for Arduino–Pi path (USB via hub)
 

@@ -13,11 +13,10 @@
 12;"C_ripple";"CP_Radial_D5.0mm_P2.00mm";1;"4.7uF (TDA2822 ripple rejection)";;;
 13;"C_dec";"C_Axial_L3.8mm_D2.6mm_P7.50mm";1;"100nF (TDA2822 Vcc decoupling, THT)";;;
 14;"C-arduino1,C-arduino-display1,C-card1,C-coin1,C-raspi1";"C_Axial_L3.8mm_D2.6mm_P7.50mm";5;"100nF decoupling (THT)";;;
-15;"D1";"SOT-143";1;"PRTR5V0U2X (ESD protection, J4 RJ9, 4-pin only)";;;
-16;"D2";"SOT-143";1;"PRTR5V0U2X (ESD protection, speaker_front+; I/O2 free)";;;
-17;"Q1";"SOT-23";1;"Si2301/Si2319 P-ch MOSFET (reverse polarity; pin-compatible)";;;
-18;"F1";"Fuse_Radial_D10.0mm_P5.00mm";1;"1A PTC resettable fuse (radial THT)";;;
-19;"D3";"LED_D5.0mm";1;"Green power indicator LED (5mm THT)";;;
+15;"D1,D2,D3";"D_DO-15_P10.16mm_Horizontal";3;"P6KE6.8CA (600W bidirectional TVS, signal-to-GND, THT DO-15)";;;
+16;"Q1";"SOT-23";1;"Si2301/Si2319 P-ch MOSFET (reverse polarity; pin-compatible)";;;
+17;"F1";"footprints:Fuse_Radial_D10.0mm_P5.00mm";1;"1A PTC resettable fuse (radial THT, pin-compatible with CP_Radial_D10mm_P5mm)";;;
+18;"D4";"LED_D5.0mm";1;"Green power indicator LED (5mm THT)";;;
 20;"R3";"R_Axial_DIN0204";1;"1k (LED current limit)";;;
 21;"J1";"PinHeader_2x05_P2.54mm_Vertical";1;"coin";;;
 22;"J2";"PinHeader_2x10_P2.54mm_Vertical";1;"keypad";;;
