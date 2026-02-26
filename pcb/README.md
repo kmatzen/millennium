@@ -79,7 +79,7 @@ eliminating the crosstalk present in the v4 LM386 design.
 | C_dec | 100nF ceramic                 | 1   | Axial L3.8mm THT                 | TDA2822 Vcc decoupling           |
 | C-*   | 100nF ceramic                 | 5   | Axial L3.8mm THT                 | Decoupling (see below)           |
 | D1–D3 | P6KE6.8CA                     | 3   | DO-15 (THT axial)               | TVS clamp signal lines to GND (600W bidirectional)    |
-| Q1    | Si2301 P-ch MOSFET            | 1   | SOT-23                           | Reverse polarity protection      |
+| Q1    | IRF9540N P-ch MOSFET          | 1   | TO-220-3 (THT, G-S-D pinout)     | Reverse polarity protection      |
 | F1    | 1A PTC fuse                   | 1   | Radial D10mm THT                 | Resettable overcurrent fuse      |
 | D4    | Green LED                     | 1   | 5mm THT                          | Power indicator                  |
 | J1    | Coin validator                | 1   | 2x5 pin header                   | 10-pin IDC                      |
@@ -105,7 +105,7 @@ eliminating the crosstalk present in the v4 LM386 design.
 
 ### Reverse Polarity Protection (Q1)
 
-A P-channel MOSFET (Si2301 or Si2319; same SOT-23 pinout) on the incoming 5V rail protects
+A P-channel MOSFET (IRF9540N, TO-220 THT; G-S-D pinout drop-in for Si2319) on the incoming 5V rail protects
 against accidental reverse-polarity connections. Q1 is placed on the power
 input *before* distribution and *before* feeding U1 IN+. The MOSFET's body
 diode conducts during normal operation with near-zero voltage drop, and blocks

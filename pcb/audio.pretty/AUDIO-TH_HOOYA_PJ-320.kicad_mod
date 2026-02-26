@@ -1,0 +1,266 @@
+(footprint "AUDIO-TH_HOOYA_PJ-320"
+	(version 20241229)
+	(generator "pcbnew")
+	(generator_version "9.0")
+	(layer "F.Cu")
+	(property "Reference" "J7"
+		(at -1.536 -3.556 0)
+		(layer "F.SilkS")
+		(hide yes)
+		(uuid "f21f940d-ccd8-487c-a757-bbb1e2061d8b")
+		(effects
+			(font
+				(size 1.143 1.143)
+				(thickness 0.152)
+			)
+			(justify left)
+		)
+	)
+	(property "Value" "speaker"
+		(at -1.536 -5.334 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "a3f9d363-159f-4855-a429-5e2a83f8af9e")
+		(effects
+			(font
+				(size 1.143 1.143)
+				(thickness 0.152)
+			)
+			(justify left)
+		)
+	)
+	(property "Datasheet" ""
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "1671263c-4a00-44ec-be07-b0695ac16bcf")
+		(effects
+			(font
+				(size 1.27 1.27)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Description" ""
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "cbb169c0-4d92-446e-9d68-58366924aa62")
+		(effects
+			(font
+				(size 1.27 1.27)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Manufacturer" "Wenzhou QingPu Electronics Co"
+		(at 295.58 -80.06 270)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "99885f78-bb33-47bc-b972-90c31045cb21")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Part Number" "WQP-WQP419GR"
+		(at 295.58 -80.06 270)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "1b410e20-e464-4287-8828-4ab022d7cd46")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Specifications" "Audio 3.5mm Jack, Stereo, PC-pin Vertical"
+		(at 295.58 -80.06 270)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "90e49231-5980-4ecd-8118-63e4fcaacd8e")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(attr through_hole)
+	(fp_line
+		(start -8.4 -2.5)
+		(end -8.4 2.5)
+		(stroke
+			(width 0.254)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "73b19be5-65f5-4e1a-b365-0f2a04d2eb29")
+	)
+	(fp_line
+		(start -5.6 -3)
+		(end -5.6 3)
+		(stroke
+			(width 0.254)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "f6de1ee1-b96e-4a39-90bf-9b706f6c0038")
+	)
+	(fp_line
+		(start -5.6 -3)
+		(end -2.374 -3)
+		(stroke
+			(width 0.254)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "a89c5167-8d34-4530-8cd9-82cc74a6a12b")
+	)
+	(fp_line
+		(start -5.6 -2.5)
+		(end -8.4 -2.5)
+		(stroke
+			(width 0.254)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "a95985e5-a76d-4591-a398-c9c20ad4bd19")
+	)
+	(fp_line
+		(start -5.6 2.5)
+		(end -8.4 2.5)
+		(stroke
+			(width 0.254)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "efc4c225-d073-414f-a45a-7826ca8638b4")
+	)
+	(fp_line
+		(start -5.6 3)
+		(end -4.374 3)
+		(stroke
+			(width 0.254)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "504e7d97-ca44-4514-a868-eaef1fc54f64")
+	)
+	(fp_line
+		(start -2.626 3)
+		(end 2.626 3)
+		(stroke
+			(width 0.254)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "604f126d-0156-4f9c-9fc5-d4bfcf523f38")
+	)
+	(fp_line
+		(start -0.626 -3)
+		(end 5.7 -3.01)
+		(stroke
+			(width 0.254)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "e5a8bd59-b895-4902-bbb5-2a82b0f6ff18")
+	)
+	(fp_line
+		(start 4.374 3)
+		(end 5.65 3.01)
+		(stroke
+			(width 0.254)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "00722744-bbe3-415b-800e-63aeee2d6936")
+	)
+	(fp_line
+		(start 5.7 -3.01)
+		(end 5.7 2.99)
+		(stroke
+			(width 0.254)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "32c41a05-cc85-49bd-9471-c92816d34820")
+	)
+	(fp_circle
+		(center -3.5 0)
+		(end -3.3 0)
+		(stroke
+			(width 0.4)
+			(type solid)
+		)
+		(fill no)
+		(layer "Cmts.User")
+		(uuid "b59092fd-fc5d-4650-ad68-a1cdb227e353")
+	)
+	(fp_circle
+		(center 2.5 0)
+		(end 2.7 0)
+		(stroke
+			(width 0.4)
+			(type solid)
+		)
+		(fill no)
+		(layer "Cmts.User")
+		(uuid "aaf16997-f0d5-4847-9d4b-0808dcb2e33e")
+	)
+	(fp_poly
+		(pts
+			(xy -5.65 -2.51) (xy -8.32 -2.51) (xy -8.32 2.48) (xy -5.63 2.48)
+		)
+		(stroke
+			(width 0)
+			(type solid)
+		)
+		(fill yes)
+		(layer "Cmts.User")
+		(uuid "22a27a1f-6b1f-4c59-88bc-f911104bac4e")
+	)
+	(pad "" np_thru_hole circle
+		(at -3.5 0)
+		(size 1.2 1.2)
+		(drill 1.2)
+		(layers "*.Cu" "*.Mask")
+		(uuid "e565139b-81a0-40a4-8023-ffb4cfae3fdc")
+	)
+	(pad "" np_thru_hole circle
+		(at 2.5 0)
+		(size 1.2 1.2)
+		(drill 1.2)
+		(layers "*.Cu" "*.Mask")
+		(uuid "7ca847aa-17b3-4d62-b0db-db4924808247")
+	)
+	(pad "1" thru_hole oval
+		(at -1.5 -2.4 270)
+		(size 1.2 1.8)
+		(drill oval 0.7 1.3)
+		(layers "*.Cu" "*.Paste" "*.Mask")
+		(remove_unused_layers no)
+		(uuid "0b96c969-e309-4fad-90f3-8e402b43530d")
+	)
+	(pad "2" thru_hole oval
+		(at -3.5 2.4 270)
+		(size 1.2 1.8)
+		(drill oval 0.7 1.3)
+		(layers "*.Cu" "*.Paste" "*.Mask")
+		(remove_unused_layers no)
+		(uuid "b4acf781-751b-4af9-b3b9-bce2f25d5e96")
+	)
+	(pad "3" thru_hole oval
+		(at 3.5 2.4 270)
+		(size 1.2 1.8)
+		(drill oval 0.7 1.3)
+		(layers "*.Cu" "*.Paste" "*.Mask")
+		(remove_unused_layers no)
+		(uuid "2f20f722-db17-49c6-ab9a-652f0df8d87a")
+	)
+	(embedded_fonts no)
+)

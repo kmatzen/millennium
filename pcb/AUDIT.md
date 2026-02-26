@@ -25,7 +25,7 @@ This document captures audit findings for the phonev4 schematic and PCB design, 
 |----------|--------|--------|
 | Power labels (5v, 12v) | ✓ Fixed | Renamed to 5V_MAIN, 12V_COIN |
 | BOM vs schematic refs | ✓ Fixed | D1–D4, TP1-TP5, U1; see phonev4.csv |
-| Q1 part number | ✓ Doc | Si2319/Si2301 pin-compatible (G-S-D); either acceptable |
+| Q1 part number | ✓ Doc | IRF9540N (TO-220 THT), G-S-D pinout for Si2319 drop-in |
 | Missing footprints | ✓ Fixed | THT assigned for D4, F1, TP1–TP5 |
 | TVS diodes | ✓ Fixed | D1, D2, D3 P6KE6.8CA DO-15; D4 Green LED 5mm |
 | Test points | ✓ Fixed | TP1-TP5 only; no TX/RX on PCB |
@@ -44,7 +44,7 @@ This document captures audit findings for the phonev4 schematic and PCB design, 
 
 ### 3. Part Discrepancies
 
-- **Q1**: Schematic Si2319CDS, BOM Si2301. Both P-ch, SOT-23, identical pinout (Gate-Source-Drain). Pin-compatible; use whichever is available.
+- **Q1**: IRF9540N, TO-220 THT, G-S-D pinout (drop-in replacement for Si2319/Si2301 SOT-23).
 - **D1, D2, D3 (P6KE6.8CA)**: ✓ All three TVS diodes use P6KE6.8CA (600W bidirectional, DO-15 THT). Each clamps signal to GND.
 - **D4 (Green LED)**: Power indicator LED, 5mm THT.
 
