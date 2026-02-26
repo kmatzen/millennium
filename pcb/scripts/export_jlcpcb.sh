@@ -6,6 +6,11 @@ PCB_DIR="$(dirname "$SCRIPT_DIR")"
 BOARD="$PCB_DIR/phonev5.kicad_pcb"
 OUT="$PCB_DIR/jlcpcb/production_files"
 TMP="$PCB_DIR/gerbers_export"
+JLCPCB="$PCB_DIR/jlcpcb"
+
+# Clean old outputs before export
+rm -f "$OUT/GERBER-phonev5.zip"
+rm -rf "$JLCPCB/gerber"
 
 mkdir -p "$OUT" "$TMP"
 
