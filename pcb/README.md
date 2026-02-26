@@ -232,25 +232,19 @@ Run `python3 audit_schematic.py` to check component/BOM alignment, net labels, a
 | `phone.kicad_sym`  | Custom symbol library (xl6009, TDA2822M, P6KE6.8CA) |
 | `footprints.pretty/` | Project footprint lib (F1: Fuse_Radial_D10.0mm_P5.00mm) |
 | `fp-lib-table` | Footprint library table (includes project footprints) |
-| `gerbers/`         | Gerber files from previous v4 fabrication   |
+| `gerbers/`         | Gerbers zip output (run export script)      |
 | `audit_schematic.py` | Python script to audit schematic vs BOM vs README |
 | `AUDIT.md`         | Audit findings and action items             |
 | `SCHEMATIC_D2_CHANGES.md` | TVS diode wiring (D1, D2, D3 P6KE6.8CA) and net reference |
 
 ## Manufacturing
 
-The Gerber files in `gerbers/` correspond to the **previous** v4 fabrication
-(with LM386). After completing the PCB layout for the updated schematic, new
-Gerber files will need to be generated.
+See **[JLCPCB_WORKFLOW.md](JLCPCB_WORKFLOW.md)** for fabrication steps.
 
-To regenerate from KiCad:
-1. Open `phonev5.kicad_pro` in KiCad 7+
-2. Open the schematic and run **Annotate** to assign references to new parts
-3. Run **ERC** (Electrical Rules Check) to verify connectivity
-4. Open the PCB editor and run **Update PCB from Schematic**
-5. Place and route the new components
-6. Use **Plot** (File → Plot) to export Gerber files
-7. Use **Generate Drill Files** for drill data
+Quick summary:
+1. Run `./pcb/scripts/export_jlcpcb.sh` to generate `gerbers/phonev5-gerbers.zip`
+2. Use KiCad's JLCPCB Fabrication Toolkit plugin for BOM/CPL
+3. Upload Gerbers zip + BOM + CPL to JLCPCB
 
 ## Schematic Changes Required in KiCad
 

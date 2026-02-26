@@ -20,5 +20,19 @@ host/*.log
 pcb/*.lck
 pcb/erc_report.txt
 pcb/drc_report.txt
+# PCB build artifacts
+pcb/gerbers_export/
+pcb/gerbers/*.zip
+pcb/gerbers/*.gbr
+pcb/gerbers/*.drl
+pcb/gerbers/*.gbrjob
+pcb/jlcpcb/
+pcb/*-backups/
+pcb/*.dsn
+pcb/*.ses
+pcb/fp-info-cache
+pcb/netlist.txt
+pcb/DRC.rpt
+pcb/*-erc.rpt
 host/unit_tests
 host/daemon-override.conf.tmp
