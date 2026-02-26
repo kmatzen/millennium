@@ -82,7 +82,7 @@
     )
   )
   (class "kicad_default"
-    "5V_MAIN" GND 3.3V "mag_cls" "unconnected-(A1-PadAREF)" "mag_rdt" "mag_rcl" miso
+    GND "5V_MAIN" 3.3V "mag_cls" "unconnected-(A1-PadAREF)" "mag_rdt" "mag_rcl" miso
     mosi RESET1 "unconnected-(A1-RESET-PadRST2)" sck ss "disp_x3" "disp_x2" "unconnected-(A2-PadAREF)"
     "disp_x4" "disp_x5" sda scl "disp_x1" "disp_d0" "disp_d1" "disp_d2"
     "disp_d3" "disp_d4" "disp_d5" "disp_d6" "disp_d7" "disp_x6" RESET2 "unconnected-(A2-RESET-PadRST2)"
