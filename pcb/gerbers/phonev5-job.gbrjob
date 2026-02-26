@@ -9,7 +9,7 @@
   },
   "GeneralSpecs": {
     "ProjectId": {
-      "Name": "phonev4",
+      "Name": "phonev5",
       "GUID": "70686f6e-6576-4342-9e6b-696361645f70",
       "Revision": "rev?"
     },
@@ -40,57 +40,57 @@
   ],
   "FilesAttributes": [
     {
-      "Path": "phonev4-F_Cu.gbr",
+      "Path": "phonev5-F_Cu.gbr",
       "FileFunction": "Copper,L1,Top",
       "FilePolarity": "Positive"
     },
     {
-      "Path": "phonev4-In1_Cu.gbr",
+      "Path": "phonev5-In1_Cu.gbr",
       "FileFunction": "Copper,L2,Inr",
       "FilePolarity": "Positive"
     },
     {
-      "Path": "phonev4-In2_Cu.gbr",
+      "Path": "phonev5-In2_Cu.gbr",
       "FileFunction": "Copper,L3,Inr",
       "FilePolarity": "Positive"
     },
     {
-      "Path": "phonev4-B_Cu.gbr",
+      "Path": "phonev5-B_Cu.gbr",
       "FileFunction": "Copper,L4,Bot",
       "FilePolarity": "Positive"
     },
     {
-      "Path": "phonev4-F_Paste.gbr",
+      "Path": "phonev5-F_Paste.gbr",
       "FileFunction": "SolderPaste,Top",
       "FilePolarity": "Positive"
     },
     {
-      "Path": "phonev4-B_Paste.gbr",
+      "Path": "phonev5-B_Paste.gbr",
       "FileFunction": "SolderPaste,Bot",
       "FilePolarity": "Positive"
     },
     {
-      "Path": "phonev4-F_Silkscreen.gbr",
+      "Path": "phonev5-F_Silkscreen.gbr",
       "FileFunction": "Legend,Top",
       "FilePolarity": "Positive"
     },
     {
-      "Path": "phonev4-B_Silkscreen.gbr",
+      "Path": "phonev5-B_Silkscreen.gbr",
       "FileFunction": "Legend,Bot",
       "FilePolarity": "Positive"
     },
     {
-      "Path": "phonev4-F_Mask.gbr",
+      "Path": "phonev5-F_Mask.gbr",
       "FileFunction": "SolderMask,Top",
       "FilePolarity": "Negative"
     },
     {
-      "Path": "phonev4-B_Mask.gbr",
+      "Path": "phonev5-B_Mask.gbr",
       "FileFunction": "SolderMask,Bot",
       "FilePolarity": "Negative"
     },
     {
-      "Path": "phonev4-Edge_Cuts.gbr",
+      "Path": "phonev5-Edge_Cuts.gbr",
       "FileFunction": "Profile",
       "FilePolarity": "Positive"
     }

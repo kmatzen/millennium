@@ -1,15 +1,15 @@
 # Schematic and PCB Audit
 
-This document captures audit findings for the phonev4 schematic and PCB design, plus recommendations. Run `python3 audit_schematic.py` in this directory to regenerate the machine-parsed report.
+This document captures audit findings for the phonev5 schematic and PCB design, plus recommendations. Run `python3 audit_schematic.py` in this directory to regenerate the machine-parsed report.
 
 ## Tools Available
 
-1. **audit_schematic.py** — Python script that parses `phonev4.kicad_sch` (s-expression) and `phonev4.csv` to extract components, compare BOM vs schematic, check net labels, and flag documentation mismatches.
+1. **audit_schematic.py** — Python script that parses `phonev5.kicad_sch` (s-expression) and `phonev5.csv` to extract components, compare BOM vs schematic, check net labels, and flag documentation mismatches.
 
 2. **kicad-cli** (command-line ERC/DRC):
    ```bash
-   kicad-cli sch erc phonev4.kicad_sch -o erc_report.txt
-   kicad-cli pcb drc phonev4.kicad_pcb -o drc_report.txt
+   kicad-cli sch erc phonev5.kicad_sch -o erc_report.txt
+   kicad-cli pcb drc phonev5.kicad_pcb -o drc_report.txt
    ```
    - **ERC**: Unconnected pins, undriven inputs, power pin issues.
    - **DRC**: Footprint library paths, silkscreen clipping, spacing.
@@ -24,7 +24,7 @@ This document captures audit findings for the phonev4 schematic and PCB design, 
 | Category | Status | Action |
 |----------|--------|--------|
 | Power labels (5v, 12v) | ✓ Fixed | Renamed to 5V_MAIN, 12V_COIN |
-| BOM vs schematic refs | ✓ Fixed | D1–D4, TP1-TP5, U1; see phonev4.csv |
+| BOM vs schematic refs | ✓ Fixed | D1–D4, TP1-TP5, U1; see phonev5.csv |
 | Q1 part number | ✓ Doc | IRF9540N (TO-220 THT), G-S-D pinout for Si2319 drop-in |
 | Missing footprints | ✓ Fixed | THT assigned for D4, F1, TP1–TP5 |
 | TVS diodes | ✓ Fixed | D1, D2, D3 P6KE6.8CA DO-15; D4 Green LED 5mm |
@@ -38,7 +38,7 @@ This document captures audit findings for the phonev4 schematic and PCB design, 
 
 - **Status:** ✓ Fixed. Schematic and PCB use `5V_MAIN`, `12V_COIN`, `gnd`.
 
-### 2. BOM (phonev4.csv)
+### 2. BOM (phonev5.csv)
 
 - **Status:** ✓ Aligned. D1–D4, TP1-TP5, F1/Fuse_Radial, R3/R_Axial, U1/XL6009_module.
 

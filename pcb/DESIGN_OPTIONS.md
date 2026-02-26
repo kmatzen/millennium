@@ -72,7 +72,7 @@ Or a single 2×25 (50-pin) if all critical signals fit; some keypad/VFD pins cou
 
 - **Pi ↔ Display Arduino:** USB CDC (SerialUSB) at 9600 baud
 - **Pi ↔ Keypad Arduino:** Indirect — keypad → display (I2C) → display → Pi (USB)
-- **Pi UART:** GPIO 14 (TX), GPIO 15 (RX) exist on the Pi header but are **unconnected** on phonev4
+- **Pi UART:** GPIO 14 (TX), GPIO 15 (RX) exist on the Pi header but are **unconnected** on phonev5
 
 ### Challenge: Arduino Pin Usage
 

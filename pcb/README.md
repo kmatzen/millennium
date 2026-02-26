@@ -8,7 +8,7 @@ This directory contains the PCB design files created with [KiCad](https://www.ki
 - **phonev4** (previous fabrication): Single LM386 power amplifier for ringer only,
   XL6009 boost converter, RJ9 and 3.5mm jacks. Had two design flaws: speaker
   output coupling (#42) and unamplified handset earpiece (#44).
-- **phonev4 (current schematic)**: TDA2822M dual-channel amplifier replacing the
+- **phonev5 (current schematic)**: TDA2822M dual-channel amplifier replacing the
   LM386, fixing both audio design flaws. Adds reverse polarity protection, ESD
   protection, power LED, fuse, test points, and improved I2C pull-ups.
 
@@ -224,11 +224,11 @@ Run `python3 audit_schematic.py` to check component/BOM alignment, net labels, a
 
 | File              | Description                                  |
 |-------------------|----------------------------------------------|
-| `phonev4.kicad_pro` | KiCad project file                         |
-| `phonev4.kicad_sch` | Schematic (updated with TDA2822M)          |
-| `phonev4.kicad_pcb` | PCB layout (needs re-layout for new parts) |
-| `phonev4.kicad_prl` | KiCad preferences (local)                  |
-| `phonev4.csv`      | Bill of materials (updated)                 |
+| `phonev5.kicad_pro` | KiCad project file                         |
+| `phonev5.kicad_sch` | Schematic (updated with TDA2822M)          |
+| `phonev5.kicad_pcb` | PCB layout (needs re-layout for new parts) |
+| `phonev5.kicad_prl` | KiCad preferences (local)                  |
+| `phonev5.csv`      | Bill of materials (updated)                 |
 | `phone.kicad_sym`  | Custom symbol library (xl6009, TDA2822M, P6KE6.8CA) |
 | `footprints.pretty/` | Project footprint lib (F1: Fuse_Radial_D10.0mm_P5.00mm) |
 | `fp-lib-table` | Footprint library table (includes project footprints) |
@@ -244,7 +244,7 @@ The Gerber files in `gerbers/` correspond to the **previous** v4 fabrication
 Gerber files will need to be generated.
 
 To regenerate from KiCad:
-1. Open `phonev4.kicad_pro` in KiCad 7+
+1. Open `phonev5.kicad_pro` in KiCad 7+
 2. Open the schematic and run **Annotate** to assign references to new parts
 3. Run **ERC** (Electrical Rules Check) to verify connectivity
 4. Open the PCB editor and run **Update PCB from Schematic**
