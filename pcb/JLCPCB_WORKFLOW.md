@@ -6,9 +6,7 @@
 ./pcb/scripts/export_jlcpcb.sh
 ```
 
-Creates:
-- `pcb/gerbers/phonev5-gerbers.zip` (Gerbers + drills)
-- Also copies to `pcb/jlcpcb/production_files/GERBER-phonev5.zip`
+Creates `pcb/jlcpcb/production_files/GERBER-phonev5.zip` (Gerbers + drills).
 
 ## 2. BOM and CPL
 

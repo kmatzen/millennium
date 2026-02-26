@@ -22,10 +22,6 @@ pcb/erc_report.txt
 pcb/drc_report.txt
 # PCB build artifacts
 pcb/gerbers_export/
-pcb/gerbers/*.zip
-pcb/gerbers/*.gbr
-pcb/gerbers/*.drl
-pcb/gerbers/*.gbrjob
 pcb/jlcpcb/
 pcb/*-backups/
 pcb/*.dsn

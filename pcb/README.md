@@ -232,7 +232,7 @@ Run `python3 audit_schematic.py` to check component/BOM alignment, net labels, a
 | `phone.kicad_sym`  | Custom symbol library (xl6009, TDA2822M, P6KE6.8CA) |
 | `footprints.pretty/` | Project footprint lib (F1: Fuse_Radial_D10.0mm_P5.00mm) |
 | `fp-lib-table` | Footprint library table (includes project footprints) |
-| `gerbers/`         | Gerbers zip output (run export script)      |
+| `jlcpcb/production_files/` | Gerbers zip, BOM, CPL (JLCPCB upload) |
 | `audit_schematic.py` | Python script to audit schematic vs BOM vs README |
 | `AUDIT.md`         | Audit findings and action items             |
 | `SCHEMATIC_D2_CHANGES.md` | TVS diode wiring (D1, D2, D3 P6KE6.8CA) and net reference |
@@ -242,9 +242,9 @@ Run `python3 audit_schematic.py` to check component/BOM alignment, net labels, a
 See **[JLCPCB_WORKFLOW.md](JLCPCB_WORKFLOW.md)** for fabrication steps.
 
 Quick summary:
-1. Run `./pcb/scripts/export_jlcpcb.sh` to generate `gerbers/phonev5-gerbers.zip`
+1. Run `./pcb/scripts/export_jlcpcb.sh` to generate `jlcpcb/production_files/GERBER-phonev5.zip`
 2. Use KiCad's JLCPCB Fabrication Toolkit plugin for BOM/CPL
-3. Upload Gerbers zip + BOM + CPL to JLCPCB
+3. Upload all three from `jlcpcb/production_files/` to JLCPCB
 
 ## Schematic Changes Required in KiCad
 
