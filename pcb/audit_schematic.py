@@ -209,8 +209,8 @@ def main():
         print("- 12V_COIN label present.")
     print("\n## 5. Part Value Discrepancies\n")
     q1 = next((c for c in comps if c["Reference"] == "Q1"), None)
-    if q1 and "IRF9540" not in (q1.get("Value") or ""):
-        print("- **Q1**: Expected IRF9540N (TO-220 THT); verify BOM/README match schematic.")
+    if q1 and "AO3401" not in (q1.get("Value") or "") and "Si2319" not in (q1.get("Value") or ""):
+        print("- **Q1**: Expected AO3401A or Si2319A (SOT-23 SMD); verify BOM/README match schematic.")
     d3 = next((c for c in comps if c["Reference"] == "D3"), None)
     if d3:
         print("- **D3/LED1**: Schematic uses D3 for power LED; BOM uses LED1. Annotate consistently.")

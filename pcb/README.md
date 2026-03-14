@@ -79,9 +79,9 @@ eliminating the crosstalk present in the v4 LM386 design.
 | C_dec | 100nF ceramic                 | 1   | Axial L3.8mm THT                 | TDA2822 Vcc decoupling           |
 | C-*   | 100nF ceramic                 | 5   | Axial L3.8mm THT                 | Decoupling (see below)           |
 | D1–D3 | P6KE6.8CA                     | 3   | DO-15 (THT axial)               | TVS clamp signal lines to GND (600W bidirectional)    |
-| Q1    | IRF9540N P-ch MOSFET          | 1   | TO-220-3 (THT, G-S-D pinout)     | Reverse polarity protection      |
+| Q1    | AO3401A P-ch MOSFET           | 1   | SOT-23 (SMD, JLCPCB basic C15127) | Reverse polarity protection      |
 | F1    | 1A PTC fuse                   | 1   | Radial D10mm THT                 | Resettable overcurrent fuse      |
-| D4    | Green LED                     | 1   | 5mm THT                          | Power indicator                  |
+| D4    | Red LED (0603, C2286 basic)   | 1   | LED_0603 SMD                     | Power indicator                  |
 | J1    | Coin validator                | 1   | 2x5 pin header                   | 10-pin IDC                      |
 | J2    | Keypad                        | 1   | 2x10 pin header                  | 20-pin IDC                      |
 | J3    | VFD display                   | 1   | 2x13 pin header                  | 26-pin IDC                      |
@@ -105,7 +105,7 @@ eliminating the crosstalk present in the v4 LM386 design.
 
 ### Reverse Polarity Protection (Q1)
 
-A P-channel MOSFET (IRF9540N, TO-220 THT; G-S-D pinout drop-in for Si2319) on the incoming 5V rail protects
+A P-channel MOSFET (AO3401A, SOT-23 SMD; JLCPCB basic C15127) on the incoming 5V rail protects
 against accidental reverse-polarity connections. Q1 is placed on the power
 input *before* distribution and *before* feeding U1 IN+. The MOSFET's body
 diode conducts during normal operation with near-zero voltage drop, and blocks
@@ -299,6 +299,13 @@ Add test point symbols connected to: 5V_MAIN, 3.3V, GND, SDA, SCL, 12V_COIN.
 Do not add TX/RX test points for USB serial; Arduino ↔ Pi communication uses
 USB through an external hub, so there are no discrete USB serial nets on the
 PCB.
+
+## Known PCB Errata
+
+1. **Missing trace: Reset 2 (GPIO27 → Arduino Beta RST)** — The PCB is missing a
+   trace connecting the Pi's GPIO27/GEN2 (pin 13) to the display Arduino's RST
+   pin. Worked around with a bodge wire on the assembled board. Must be added as
+   a proper trace in the next KiCad layout revision.
 
 ## Known Issues (resolved by this revision)
 

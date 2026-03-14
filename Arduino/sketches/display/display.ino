@@ -15,7 +15,6 @@
 #define CMD_COIN_PROGRAM  0x04
 #define CMD_COIN_VERIFY   0x05
 #define CMD_KEEPALIVE     0x06  /* Pi->Arduino: no-op, resets serial watchdog (#59) */
-#define CMD_FLASH_MODE    0xFF  /* Enter silent mode for 30s so host can trigger bootloader */
 
 /* I2C event prefixes (keypad -> display -> Pi) */
 #define EVT_KEY        'K'
@@ -94,7 +93,6 @@ static volatile byte i2cBuf[I2C_BUF_SIZE];
 static volatile byte i2cHead = 0, i2cTail = 0;
 
 static unsigned long lastHeartbeat = 0;
-static unsigned long silentUntil = 0;  /* CMD_FLASH_MODE: suppress SerialUSB.write until this time */
 
 const unsigned long SERIAL_TIMEOUT_MS = 2000;
 
@@ -181,7 +179,7 @@ void loop() {
   byte head = i2cHead;
   interrupts();
   while (i2cTail != head) {
-    if (millis() >= silentUntil) SerialUSB.write(i2cBuf[i2cTail]);
+    SerialUSB.write(i2cBuf[i2cTail]);
     i2cTail = (i2cTail + 1) % I2C_BUF_SIZE;
   }
 
@@ -215,7 +213,7 @@ void loop() {
         delay(100);
       }
     } else if (data == CMD_COIN_PROGRAM) {
-      if (millis() >= silentUntil) SerialUSB.write("A");
+      SerialUSB.write("A");
       for (int i = 0; i < 256; ++i) {
         wdt_reset();
         coinSerialDevice.write('E');
@@ -231,9 +229,9 @@ void loop() {
         coinSerialDevice.write(coinEeprom[i]);
         delay(20);
       }
-      if (millis() >= silentUntil) SerialUSB.write('B');
+      SerialUSB.write('B');
     } else if (data == CMD_COIN_VERIFY) {
-      if (millis() >= silentUntil) SerialUSB.write('D');
+      SerialUSB.write('D');
       for (int i = 0; i < 256; ++i) {
         wdt_reset();
         while (coinSerialDevice.available()) {
@@ -252,32 +250,26 @@ void loop() {
         if (coinSerialDevice.available()) {
           byte val = coinSerialDevice.read();
           if (val != coinEeprom[i]) {
-            if (millis() >= silentUntil) {
-              SerialUSB.write('E');
-              SerialUSB.write(lowByte(i));
-              SerialUSB.write(val);
-              SerialUSB.write(coinEeprom[i]);
-            }
+            SerialUSB.write('E');
+            SerialUSB.write(lowByte(i));
+            SerialUSB.write(val);
+            SerialUSB.write(coinEeprom[i]);
           }
         }
       }
-      if (millis() >= silentUntil) SerialUSB.write('F');
+      SerialUSB.write('F');
     } else if (data == CMD_KEEPALIVE) {
       /* No-op: Pi sends this when idle to keep serial watchdog from false-triggering */
-    } else if (data == CMD_FLASH_MODE) {
-      silentUntil = millis() + 30000;  /* Silent for 30s so deploy can trigger bootloader */
     }
   }
   if (coinSerialDevice.available()) {
     char data = coinSerialDevice.read();
-    if (millis() >= silentUntil) {
-      SerialUSB.write(EVT_COIN_DATA);
-      SerialUSB.write(data);
-    }
+    SerialUSB.write(EVT_COIN_DATA);
+    SerialUSB.write(data);
   }
 
   unsigned long now = millis();
-  if (now - lastHeartbeat >= HEARTBEAT_INTERVAL_MS && now >= silentUntil) {
+  if (now - lastHeartbeat >= HEARTBEAT_INTERVAL_MS) {
     SerialUSB.write(EVT_HEARTBEAT);
     lastHeartbeat = now;
   }

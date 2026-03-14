@@ -4234,7 +4234,7 @@
 					)
 				)
 			)
-			(property "Footprint" "4ms_Jack:EighthInch_Stereo_PJ366ST"
+			(property "Footprint" "audio:AUDIO-TH_HOOYA_PJ-320"
 				(at -10.16 -22.86 0)
 				(effects
 					(font
@@ -5481,7 +5481,7 @@
 					(justify left)
 				)
 			)
-			(property "Value" "IRF9540N"
+			(property "Value" "AO3401A"
 				(at 5.08 0 0)
 				(effects
 					(font
@@ -5490,7 +5490,7 @@
 					(justify left)
 				)
 			)
-			(property "Footprint" "footprints:TO-220-3_Vertical_GSD"
+			(property "Footprint" "Package_TO_SOT_SMD:SOT-23"
 				(at 5.08 -1.905 0)
 				(effects
 					(font
@@ -5501,7 +5501,7 @@
 					(hide yes)
 				)
 			)
-			(property "Datasheet" "https://www.infineon.com/dgdl/irf9540npbf.pdf"
+			(property "Datasheet" "https://www.lcsc.com/datasheet/C15127.pdf"
 				(at 5.08 -3.81 0)
 				(effects
 					(font
@@ -5511,7 +5511,7 @@
 					(hide yes)
 				)
 			)
-			(property "Description" "23A Id, -100V Vds, P-Channel MOSFET, TO-220"
+			(property "LCSC" "C15127"
 				(at 0 0 0)
 				(effects
 					(font
@@ -5520,7 +5520,7 @@
 					(hide yes)
 				)
 			)
-			(property "ki_keywords" "P-Channel MOSFET TO-220"
+			(property "Description" "P-Channel 40V 4.4A MOSFET, SOT-23, reverse polarity"
 				(at 0 0 0)
 				(effects
 					(font
@@ -5529,7 +5529,16 @@
 					(hide yes)
 				)
 			)
-			(property "ki_fp_filters" "TO?220*"
+			(property "ki_keywords" "P-Channel MOSFET SOT-23"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "ki_fp_filters" "SOT-23*"
 				(at 0 0 0)
 				(effects
 					(font
@@ -5925,7 +5934,7 @@
 			)
 			(embedded_fonts no)
 		)
-		(symbol "phone:TDA2822M"
+		(symbol "phone:PT2308-S"
 			(pin_names
 				(offset 1.016)
 			)
@@ -5940,7 +5949,7 @@
 					)
 				)
 			)
-			(property "Value" "TDA2822M"
+			(property "Value" "PT2308-S"
 				(at 0 -10.16 0)
 				(effects
 					(font
@@ -5948,7 +5957,7 @@
 					)
 				)
 			)
-			(property "Footprint" "Package_DIP:DIP-8_W7.62mm"
+			(property "Footprint" "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm"
 				(at 0 0 0)
 				(effects
 					(font
@@ -5957,7 +5966,7 @@
 					(hide yes)
 				)
 			)
-			(property "Datasheet" "https://www.st.com/resource/en/datasheet/tda2822m.pdf"
+			(property "Datasheet" "https://www.lcsc.com/datasheet/C115492.pdf"
 				(at 0 0 0)
 				(effects
 					(font
@@ -5966,7 +5975,7 @@
 					(hide yes)
 				)
 			)
-			(property "Description" "Dual low-voltage audio power amplifier, DIP-8"
+			(property "Description" "2-channel Class AB headphone driver, SOIC-8"
 				(at 0 0 0)
 				(effects
 					(font
@@ -5975,7 +5984,7 @@
 					(hide yes)
 				)
 			)
-			(property "ki_keywords" "dual audio amplifier"
+			(property "ki_keywords" "dual audio amplifier headphone driver SOIC-8"
 				(at 0 0 0)
 				(effects
 					(font
@@ -5984,7 +5993,7 @@
 					(hide yes)
 				)
 			)
-			(symbol "TDA2822M_0_1"
+			(symbol "PT2308-S_0_1"
 				(rectangle
 					(start -7.62 8.89)
 					(end 7.62 -8.89)
@@ -5997,7 +6006,7 @@
 					)
 				)
 			)
-			(symbol "TDA2822M_1_1"
+			(symbol "PT2308-S_1_1"
 				(pin input line
 					(at -10.16 5.08 0)
 					(length 2.54)
@@ -6026,7 +6035,25 @@
 							)
 						)
 					)
-					(number "4"
+					(number "5"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin power_in line
+					(at -2.54 -11.43 90)
+					(length 2.54)
+					(name "INB-"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "6"
 						(effects
 							(font
 								(size 1.27 1.27)
@@ -6044,7 +6071,7 @@
 							)
 						)
 					)
-					(number "6"
+					(number "8"
 						(effects
 							(font
 								(size 1.27 1.27)
@@ -6055,7 +6082,7 @@
 				(pin power_in line
 					(at 0 -11.43 90)
 					(length 2.54)
-					(name "GND"
+					(name "INA-"
 						(effects
 							(font
 								(size 1.27 1.27)
@@ -6070,17 +6097,17 @@
 						)
 					)
 				)
-				(pin passive line
+				(pin power_in line
 					(at 2.54 11.43 270)
 					(length 2.54)
-					(name "RIPPLE"
+					(name "GND"
 						(effects
 							(font
 								(size 1.27 1.27)
 							)
 						)
 					)
-					(number "7"
+					(number "4"
 						(effects
 							(font
 								(size 1.27 1.27)
@@ -6106,24 +6133,6 @@
 						)
 					)
 				)
-				(pin passive line
-					(at 10.16 0 180)
-					(length 2.54)
-					(name "NC"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "8"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
 				(pin output line
 					(at 10.16 -5.08 180)
 					(length 2.54)
@@ -6134,7 +6143,7 @@
 							)
 						)
 					)
-					(number "5"
+					(number "7"
 						(effects
 							(font
 								(size 1.27 1.27)
@@ -7007,13 +7016,13 @@
 	)
 	(wire
 		(pts
-			(xy 115.57 139.7) (xy 124.46 139.7)
+			(xy 110.49 137.16) (xy 110.49 134.62)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
-		(uuid "5182994e-20f1-4c82-806a-227b5886a76b")
+		(uuid "4a015376-dab0-4619-87a6-90bf5ace6493")
 	)
 	(wire
 		(pts
@@ -7204,6 +7213,16 @@
 			(type default)
 		)
 		(uuid "a5bc2db1-54c6-4ea2-9d3e-9ca1de23264e")
+	)
+	(wire
+		(pts
+			(xy 110.49 134.62) (xy 19.05 134.62)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "a5e8964d-12b7-4deb-b25a-ce38df92296c")
 	)
 	(wire
 		(pts
@@ -8695,7 +8714,7 @@
 	)
 	(global_label "GND"
 		(shape input)
-		(at 132.08 139.7 0)
+		(at 115.57 139.7 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -8705,7 +8724,7 @@
 		)
 		(uuid "67ffab90-c930-4e32-ad55-a59f59fc81b6")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 138.5122 139.7 0)
+			(at 122.0022 139.7 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -8931,6 +8950,28 @@
 					(size 1.27 1.27)
 				)
 				(justify left)
+				(hide yes)
+			)
+		)
+	)
+	(global_label "GND"
+		(shape input)
+		(at 110.49 162.56 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "854219a1-ec6a-4c17-8e0a-0a6699cbb396")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 103.6343 162.56 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
 				(hide yes)
 			)
 		)
@@ -10766,17 +10807,8 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "Capacitor_THT:C_Disc_D5.0mm_W2.5mm_P2.50mm"
+		(property "Footprint" "Capacitor_SMD:C_0805_2012Metric"
 			(at 242.57 27.94 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "LCSC" "C600221"
-			(at 0 0 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -10799,6 +10831,15 @@
 				(font
 					(size 1.27 1.27)
 				)
+			)
+		)
+		(property "LCSC" "C49678"
+			(at 0 0 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
 			)
 		)
 		(pin "1"
@@ -11117,17 +11158,8 @@
 				(hide yes)
 			)
 		)
-		(property "Footprint" "Capacitor_THT:C_Disc_D5.0mm_W2.5mm_P2.50mm"
+		(property "Footprint" "Capacitor_SMD:C_0805_2012Metric"
 			(at 110.49 146.05 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "LCSC" "C600221"
-			(at 0 0 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -11150,6 +11182,15 @@
 				(font
 					(size 1.27 1.27)
 				)
+			)
+		)
+		(property "LCSC" "C49678"
+			(at 0 0 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
 			)
 		)
 		(pin "1"
@@ -11195,7 +11236,7 @@
 				(hide yes)
 			)
 		)
-		(property "Footprint" "Capacitor_THT:CP_Radial_D5.0mm_P2.00mm"
+		(property "Footprint" "Capacitor_SMD:CP_Elec_6.3x5.4"
 			(at 110.49 144.78 0)
 			(effects
 				(font
@@ -11219,6 +11260,15 @@
 				(font
 					(size 1.27 1.27)
 				)
+			)
+		)
+		(property "LCSC" "C37308"
+			(at 0 0 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
 			)
 		)
 		(pin "1"
@@ -11486,7 +11536,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "Resistor_THT:R_Axial_DIN0204_L3.6mm_D1.6mm_P7.62mm_Horizontal"
+		(property "Footprint" "Resistor_SMD:R_0805_2012Metric"
 			(at 178.816 150.264 90)
 			(effects
 				(font
@@ -11506,6 +11556,15 @@
 		)
 		(property "Description" "Pi GPIO27 to Display Arduino RST1"
 			(at 177.8 149.86 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "LCSC" "C17513"
+			(at 0 0 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -11554,7 +11613,7 @@
 				)
 			)
 		)
-		(property "Footprint" "Diode_THT:D_DO-201AD_P12.70mm_Horizontal"
+		(property "Footprint" "Diode_SMD:D_SMB"
 			(at 42.164 162.56 0)
 			(effects
 				(font
@@ -11572,8 +11631,17 @@
 				(hide yes)
 			)
 		)
-		(property "Description" "600W bidirectional TVS, 5.8V standoff, ~10.5V clamp, DO-15"
+		(property "Description" "600W bidirectional TVS, 5.8V standoff, ~10.5V clamp, SMB"
 			(at 40.64 162.56 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "LCSC" "C78395"
+			(at 0 0 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -11751,6 +11819,15 @@
 				(hide yes)
 			)
 		)
+		(property "LCSC" "C2884926"
+			(at 0 0 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
 		(pin "1"
 			(uuid "5b5ea19b-9bdf-4a99-97fa-1d4c837c5818")
 		)
@@ -11797,17 +11874,8 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "Capacitor_THT:C_Disc_D5.0mm_W2.5mm_P2.50mm"
+		(property "Footprint" "Capacitor_SMD:C_0805_2012Metric"
 			(at 171.45 82.55 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "LCSC" "C600221"
-			(at 0 0 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -11830,6 +11898,15 @@
 				(font
 					(size 1.27 1.27)
 				)
+			)
+		)
+		(property "LCSC" "C49678"
+			(at 0 0 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
 			)
 		)
 		(pin "1"
@@ -11874,17 +11951,8 @@
 				(hide yes)
 			)
 		)
-		(property "Footprint" "Capacitor_THT:C_Disc_D5.0mm_W2.5mm_P2.50mm"
+		(property "Footprint" "Capacitor_SMD:C_0805_2012Metric"
 			(at 110.49 156.21 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "LCSC" "C600221"
-			(at 0 0 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -11907,6 +11975,15 @@
 				(font
 					(size 1.27 1.27)
 				)
+			)
+		)
+		(property "LCSC" "C49678"
+			(at 0 0 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
 			)
 		)
 		(pin "1"
@@ -11950,7 +12027,7 @@
 				)
 			)
 		)
-		(property "Footprint" "Diode_THT:D_DO-201AD_P12.70mm_Horizontal"
+		(property "Footprint" "Diode_SMD:D_SMB"
 			(at 42.164 156.21 0)
 			(effects
 				(font
@@ -11968,8 +12045,17 @@
 				(hide yes)
 			)
 		)
-		(property "Description" "600W bidirectional TVS, 5.8V standoff, ~10.5V clamp, DO-15"
+		(property "Description" "600W bidirectional TVS, 5.8V standoff, ~10.5V clamp, SMB"
 			(at 40.64 156.21 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "LCSC" "C78395"
+			(at 0 0 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -12111,7 +12197,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "Resistor_THT:R_Axial_DIN0204_L3.6mm_D1.6mm_P7.62mm_Horizontal"
+		(property "Footprint" "Resistor_SMD:R_0805_2012Metric"
 			(at 26.416 117.094 90)
 			(effects
 				(font
@@ -12135,6 +12221,15 @@
 				(font
 					(size 1.27 1.27)
 				)
+			)
+		)
+		(property "LCSC" "C17673"
+			(at 0 0 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
 			)
 		)
 		(pin "1"
@@ -12312,17 +12407,8 @@
 				(hide yes)
 			)
 		)
-		(property "Footprint" "Capacitor_THT:C_Disc_D5.0mm_W2.5mm_P2.50mm"
+		(property "Footprint" "Capacitor_SMD:C_0805_2012Metric"
 			(at 105.41 144.78 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "LCSC" "C600221"
-			(at 0 0 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -12345,6 +12431,15 @@
 				(font
 					(size 1.27 1.27)
 				)
+			)
+		)
+		(property "LCSC" "C49678"
+			(at 0 0 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
 			)
 		)
 		(pin "1"
@@ -12389,7 +12484,7 @@
 				(hide yes)
 			)
 		)
-		(property "Footprint" "Capacitor_THT:CP_Radial_D5.0mm_P2.00mm"
+		(property "Footprint" "Capacitor_SMD:CP_Elec_6.3x5.4"
 			(at 138.43 146.05 0)
 			(effects
 				(font
@@ -12413,6 +12508,15 @@
 				(font
 					(size 1.27 1.27)
 				)
+			)
+		)
+		(property "LCSC" "C37308"
+			(at 0 0 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
 			)
 		)
 		(pin "1"
@@ -12458,17 +12562,8 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "Capacitor_THT:C_Disc_D5.0mm_W2.5mm_P2.50mm"
+		(property "Footprint" "Capacitor_SMD:C_0805_2012Metric"
 			(at 22.86 64.77 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "LCSC" "C600221"
-			(at 0 0 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -12491,6 +12586,15 @@
 				(font
 					(size 1.27 1.27)
 				)
+			)
+		)
+		(property "LCSC" "C49678"
+			(at 0 0 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
 			)
 		)
 		(pin "1"
@@ -12759,17 +12863,8 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "Capacitor_THT:C_Disc_D5.0mm_W2.5mm_P2.50mm"
+		(property "Footprint" "Capacitor_SMD:C_0805_2012Metric"
 			(at 100.33 64.77 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "LCSC" "C600221"
-			(at 0 0 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -12792,6 +12887,15 @@
 				(font
 					(size 1.27 1.27)
 				)
+			)
+		)
+		(property "LCSC" "C49678"
+			(at 0 0 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
 			)
 		)
 		(pin "1"
@@ -12903,7 +13007,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "Resistor_THT:R_Axial_DIN0204_L3.6mm_D1.6mm_P7.62mm_Horizontal"
+		(property "Footprint" "Resistor_SMD:R_0805_2012Metric"
 			(at 34.036 117.094 90)
 			(effects
 				(font
@@ -12927,6 +13031,15 @@
 				(font
 					(size 1.27 1.27)
 				)
+			)
+		)
+		(property "LCSC" "C17673"
+			(at 0 0 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
 			)
 		)
 		(pin "1"
@@ -12972,17 +13085,8 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "Capacitor_THT:C_Disc_D5.0mm_W2.5mm_P2.50mm"
+		(property "Footprint" "Capacitor_SMD:C_0805_2012Metric"
 			(at 27.94 95.25 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "LCSC" "C600221"
-			(at 0 0 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -13005,6 +13109,15 @@
 				(font
 					(size 1.27 1.27)
 				)
+			)
+		)
+		(property "LCSC" "C49678"
+			(at 0 0 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
 			)
 		)
 		(pin "1"
@@ -13150,7 +13263,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "Resistor_THT:R_Axial_DIN0204_L3.6mm_D1.6mm_P7.62mm_Horizontal"
+		(property "Footprint" "Resistor_SMD:R_0805_2012Metric"
 			(at 166.116 150.264 90)
 			(effects
 				(font
@@ -13170,6 +13283,15 @@
 		)
 		(property "Description" "Pi GPIO17 to Keypad Arduino RST1"
 			(at 165.1 149.86 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "LCSC" "C17513"
+			(at 0 0 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -13360,7 +13482,7 @@
 				)
 			)
 		)
-		(property "Footprint" "footprints:Fuse_Radial_D10.0mm_P5.00mm"
+		(property "Footprint" "Fuse:Fuse_1812_4532Metric"
 			(at 176.53 131.572 90)
 			(effects
 				(font
@@ -13378,8 +13500,17 @@
 				(hide yes)
 			)
 		)
-		(property "Description" "Fuse"
+		(property "Description" "PTC resettable fuse 1A 1812"
 			(at 176.53 133.35 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "LCSC" "C2649901"
+			(at 0 0 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -13488,7 +13619,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "IRF9540N"
+		(property "Value" "AO3401A"
 			(at 176.53 129.5399 0)
 			(effects
 				(font
@@ -13497,7 +13628,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "footprints:TO-220-3_Vertical_GSD"
+		(property "Footprint" "Package_TO_SOT_SMD:SOT-23"
 			(at 175.26 130.175 0)
 			(effects
 				(font
@@ -13508,7 +13639,16 @@
 				(hide yes)
 			)
 		)
-		(property "Datasheet" "https://www.infineon.com/dgdl/irf9540npbf.pdf"
+		(property "LCSC" "C15127"
+			(at 0 0 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "https://www.lcsc.com/datasheet/C15127.pdf"
 			(at 175.26 132.08 0)
 			(effects
 				(font
@@ -13518,7 +13658,7 @@
 				(hide yes)
 			)
 		)
-		(property "Description" "23A Id, -100V Vds, P-Channel MOSFET, TO-220"
+		(property "Description" "P-Channel 40V 4.4A MOSFET, SOT-23, reverse polarity"
 			(at 170.18 128.27 0)
 			(effects
 				(font
@@ -13976,7 +14116,7 @@
 		)
 	)
 	(symbol
-		(lib_id "phone:TDA2822M")
+		(lib_id "phone:PT2308-S")
 		(at 113.03 151.13 0)
 		(unit 1)
 		(exclude_from_sim no)
@@ -13993,7 +14133,7 @@
 				)
 			)
 		)
-		(property "Value" "TDA2822M"
+		(property "Value" "PT2308-S"
 			(at 123.19 149.4791 0)
 			(effects
 				(font
@@ -14001,7 +14141,7 @@
 				)
 			)
 		)
-		(property "Footprint" "Package_DIP:DIP-8_W7.62mm"
+		(property "Footprint" "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm"
 			(at 113.03 151.13 0)
 			(effects
 				(font
@@ -14010,7 +14150,7 @@
 				(hide yes)
 			)
 		)
-		(property "Datasheet" "https://www.st.com/resource/en/datasheet/tda2822m.pdf"
+		(property "Datasheet" "https://www.lcsc.com/datasheet/C115492.pdf"
 			(at 113.03 151.13 0)
 			(effects
 				(font
@@ -14025,6 +14165,15 @@
 				(font
 					(size 1.27 1.27)
 				)
+			)
+		)
+		(property "LCSC" "C115492"
+			(at 0 0 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
 			)
 		)
 		(pin "1"
@@ -14086,7 +14235,7 @@
 				)
 			)
 		)
-		(property "Footprint" "Diode_THT:D_DO-201AD_P12.70mm_Horizontal"
+		(property "Footprint" "Diode_SMD:D_SMB"
 			(at 42.164 171.45 0)
 			(effects
 				(font
@@ -14104,8 +14253,17 @@
 				(hide yes)
 			)
 		)
-		(property "Description" "600W bidirectional TVS, 5.8V standoff, ~10.5V clamp, DO-15"
+		(property "Description" "600W bidirectional TVS, 5.8V standoff, ~10.5V clamp, SMB"
 			(at 40.64 171.45 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "LCSC" "C78395"
+			(at 0 0 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -14156,7 +14314,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "Resistor_THT:R_Axial_DIN0204_L3.6mm_D1.6mm_P7.62mm_Horizontal"
+		(property "Footprint" "Resistor_SMD:R_0805_2012Metric"
 			(at 51.816 120.904 90)
 			(effects
 				(font
@@ -14180,6 +14338,15 @@
 				(font
 					(size 1.27 1.27)
 				)
+			)
+		)
+		(property "LCSC" "C17513"
+			(at 0 0 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
 			)
 		)
 		(pin "1"
@@ -14329,74 +14496,6 @@
 		)
 	)
 	(symbol
-		(lib_id "PCM_Capacitor_US_AKL:CP_Axial_L18.0mm_D10.0mm_P25.00mm")
-		(at 128.27 139.7 90)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "f3e23ae5-4d17-4d89-b31f-f14c41e763ac")
-		(property "Reference" "C8"
-			(at 127.635 132.08 90)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "4.7µF"
-			(at 127.635 134.62 90)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Footprint" "Capacitor_THT:CP_Radial_D5.0mm_P2.00mm"
-			(at 138.43 139.7 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" "~"
-			(at 128.27 139.7 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" ""
-			(at 128.27 139.7 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "c0b3fbf5-024e-409e-82bb-7ea04cca75d6")
-		)
-		(pin "2"
-			(uuid "6c87e45d-52bf-4eff-9daf-445ba25984cc")
-		)
-		(instances
-			(project "phonev5"
-				(path "/5a5bcfa4-7dd5-4521-94f3-d918e9453cc6"
-					(reference "C8")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
 		(lib_id "Device:LED")
 		(at 50.8 128.27 90)
 		(unit 1)
@@ -14415,7 +14514,7 @@
 				(justify right)
 			)
 		)
-		(property "Value" "Green LED"
+		(property "Value" "Red LED"
 			(at 54.61 131.1274 90)
 			(effects
 				(font
@@ -14424,7 +14523,7 @@
 				(justify right)
 			)
 		)
-		(property "Footprint" "LED_THT:LED_D5.0mm"
+		(property "Footprint" "LED_SMD:LED_0603_1608Metric"
 			(at 50.8 128.27 0)
 			(effects
 				(font
@@ -14444,6 +14543,15 @@
 		)
 		(property "Description" "Light emitting diode"
 			(at 50.8 128.27 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "LCSC" "C2286"
+			(at 0 0 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -14503,7 +14611,7 @@
 				(hide yes)
 			)
 		)
-		(property "Footprint" "Capacitor_THT:CP_Radial_D5.0mm_P2.00mm"
+		(property "Footprint" "Capacitor_SMD:CP_Elec_6.3x5.4"
 			(at 138.43 156.21 0)
 			(effects
 				(font
@@ -14527,6 +14635,15 @@
 				(font
 					(size 1.27 1.27)
 				)
+			)
+		)
+		(property "LCSC" "C37308"
+			(at 0 0 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
 			)
 		)
 		(pin "1"

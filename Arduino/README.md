@@ -48,20 +48,30 @@ make install_display    # Flash display only
 make clean              # Remove build artifacts
 ```
 
-**When display firmware changes** (e.g. after merging a PR that touches `sketches/display/`):
-flash the display Arduino so it stays in sync with the daemon. Always build with
-`arduino:avr:millennium_beta` so the board keeps its "Millennium Beta" USB identity.
+**Recommended: build on macOS, deploy to Pi via GPIO reset**
 
-**Recommended: build on macOS, sync, flash on Pi**
+The Pi has direct GPIO reset connections to both Arduinos:
+- GPIO17/GEN0 (pin 11) → Arduino Alpha RST
+- GPIO27/GEN2 (pin 13) → Arduino Beta RST
+
+The deploy scripts assert reset via GPIO (open-drain: drive low, release to input), wait for
+the device to disappear then reappear (the bootloader enumerates under the same custom PID as
+the sketch), then flash with `avrdude`. No uhubctl or 1200-baud tricks needed. Requires
+`raspi-gpio` and `avrdude` on the Pi. Note: the WDT (4s) limits the bootloader window —
+flashing completes well within that window.
+
 ```bash
-./Arduino/deploy_display.sh [user@host]
-# Builds locally, syncs (git pull on remote), then arduino-cli upload (handles 32U4 reset).
-# Default host: matzen@192.168.86.145 (see host/DEVICE_TEST.md)
+./Arduino/deploy_display.sh [user@host]   # flash Beta (display)
+./Arduino/deploy_keypad.sh  [user@host]   # flash Alpha (keypad)
+# Default host: matzen@192.168.86.145
+
+# Or via make:
+make deploy_display
+make deploy_keypad
+make deploy          # flash both (keypad first, then display)
 ```
 
-The script stops the daemon, power-cycles the display Arduino via uhubctl (Huasheng hub supports per-port toggle), sends CMD_FLASH_MODE (0xFF) to silence the sketch's serial output, then uploads with `arduino-cli`. **Bootstrap**: devices running older firmware need one manual flash (e.g. `make install_display` with Arduino connected to a Mac) to get the flash-mode support. Install on Pi: `sudo apt install arduino-cli uhubctl`. Uses `/dev/serial/by-id/usb-Arduino_LLC_Millennium_Beta-if00` (port can change after uhubctl cycle).
-
-If build fails (arduino-cli.yaml has Linux paths): `BUILD_CONFIG=0 make build_display`. If hex not pushed: `VIA_SCP=1`.
+If build fails because arduino-cli.yaml has Linux paths: `BUILD_CONFIG=0 make build_display`. If hex not pushed: `VIA_SCP=1`.
 
 If `arduino-cli` is not in your `PATH`:
 

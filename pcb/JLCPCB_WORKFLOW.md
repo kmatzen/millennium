@@ -20,3 +20,5 @@ Upload from `pcb/jlcpcb/production_files/`:
 - GERBER-phonev5.zip
 - BOM-phonev5.csv
 - CPL-phonev5.csv
+
+See **JLCPCB_COST_REDUCTION.md** for basic vs extended parts and assembly cost optimization.

@@ -11,7 +11,7 @@ KEYPAD_FQBN  = arduino:avr:millennium_alpha
 DISPLAY_DEVICE ?= $(shell realpath /dev/serial/by-id/usb-Arduino_LLC_Millennium_Beta-if00 2>/dev/null)
 KEYPAD_DEVICE ?= $(shell realpath /dev/serial/by-id/usb-Arduino_LLC_Millennium_Alpha-if00 2>/dev/null)
 
-.PHONY: build build_display install install_keypad install_display flash_display clean
+.PHONY: build build_display install install_keypad install_display deploy deploy_display deploy_keypad clean
 
 build: build/keypad/keypad.ino.hex build/display/display.ino.hex
 
@@ -33,16 +33,19 @@ install_display: build/display/display.ino.hex
 	$(ARDUINO_CLI) upload -p $(DISPLAY_DEVICE) --fqbn $(DISPLAY_FQBN) \
 		sketches/display $(BUILD_ARGS) --input-dir ./build/display
 
-# Flash display with avrdude. SKIP_TRIGGER=1 if caller already did 1200-baud (e.g. deploy script).
-FLASH_PORT ?= /dev/ttyACM0
-flash_display: build/display/display.ino.hex
-ifneq ($(SKIP_TRIGGER),1)
-	@echo "Triggering bootloader (1200 baud on $(FLASH_PORT))..."
-	@stty -F $(FLASH_PORT) 1200 2>/dev/null || true
-	@sleep 2
-endif
-	@echo "Flashing..."
-	avrdude -p atmega32u4 -c avr109 -P $(FLASH_PORT) -b 57600 -U flash:w:build/display/display.ino.hex:i
+# Deploy to Pi via GPIO reset (build on Mac, sync, flash on Pi).
+# Requires raspi-gpio and avrdude on the Pi.
+DEPLOY_HOST ?= matzen@192.168.86.145
+
+deploy_display: build/display/display.ino.hex
+	./deploy_display.sh $(DEPLOY_HOST)
+
+deploy_keypad: build/keypad/keypad.ino.hex
+	./deploy_keypad.sh $(DEPLOY_HOST)
+
+deploy: build
+	./deploy_keypad.sh $(DEPLOY_HOST)
+	./deploy_display.sh $(DEPLOY_HOST)
 
 install: build
 	$(ARDUINO_CLI) upload -p $(DISPLAY_DEVICE) --fqbn $(DISPLAY_FQBN) \
