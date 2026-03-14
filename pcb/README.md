@@ -8,7 +8,7 @@ This directory contains the PCB design files created with [KiCad](https://www.ki
 - **phonev4** (previous fabrication): Single LM386 power amplifier for ringer only,
   XL6009 boost converter, RJ9 and 3.5mm jacks. Had two design flaws: speaker
   output coupling (#42) and unamplified handset earpiece (#44).
-- **phonev4 (current schematic)**: TDA2822M dual-channel amplifier replacing the
+- **phonev5 (current schematic)**: TDA2822M dual-channel amplifier replacing the
   LM386, fixing both audio design flaws. Adds reverse polarity protection, ESD
   protection, power LED, fuse, test points, and improved I2C pull-ups.
 
@@ -78,11 +78,10 @@ eliminating the crosstalk present in the v4 LM386 design.
 | C_ripple | 4.7µF electrolytic         | 1   | Radial D5mm P2.0mm               | TDA2822 ripple rejection         |
 | C_dec | 100nF ceramic                 | 1   | Axial L3.8mm THT                 | TDA2822 Vcc decoupling           |
 | C-*   | 100nF ceramic                 | 5   | Axial L3.8mm THT                 | Decoupling (see below)           |
-| D1    | PRTR5V0U2X                    | 1   | SOT-143 (4-pin)                  | ESD clamp on J4 signal pins (handset) |
-| D2    | PRTR5V0U2X                    | 1   | SOT-143 (4-pin)                  | ESD clamp on J1 signal pins (coin TX/RX) |
-| Q1    | Si2301 P-ch MOSFET            | 1   | SOT-23                           | Reverse polarity protection      |
+| D1–D3 | P6KE6.8CA                     | 3   | DO-15 (THT axial)               | TVS clamp signal lines to GND (600W bidirectional)    |
+| Q1    | AO3401A P-ch MOSFET           | 1   | SOT-23 (SMD, JLCPCB basic C15127) | Reverse polarity protection      |
 | F1    | 1A PTC fuse                   | 1   | Radial D10mm THT                 | Resettable overcurrent fuse      |
-| D3    | Green LED                     | 1   | 5mm THT                          | Power indicator                  |
+| D4    | Red LED (0603, C2286 basic)   | 1   | LED_0603 SMD                     | Power indicator                  |
 | J1    | Coin validator                | 1   | 2x5 pin header                   | 10-pin IDC                      |
 | J2    | Keypad                        | 1   | 2x10 pin header                  | 20-pin IDC                      |
 | J3    | VFD display                   | 1   | 2x13 pin header                  | 26-pin IDC                      |
@@ -106,19 +105,19 @@ eliminating the crosstalk present in the v4 LM386 design.
 
 ### Reverse Polarity Protection (Q1)
 
-A P-channel MOSFET (Si2301 or Si2319; same SOT-23 pinout) on the incoming 5V rail protects
+A P-channel MOSFET (AO3401A, SOT-23 SMD; JLCPCB basic C15127) on the incoming 5V rail protects
 against accidental reverse-polarity connections. Q1 is placed on the power
 input *before* distribution and *before* feeding U1 IN+. The MOSFET's body
 diode conducts during normal operation with near-zero voltage drop, and blocks
 current when polarity is reversed.
 
-### ESD Protection (D1, D2)
+### ESD / TVS Protection (D1, D2, D3)
 
-TVS diode arrays (PRTR5V0U2X) protect signal lines, not power rails. Each array
-clamps signal pins to VCC (5V) and GND, limiting ESD transients that could
-enter through externally accessible connectors. D1 protects J4 (handset mic+,
-speaker_receiver+); D2 protects J1 (coin validator TX/RX). These keep Arduino
-I/O pins within safe voltage limits during static discharge.
+Three P6KE6.8CA TVS diodes (600W bidirectional, THT DO-15) protect signal
+lines from ESD and transients. Each clamps between the protected signal and
+GND—one pin to signal, one to GND. D1 protects J4 (handset); D2 protects
+speaker_front+ (ringer output from TDA2822); D3 protects the third signal
+line. These protect against back-EMF and ESD on external connectors.
 
 ### Overcurrent Protection (F1)
 
@@ -127,7 +126,7 @@ with Q1, before power distribution and before U1. It protects the entire board
 (including the boost converter input) from downstream shorts. The fuse
 self-resets when the fault is cleared.
 
-### Power Indicator (D3, R3)
+### Power Indicator (D4, R3)
 
 A green LED on the 5V_MAIN rail provides visual confirmation that the board is
 powered, useful when debugging inside the payphone enclosure.
@@ -225,30 +224,27 @@ Run `python3 audit_schematic.py` to check component/BOM alignment, net labels, a
 
 | File              | Description                                  |
 |-------------------|----------------------------------------------|
-| `phonev4.kicad_pro` | KiCad project file                         |
-| `phonev4.kicad_sch` | Schematic (updated with TDA2822M)          |
-| `phonev4.kicad_pcb` | PCB layout (needs re-layout for new parts) |
-| `phonev4.kicad_prl` | KiCad preferences (local)                  |
-| `phonev4.csv`      | Bill of materials (updated)                 |
-| `phone.kicad_sym`  | Custom symbol library (xl6009, TDA2822M)   |
-| `gerbers/`         | Gerber files from previous v4 fabrication   |
+| `phonev5.kicad_pro` | KiCad project file                         |
+| `phonev5.kicad_sch` | Schematic (updated with TDA2822M)          |
+| `phonev5.kicad_pcb` | PCB layout (needs re-layout for new parts) |
+| `phonev5.kicad_prl` | KiCad preferences (local)                  |
+| `phonev5.csv`      | Bill of materials (updated)                 |
+| `phone.kicad_sym`  | Custom symbol library (xl6009, TDA2822M, P6KE6.8CA) |
+| `footprints.pretty/` | Project footprint lib (F1: Fuse_Radial_D10.0mm_P5.00mm) |
+| `fp-lib-table` | Footprint library table (includes project footprints) |
+| `jlcpcb/production_files/` | Gerbers zip, BOM, CPL (JLCPCB upload) |
 | `audit_schematic.py` | Python script to audit schematic vs BOM vs README |
 | `AUDIT.md`         | Audit findings and action items             |
+| `SCHEMATIC_D2_CHANGES.md` | TVS diode wiring (D1, D2, D3 P6KE6.8CA) and net reference |
 
 ## Manufacturing
 
-The Gerber files in `gerbers/` correspond to the **previous** v4 fabrication
-(with LM386). After completing the PCB layout for the updated schematic, new
-Gerber files will need to be generated.
+See **[JLCPCB_WORKFLOW.md](JLCPCB_WORKFLOW.md)** for fabrication steps.
 
-To regenerate from KiCad:
-1. Open `phonev4.kicad_pro` in KiCad 7+
-2. Open the schematic and run **Annotate** to assign references to new parts
-3. Run **ERC** (Electrical Rules Check) to verify connectivity
-4. Open the PCB editor and run **Update PCB from Schematic**
-5. Place and route the new components
-6. Use **Plot** (File → Plot) to export Gerber files
-7. Use **Generate Drill Files** for drill data
+Quick summary:
+1. Run `./pcb/scripts/export_jlcpcb.sh` to generate `jlcpcb/production_files/GERBER-phonev5.zip`
+2. Use KiCad's JLCPCB Fabrication Toolkit plugin for BOM/CPL
+3. Upload all three from `jlcpcb/production_files/` to JLCPCB
 
 ## Schematic Changes Required in KiCad
 
@@ -291,13 +287,11 @@ schematic editor:
    Q1 drain and 5V_MAIN distribution. Protects the 5V supply and boost converter
    input from overcurrent.
 
-3. **D1 (ESD on J4)**: Connect across J4 signal pins (mic+, speaker_receiver+);
-   clamp to 5V_MAIN and GND. Protects signal lines, not power.
+3. **D1, D2, D3 (TVS)**: P6KE6.8CA bidirectional TVS. Each: pin 1 → GND,
+   pin 2 → protected signal (e.g. speaker_receiver+, speaker_front+, or
+   other external signal). Protects signal lines, not power.
 
-4. **D2 (ESD on J1)**: Connect across J1 signal pins (coin TX/RX); clamp to
-   5V_MAIN and GND. Protects signal lines, not power.
-
-5. **D3 + R3**: Connect from 5V_MAIN through R3 (1kΩ) through D3 to GND.
+4. **D4 + R3**: Connect from 5V_MAIN through R3 (1kΩ) through D4 to GND.
 
 ### Test points
 
@@ -305,6 +299,13 @@ Add test point symbols connected to: 5V_MAIN, 3.3V, GND, SDA, SCL, 12V_COIN.
 Do not add TX/RX test points for USB serial; Arduino ↔ Pi communication uses
 USB through an external hub, so there are no discrete USB serial nets on the
 PCB.
+
+## Known PCB Errata
+
+1. **Missing trace: Reset 2 (GPIO27 → Arduino Beta RST)** — The PCB is missing a
+   trace connecting the Pi's GPIO27/GEN2 (pin 13) to the display Arduino's RST
+   pin. Worked around with a bodge wire on the assembled board. Must be added as
+   a proper trace in the next KiCad layout revision.
 
 ## Known Issues (resolved by this revision)
 
@@ -369,7 +370,7 @@ Ideas for future revisions, ordered by likely impact.
 7. **ESD on audio jacks** — J5 (mic) and J7 (speaker) are externally accessible.
    Consider PRTR5V0U2X or similar TVS on their signal pins for robustness.
 
-8. **Power LED brightness** — If D3 is too bright in a dark payphone, increase
+8. **Power LED brightness** — If D4 is too bright in a dark payphone, increase
    R3 (e.g., 2–4.7 kΩ) for dimmer indication.
 
 9. **TDA2822M gain flexibility** — Add DNP footprints for optional input

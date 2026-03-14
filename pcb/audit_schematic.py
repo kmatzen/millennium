@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
-Audit phonev4 KiCad schematic: components, values, footprints, labels, BOM consistency.
-Parses phonev4.kicad_sch (s-expression format) and phonev4.csv (BOM).
+Audit phonev5 KiCad schematic: components, values, footprints, labels, BOM consistency.
+Parses phonev5.kicad_sch (s-expression format) and phonev5.csv (BOM).
 """
 import re
 import csv
 from pathlib import Path
 
-SCHEM = Path(__file__).parent / "phonev4.kicad_sch"
-BOM_CSV = Path(__file__).parent / "phonev4.csv"
+SCHEM = Path(__file__).parent / "phonev5.kicad_sch"
+BOM_CSV = Path(__file__).parent / "phonev5.csv"
 README = Path(__file__).parent.parent / "pcb" / "README.md"
 README = Path(__file__).parent / "README.md"
 
@@ -127,11 +127,11 @@ def extract_global_labels(schem_path: Path) -> set[str]:
 
 
 def main():
-    print("# Schematic Audit Report: phonev4\n")
-    schem = Path(__file__).parent / "phonev4.kicad_sch"
-    bom_csv = Path(__file__).parent / "phonev4.csv"
+    print("# Schematic Audit Report: phonev5\n")
+    schem = Path(__file__).parent / "phonev5.kicad_sch"
+    bom_csv = Path(__file__).parent / "phonev5.csv"
     if not schem.exists():
-        print("Error: phonev4.kicad_sch not found")
+        print("Error: phonev5.kicad_sch not found")
         return 1
     # Extract components - use simpler line-by-line approach
     content = schem.read_text()
@@ -165,7 +165,7 @@ def main():
     power_labels = {l for l in labels if "v" in l.lower() or "gnd" in l.lower() or "5" in l or "12" in l}
     print("Power-related:", sorted(power_labels))
     print("\nAll labels count:", len(labels))
-    print("\n## 3. BOM Comparison (schematic vs phonev4.csv)\n")
+    print("\n## 3. BOM Comparison (schematic vs phonev5.csv)\n")
     bom = load_bom(bom_csv)
     bom_refs = set()
     for row in bom:
@@ -209,8 +209,8 @@ def main():
         print("- 12V_COIN label present.")
     print("\n## 5. Part Value Discrepancies\n")
     q1 = next((c for c in comps if c["Reference"] == "Q1"), None)
-    if q1 and "Si2319" in (q1.get("Value") or ""):
-        print("- **Q1**: Schematic has Si2319CDS, BOM/README specify Si2301. Verify pin compatibility.")
+    if q1 and "AO3401" not in (q1.get("Value") or "") and "Si2319" not in (q1.get("Value") or ""):
+        print("- **Q1**: Expected AO3401A or Si2319A (SOT-23 SMD); verify BOM/README match schematic.")
     d3 = next((c for c in comps if c["Reference"] == "D3"), None)
     if d3:
         print("- **D3/LED1**: Schematic uses D3 for power LED; BOM uses LED1. Annotate consistently.")

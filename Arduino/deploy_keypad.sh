@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Build (on macOS), sync, then flash display firmware on the remote device (Pi).
-# Uses GPIO27/GEN2 (pin 13) to assert Arduino Beta's reset pin directly.
+# Build (on macOS), sync, then flash keypad firmware on the remote device (Pi).
+# Uses GPIO17/GEN0 (pin 11) to assert Arduino Alpha's reset pin directly.
 #
-# Usage: ./deploy_display.sh [user@host]
+# Usage: ./deploy_keypad.sh [user@host]
 #   Default host: matzen@192.168.86.145
 #
 # Env: BRANCH=      deploy specific branch on remote
@@ -20,25 +20,25 @@ VIA_SCP="${VIA_SCP:-0}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-# GPIO pin on Pi connected to Arduino Beta RST (GPIO27/GEN2, pin 13)
-RESET_GPIO=27
+# GPIO pin on Pi connected to Arduino Alpha RST (GPIO17/GEN0, pin 11)
+RESET_GPIO=17
 
-echo "Deploying display firmware (Millennium Beta) to $REMOTE"
+echo "Deploying keypad firmware (Millennium Alpha) to $REMOTE"
 
 # Step 1: Build on macOS
 if [ "$SKIP_BUILD" != "1" ]; then
-  echo "  Step 1: Building display sketch..."
+  echo "  Step 1: Building keypad sketch..."
   cd "$SCRIPT_DIR"
-  if ! BUILD_CONFIG=0 make build_display 2>/dev/null; then
-    make build_display
+  if ! BUILD_CONFIG=0 make build 2>/dev/null; then
+    make build
   fi
   cd "$REPO_ROOT"
-  if ! git diff --quiet Arduino/build/display/display.ino.hex 2>/dev/null; then
+  if ! git diff --quiet Arduino/build/keypad/keypad.ino.hex 2>/dev/null; then
     if [ "$VIA_SCP" = "1" ]; then
       echo "    Hex changed - will copy via scp (VIA_SCP=1)"
     else
       echo "    Hex changed - commit and push first, or use VIA_SCP=1"
-      echo "      git add Arduino/build/display/display.ino.hex && git commit -m '...' && git push"
+      echo "      git add Arduino/build/keypad/keypad.ino.hex && git commit -m '...' && git push"
       exit 1
     fi
   fi
@@ -48,9 +48,9 @@ fi
 
 # Step 2: Sync
 echo "  Step 2: Syncing..."
-if [ "$VIA_SCP" = "1" ] && [ -f "$SCRIPT_DIR/build/display/display.ino.hex" ]; then
-  ssh "$REMOTE" "mkdir -p $REPO_DIR/Arduino/build/display"
-  scp "$SCRIPT_DIR/build/display/display.ino.hex" "$REMOTE:$REPO_DIR/Arduino/build/display/"
+if [ "$VIA_SCP" = "1" ] && [ -f "$SCRIPT_DIR/build/keypad/keypad.ino.hex" ]; then
+  ssh "$REMOTE" "mkdir -p $REPO_DIR/Arduino/build/keypad"
+  scp "$SCRIPT_DIR/build/keypad/keypad.ino.hex" "$REMOTE:$REPO_DIR/Arduino/build/keypad/"
 else
   if [ -n "$BRANCH" ]; then
     ssh "$REMOTE" "cd $REPO_DIR && git fetch origin && git checkout $BRANCH && git pull --ff-only || git pull || true"
@@ -60,7 +60,7 @@ else
 fi
 
 # Step 3: Flash via GPIO reset
-echo "  Step 3: Flashing display Arduino (Beta) on $REMOTE..."
+echo "  Step 3: Flashing keypad Arduino (Alpha) on $REMOTE..."
 ssh "$REMOTE" "bash -l -c '
   set -e
   sudo systemctl stop daemon.service 2>/dev/null || true
@@ -71,7 +71,7 @@ ssh "$REMOTE" "bash -l -c '
   sleep 0.1
   raspi-gpio set $RESET_GPIO ip
 
-  BY_ID=/dev/serial/by-id/usb-Arduino_LLC_Millennium_Beta-if00
+  BY_ID=/dev/serial/by-id/usb-Arduino_LLC_Millennium_Alpha-if00
 
   # Wait for device to go away (confirms reset triggered)
   echo \"  Waiting for reset...\"
@@ -90,7 +90,7 @@ ssh "$REMOTE" "bash -l -c '
   PORT=\$(readlink -f \$BY_ID)
   echo \"  Bootloader on \$PORT, flashing...\"
   avrdude -p atmega32u4 -c avr109 -P \"\$PORT\" -b 57600 \
-    -U flash:w:$REPO_DIR/Arduino/build/display/display.ino.hex:i
+    -U flash:w:$REPO_DIR/Arduino/build/keypad/keypad.ino.hex:i
 
   sudo systemctl start daemon.service 2>/dev/null || true
 '"
