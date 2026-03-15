@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <sys/socket.h>
+#include <sys/select.h>
 #include <netinet/in.h>
 #include <fcntl.h>
 #include <errno.h>
@@ -231,13 +232,12 @@ void *metrics_server_loop(void *arg) {
             close(client_fd);
         }
         
-        /* Small delay to prevent busy waiting */
-        /* Simple delay loop - not precise but works in C89 */
+        /* Small delay to prevent busy waiting (avoid CPU hog) */
         {
-            volatile int i;
-            for (i = 0; i < 10000; i++) {
-                /* Empty loop for delay */
-            }
+            struct timeval tv;
+            tv.tv_sec = 0;
+            tv.tv_usec = 1000; /* 1ms */
+            select(0, NULL, NULL, NULL, &tv);
         }
     }
     

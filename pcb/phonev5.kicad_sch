@@ -5511,7 +5511,7 @@
 					(hide yes)
 				)
 			)
-			(property "LCSC" "C15127"
+			(property "Description" "P-Channel 40V 4.4A MOSFET, SOT-23, reverse polarity"
 				(at 0 0 0)
 				(effects
 					(font
@@ -5520,7 +5520,7 @@
 					(hide yes)
 				)
 			)
-			(property "Description" "P-Channel 40V 4.4A MOSFET, SOT-23, reverse polarity"
+			(property "LCSC" "C15127"
 				(at 0 0 0)
 				(effects
 					(font
@@ -5755,168 +5755,6 @@
 					(at 2.54 -5.08 90)
 					(length 2.54)
 					(name "S"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "2"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-			)
-			(embedded_fonts no)
-		)
-		(symbol "phone:P6KE6.8CA"
-			(pin_numbers
-				(hide yes)
-			)
-			(pin_names
-				(offset 1.016)
-				(hide yes)
-			)
-			(exclude_from_sim no)
-			(in_bom yes)
-			(on_board yes)
-			(property "Reference" "D"
-				(at 0 2.54 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Value" "P6KE6.8CA"
-				(at 0 -2.54 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Footprint" "Diode_THT:D_DO-201AD_P12.70mm_Horizontal"
-				(at 0 -5.08 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(hide yes)
-				)
-			)
-			(property "Datasheet" "https://www.littelfuse.com/~/media/electronics/datasheets/tvs_diodes/littelfuse_tvs_diode_p6ke_datasheet.pdf"
-				(at 0 0 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(hide yes)
-				)
-			)
-			(property "Description" "600W bidirectional TVS, 5.8V standoff, ~10.5V clamp, DO-15"
-				(at 0 0 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(hide yes)
-				)
-			)
-			(property "ki_keywords" "TVS transient voltage suppressor P6KE"
-				(at 0 0 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(hide yes)
-				)
-			)
-			(property "ki_fp_filters" "D*DO*15*"
-				(at 0 0 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(hide yes)
-				)
-			)
-			(symbol "P6KE6.8CA_0_1"
-				(polyline
-					(pts
-						(xy -2.54 -1.27) (xy 0 0) (xy -2.54 1.27) (xy -2.54 -1.27)
-					)
-					(stroke
-						(width 0.254)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(polyline
-					(pts
-						(xy 0.508 1.27) (xy 0 1.27) (xy 0 -1.27) (xy -0.508 -1.27)
-					)
-					(stroke
-						(width 0.254)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(polyline
-					(pts
-						(xy 1.27 0) (xy -1.27 0)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(polyline
-					(pts
-						(xy 2.54 1.27) (xy 2.54 -1.27) (xy 0 0) (xy 2.54 1.27)
-					)
-					(stroke
-						(width 0.254)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-			)
-			(symbol "P6KE6.8CA_1_1"
-				(pin passive line
-					(at -3.81 0 0)
-					(length 2.54)
-					(name "1"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "1"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-				(pin passive line
-					(at 3.81 0 180)
-					(length 2.54)
-					(name "2"
 						(effects
 							(font
 								(size 1.27 1.27)
@@ -7612,28 +7450,6 @@
 			)
 		)
 	)
-	(global_label "mic+"
-		(shape input)
-		(at 36.83 171.45 180)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right)
-		)
-		(uuid "131dfcd1-2fee-4627-b408-d671dcf50493")
-		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 28.8857 171.45 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify right)
-				(hide yes)
-			)
-		)
-	)
 	(global_label "key_col_6"
 		(shape input)
 		(at 78.74 86.36 0)
@@ -7652,28 +7468,6 @@
 					(size 1.27 1.27)
 				)
 				(justify left)
-				(hide yes)
-			)
-		)
-	)
-	(global_label "speaker_front+"
-		(shape input)
-		(at 36.83 162.56 180)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right)
-		)
-		(uuid "15032ce0-d006-48a4-8a4b-9a2293383acd")
-		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 19.4516 162.56 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify right)
 				(hide yes)
 			)
 		)
@@ -7850,28 +7644,6 @@
 					(size 1.27 1.27)
 				)
 				(justify right)
-				(hide yes)
-			)
-		)
-	)
-	(global_label "GND"
-		(shape input)
-		(at 44.45 162.56 0)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left)
-		)
-		(uuid "253aef13-5886-4f72-ad0c-819dfdd00a90")
-		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 50.8822 162.56 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
 				(hide yes)
 			)
 		)
@@ -8268,28 +8040,6 @@
 					(size 1.27 1.27)
 				)
 				(justify left)
-				(hide yes)
-			)
-		)
-	)
-	(global_label "speaker_receiver+"
-		(shape input)
-		(at 36.83 156.21 180)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right)
-		)
-		(uuid "41719e84-431c-4230-86c1-97fce2894965")
-		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 16.488 156.21 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify right)
 				(hide yes)
 			)
 		)
@@ -9099,28 +8849,6 @@
 		(uuid "90c4cd2e-a040-4ce5-9e78-437871afb744")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
 			(at 174.0722 33.02 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-				(hide yes)
-			)
-		)
-	)
-	(global_label "GND"
-		(shape input)
-		(at 44.45 156.21 0)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left)
-		)
-		(uuid "9174fce3-2d44-4568-9c48-c8aa23615b5f")
-		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 50.8822 156.21 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -10067,28 +9795,6 @@
 		(uuid "cddcc856-937b-4d71-80f1-9800b417c12f")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
 			(at 22.9423 148.59 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-				(hide yes)
-			)
-		)
-	)
-	(global_label "GND"
-		(shape input)
-		(at 44.45 171.45 0)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left)
-		)
-		(uuid "d0a8bb54-8826-48e6-b6d9-6bf4ead0dc84")
-		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 50.8822 171.45 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -11588,83 +11294,6 @@
 		)
 	)
 	(symbol
-		(lib_id "phone:P6KE6.8CA")
-		(at 40.64 162.56 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "1bc7a920-6177-4345-8a83-bdfc176c5c6f")
-		(property "Reference" "D2"
-			(at 55.88 156.1398 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "P6KE6.8CA"
-			(at 55.88 158.6798 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "Diode_SMD:D_SMB"
-			(at 42.164 162.56 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" "https://www.littelfuse.com/~/media/electronics/datasheets/tvs_diodes/littelfuse_tvs_diode_p6ke_datasheet.pdf"
-			(at 42.164 162.56 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "600W bidirectional TVS, 5.8V standoff, ~10.5V clamp, SMB"
-			(at 40.64 162.56 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "LCSC" "C78395"
-			(at 0 0 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(pin "1"
-			(uuid "d1e08d0f-c8f0-42d3-92c5-558d45ba1fdf")
-		)
-		(pin "2"
-			(uuid "6821b499-c889-4fbb-9e4a-ff1b56330b5f")
-		)
-		(instances
-			(project "phonev5"
-				(path "/5a5bcfa4-7dd5-4521-94f3-d918e9453cc6"
-					(reference "D2")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
 		(lib_id "Connector:RJ9")
 		(at 140.97 87.63 0)
 		(unit 1)
@@ -11996,83 +11625,6 @@
 			(project "phonev5"
 				(path "/5a5bcfa4-7dd5-4521-94f3-d918e9453cc6"
 					(reference "C10")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "phone:P6KE6.8CA")
-		(at 40.64 156.21 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "3647431c-d6ba-4267-91b3-2d92f4e67f29")
-		(property "Reference" "D1"
-			(at 55.88 149.7898 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "P6KE6.8CA"
-			(at 55.88 152.3298 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "Diode_SMD:D_SMB"
-			(at 42.164 156.21 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" "https://www.littelfuse.com/~/media/electronics/datasheets/tvs_diodes/littelfuse_tvs_diode_p6ke_datasheet.pdf"
-			(at 42.164 156.21 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "600W bidirectional TVS, 5.8V standoff, ~10.5V clamp, SMB"
-			(at 40.64 156.21 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "LCSC" "C78395"
-			(at 0 0 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(pin "1"
-			(uuid "336b683d-9b67-44c8-af1c-9f6f2d30c0f9")
-		)
-		(pin "2"
-			(uuid "0e83a1bb-3404-4abe-96d2-4755722e2485")
-		)
-		(instances
-			(project "phonev5"
-				(path "/5a5bcfa4-7dd5-4521-94f3-d918e9453cc6"
-					(reference "D1")
 					(unit 1)
 				)
 			)
@@ -13639,15 +13191,6 @@
 				(hide yes)
 			)
 		)
-		(property "LCSC" "C15127"
-			(at 0 0 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
 		(property "Datasheet" "https://www.lcsc.com/datasheet/C15127.pdf"
 			(at 175.26 132.08 0)
 			(effects
@@ -13660,6 +13203,15 @@
 		)
 		(property "Description" "P-Channel 40V 4.4A MOSFET, SOT-23, reverse polarity"
 			(at 170.18 128.27 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "LCSC" "C15127"
+			(at 0 0 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -14210,83 +13762,6 @@
 		)
 	)
 	(symbol
-		(lib_id "phone:P6KE6.8CA")
-		(at 40.64 171.45 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "e6273856-bdf4-4d3e-bdea-1281d6f62025")
-		(property "Reference" "D3"
-			(at 40.64 165.1 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "P6KE6.8CA"
-			(at 40.64 167.64 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "Diode_SMD:D_SMB"
-			(at 42.164 171.45 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" "https://www.littelfuse.com/~/media/electronics/datasheets/tvs_diodes/littelfuse_tvs_diode_p6ke_datasheet.pdf"
-			(at 42.164 171.45 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "600W bidirectional TVS, 5.8V standoff, ~10.5V clamp, SMB"
-			(at 40.64 171.45 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "LCSC" "C78395"
-			(at 0 0 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(pin "1"
-			(uuid "7e6d07cd-6d19-45ae-9fb1-2becfc1e7f77")
-		)
-		(pin "2"
-			(uuid "23dc215d-f48c-4a5e-b902-b03d918f649d")
-		)
-		(instances
-			(project "phonev5"
-				(path "/5a5bcfa4-7dd5-4521-94f3-d918e9453cc6"
-					(reference "D3")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
 		(lib_id "Device:R_US")
 		(at 50.8 120.65 0)
 		(unit 1)
@@ -14523,7 +13998,7 @@
 				(justify right)
 			)
 		)
-		(property "Footprint" "LED_SMD:LED_0603_1608Metric"
+		(property "Footprint" "LED_SMD:LED_0805_2012Metric"
 			(at 50.8 128.27 0)
 			(effects
 				(font
@@ -14550,7 +14025,7 @@
 				(hide yes)
 			)
 		)
-		(property "LCSC" "C2286"
+		(property "LCSC" "C2297"
 			(at 0 0 0)
 			(effects
 				(font

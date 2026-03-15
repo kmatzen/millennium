@@ -187,18 +187,24 @@ void loop() {
   if (SerialUSB.available()) {
     byte data = SerialUSB.read();
     if (data == CMD_DISPLAY_TEXT) {
-      if (!waitForSerial()) return;
+      SerialUSB.write('Y');
+      if (!waitForSerial()) { SerialUSB.write('X'); return; }
       byte num_bytes = SerialUSB.read();
-      if (num_bytes > sizeof(buf)) return;
+      SerialUSB.write('L'); SerialUSB.write(num_bytes);
+      if (num_bytes > sizeof(buf)) { SerialUSB.write('Z'); return; }
       for (int i = 0; i < num_bytes; ++i) {
-        if (!waitForSerial()) return;
+        if (!waitForSerial()) { SerialUSB.write('X'); return; }
         buf[i] = SerialUSB.read();
       }
+      SerialUSB.write('R');
+      vfdreset();
       delay(100);
-      writeCommand(0);
+      writeCharacter(20u); /* display on */
+      writeCharacter(18);  /* scroll off */
       for (int i = 0; i < num_bytes; ++i) {
-        writeCharacter(buf[i]);
+        writeCharacter(buf[i] == 0x0A ? 13 : buf[i]);
       }
+      SerialUSB.write('W');
     } else if (data == CMD_COIN_CTRL) {
       if (!waitForSerial()) return;
       char data = SerialUSB.read();
@@ -260,6 +266,10 @@ void loop() {
       SerialUSB.write('F');
     } else if (data == CMD_KEEPALIVE) {
       /* No-op: Pi sends this when idle to keep serial watchdog from false-triggering */
+    } else {
+      /* Unknown command byte — report it for debugging */
+      SerialUSB.write('?');
+      SerialUSB.write(data);
     }
   }
   if (coinSerialDevice.available()) {
