@@ -197,10 +197,12 @@ void loop() {
         buf[i] = SerialUSB.read();
       }
       SerialUSB.write('R');
+      vfdreset();
       delay(100);
-      writeCommand(0);
+      writeCharacter(20u); /* display on */
+      writeCharacter(18);  /* scroll off */
       for (int i = 0; i < num_bytes; ++i) {
-        writeCharacter(buf[i]);
+        writeCharacter(buf[i] == 0x0A ? 13 : buf[i]);
       }
       SerialUSB.write('W');
     } else if (data == CMD_COIN_CTRL) {
