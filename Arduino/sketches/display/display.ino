@@ -187,6 +187,7 @@ void loop() {
   if (SerialUSB.available()) {
     byte data = SerialUSB.read();
     if (data == CMD_DISPLAY_TEXT) {
+      SerialUSB.write('Y');
       if (!waitForSerial()) { SerialUSB.write('X'); return; }
       byte num_bytes = SerialUSB.read();
       SerialUSB.write('L'); SerialUSB.write(num_bytes);
@@ -263,6 +264,10 @@ void loop() {
       SerialUSB.write('F');
     } else if (data == CMD_KEEPALIVE) {
       /* No-op: Pi sends this when idle to keep serial watchdog from false-triggering */
+    } else {
+      /* Unknown command byte — report it for debugging */
+      SerialUSB.write('?');
+      SerialUSB.write(data);
     }
   }
   if (coinSerialDevice.available()) {
