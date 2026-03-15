@@ -187,18 +187,21 @@ void loop() {
   if (SerialUSB.available()) {
     byte data = SerialUSB.read();
     if (data == CMD_DISPLAY_TEXT) {
-      if (!waitForSerial()) return;
+      if (!waitForSerial()) { SerialUSB.write('X'); return; }
       byte num_bytes = SerialUSB.read();
-      if (num_bytes > sizeof(buf)) return;
+      SerialUSB.write('L'); SerialUSB.write(num_bytes);
+      if (num_bytes > sizeof(buf)) { SerialUSB.write('Z'); return; }
       for (int i = 0; i < num_bytes; ++i) {
-        if (!waitForSerial()) return;
+        if (!waitForSerial()) { SerialUSB.write('X'); return; }
         buf[i] = SerialUSB.read();
       }
+      SerialUSB.write('R');
       delay(100);
       writeCommand(0);
       for (int i = 0; i < num_bytes; ++i) {
         writeCharacter(buf[i]);
       }
+      SerialUSB.write('W');
     } else if (data == CMD_COIN_CTRL) {
       if (!waitForSerial()) return;
       char data = SerialUSB.read();
