@@ -7,6 +7,7 @@
 #include "../metrics.h"
 #include "../millennium_sdk.h"
 #include "../updater.h"
+#include "../plugin_sdk.h"
 #include <stdlib.h>
 
 /* ── Stubs for linker (plugins.c references these) ──────────────── */
@@ -517,6 +518,79 @@ static void test_number_guess_compare(void) {
     TEST_ASSERT(number_guess_compare(99, 1) < 0);
 }
 
+/* ── Plugin SDK ─────────────────────────────────────────────────────── */
+
+static void test_sdk_rand_bounds(void) {
+    int i;
+    TEST_ASSERT_EQ_INT(sdk_rand_below(0), 0);   /* defensive */
+    TEST_ASSERT_EQ_INT(sdk_rand_below(-5), 0);
+    TEST_ASSERT_EQ_INT(sdk_rand_below(1), 0);
+    TEST_ASSERT_EQ_INT(sdk_rand_range(5, 5), 5);
+    for (i = 0; i < 1000; i++) {
+        int b = sdk_rand_below(10);
+        int r = sdk_rand_range(3, 7);
+        int s = sdk_rand_range(7, 3); /* swapped args still valid */
+        TEST_ASSERT(b >= 0 && b < 10);
+        TEST_ASSERT(r >= 3 && r <= 7);
+        TEST_ASSERT(s >= 3 && s <= 7);
+    }
+}
+
+static void test_sdk_rand_choice(void) {
+    static const char *const opts[] = {"a", "b", "c"};
+    int i;
+    TEST_ASSERT_NULL((void *)sdk_rand_choice(NULL, 3));
+    TEST_ASSERT_NULL((void *)sdk_rand_choice(opts, 0));
+    for (i = 0; i < 100; i++) {
+        const char *c = sdk_rand_choice(opts, 3);
+        TEST_ASSERT(c == opts[0] || c == opts[1] || c == opts[2]);
+    }
+}
+
+static void test_sdk_balance(void) {
+    daemon_state_data_t ds;
+    daemon_state_init(&ds);
+    daemon_state = &ds;
+
+    TEST_ASSERT_EQ_INT(sdk_balance(), 0);
+    sdk_add_balance(25);
+    TEST_ASSERT_EQ_INT(sdk_balance(), 25);
+    sdk_spend_balance(10);
+    TEST_ASSERT_EQ_INT(sdk_balance(), 15);
+    sdk_spend_balance(1000);                 /* over-spend clamps at 0 */
+    TEST_ASSERT_EQ_INT(sdk_balance(), 0);
+    sdk_add_balance(50);
+    sdk_clear_balance();
+    TEST_ASSERT_EQ_INT(sdk_balance(), 0);
+
+    daemon_state = NULL;
+    TEST_ASSERT_EQ_INT(sdk_balance(), 0);    /* NULL-safe */
+}
+
+static void test_sdk_state(void) {
+    daemon_state_data_t ds;
+    daemon_state_init(&ds);
+    daemon_state = &ds;
+
+    ds.current_state = DAEMON_STATE_IDLE_DOWN;
+    TEST_ASSERT_EQ_INT((int)sdk_state(), (int)DAEMON_STATE_IDLE_DOWN);
+    TEST_ASSERT_EQ_INT(sdk_receiver_is_up(), 0);
+
+    ds.current_state = DAEMON_STATE_IDLE_UP;
+    TEST_ASSERT_EQ_INT(sdk_receiver_is_up(), 1);
+
+    ds.current_state = DAEMON_STATE_CALL_ACTIVE;
+    TEST_ASSERT_EQ_INT(sdk_receiver_is_up(), 1);
+
+    daemon_state_add_key(&ds, '4');
+    daemon_state_add_key(&ds, '2');
+    TEST_ASSERT_EQ_STR(sdk_keypad(), "42");
+
+    daemon_state = NULL;
+    TEST_ASSERT_EQ_INT((int)sdk_state(), (int)DAEMON_STATE_INVALID); /* NULL-safe */
+    TEST_ASSERT_EQ_STR(sdk_keypad(), "");
+}
+
 /* ── Emergency number tests ────────────────────────────────────── */
 
 static void test_free_number_911(void) {
@@ -680,6 +754,12 @@ int main(void) {
     TEST_SUITE_RUN(test_plugins_to_json);
     TEST_SUITE_RUN(test_plugins_to_json_escapes);
     TEST_SUITE_RUN(test_number_guess_compare);
+
+    TEST_SUITE_BEGIN("Plugin SDK");
+    TEST_SUITE_RUN(test_sdk_rand_bounds);
+    TEST_SUITE_RUN(test_sdk_rand_choice);
+    TEST_SUITE_RUN(test_sdk_balance);
+    TEST_SUITE_RUN(test_sdk_state);
 
     TEST_SUITE_BEGIN("Emergency Numbers");
     TEST_SUITE_RUN(test_free_number_911);
