@@ -418,8 +418,8 @@ static void test_plugins_builtins_registered(void) {
 
     plugins_init();
 
-    /* Five built-ins ship with the platform. */
-    TEST_ASSERT_EQ_INT(plugins_get_count(), 5);
+    /* Seven built-ins ship with the platform. */
+    TEST_ASSERT_EQ_INT(plugins_get_count(), 7);
 
     TEST_ASSERT_EQ_INT(plugins_list(buf, sizeof(buf)), 0);
     TEST_ASSERT_NOT_NULL(strstr(buf, "Classic Phone"));
@@ -427,6 +427,8 @@ static void test_plugins_builtins_registered(void) {
     TEST_ASSERT_NOT_NULL(strstr(buf, "Jukebox"));
     TEST_ASSERT_NOT_NULL(strstr(buf, "Number Guess"));
     TEST_ASSERT_NOT_NULL(strstr(buf, "Simon"));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "Dial-A-Joke"));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "Trivia"));
 
     millennium_client_destroy(client);
     client = NULL;

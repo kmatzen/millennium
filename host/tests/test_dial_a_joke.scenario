@@ -1,0 +1,26 @@
+# Test: Dial-A-Joke plugin
+# Free-to-play joke line. Force a specific joke (index 8 has a short, non-
+# scrolling punchline) so setup + timed punchline reveal are deterministic.
+
+# Joke 8: "Why is 6 afraid of 7?" / "Because 7 ate 9!"
+config joke.index 8
+activate_plugin Dial-A-Joke
+
+# Receiver down -> invitation
+assert_display Lift receiver
+
+# Lift the handset -> the splash
+hook_up
+assert_display Dial-A-Joke
+
+# Press a key -> the setup appears first
+key 5
+assert_display afraid
+
+# After the beat, the punchline lands (short line, no scroll)
+wait 2
+assert_display Because 7 ate 9
+
+# Hanging up returns to the idle splash
+hook_down
+assert_display Lift receiver

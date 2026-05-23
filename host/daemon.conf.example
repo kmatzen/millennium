@@ -52,3 +52,9 @@ guess.secret=0
 #   Simon (memory game, free to play)
 # simon.seq forces the tone sequence, e.g. 1342 (empty = random)
 simon.seq=
+#   Dial-A-Joke (free joke line)
+# joke.index forces a starting joke (-1 = random)
+joke.index=-1
+#   Trivia (free True/False quiz)
+# trivia.start forces the first question index (-1 = random)
+trivia.start=-1

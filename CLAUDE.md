@@ -96,7 +96,7 @@ Single-process C daemon. Key files:
 | `millennium_sdk.c` | Serial I/O, event queue, Baresip call wrappers |
 | `daemon_state.c` | Phone state machine (5 states), keypad buffer |
 | `event_processor.c` | Routes queued events to handlers |
-| `plugins.c` + `plugins/` | Plugin registry; built-ins: Classic Phone, Fortune Teller, Jukebox, Number Guess, Simon |
+| `plugins.c` + `plugins/` | Plugin registry; built-ins: Classic Phone, Fortune Teller, Jukebox, Number Guess, Simon, Dial-A-Joke, Trivia |
 | `plugin_sdk.c` / `plugin_sdk.h` | Friendly facade for plugin authors (display, audio, calls, state, balance, logging, RNG) — see `host/PLUGIN_AUTHORING.md` |
 | `display_manager.c` | VFD abstraction with auto-scrolling for lines >20 chars |
 | `audio_tones.c` | ALSA tone generator: dial tone, DTMF, ringback, busy, coin chime |

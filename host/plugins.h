@@ -73,5 +73,7 @@ void register_fortune_teller_plugin(void);
 void register_jukebox_plugin(void);
 void register_number_guess_plugin(void);
 void register_simon_plugin(void);
+void register_dial_a_joke_plugin(void);
+void register_trivia_plugin(void);
 
 #endif /* PLUGINS_H */

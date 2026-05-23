@@ -9,8 +9,9 @@
 #include "logger.h"
 #include "millennium_sdk.h"
 
-/* Maximum number of plugins */
-#define MAX_PLUGINS 10
+/* Maximum number of plugins. Generous headroom so experimenters can add
+ * their own alongside the built-ins (7 ship by default). */
+#define MAX_PLUGINS 32
 
 /* Plugin registry */
 static plugin_t plugins[MAX_PLUGINS];
@@ -32,6 +33,8 @@ void plugins_init(void) {
     register_jukebox_plugin();
     register_number_guess_plugin();
     register_simon_plugin();
+    register_dial_a_joke_plugin();
+    register_trivia_plugin();
     
     /* Activate classic phone by default */
     plugins_activate("Classic Phone");

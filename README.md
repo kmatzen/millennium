@@ -69,7 +69,7 @@ This project reimagines the functionality of the Nortel Millennium telephone by 
 ## Features
 
 - **Pay phone operation**: Insert coins, dial numbers, make VoIP calls — authentic payphone experience
-- **Plugin system**: Swap between Classic Phone, Fortune Teller, and Jukebox modes at runtime
+- **Plugin system**: Swap modes live — Classic Phone, Fortune Teller, Jukebox, plus games (Number Guess, Simon, Dial-A-Joke, Trivia). Write your own against the [plugin SDK](host/PLUGIN_AUTHORING.md); new plugins appear in the dashboard automatically
 - **Emergency calls**: Dial 911, 311, or 0 without coins (configurable free numbers)
 - **Magstripe card support**: Swipe a registered card for free calling or admin access
 - **Web dashboard**: Real-time phone state, plugin switching, health monitoring via WebSocket
@@ -92,7 +92,8 @@ This project reimagines the functionality of the Nortel Millennium telephone by 
 - **`HARDWARE.md`**: Physical assembly reference — USB topology, cable routing, power budget, and component list.
 - **`host/`**: Raspberry Pi software:
   - `daemon.c` — Main daemon loop and event routing
-  - `plugins/` — Plugin implementations (classic_phone, fortune_teller, jukebox)
+  - `plugins/` — Plugin implementations (classic_phone, fortune_teller, jukebox, number_guess, simon, dial_a_joke, trivia)
+  - `plugin_sdk.c` — Plugin authoring facade (see [PLUGIN_AUTHORING.md](host/PLUGIN_AUTHORING.md))
   - `web_server.c` — HTTP server with dashboard and REST API
   - `audio_tones.c` — Tone generation (DTMF, dial tone, etc.)
   - `updater.c` — OTA update checker and applier
@@ -182,11 +183,14 @@ This runs:
 
 ### Adding a plugin
 
-1. Create `host/plugins/your_plugin.c`
-2. Implement handler functions for the events you care about (coin, keypad, hook, call state, card)
+See [host/PLUGIN_AUTHORING.md](host/PLUGIN_AUTHORING.md) for the full guide. In short:
+
+1. Create `host/plugins/your_plugin.c` (write it against [plugin_sdk.h](host/plugin_sdk.h))
+2. Implement handler functions for the events you care about (coin, keypad, hook, call state, card, tick)
 3. Register with `plugins_register()` in a `register_your_plugin()` function
 4. Call the registration function from `plugins_init()` in `plugins.c`
-5. Add the `.o` file to the Makefile build targets
+5. Add the `.o` file to the Makefile build targets (daemon, `SIM_OBJS`, `UNIT_TEST_OBJS`)
+6. Run `make test` — your plugin then appears in the dashboard automatically
 
 ### Coding style
 
