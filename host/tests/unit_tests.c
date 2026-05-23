@@ -404,6 +404,117 @@ static void test_plugins_duplicate_register(void) {
     plugins_cleanup();
 }
 
+/* ── Plugin registry / dynamic enumeration ─────────────────────────── */
+
+/* Pure comparison exported by plugins/number_guess.c */
+int number_guess_compare(int secret, int guess);
+
+static void test_plugins_builtins_registered(void) {
+    char buf[2048];
+    daemon_state_data_t ds;
+    daemon_state_init(&ds);
+    daemon_state = &ds;
+    client = millennium_client_create();
+
+    plugins_init();
+
+    /* Five built-ins ship with the platform. */
+    TEST_ASSERT_EQ_INT(plugins_get_count(), 5);
+
+    TEST_ASSERT_EQ_INT(plugins_list(buf, sizeof(buf)), 0);
+    TEST_ASSERT_NOT_NULL(strstr(buf, "Classic Phone"));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "Fortune Teller"));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "Jukebox"));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "Number Guess"));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "Simon"));
+
+    millennium_client_destroy(client);
+    client = NULL;
+    daemon_state = NULL;
+    plugins_cleanup();
+}
+
+static void test_plugins_get_info(void) {
+    const char *name = NULL;
+    const char *desc = NULL;
+    int active = -1;
+    daemon_state_data_t ds;
+    daemon_state_init(&ds);
+    daemon_state = &ds;
+    client = millennium_client_create();
+
+    plugins_init(); /* default-activates Classic Phone (index 0) */
+
+    TEST_ASSERT_EQ_INT(plugins_get_info(0, &name, &desc, &active), 0);
+    TEST_ASSERT_EQ_STR(name, "Classic Phone");
+    TEST_ASSERT_NOT_NULL((void *)desc);
+    TEST_ASSERT_EQ_INT(active, 1);
+
+    /* Out-of-range index is rejected. */
+    TEST_ASSERT_EQ_INT(plugins_get_info(999, &name, &desc, &active), -1);
+    TEST_ASSERT_EQ_INT(plugins_get_info(-1, NULL, NULL, NULL), -1);
+
+    millennium_client_destroy(client);
+    client = NULL;
+    daemon_state = NULL;
+    plugins_cleanup();
+}
+
+static void test_plugins_to_json(void) {
+    char buf[2048];
+    daemon_state_data_t ds;
+    daemon_state_init(&ds);
+    daemon_state = &ds;
+    client = millennium_client_create();
+
+    plugins_init();
+    plugins_activate("Simon");
+
+    TEST_ASSERT(plugins_to_json(buf, sizeof(buf)) > 0);
+    TEST_ASSERT_NOT_NULL(strstr(buf, "\"plugins\":["));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "\"name\":\"Number Guess\""));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "\"name\":\"Simon\""));
+    /* The active plugin is reported and flagged. */
+    TEST_ASSERT_NOT_NULL(strstr(buf, "\"active_plugin\":\"Simon\""));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "\"active\":true"));
+
+    millennium_client_destroy(client);
+    client = NULL;
+    daemon_state = NULL;
+    plugins_cleanup();
+}
+
+static void test_plugins_to_json_escapes(void) {
+    char buf[2048];
+    daemon_state_data_t ds;
+    daemon_state_init(&ds);
+    daemon_state = &ds;
+    client = millennium_client_create();
+
+    plugins_init();
+    /* Names are stored by pointer; a static literal with a quote is safe. */
+    TEST_ASSERT_EQ_INT(plugins_register("Quote\"Plugin", "desc\\with\\slash",
+        NULL, NULL, NULL, NULL, NULL, NULL, NULL), 0);
+
+    TEST_ASSERT(plugins_to_json(buf, sizeof(buf)) > 0);
+    /* The embedded quote and backslash must be escaped, not raw. */
+    TEST_ASSERT_NOT_NULL(strstr(buf, "Quote\\\"Plugin"));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "desc\\\\with\\\\slash"));
+
+    millennium_client_destroy(client);
+    client = NULL;
+    daemon_state = NULL;
+    plugins_cleanup();
+}
+
+static void test_number_guess_compare(void) {
+    TEST_ASSERT(number_guess_compare(50, 25) < 0);  /* guess too low */
+    TEST_ASSERT(number_guess_compare(50, 75) > 0);  /* guess too high */
+    TEST_ASSERT_EQ_INT(number_guess_compare(50, 50), 0); /* exact */
+    TEST_ASSERT(number_guess_compare(1, 99) > 0);
+    TEST_ASSERT(number_guess_compare(99, 1) < 0);
+}
+
 /* ── Emergency number tests ────────────────────────────────────── */
 
 static void test_free_number_911(void) {
@@ -562,6 +673,11 @@ int main(void) {
     TEST_SUITE_RUN(test_plugins_register_custom);
     TEST_SUITE_RUN(test_plugins_list);
     TEST_SUITE_RUN(test_plugins_duplicate_register);
+    TEST_SUITE_RUN(test_plugins_builtins_registered);
+    TEST_SUITE_RUN(test_plugins_get_info);
+    TEST_SUITE_RUN(test_plugins_to_json);
+    TEST_SUITE_RUN(test_plugins_to_json_escapes);
+    TEST_SUITE_RUN(test_number_guess_compare);
 
     TEST_SUITE_BEGIN("Emergency Numbers");
     TEST_SUITE_RUN(test_free_number_911);

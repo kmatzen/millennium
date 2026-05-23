@@ -5,6 +5,7 @@
 #include "metrics.h"
 #include "health_monitor.h"
 #include "plugins.h"
+#include "display_manager.h"
 #include "websocket.h"
 #include "version.h"
 #include "updater.h"
@@ -974,14 +975,22 @@ struct http_response web_server_handle_api_state(const struct http_request* requ
     response.status_code = 200;
     web_server_strcpy_safe(response.content_type, "application/json", sizeof(response.content_type));
     
-    char json[768];
+    char json[1024];
     struct daemon_state_info state_info = get_daemon_state_info();
-    
+    char line1[64], line2[64];
+    char escaped_line1[128], escaped_line2[128];
+
     /* Escape strings for JSON (prevent injection from keypad_buffer, sip_last_error) */
     char escaped_keypad[128];
     char escaped_error[256];
     web_server_json_escape(state_info.keypad_buffer, escaped_keypad, sizeof(escaped_keypad));
     web_server_json_escape(state_info.sip_last_error, escaped_error, sizeof(escaped_error));
+
+    /* Current VFD text, so the dashboard can show what the phone is displaying
+     * (e.g. the active game) on initial load. */
+    display_manager_get_text(line1, sizeof(line1), line2, sizeof(line2));
+    web_server_json_escape(line1, escaped_line1, sizeof(escaped_line1));
+    web_server_json_escape(line2, escaped_line2, sizeof(escaped_line2));
 
     snprintf(json, sizeof(json),
         "{"
@@ -990,14 +999,16 @@ struct http_response web_server_handle_api_state(const struct http_request* requ
         "\"keypad_buffer\":\"%s\","
         "\"last_activity\":%ld,"
         "\"sip_registered\":%d,"
-        "\"sip_last_error\":\"%s\""
+        "\"sip_last_error\":\"%s\","
+        "\"line1\":\"%s\",\"line2\":\"%s\""
         "}",
         state_info.current_state,
         state_info.inserted_cents,
         escaped_keypad,
         state_info.last_activity,
         state_info.sip_registered,
-        escaped_error);
+        escaped_error,
+        escaped_line1, escaped_line2);
     
     web_server_strcpy_safe(response.body, json, sizeof(response.body));
     return response;
@@ -1347,36 +1358,15 @@ struct http_response web_server_handle_api_plugins(const struct http_request* re
     response.status_code = 200;
     web_server_strcpy_safe(response.content_type, "application/json", sizeof(response.content_type));
     
-    char json[1024];
-    const char* active_plugin = plugins_get_active_name();
-    
-    snprintf(json, sizeof(json),
-        "{"
-        "\"plugins\":["
-        "{"
-        "\"name\":\"Classic Phone\","
-        "\"description\":\"Traditional pay phone functionality with VoIP calling\","
-        "\"active\":%s"
-        "},"
-        "{"
-        "\"name\":\"Fortune Teller\","
-        "\"description\":\"Mystical fortune telling experience - 25¢ per fortune\","
-        "\"active\":%s"
-        "},"
-        "{"
-        "\"name\":\"Jukebox\","
-        "\"description\":\"Coin-operated music player - 25¢ per song\","
-        "\"active\":%s"
-        "}"
-        "],"
-        "\"active_plugin\":\"%s\""
-        "}",
-        (active_plugin && strcmp(active_plugin, "Classic Phone") == 0) ? "true" : "false",
-        (active_plugin && strcmp(active_plugin, "Fortune Teller") == 0) ? "true" : "false",
-        (active_plugin && strcmp(active_plugin, "Jukebox") == 0) ? "true" : "false",
-        active_plugin ? active_plugin : "Unknown"
-    );
-    
+    char json[2048];
+
+    /* Enumerate the registry dynamically so newly added plugins appear in the
+     * dashboard automatically (no hard-coded list to keep in sync). */
+    if (plugins_to_json(json, sizeof(json)) < 0) {
+        web_server_strcpy_safe(json, "{\"plugins\":[],\"active_plugin\":\"\"}",
+                               sizeof(json));
+    }
+
     web_server_strcpy_safe(response.body, json, sizeof(response.body));
     return response;
 }
@@ -1495,10 +1485,34 @@ struct http_response web_server_handle_dashboard(const struct http_request* requ
         "</div>"
 
         "<div class=\"card\"><h2>Plugins</h2>"
-        "<div style=\"display:flex;gap:6px;flex-wrap:wrap\">"
-        "<button class=\"btn\" onclick=\"post('/api/control',{action:'activate_plugin',plugin:'Classic Phone'})\">Classic Phone</button>"
-        "<button class=\"btn\" onclick=\"post('/api/control',{action:'activate_plugin',plugin:'Fortune Teller'})\">Fortune Teller</button>"
-        "<button class=\"btn\" onclick=\"post('/api/control',{action:'activate_plugin',plugin:'Jukebox'})\">Jukebox</button>"
+        "<div id=\"plugins\" style=\"display:flex;gap:6px;flex-wrap:wrap\">"
+        "<span style=\"font-size:12px;color:#888\">Loading...</span>"
+        "</div></div>"
+
+        "<div class=\"card\"><h2>Play</h2>"
+        "<div style=\"display:flex;gap:6px;margin-bottom:8px\">"
+        "<button class=\"btn\" onclick=\"hook(1)\">Lift</button>"
+        "<button class=\"btn secondary\" onclick=\"hook(0)\">Hang Up</button>"
+        "</div>"
+        "<div style=\"display:flex;gap:6px;margin-bottom:8px\">"
+        "<button class=\"btn\" onclick=\"coin(5)\">5&cent;</button>"
+        "<button class=\"btn\" onclick=\"coin(10)\">10&cent;</button>"
+        "<button class=\"btn\" onclick=\"coin(25)\">25&cent;</button>"
+        "<button class=\"btn secondary\" onclick=\"post('/api/control',{action:'coin_return'})\">Return</button>"
+        "</div>"
+        "<div style=\"display:grid;grid-template-columns:repeat(3,1fr);gap:6px;max-width:220px\">"
+        "<button class=\"btn\" onclick=\"k('1')\">1</button>"
+        "<button class=\"btn\" onclick=\"k('2')\">2</button>"
+        "<button class=\"btn\" onclick=\"k('3')\">3</button>"
+        "<button class=\"btn\" onclick=\"k('4')\">4</button>"
+        "<button class=\"btn\" onclick=\"k('5')\">5</button>"
+        "<button class=\"btn\" onclick=\"k('6')\">6</button>"
+        "<button class=\"btn\" onclick=\"k('7')\">7</button>"
+        "<button class=\"btn\" onclick=\"k('8')\">8</button>"
+        "<button class=\"btn\" onclick=\"k('9')\">9</button>"
+        "<button class=\"btn secondary\" onclick=\"k('*')\">*</button>"
+        "<button class=\"btn\" onclick=\"k('0')\">0</button>"
+        "<button class=\"btn secondary\" onclick=\"k('#')\">#</button>"
         "</div></div>"
 
         "<div class=\"card\"><h2>System</h2>"
@@ -1527,6 +1541,10 @@ struct http_response web_server_handle_dashboard(const struct http_request* requ
         "<script>"
         "function api(u){return fetch(u).then(r=>r.json())}"
         "function post(u,b){return fetch(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)}).then(r=>r.json())}"
+        "function k(x){post('/api/control',{action:'keypad_press',key:x})}"
+        "function coin(c){post('/api/control',{action:'coin_insert',cents:c})}"
+        "function hook(u){post('/api/control',{action:u?'handset_up':'handset_down'})}"
+        "function vfd(a,b){var e=document.getElementById('vfd');if(e)e.textContent=((a||'')+'                    ').slice(0,20)+' | '+((b||'')+'                    ').slice(0,20)}"
         "var ws,log=document.getElementById('log');"
         "function connect(){"
         "ws=new WebSocket('ws://'+location.host+'/ws');"
@@ -1536,6 +1554,7 @@ struct http_response web_server_handle_dashboard(const struct http_request* requ
         "if(d.coins!==undefined)document.getElementById('coins').textContent=d.coins+'c';"
         "if(d.keypad!==undefined)document.getElementById('keypad').textContent=d.keypad||'(empty)';"
         "if(d.plugin)document.getElementById('plugin').textContent=d.plugin;"
+        "if(d.line1!==undefined||d.line2!==undefined)vfd(d.line1,d.line2);"
         "var p=document.createElement('div');"
         "p.textContent=new Date().toLocaleTimeString()+' '+d.event;"
         "log.prepend(p);"
@@ -1544,10 +1563,25 @@ struct http_response web_server_handle_dashboard(const struct http_request* requ
         "ws.onclose=function(){setTimeout(connect,2000)};"
         "}"
         "connect();"
+        "function loadPlugins(){"
+        "api('/api/plugins').then(function(d){"
+        "var c=document.getElementById('plugins');c.innerHTML='';"
+        "(d.plugins||[]).forEach(function(p){"
+        "var b=document.createElement('button');"
+        "b.className='btn'+(p.active?'':' secondary');"
+        "b.textContent=p.name;b.title=p.description||'';"
+        "b.onclick=function(){post('/api/control',{action:'activate_plugin',plugin:p.name}).then(loadPlugins)};"
+        "c.appendChild(b);"
+        "});"
+        "if(!(d.plugins||[]).length)c.innerHTML='<span style=\"font-size:12px;color:#888\">No plugins</span>';"
+        "}).catch(function(){});"
+        "}"
+        "loadPlugins();"
         "api('/api/state').then(function(d){"
         "document.getElementById('state').textContent=d.state||'Unknown';"
         "document.getElementById('coins').textContent=(d.inserted_cents||0)+'c';"
         "document.getElementById('keypad').textContent=d.keypad_buffer||'(empty)';"
+        "vfd(d.line1,d.line2);"
         "}).catch(function(){});"
         "</script>"
 

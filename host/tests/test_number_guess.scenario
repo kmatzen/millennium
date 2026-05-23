@@ -1,0 +1,43 @@
+# Test: Number Guess (Hi-Lo) plugin
+# Drives the coin-operated guessing game with a forced secret so the
+# higher/lower/correct feedback is deterministic.
+
+# Force the secret to 50 and the price to a quarter
+config guess.secret 50
+config guess.cost_cents 25
+activate_plugin Number Guess
+
+# Receiver down -> invitation to lift
+assert_display Lift receiver
+
+# Lift the handset -> asked to insert a coin
+hook_up
+assert_state IDLE_UP
+assert_display Insert 25c
+
+# Insert a quarter -> a game begins
+coin 25
+assert_display Pick 1-99
+
+# Guess 25 -> too low, hint to go higher
+key 2
+key 5
+key #
+assert_display Too low
+
+# Guess 75 -> too high, hint to go lower
+key 7
+key 5
+key #
+assert_display Too high
+
+# Guess 50 -> correct!
+key 5
+key 0
+key #
+assert_display Correct
+
+# Hanging up resets the game
+hook_down
+assert_state IDLE_DOWN
+assert_display Lift receiver

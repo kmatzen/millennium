@@ -42,3 +42,13 @@ metrics_server.port=8080
 # Web Server Configuration
 web_server.enabled=true
 web_server.port=8081
+
+# Plugin Configuration
+# Each plugin can read its own keys from this file. Built-in game plugins:
+#   Number Guess (Hi-Lo)
+guess.cost_cents=25
+# guess.secret forces the hidden number 1..99 (0 = random; for testing/demos)
+guess.secret=0
+#   Simon (memory game, free to play)
+# simon.seq forces the tone sequence, e.g. 1342 (empty = random)
+simon.seq=

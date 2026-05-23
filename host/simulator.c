@@ -344,23 +344,19 @@ static void sim_handle_hook(hook_state_change_event_t *ev) {
 
 static void sim_handle_keypad(keypad_event_t *ev) {
     char key;
-    int in_call;
     if (!ev || !daemon_state) return;
     key = keypad_event_get_key(ev);
-    in_call = (daemon_state->current_state == DAEMON_STATE_CALL_ACTIVE ||
-               daemon_state->current_state == DAEMON_STATE_CALL_INCOMING);
 
+    /* Mirror daemon.c: digits feed the dial buffer when idle-up with room... */
     if (isdigit(key) &&
         daemon_state->current_state == DAEMON_STATE_IDLE_UP &&
         daemon_state_get_keypad_length(daemon_state) < 10) {
-
         daemon_state_add_key(daemon_state, key);
         daemon_state_update_activity(daemon_state);
-        plugins_handle_keypad(key);
-    } else if (in_call && (isdigit(key) || key == '*' || key == '#')) {
-        /* #95: Pass keys to plugin for DTMF during call */
-        plugins_handle_keypad(key);
     }
+
+    /* ...but every key is delivered to the active plugin in every state. */
+    plugins_handle_keypad(key);
 }
 
 static void sim_handle_call_state(call_state_event_t *ev) {
@@ -522,11 +518,12 @@ static int run_scenario(const char *path) {
             sim_drain_events();
         }
 
-        /* ── key <digit> ─────────────────────────────────────────── */
+        /* ── key <char> — any keypad key: 0-9, *, #, A-D ─────────────── */
         else if (strncmp(cmd, "key ", 4) == 0) {
             char key = cmd[4];
             keypad_event_t *ev;
-            if (!isdigit(key)) {
+            if (!isdigit(key) && key != '*' && key != '#' &&
+                !(key >= 'A' && key <= 'D')) {
                 fprintf(stderr, "  ERROR: invalid key: %c\n", key);
                 failures++;
                 continue;
@@ -728,6 +725,31 @@ static int run_scenario(const char *path) {
             cfg_val[sizeof(cfg_val) - 1] = '\0';
             config_set_value(config_get_instance(), cfg_key, cfg_val);
             fprintf(stderr, "  config: %s = %s\n", cfg_key, cfg_val);
+        }
+
+        /* ── activate_plugin <name> ──────────────────────────────── */
+        else if (strncmp(cmd, "activate_plugin ", 16) == 0) {
+            arg = trim(cmd + 16);
+            if (plugins_activate(arg) == 0) {
+                sim_drain_events();
+                fprintf(stderr, "  activated plugin: %s\n", arg);
+            } else {
+                fprintf(stderr, "  FAIL: could not activate plugin \"%s\"\n", arg);
+                failures++;
+            }
+        }
+
+        /* ── tick [N] — advance plugin ticks without wall-clock wait ─ */
+        else if (strncmp(cmd, "tick", 4) == 0 &&
+                 (cmd[4] == '\0' || cmd[4] == ' ')) {
+            int count = 1;
+            if (cmd[4] == ' ') count = atoi(cmd + 5);
+            if (count < 1) count = 1;
+            { int t; for (t = 0; t < count; t++) {
+                plugins_tick();
+                display_manager_tick();
+            } }
+            sim_drain_events();
         }
 
         /* ── unknown ─────────────────────────────────────────────── */

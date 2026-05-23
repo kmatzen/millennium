@@ -33,4 +33,12 @@ void display_manager_tick(void);
  */
 void display_manager_refresh(void);
 
+/*
+ * Copy the current (full, un-scrolled) display text into the caller's
+ * buffers. Either pointer may be NULL. Useful for surfacing the VFD in the
+ * web API / dashboard so plugins (e.g. games) are visible remotely.
+ */
+void display_manager_get_text(char *line1, size_t line1_size,
+                              char *line2, size_t line2_size);
+
 #endif /* DISPLAY_MANAGER_H */

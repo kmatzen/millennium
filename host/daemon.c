@@ -225,24 +225,50 @@ static void daemon_save_state(void) {
     state_persistence_save(&ps, state_file_path);
 }
 
+/* Minimal JSON string escaper for broadcast fields (display text may contain
+ * quotes/backslashes). Writes a NUL-terminated, escaped copy into dst. */
+static void daemon_json_escape(const char *src, char *dst, size_t dst_size) {
+    size_t o = 0;
+    if (!dst || dst_size == 0) return;
+    if (!src) src = "";
+    while (*src && o + 2 < dst_size) {
+        unsigned char c = (unsigned char)*src++;
+        if (c == '"' || c == '\\') {
+            dst[o++] = '\\';
+            dst[o++] = (char)c;
+        } else if (c >= 0x20) {
+            dst[o++] = (char)c;
+        } /* drop control chars */
+    }
+    dst[o] = '\0';
+}
+
 static void daemon_broadcast_state(const char *event_type) {
-    char msg[512];
+    char msg[768];
     const char *state_str;
     const char *plugin_name;
+    char line1[64], line2[64];
+    char esc1[128], esc2[128];
 
     if (!web_server || !daemon_state) return;
+
+    display_manager_get_text(line1, sizeof(line1), line2, sizeof(line2));
+    daemon_json_escape(line1, esc1, sizeof(esc1));
+    daemon_json_escape(line2, esc2, sizeof(esc2));
 
     pthread_mutex_lock(&daemon_state_mutex);
     state_str = daemon_state_to_string(daemon_state->current_state);
     plugin_name = plugins_get_active_name();
     snprintf(msg, sizeof(msg),
         "{\"event\":\"%s\",\"state\":\"%s\",\"coins\":%d,"
-        "\"keypad\":\"%s\",\"plugin\":\"%s\"}",
+        "\"keypad\":\"%s\",\"plugin\":\"%s\","
+        "\"line1\":\"%s\",\"line2\":\"%s\"}",
         event_type ? event_type : "update",
         state_str ? state_str : "UNKNOWN",
         daemon_state->inserted_cents,
         daemon_state->keypad_buffer,
-        plugin_name ? plugin_name : "");
+        plugin_name ? plugin_name : "",
+        esc1, esc2);
     pthread_mutex_unlock(&daemon_state_mutex);
 
     web_server_broadcast_to_websockets(web_server, msg);
@@ -457,32 +483,26 @@ void handle_keypad_event(keypad_event_t *keypad_event) {
     VALIDATE_BASICS();
     
     char key = keypad_event_get_key(keypad_event);
-    int in_call = (daemon_state->current_state == DAEMON_STATE_CALL_ACTIVE ||
-                   daemon_state->current_state == DAEMON_STATE_CALL_INCOMING);
-    
+
+    /* Digits feed the shared dial buffer (for Classic Phone dialing) only
+     * while the phone is ready and the buffer has room. */
     if (isdigit(key)) {
         pthread_mutex_lock(&daemon_state_mutex);
-        
         if (keypad_has_space() && is_phone_ready_for_operation()) {
-            
             logger_debugf_with_category("Keypad", "Key pressed: %c", key);
-            metrics_increment_counter("keypad_presses", 1);
-            
             daemon_state_add_key(daemon_state, key);
             daemon_state_update_activity(daemon_state);
-            
-            /* Let plugins handle display updates */
         }
         pthread_mutex_unlock(&daemon_state_mutex);
-        
-        plugins_handle_keypad(key);
-        daemon_broadcast_state("keypad");
-    } else if (in_call && (key == '*' || key == '#')) {
-        /* #95: Pass * and # to plugin for DTMF during call */
-        metrics_increment_counter("keypad_presses", 1);
-        plugins_handle_keypad(key);
-        daemon_broadcast_state("keypad");
     }
+
+    /* Every keypress — digit, *, #, or matrix letter — is delivered to the
+     * active plugin in every state, so plugins can use the full keypad
+     * (games, menus, IVR/DTMF during calls). Plugins ignore keys they don't
+     * care about. */
+    metrics_increment_counter("keypad_presses", 1);
+    plugins_handle_keypad(key);
+    daemon_broadcast_state("keypad");
 }
 
 void handle_card_event(card_event_t *card_event) {
@@ -573,17 +593,20 @@ int send_control_command(const char* action) {
         return 1;
         
     } else if (strcmp(command, "keypad_press") == 0) {
-        /* Extract key from argument and inject as keypad event */
-        if (isdigit(arg[0])) {
-            keypad_event_t *keypad_event = keypad_event_create(arg[0]);
+        /* Inject any keypad key: digits, * and #, or matrix letters A-D, so
+         * the full keypad is usable from the web/REST API (games, menus). */
+        char k = arg[0];
+        if (isdigit((unsigned char)k) || k == '*' || k == '#' ||
+            (k >= 'A' && k <= 'D')) {
+            keypad_event_t *keypad_event = keypad_event_create(k);
             if (keypad_event) {
                 event_processor_process_event(event_processor, (event_t *)keypad_event);
                 event_destroy((event_t *)keypad_event);
             }
-            logger_infof_with_category("Control", "Keypad key '%c' pressed via web portal", arg[0]);
+            logger_infof_with_category("Control", "Keypad key '%c' pressed via web portal", k);
             return 1;
         } else {
-            logger_warnf_with_category("Control", "Invalid keypad key: %c", arg[0]);
+            logger_warnf_with_category("Control", "Invalid keypad key: %c", k);
             return 0;
         }
         
@@ -977,10 +1000,23 @@ int main(int argc, char *argv[]) {
         
         /* Update metrics and tick plugins (every 1000 loops = ~1 second) */
         if (++loop_count % 1000 == 0) {
+            static char last_display[128] = "";
+            char cur1[64], cur2[64], cur[128];
+
             update_metrics();
             plugins_tick();
             display_manager_tick();
             millennium_client_check_serial(client);
+
+            /* Broadcast tick-driven display changes (e.g. game animations,
+             * fortune reveals) so the dashboard VFD stays live even without a
+             * user event. Compares full text, so scrolling alone won't spam. */
+            display_manager_get_text(cur1, sizeof(cur1), cur2, sizeof(cur2));
+            snprintf(cur, sizeof(cur), "%s\n%s", cur1, cur2);
+            if (strcmp(cur, last_display) != 0) {
+                safe_strcpy(last_display, cur, sizeof(last_display));
+                daemon_broadcast_state("display");
+            }
         }
         
         /* Log metrics summary every 10000 loops (about every 10 seconds) at DEBUG level */

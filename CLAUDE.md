@@ -96,7 +96,8 @@ Single-process C daemon. Key files:
 | `millennium_sdk.c` | Serial I/O, event queue, Baresip call wrappers |
 | `daemon_state.c` | Phone state machine (5 states), keypad buffer |
 | `event_processor.c` | Routes queued events to handlers |
-| `plugins.c` + `plugins/` | Plugin registry; built-ins: Classic Phone, Fortune Teller, Jukebox |
+| `plugins.c` + `plugins/` | Plugin registry; built-ins: Classic Phone, Fortune Teller, Jukebox, Number Guess, Simon |
+| `plugin_sdk.c` / `plugin_sdk.h` | Friendly facade for plugin authors (display, audio, calls, state, balance, logging, RNG) — see `host/PLUGIN_AUTHORING.md` |
 | `display_manager.c` | VFD abstraction with auto-scrolling for lines >20 chars |
 | `audio_tones.c` | ALSA tone generator: dial tone, DTMF, ringback, busy, coin chime |
 | `web_server.c` | HTTP+WebSocket server on port 8081; REST API + real-time events |
@@ -119,7 +120,11 @@ State is protected by `daemon_state_mutex`; the `running_mutex` guards the main 
 
 ### Plugin System
 
-Plugins register a `plugin_t` struct with function pointers for: `handle_coin`, `handle_keypad`, `handle_hook`, `handle_call_state`, `handle_card`, `handle_activation`, `handle_tick`. The active plugin can be switched at runtime via `POST /api/control` (`activate_plugin:<name>`) and persists across restarts.
+Plugins register a `plugin_t` struct with function pointers for: `handle_coin`, `handle_keypad`, `handle_hook`, `handle_call_state`, `handle_card`, `handle_activation`, `handle_tick`. The active plugin can be switched at runtime via `POST /api/control` (`activate_plugin:<name>`) and persists across restarts. The active plugin receives **every** keypress (digits, `*`, `#`, and matrix letters A–D) in all states, so plugins can use the full keypad.
+
+The web dashboard and `GET /api/plugins` enumerate the registry **dynamically** (`plugins_to_json`), so a newly registered plugin appears automatically — no hard-coded list to update.
+
+New plugins should be written against `plugin_sdk.h`, which wraps the hardware/subsystems behind a small, NULL-safe, no-op-on-missing-hardware API. The same plugin code then runs unchanged on the Pi, in the scenario simulator, and in unit tests. `plugins/number_guess.c` is the canonical example. See `host/PLUGIN_AUTHORING.md` for a step-by-step guide.
 
 ### Web API
 

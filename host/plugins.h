@@ -41,6 +41,21 @@ int plugins_activate(const char *plugin_name);
 const char* plugins_get_active_name(void);
 int plugins_list(char *buffer, size_t buffer_size);
 
+/* Dynamic enumeration: lets the web API / dashboard discover plugins at
+ * runtime instead of hard-coding them. Returns the number of registered
+ * plugins. plugins_get_info() fills the (optional) out-params for the plugin
+ * at index [0, count); returns 0 on success, -1 if index is out of range. */
+int plugins_get_count(void);
+int plugins_get_info(int index, const char **name, const char **description,
+                     int *is_active);
+
+/* Render the plugin registry as a JSON object into buffer:
+ *   {"plugins":[{"name":..,"description":..,"active":bool},..],
+ *    "active_plugin":".."}
+ * Strings are JSON-escaped. Returns the number of bytes written (excluding
+ * the NUL), or -1 on bad arguments. */
+int plugins_to_json(char *buffer, size_t buffer_size);
+
 /* #109: Sync inserted_cents when plugin deducts/refunds (e.g. call cost). */
 void plugins_adjust_inserted_cents(int delta);
 
@@ -56,5 +71,7 @@ void plugins_tick(void);
 void register_classic_phone_plugin(void);
 void register_fortune_teller_plugin(void);
 void register_jukebox_plugin(void);
+void register_number_guess_plugin(void);
+void register_simon_plugin(void);
 
 #endif /* PLUGINS_H */

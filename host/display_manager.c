@@ -132,3 +132,15 @@ void display_manager_tick(void) {
 void display_manager_refresh(void) {
     dm_send_display();
 }
+
+void display_manager_get_text(char *line1, size_t line1_size,
+                              char *line2, size_t line2_size) {
+    if (line1 && line1_size > 0) {
+        strncpy(line1, dm_line1_full, line1_size - 1);
+        line1[line1_size - 1] = '\0';
+    }
+    if (line2 && line2_size > 0) {
+        strncpy(line2, dm_line2_full, line2_size - 1);
+        line2[line2_size - 1] = '\0';
+    }
+}
