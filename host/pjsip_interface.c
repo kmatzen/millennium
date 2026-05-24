@@ -147,6 +147,8 @@ int pjsip_iface_start(const pjsip_iface_account_t *acc,
     pjsua_transport_config tp_cfg;
     pjsua_acc_config acc_cfg;
     pjsip_transport_type_e tp_type;
+    pjsua_transport_id tid = PJSUA_INVALID_ID;
+    char reg_uri_buf[256];
 
     if (!acc || !acc->id_uri || !acc->reg_uri) {
         logger_error_with_category("SIP", "Invalid account configuration");
@@ -182,6 +184,10 @@ int pjsip_iface_start(const pjsip_iface_account_t *acc,
     media_cfg.clock_rate = 8000;        /* match G.711 telephony */
     media_cfg.snd_clock_rate = 8000;
     media_cfg.channel_count = 1;        /* mono handset */
+    /* Close the sound device whenever there is no call, so it doesn't sit open
+     * underrunning (CPU/log spam on the single-core Pi) and so the daemon's own
+     * tone generator can use ALSA while idle. */
+    media_cfg.snd_auto_close_time = 0;
 
     status = pjsua_init(&ua_cfg, &log_cfg, &media_cfg);
     if (status != PJ_SUCCESS) {
@@ -198,7 +204,7 @@ int pjsip_iface_start(const pjsip_iface_account_t *acc,
         case PJSIP_IFACE_TRANSPORT_TLS: tp_type = PJSIP_TRANSPORT_TLS; break;
         default:                        tp_type = PJSIP_TRANSPORT_UDP; break;
     }
-    status = pjsua_transport_create(tp_type, &tp_cfg, NULL);
+    status = pjsua_transport_create(tp_type, &tp_cfg, &tid);
     if (status != PJ_SUCCESS) {
         logger_error_with_category("SIP", "pjsua_transport_create failed");
         pjsua_destroy();
@@ -230,16 +236,35 @@ int pjsip_iface_start(const pjsip_iface_account_t *acc,
                                        acc->snd_playback);
             play = PJMEDIA_AUD_DEFAULT_PLAYBACK_DEV;
         }
-        if (pjsua_set_snd_dev(cap, play) == PJ_SUCCESS)
-            logger_infof_with_category("SIP", "Sound devices: capture=%d playback=%d", cap, play);
-        else
-            logger_warn_with_category("SIP", "pjsua_set_snd_dev failed");
+        {
+            /* Set the device preference WITHOUT opening it now; pjsua opens it
+             * on the next call and closes it when idle (snd_auto_close_time=0). */
+            pjsua_snd_dev_param snd_param;
+            pjsua_snd_dev_param_default(&snd_param);
+            snd_param.capture_dev = cap;
+            snd_param.playback_dev = play;
+            snd_param.mode = PJSUA_SND_DEV_NO_IMMEDIATE_OPEN;
+            if (pjsua_set_snd_dev2(&snd_param) == PJ_SUCCESS)
+                logger_infof_with_category("SIP", "Sound devices: capture=%d playback=%d (lazy open)", cap, play);
+            else
+                logger_warn_with_category("SIP", "pjsua_set_snd_dev2 failed");
+        }
     }
 
-    /* Register the account */
+    /* Register the account. Bind it to the transport we created (so pjsua can
+     * generate a Contact and pick a transport), and for TLS make sure the
+     * registrar URI carries ;transport=tls. */
     pjsua_acc_config_default(&acc_cfg);
     acc_cfg.id      = S(acc->id_uri);
-    acc_cfg.reg_uri = S(acc->reg_uri);
+    if (acc->transport == PJSIP_IFACE_TRANSPORT_TLS &&
+        !strstr(acc->reg_uri, "transport=")) {
+        pj_ansi_snprintf(reg_uri_buf, sizeof(reg_uri_buf),
+                         "%s;transport=tls", acc->reg_uri);
+        acc_cfg.reg_uri = S(reg_uri_buf);
+    } else {
+        acc_cfg.reg_uri = S(acc->reg_uri);
+    }
+    acc_cfg.transport_id = tid;
     acc_cfg.cred_count = 1;
     acc_cfg.cred_info[0].realm     = S((acc->realm && acc->realm[0]) ? acc->realm : "*");
     acc_cfg.cred_info[0].scheme    = S("digest");
