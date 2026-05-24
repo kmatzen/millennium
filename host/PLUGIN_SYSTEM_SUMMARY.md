@@ -37,7 +37,7 @@ The registry is enumerated dynamically (`plugins_get_count` / `plugins_get_info`
 
 | Plugin | Coins? | What it does |
 |--------|--------|--------------|
-| **Classic Phone** | yes | Traditional payphone: dial 10 digits, VoIP call via Baresip, coin return on failure. Free/emergency numbers configurable. |
+| **Classic Phone** | yes | Traditional payphone: dial 10 digits, VoIP call via PJSIP, coin return on failure. Free/emergency numbers configurable. |
 | **Fortune Teller** | 25¢ | Pick a category (1–5), receive a mystical fortune. |
 | **Jukebox** | 25¢ | Choose a song (1–9); WAV playback via ALSA. `*` stop, `#` menu. |
 | **Number Guess** | configurable | Hi-Lo guessing game: find the hidden number 1–99 with higher/lower hints. |
@@ -72,4 +72,4 @@ browser.
   and pure plugin logic.
 
 All plugins ship with tests; `make test` runs the full suite on any platform
-(no Baresip/ALSA needed).
+(no PJSIP/ALSA needed).

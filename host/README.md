@@ -25,9 +25,9 @@ The host software includes:
 
 The following must be installed on the Raspberry Pi Zero 2 W:
 
-1. **Baresip** and **libre**: Built from source for VoIP/SIP support.
-   - [Baresip GitHub Repository](https://github.com/baresip/baresip)
-   - [libre GitHub Repository](https://github.com/baresip/re)
+1. **PJSIP (pjproject)**: Built from source for VoIP/SIP support (PJSUA C API).
+   - [pjproject GitHub Repository](https://github.com/pjsip/pjproject)
+   - See [SETUP.md](SETUP.md) for build flags (ALSA + OpenSSL/TLS).
 
 2. **ALSA development libraries**: For audio tone generation.
    ```bash
@@ -58,7 +58,7 @@ The config provides several PCM devices:
 ## Build and Test
 
 ```bash
-make daemon        # Build the full daemon (requires Baresip/libre)
+make daemon        # Build the full daemon (requires PJSIP/libpjproject)
 make test          # Build simulator + unit tests, run both
 make clean         # Remove all build artifacts
 sudo make install  # Install daemon binary, ALSA config, and systemd service
@@ -70,8 +70,8 @@ sudo make install  # Install daemon binary, ALSA config, and systemd service
 sudo make install
 ```
 
-This installs the daemon and enables the `daemon.service` unit. The service
-runs system-wide but as your user (for `~/.baresip/`). Check status:
+This installs the daemon and enables the `daemon.service` unit. SIP credentials
+are read from `/etc/millennium/daemon.conf` (`sip.*`). Check status:
 
 ```bash
 sudo systemctl status daemon.service

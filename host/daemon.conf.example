@@ -13,6 +13,28 @@ call.free_numbers=911,311,0
 # Seconds of inactivity (handset up, no dialing) before phone resets
 call.idle_timeout_seconds=60
 
+# SIP / VoIP Configuration (PJSIP / PJSUA)
+# Credentials live here now (no separate ~/.baresip/accounts file). Leave
+# sip.id_uri / sip.registrar empty to run the phone without VoIP (games only).
+# Account-of-record URI (your DID @ provider domain):
+sip.id_uri=
+# Registrar URI (usually sip:<provider-domain>):
+sip.registrar=
+# Auth realm ("*" matches any realm the server offers):
+sip.realm=*
+sip.username=
+sip.password=
+# Signalling transport: udp | tcp | tls  (Twilio requires tls)
+sip.transport=tls
+# Optional STUN server for NAT traversal (host:port), e.g. stun.l.google.com:19302
+sip.stun_server=
+# Local SIP port (0 = auto/ephemeral)
+sip.local_port=0
+# Sound device indices (-1 = PJSUA default; the C-Media USB adapter is usually
+# the ALSA "default" via /etc/asound.conf). Run with logging to see device IDs.
+sip.snd_capture_dev=-1
+sip.snd_playback_dev=-1
+
 # Card Configuration (magstripe reader)
 card.enabled=true
 # Comma-separated 16-digit card numbers that grant free calling

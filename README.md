@@ -36,7 +36,7 @@ This project reimagines the functionality of the Nortel Millennium telephone by 
 │                 Raspberry Pi Zero 2 W               │
 │                                                     │
 │  ┌──────────┐  ┌──────────┐  ┌───────────────────┐ │
-│  │  Daemon   │  │ Baresip  │  │   Web Dashboard   │ │
+│  │  Daemon   │  │  PJSIP   │  │   Web Dashboard   │ │
 │  │          │──│  (VoIP)  │  │   :8081            │ │
 │  │ Plugins: │  └──────────┘  │ - Phone state      │ │
 │  │ - Phone  │                │ - Plugin switching  │ │
@@ -62,7 +62,7 @@ This project reimagines the functionality of the Nortel Millennium telephone by 
 └──────────────────────────────────────────────────┘
 ```
 
-**Data flow**: Keypad/hook/card events originate on the Keypad Arduino, are sent via I2C to the Display Arduino, which forwards them to the Raspberry Pi over USB serial. The daemon processes events through an event processor, dispatches them to the active plugin, and sends display updates back down the same path. VoIP calls are handled by Baresip with audio routed through ALSA (dmix + route plugins for mono channel splitting).
+**Data flow**: Keypad/hook/card events originate on the Keypad Arduino, are sent via I2C to the Display Arduino, which forwards them to the Raspberry Pi over USB serial. The daemon processes events through an event processor, dispatches them to the active plugin, and sends display updates back down the same path. VoIP calls are handled by PJSIP (PJSUA C API) with audio routed through ALSA (dmix + route plugins for mono channel splitting).
 
 ---
 
@@ -122,7 +122,7 @@ make daemon        # Build the daemon
 sudo make install  # Install to /usr/local/bin and set up systemd
 ```
 
-See the [host README](host/README.md) for dependency installation (Baresip, ALSA) and audio configuration.
+See the [host README](host/README.md) for dependency installation (PJSIP, ALSA) and audio configuration.
 
 ### 4. Configuration
 Copy and edit the configuration file:
@@ -164,13 +164,13 @@ The daemon reads configuration from `/etc/millennium/daemon.conf`. See `host/dae
 ```bash
 cd host
 make test          # Build simulator + unit tests, run both
-make daemon        # Build the full daemon (requires Baresip/libre on the Pi)
+make daemon        # Build the full daemon (requires PJSIP/libpjproject on the Pi)
 make clean         # Remove all build artifacts
 ```
 
 ### Running tests locally
 
-Tests run on any platform (macOS, Linux) without Baresip or ALSA — the simulator stubs out hardware dependencies:
+Tests run on any platform (macOS, Linux) without PJSIP or ALSA — the simulator stubs out hardware dependencies:
 
 ```bash
 cd host

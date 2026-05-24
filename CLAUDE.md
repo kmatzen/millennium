@@ -21,10 +21,10 @@ ssh matzen@192.168.86.145   # Pi fixed address on local network
 ### Host Software (`host/`)
 
 ```bash
-# Build the full daemon (requires Baresip/libre/ALSA — Pi only)
+# Build the full daemon (requires PJSIP/libpjproject/ALSA — Pi only)
 make daemon
 
-# Build and run all tests (works on any platform, no Baresip/ALSA needed)
+# Build and run all tests (works on any platform, no PJSIP/ALSA needed)
 make test
 
 # Run unit tests only
@@ -93,7 +93,8 @@ Single-process C daemon. Key files:
 | File | Role |
 |------|------|
 | `daemon.c` | Main event loop, all event handlers, `main()` |
-| `millennium_sdk.c` | Serial I/O, event queue, Baresip call wrappers |
+| `millennium_sdk.c` | Serial I/O, event queue, VoIP call wrappers (via `pjsip_interface.c`) |
+| `pjsip_interface.c` / `pjsip_interface.h` | PJSIP (PJSUA C API) wrapper: register/call/answer/hangup/DTMF. Header has plain declarations only (so `millennium_sdk.c` compiles on the Mac); the `.c` is built only on the Pi |
 | `daemon_state.c` | Phone state machine (5 states), keypad buffer |
 | `event_processor.c` | Routes queued events to handlers |
 | `plugins.c` + `plugins/` | Plugin registry; built-ins: Classic Phone, Fortune Teller, Jukebox, Number Guess, Simon, Dial-A-Joke, Trivia |
@@ -143,7 +144,7 @@ Pure ALSA (`libasound`), no PipeWire. Left channel → ringer (TDA2822M ch A), r
 
 - **C89** for all files except `simulator.c`, `jukebox.c`, `audio_tones.c` (C99 needed for mixed declarations)
 - `-Wall -Wextra` on all targets; no separate linter configured
-- No external dependencies beyond ALSA, pthread, Baresip/libre, and libc
+- No external dependencies beyond ALSA, pthread, PJSIP (libpjproject), and libc
 - No C++ in the active daemon targets (`.cpp` files in `host/` are legacy/unused)
 
 ## Configuration

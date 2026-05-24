@@ -352,7 +352,7 @@ void handle_call_state_event(call_state_event_t *call_state_event) {
         daemon_state_update_activity(daemon_state);
         
     } else if (call_state_event_get_state(call_state_event) == EVENT_CALL_STATE_ACTIVE) {
-        /* Handle call established (when baresip reports CALL_ESTABLISHED) */
+        /* Handle call established (when the SIP stack reports CALL_ESTABLISHED) */
         logger_info_with_category("Call", "Call established - audio should be working");
         metrics_increment_counter("calls_established", 1);
         
@@ -808,8 +808,8 @@ static void update_metrics(void) {
 }
 
 int main(int argc, char *argv[]) {
-    /* Redirect stdin to /dev/null so baresip/libre does not try to epoll fd 0.
-     * When run under systemd, fd 0 can trigger "Operation not permitted" and SEGV. */
+    /* Daemon has no controlling terminal: point stdin at /dev/null so nothing
+     * accidentally polls fd 0 (which under systemd can be a non-pollable fd). */
     {
         int devnull = open("/dev/null", O_RDONLY);
         if (devnull >= 0) {

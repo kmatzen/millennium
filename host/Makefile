@@ -1,5 +1,5 @@
 CXXFLAGS=-g -O3 -std=c++17 -Wall -Wextra
-LDFLAGS=-lpthread -latomic -lasound `pkg-config libre --libs` `pkg-config libbaresip --libs`
+LDFLAGS=-lpthread -latomic -lasound `pkg-config --libs libpjproject`
 
 # C flags for C files
 CFLAGS=-g -O3 -Wall -Wextra -std=c89
@@ -36,8 +36,8 @@ websocket.o: websocket.c websocket.h
 web_server.o: web_server.c web_server.h websocket.h config.h logger.h metrics.h health_monitor.h version.h updater.h
 	gcc web_server.c -o web_server.o -c $(CFLAGS)
 
-baresip_interface.o: baresip_interface.c baresip_interface.h
-	gcc baresip_interface.c -o baresip_interface.o -c $(C99_CFLAGS) `pkg-config --cflags libre libbaresip`
+pjsip_interface.o: pjsip_interface.c pjsip_interface.h logger.h
+	gcc pjsip_interface.c -o pjsip_interface.o -c $(C99_CFLAGS) `pkg-config --cflags libpjproject`
 
 events.o: events.c events.h
 	gcc events.c -o events.o -c $(CFLAGS)
@@ -45,7 +45,7 @@ events.o: events.c events.h
 event_processor.o: event_processor.c event_processor.h events.h
 	gcc event_processor.c -o event_processor.o -c $(CFLAGS)
 
-millennium_sdk.o: millennium_sdk.c millennium_sdk.h events.h baresip_interface.h
+millennium_sdk.o: millennium_sdk.c millennium_sdk.h events.h pjsip_interface.h config.h
 	gcc millennium_sdk.c -o millennium_sdk.o -c $(CFLAGS)
 
 state_persistence.o: state_persistence.c state_persistence.h daemon_state.h logger.h
@@ -94,8 +94,8 @@ plugins/dial_a_joke.o: plugins/dial_a_joke.c plugins.h plugin_sdk.h config.h
 plugins/trivia.o: plugins/trivia.c plugins.h plugin_sdk.h config.h
 	gcc plugins/trivia.c -o plugins/trivia.o -c $(CFLAGS)
 
-daemon: daemon.o daemon_state.o millennium_sdk.o baresip_interface.o events.o event_processor.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o websocket.o plugins.o plugin_sdk.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o plugins/number_guess.o plugins/simon.o plugins/dial_a_joke.o plugins/trivia.o state_persistence.o display_manager.o version.o audio_tones.o updater.o
-	gcc daemon.o daemon_state.o millennium_sdk.o baresip_interface.o events.o event_processor.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o websocket.o plugins.o plugin_sdk.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o plugins/number_guess.o plugins/simon.o plugins/dial_a_joke.o plugins/trivia.o state_persistence.o display_manager.o version.o audio_tones.o updater.o -o daemon $(LDFLAGS) -lm
+daemon: daemon.o daemon_state.o millennium_sdk.o pjsip_interface.o events.o event_processor.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o websocket.o plugins.o plugin_sdk.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o plugins/number_guess.o plugins/simon.o plugins/dial_a_joke.o plugins/trivia.o state_persistence.o display_manager.o version.o audio_tones.o updater.o
+	gcc daemon.o daemon_state.o millennium_sdk.o pjsip_interface.o events.o event_processor.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o websocket.o plugins.o plugin_sdk.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o plugins/number_guess.o plugins/simon.o plugins/dial_a_joke.o plugins/trivia.o state_persistence.o display_manager.o version.o audio_tones.o updater.o -o daemon $(LDFLAGS) -lm
 
 # Simulator object file (uses C99 for mixed declarations)
 simulator.o: simulator.c millennium_sdk.h events.h config.h daemon_state.h logger.h metrics.h plugins.h
@@ -158,10 +158,6 @@ install: daemon
 	sudo mkdir -p /usr/local/share/millennium
 	sudo cp web_portal.html /usr/local/share/millennium/
 	sudo cp systemd/daemon.service /etc/systemd/system/
-	@if [ -f $$HOME/.baresip/config ] && grep -qE '^[[:space:]]*module[[:space:]]*stdio\.so' $$HOME/.baresip/config 2>/dev/null; then \
-		sed -i.bak 's/^[[:space:]]*module[[:space:]]*stdio\.so/# module stdio.so/' $$HOME/.baresip/config; \
-		echo "Commented out stdio module in ~/.baresip/config (backup: .bak)"; \
-	fi
 	sudo mkdir -p /etc/systemd/system/daemon.service.d
 	@printf '[Service]\nUser=%s\n' "$$(logname 2>/dev/null || whoami)" > daemon-override.conf.tmp && sudo cp daemon-override.conf.tmp /etc/systemd/system/daemon.service.d/override.conf; rm -f daemon-override.conf.tmp
 	sudo systemctl daemon-reload
