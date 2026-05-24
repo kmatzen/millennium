@@ -830,7 +830,6 @@ int main(int argc, char *argv[]) {
 
     config_data_t* config = config_get_instance();
     /* health_monitor_t* health_monitor = health_monitor_get_instance(); */
-    int loop_count = 0;
     char config_file[MAX_STRING_LEN];
     
     /* Record daemon start time for uptime calculation */
@@ -999,43 +998,62 @@ int main(int argc, char *argv[]) {
             event_processor_process_event(event_processor, event);
             event_destroy(event);
         } else {
-            /* No event: yield to reduce CPU when idle (#115) */
+            /* No event: yield ~10ms to keep idle CPU low (the OS buffers serial,
+             * so input latency stays imperceptible) — frees the single core for
+             * call audio (#115). */
             {
                 struct timeval tv;
                 tv.tv_sec = 0;
-                tv.tv_usec = 1000;
+                tv.tv_usec = 10000;
                 select(0, NULL, NULL, NULL, &tv);
             }
         }
         
-        /* Update metrics and tick plugins (every 1000 loops = ~1 second) */
-        if (++loop_count % 1000 == 0) {
+        /* Periodic work on a wall-clock schedule. The loop now idles at ~10ms
+         * (and runs faster when events flow), so we can't count iterations —
+         * gate on elapsed time instead. ~300ms keeps display scrolling/game
+         * animation smooth while leaving the CPU free for call audio. */
+        {
+            static struct timespec last_tick = {0, 0};
+            static struct timespec last_summary = {0, 0};
             static char last_display[128] = "";
-            char cur1[64], cur2[64], cur[128];
+            struct timespec now_ts;
+            long tick_ms;
 
-            update_metrics();
-            plugins_tick();
-            display_manager_tick();
-            millennium_client_check_serial(client);
+            clock_gettime(CLOCK_MONOTONIC, &now_ts);
+            tick_ms = (now_ts.tv_sec - last_tick.tv_sec) * 1000L +
+                      (now_ts.tv_nsec - last_tick.tv_nsec) / 1000000L;
+            if (tick_ms >= 300) {
+                char cur1[64], cur2[64], cur[128];
+                long summary_ms;
+                last_tick = now_ts;
 
-            /* Broadcast tick-driven display changes (e.g. game animations,
-             * fortune reveals) so the dashboard VFD stays live even without a
-             * user event. Compares full text, so scrolling alone won't spam. */
-            display_manager_get_text(cur1, sizeof(cur1), cur2, sizeof(cur2));
-            snprintf(cur, sizeof(cur), "%s\n%s", cur1, cur2);
-            if (strcmp(cur, last_display) != 0) {
-                safe_strcpy(last_display, cur, sizeof(last_display));
-                daemon_broadcast_state("display");
+                update_metrics();
+                plugins_tick();
+                display_manager_tick();
+                millennium_client_check_serial(client);
+
+                /* Broadcast tick-driven display changes (game animations,
+                 * fortune reveals) so the dashboard VFD stays live without a
+                 * user event. Compares full text, so scrolling won't spam. */
+                display_manager_get_text(cur1, sizeof(cur1), cur2, sizeof(cur2));
+                snprintf(cur, sizeof(cur), "%s\n%s", cur1, cur2);
+                if (strcmp(cur, last_display) != 0) {
+                    safe_strcpy(last_display, cur, sizeof(last_display));
+                    daemon_broadcast_state("display");
+                }
+
+                summary_ms = (now_ts.tv_sec - last_summary.tv_sec) * 1000L +
+                             (now_ts.tv_nsec - last_summary.tv_nsec) / 1000000L;
+                if (summary_ms >= 10000) {
+                    last_summary = now_ts;
+                    logger_debug_with_category("Metrics", "=== Metrics Summary ===");
+                    {
+                        double current_state = metrics_get_gauge("current_state");
+                        logger_debugf_with_category("Metrics", "Current state: %.0f", current_state);
+                    }
+                }
             }
-        }
-        
-        /* Log metrics summary every 10000 loops (about every 10 seconds) at DEBUG level */
-        if (loop_count % 10000 == 0) {
-            logger_debug_with_category("Metrics", "=== Metrics Summary ===");
-            
-            /* Log current state gauge (simplified for C89 version) */
-            double current_state = metrics_get_gauge("current_state");
-            logger_debugf_with_category("Metrics", "Current state: %.0f", current_state);
         }
     }
     
