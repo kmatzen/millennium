@@ -1,5 +1,7 @@
 CXXFLAGS=-g -O3 -std=c++17 -Wall -Wextra
-LDFLAGS=-lpthread -latomic -lasound `pkg-config --libs libpjproject`
+# pjproject ships static .a libs; its ssl/crypto/srtp/codec deps live in the
+# .pc Libs.private, so we need --static to pull them into the link.
+LDFLAGS=-lpthread -latomic -lasound `pkg-config --libs --static libpjproject`
 
 # C flags for C files
 CFLAGS=-g -O3 -Wall -Wextra -std=c89
@@ -137,7 +139,7 @@ unit_tests: $(UNIT_TEST_OBJS)
 pjsip-smoke: tests/pjsip_smoke.c pjsip_interface.c pjsip_interface.h logger.o
 	gcc tests/pjsip_smoke.c pjsip_interface.c logger.o -o pjsip_smoke \
 		$(C99_CFLAGS) `pkg-config --cflags libpjproject` \
-		`pkg-config --libs libpjproject` -lpthread -lm
+		`pkg-config --libs --static libpjproject` -lpthread -lm
 
 # Run all scenario tests via the simulator
 test: simulator unit_tests
