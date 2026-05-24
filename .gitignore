@@ -31,4 +31,5 @@ pcb/netlist.txt
 pcb/DRC.rpt
 pcb/*-erc.rpt
 host/unit_tests
+host/pjsip_smoke
 host/daemon-override.conf.tmp

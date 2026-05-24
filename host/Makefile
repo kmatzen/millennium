@@ -130,6 +130,15 @@ endif
 unit_tests: $(UNIT_TEST_OBJS)
 	gcc $(UNIT_TEST_OBJS) -o unit_tests $(UNIT_LDFLAGS)
 
+# Optional PJSIP runtime smoke test. Needs libpjproject on the dev box
+# (macOS: `brew install pjproject`; Pi: built from source). Brings PJSUA up and
+# down without a SIP peer or phone hardware — validates the PJSIP integration
+# compiles and runs. Not part of `make test` (which must run anywhere).
+pjsip-smoke: tests/pjsip_smoke.c pjsip_interface.c pjsip_interface.h logger.o
+	gcc tests/pjsip_smoke.c pjsip_interface.c logger.o -o pjsip_smoke \
+		$(C99_CFLAGS) `pkg-config --cflags libpjproject` \
+		`pkg-config --libs libpjproject` -lpthread -lm
+
 # Run all scenario tests via the simulator
 test: simulator unit_tests
 	@echo "Running unit tests..."
@@ -140,7 +149,7 @@ test: simulator unit_tests
 	@echo ""
 
 clean:
-	rm -rf *.o daemon simulator unit_tests plugins/*.o tests/*.o
+	rm -rf *.o daemon simulator unit_tests pjsip_smoke plugins/*.o tests/*.o
 
 install: daemon
 	@systemctl --user stop daemon.service 2>/dev/null || true
@@ -191,4 +200,4 @@ break-test:
 	@chmod +x tests/break_test.sh
 	@HOST=$(HOST) ./tests/break_test.sh $(HOST)
 
-.PHONY: all clean install uninstall test unit_tests api-test device-test break-test
+.PHONY: all clean install uninstall test unit_tests api-test device-test break-test pjsip-smoke

@@ -35,8 +35,10 @@ static void emit(enum pjsip_iface_event ev, const char *text) {
  * first so it has thread-local storage. The daemon calls pjsip_iface_call/
  * answer/hangup/send_dtmf from its event threads, so register lazily. */
 static void thread_ensure(void) {
-    static PJ_THREAD_LOCAL pj_thread_desc desc;
-    static PJ_THREAD_LOCAL pj_thread_t *thread;
+    /* Each external thread needs its own persistent descriptor storage, so
+     * these are thread-local (GCC/Clang __thread; available on the Pi's gcc). */
+    static __thread pj_thread_desc desc;
+    static __thread pj_thread_t *thread;
     if (!pj_thread_is_registered()) {
         pj_bzero(desc, sizeof(desc));
         pj_thread_register("millennium", desc, &thread);
@@ -218,6 +220,22 @@ int pjsip_iface_start(const pjsip_iface_account_t *acc,
         logger_error_with_category("SIP", "pjsua_acc_add failed");
         pjsua_destroy();
         return -1;
+    }
+
+    /* Telephony only needs G.711 (PCMU/PCMA), which is also what Twilio uses.
+     * Disable every other codec so the SDP stays small and the Pi stays cool. */
+    {
+        pjsua_codec_info ci[48];
+        unsigned n = PJ_ARRAY_SIZE(ci);
+        pj_str_t pcmu = S("PCMU");
+        pj_str_t pcma = S("PCMA");
+        if (pjsua_enum_codecs(ci, &n) == PJ_SUCCESS) {
+            unsigned i;
+            for (i = 0; i < n; i++)
+                pjsua_codec_set_priority(&ci[i].codec_id, PJMEDIA_CODEC_PRIO_DISABLED);
+        }
+        pjsua_codec_set_priority(&pcmu, (pj_uint8_t)255);
+        pjsua_codec_set_priority(&pcma, (pj_uint8_t)254);
     }
 
     g_started = 1;

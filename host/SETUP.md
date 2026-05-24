@@ -54,6 +54,13 @@ Notes:
 - If `pkg-config` can't find it, ensure `/usr/local/lib/pkgconfig` is on
   `PKG_CONFIG_PATH`.
 
+Smoke-test the PJSIP integration before wiring up real credentials — this
+brings PJSUA up and down without a SIP peer or the phone hardware:
+
+```bash
+make pjsip-smoke && ./pjsip_smoke   # expect "RESULT: PASS"
+```
+
 ## 4. Configure the SIP account
 
 There is **no separate accounts file** — SIP credentials live in
