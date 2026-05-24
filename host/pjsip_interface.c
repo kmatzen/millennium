@@ -64,8 +64,11 @@ static void on_incoming_call(pjsua_acc_id acc_id, pjsua_call_id call_id,
                              pjsip_rx_data *rdata) {
     PJ_UNUSED_ARG(acc_id);
     PJ_UNUSED_ARG(rdata);
-    /* Track the inbound call; the daemon decides whether/when to answer. */
+    /* Track the inbound call; the daemon decides whether/when to answer
+     * (handset lift -> pjsip_iface_answer). Send 180 Ringing so the caller
+     * hears ringback while the phone bell rings. */
     g_call_id = call_id;
+    pjsua_call_answer(call_id, 180, NULL, NULL);
     logger_info_with_category("SIP", "Incoming call");
     emit(PJSIP_IFACE_CALL_INCOMING, NULL);
 }
