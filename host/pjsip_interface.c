@@ -187,6 +187,10 @@ int pjsip_iface_start(const pjsip_iface_account_t *acc,
     media_cfg.clock_rate = 8000;        /* match G.711 telephony */
     media_cfg.snd_clock_rate = 8000;
     media_cfg.channel_count = 1;        /* mono handset */
+    /* No echo canceller: this is a handset (not a speakerphone), so AEC isn't
+     * needed and only muddies the audio and burns CPU on the single-core Pi.
+     * baresip ran with no AEC module, so this restores that behaviour. */
+    media_cfg.ec_tail_len = 0;
     /* Close the sound device whenever there is no call, so it doesn't sit open
      * underrunning (CPU/log spam on the single-core Pi) and so the daemon's own
      * tone generator can use ALSA while idle. */

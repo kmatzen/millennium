@@ -394,10 +394,20 @@ void handle_call_state_event(call_state_event_t *call_state_event) {
     daemon_save_state();
     daemon_broadcast_state("call_state");
 
-    /* Handle coin validator commands outside of mutex */
-    if (call_state_event_get_state(call_state_event) == EVENT_CALL_STATE_INCOMING) {
-        millennium_client_write_to_coin_validator(client, 'f');
-        millennium_client_write_to_coin_validator(client, 'z');
+    /* Handle coin validator + ringer outside of mutex */
+    {
+        call_state_t st = call_state_event_get_state(call_state_event);
+        if (st == EVENT_CALL_STATE_INCOMING) {
+            millennium_client_write_to_coin_validator(client, 'f');
+            millennium_client_write_to_coin_validator(client, 'z');
+            /* Ring the bell until the call is answered (handset lift) or ends.
+             * PJSIP (unlike baresip's audio_alert) plays no local ring, so the
+             * daemon drives the ringer. Safe because the call audio device is
+             * only opened by PJSIP once the call is answered. */
+            audio_tones_play_ring();
+        } else if (st == EVENT_CALL_STATE_ACTIVE || st == EVENT_CALL_STATE_INVALID) {
+            audio_tones_stop();
+        }
     }
 }
 

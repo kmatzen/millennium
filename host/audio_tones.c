@@ -203,6 +203,12 @@ void audio_tones_play_ringback(void) {
     start_tone(&s);
 }
 
+void audio_tones_play_ring(void) {
+    tone_spec_t s = { 440.0, 480.0, 2000, 4000, 0 };
+    logger_debug_with_category("AudioTones", "Playing ring (incoming)");
+    start_tone(&s);
+}
+
 void audio_tones_play_busy_tone(void) {
     tone_spec_t s = { 480.0, 620.0, 500, 500, 0 };
     logger_debug_with_category("AudioTones", "Playing busy tone");
