@@ -30,10 +30,12 @@ sip.transport=tls
 sip.stun_server=
 # Local SIP port (0 = auto/ephemeral)
 sip.local_port=0
-# Sound device indices (-1 = PJSUA default; the C-Media USB adapter is usually
-# the ALSA "default" via /etc/asound.conf). Run with logging to see device IDs.
-sip.snd_capture_dev=-1
-sip.snd_playback_dev=-1
+# ALSA sound device NAMES for the call leg (matched against PJSUA's device
+# list; empty = PJSUA auto). The raw "hw:..." device is stereo-only and fails
+# at mono telephony, so use plug-wrapped devices. Defaults route call audio to
+# the handset earpiece (right channel) and capture the C-Media mic:
+sip.snd_capture=plughw:CARD=Device,DEV=0
+sip.snd_playback=out_right_solo
 
 # Card Configuration (magstripe reader)
 card.enabled=true

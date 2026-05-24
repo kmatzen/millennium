@@ -298,9 +298,11 @@ struct millennium_client *millennium_client_create(void) {
         acc.username    = config_get_string(cfg, "sip.username", "");
         acc.password    = config_get_string(cfg, "sip.password", "");
         acc.stun_server = config_get_string(cfg, "sip.stun_server", "");
-        acc.local_port      = config_get_int(cfg, "sip.local_port", 0);
-        acc.snd_capture_dev  = config_get_int(cfg, "sip.snd_capture_dev", -1);
-        acc.snd_playback_dev = config_get_int(cfg, "sip.snd_playback_dev", -1);
+        acc.local_port   = config_get_int(cfg, "sip.local_port", 0);
+        /* ALSA device names; defaults route call audio to the handset earpiece
+         * (right channel) and capture the C-Media mic via a plug device. */
+        acc.snd_capture  = config_get_string(cfg, "sip.snd_capture",  "plughw:CARD=Device,DEV=0");
+        acc.snd_playback = config_get_string(cfg, "sip.snd_playback", "out_right_solo");
 
         transport = config_get_string(cfg, "sip.transport", "tls");
         if (strcmp(transport, "udp") == 0)

@@ -53,8 +53,13 @@ typedef struct {
     const char *stun_server; /* e.g. "stun.l.google.com:19302", or NULL/"" */
     int transport;           /* PJSIP_IFACE_TRANSPORT_* */
     int local_port;          /* local SIP port, 0 = auto */
-    int snd_capture_dev;     /* sound capture device id, -1 = default */
-    int snd_playback_dev;    /* sound playback device id, -1 = default */
+    /* ALSA device NAMES (matched against PJSUA's device list at startup), or
+     * "" for PJSUA's auto default. Names are used rather than numeric indices
+     * because the index order is not stable. The raw "hw:..." device is
+     * stereo-only and will fail at mono; use a plug-wrapped device, e.g.
+     * capture "plughw:CARD=Device,DEV=0", playback "out_right_solo". */
+    const char *snd_capture;
+    const char *snd_playback;
 } pjsip_iface_account_t;
 
 /* Bring up PJSUA: create, init, add a UDP/TCP/TLS transport, register the

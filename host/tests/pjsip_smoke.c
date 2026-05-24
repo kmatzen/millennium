@@ -44,7 +44,7 @@ static void on_event(enum pjsip_iface_event ev, const char *text, void *arg) {
     }
 }
 
-int main(void) {
+int main(int argc, char **argv) {
     pjsip_iface_account_t acc;
     int rc;
 
@@ -59,8 +59,13 @@ int main(void) {
     acc.stun_server = "";
     acc.transport   = PJSIP_IFACE_TRANSPORT_UDP;
     acc.local_port  = 0;       /* ephemeral, avoids clashing with port 5060 */
-    acc.snd_capture_dev  = -1; /* PJSUA default device */
-    acc.snd_playback_dev = -1;
+    /* Mono-capable plug devices (raw hw: is stereo-only and fails at mono).
+     * Override via argv[1]/argv[2] if your ALSA device names differ; pass
+     * "" to fall back to PJSUA's default selection. */
+    acc.snd_capture  = "plughw:CARD=Device,DEV=0";
+    acc.snd_playback = "out_right_solo";
+    if (argc > 1) acc.snd_capture = argv[1];
+    if (argc > 2) acc.snd_playback = argv[2];
 
     printf("[1] pjsip_iface_start...\n");
     rc = pjsip_iface_start(&acc, on_event, NULL);

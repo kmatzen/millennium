@@ -31,6 +31,19 @@ static void emit(enum pjsip_iface_event ev, const char *text) {
     if (g_cb) g_cb(ev, text, g_cb_arg);
 }
 
+/* Resolve an ALSA device name to a PJSUA audio device index, or
+ * PJMEDIA_AUD_INVALID_DEV if not found. */
+static int find_aud_dev(const char *name) {
+    pjmedia_aud_dev_info info[64];
+    unsigned count = PJ_ARRAY_SIZE(info), i;
+    if (!name || !name[0]) return PJMEDIA_AUD_INVALID_DEV;
+    if (pjsua_enum_aud_devs(info, &count) != PJ_SUCCESS)
+        return PJMEDIA_AUD_INVALID_DEV;
+    for (i = 0; i < count; i++)
+        if (strcmp(info[i].name, name) == 0) return (int)i;
+    return PJMEDIA_AUD_INVALID_DEV;
+}
+
 /* Any non-PJSUA thread that calls a PJSUA/PJLIB function must be registered
  * first so it has thread-local storage. The daemon calls pjsip_iface_call/
  * answer/hangup/send_dtmf from its event threads, so register lazily. */
@@ -199,9 +212,28 @@ int pjsip_iface_start(const pjsip_iface_account_t *acc,
         return -1;
     }
 
-    /* Optional explicit sound device selection (else PJSUA auto/default). */
-    if (acc->snd_capture_dev >= 0 || acc->snd_playback_dev >= 0) {
-        pjsua_set_snd_dev(acc->snd_capture_dev, acc->snd_playback_dev);
+    /* Select sound devices by name (else PJSUA auto-picks, which may grab the
+     * raw stereo-only hw: device and fail at mono). */
+    if ((acc->snd_capture && acc->snd_capture[0]) ||
+        (acc->snd_playback && acc->snd_playback[0])) {
+        int cap = (acc->snd_capture && acc->snd_capture[0])
+                      ? find_aud_dev(acc->snd_capture) : PJMEDIA_AUD_DEFAULT_CAPTURE_DEV;
+        int play = (acc->snd_playback && acc->snd_playback[0])
+                      ? find_aud_dev(acc->snd_playback) : PJMEDIA_AUD_DEFAULT_PLAYBACK_DEV;
+        if (cap == PJMEDIA_AUD_INVALID_DEV) {
+            logger_warnf_with_category("SIP", "Capture device '%s' not found; using default",
+                                       acc->snd_capture);
+            cap = PJMEDIA_AUD_DEFAULT_CAPTURE_DEV;
+        }
+        if (play == PJMEDIA_AUD_INVALID_DEV) {
+            logger_warnf_with_category("SIP", "Playback device '%s' not found; using default",
+                                       acc->snd_playback);
+            play = PJMEDIA_AUD_DEFAULT_PLAYBACK_DEV;
+        }
+        if (pjsua_set_snd_dev(cap, play) == PJ_SUCCESS)
+            logger_infof_with_category("SIP", "Sound devices: capture=%d playback=%d", cap, play);
+        else
+            logger_warn_with_category("SIP", "pjsua_set_snd_dev failed");
     }
 
     /* Register the account */
