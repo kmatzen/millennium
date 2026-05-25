@@ -2,6 +2,14 @@
 
 This document captures audit findings for the phonev5 schematic and PCB design, plus recommendations. Run `python3 audit_schematic.py` in this directory to regenerate the machine-parsed report.
 
+> **Note — predates the THT→SMD migration.** For the as-built board, the
+> production BOM (`jlcpcb/production_files/BOM-phonev5.csv`) and
+> `JLCPCB_COST_REDUCTION.md` are authoritative. Key as-built parts:
+> Q1 = AO3401A (SOT-23, C15127), D1–D3 TVS = P6KE6.8CA (D_SMB, C78395),
+> D4 = red LED (0603, C2286), F1 = 1812 SMD fuse, R3/R4/R5 = C17513,
+> U2 = PT2308-S (SOIC-8, C115492). Some detailed sections below still describe
+> the earlier THT parts (e.g. the capacitor package audit).
+
 ## Tools Available
 
 1. **audit_schematic.py** — Python script that parses `phonev5.kicad_sch` (s-expression) and `phonev5.csv` to extract components, compare BOM vs schematic, check net labels, and flag documentation mismatches.
@@ -25,9 +33,9 @@ This document captures audit findings for the phonev5 schematic and PCB design, 
 |----------|--------|--------|
 | Power labels (5v, 12v) | ✓ Fixed | Renamed to 5V_MAIN, 12V_COIN |
 | BOM vs schematic refs | ✓ Fixed | D1–D4, TP1-TP5, U1; see phonev5.csv |
-| Q1 part number | ✓ Doc | IRF9540N (TO-220 THT), G-S-D pinout for Si2319 drop-in |
-| Missing footprints | ✓ Fixed | THT assigned for D4, F1, TP1–TP5 |
-| TVS diodes | ✓ Fixed | D1, D2, D3 P6KE6.8CA DO-15; D4 Green LED 5mm |
+| Q1 part number | ✓ As-built | AO3401A (SOT-23 SMD, C15127), P-channel, G-S-D |
+| Footprints | ✓ As-built | D4 (LED_0603 SMD), F1 (Fuse_1812 SMD), TP1–TP5 (loop) |
+| TVS diodes | ✓ As-built | D1–D3 P6KE6.8CA (D_SMB SMD, C78395); D4 red LED (0603, C2286) |
 | Test points | ✓ Fixed | TP1-TP5 only; no TX/RX on PCB |
 
 ---
