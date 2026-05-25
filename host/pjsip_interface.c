@@ -185,10 +185,11 @@ int pjsip_iface_start(const pjsip_iface_account_t *acc,
 
     pjsua_media_config_default(&media_cfg);
     media_cfg.clock_rate = 8000;        /* conference/codec runs at G.711 8 kHz */
-    /* Keep the sound device at 8 kHz: this single-core ARM11 can't resample
-     * 8<->48 kHz in PJSIP without crackling (CPU starvation), so let ALSA's
-     * lightweight converter handle the 8->48 kHz device step instead. */
-    media_cfg.snd_clock_rate = 8000;
+    /* Open the device at its native 48 kHz and let PJSIP resample 8<->48 kHz
+     * internally — this matches the known-good baresip config (auplay_srate/
+     * ausrc_srate 48000) on this exact hardware, and avoids ALSA's plug doing
+     * the resample under the audio thread. */
+    media_cfg.snd_clock_rate = 48000;
     media_cfg.channel_count = 1;        /* mono handset */
     /* Big playback buffer: the playback ALSA chain (route+softvol+dmix) starves
      * on this single core and underruns (crackle). A larger buffer absorbs the
