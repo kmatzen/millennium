@@ -8,10 +8,15 @@ The Millennium pay phone plugin system has been successfully built and is ready 
 
 ```
 gcc plugins/classic_phone.c -o plugins/classic_phone.o -c -g -O3 -Wall -Wextra -std=c89
-gcc plugins/fortune_teller.c -o plugins/fortune_teller.o -c -g -O3 -Wall -Wextra -std=c89  
+gcc plugins/fortune_teller.c -o plugins/fortune_teller.o -c -g -O3 -Wall -Wextra -std=c89
 gcc plugins/jukebox.c -o plugins/jukebox.o -c -g -O3 -Wall -Wextra -std=c89
-gcc daemon.o daemon_state.o millennium_sdk.o baresip_interface.o events.o event_processor.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o plugins.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o -o daemon -lpthread -latomic `pkg-config libre --libs` `pkg-config libbaresip --libs`
+# ... number_guess, simon, dial_a_joke, trivia, plus plugin_sdk.o ...
+gcc daemon.o daemon_state.o millennium_sdk.o pjsip_interface.o events.o event_processor.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o display_manager.o audio_tones.o state_persistence.o plugin_sdk.o plugins.o plugins/*.o -o daemon -lpthread -latomic -lasound `pkg-config --libs --static libpjproject`
 ```
+
+> VoIP now runs on **PJSIP (PJSUA C API)**, not the original Baresip. The
+> `--static` link pulls in PJSIP's ssl/srtp/codec dependencies. See the
+> `Makefile` for the authoritative object list.
 
 ## What Was Built
 
@@ -37,12 +42,16 @@ The build completed with only minor warnings that don't affect functionality:
 
 ## Plugin System Features
 
-### 🎯 Three Working Plugins
+### 🎯 Built-in Plugins
+
+The registry now ships **seven** plugins (and is enumerated dynamically — add
+a plugin and it appears in `GET /api/plugins` and the dashboard automatically).
+The three originals:
 
 1. **Classic Phone Plugin**
    - Traditional pay phone functionality
-   - 25 cents per call, 10-digit dialing
-   - VoIP calling via Baresip
+   - Configurable call cost (`call.cost_cents`), 10-digit dialing
+   - VoIP calling via PJSIP (PJSUA C API)
    - Complete original behavior preserved
 
 2. **Fortune Teller Plugin**
@@ -53,9 +62,13 @@ The build completed with only minor warnings that don't affect functionality:
 
 3. **Jukebox Plugin**
    - Coin-operated music player
-   - 25 cents per song
    - 9 classic songs pre-loaded
    - Keypad selection (1-9), playback controls
+
+Plus four games added later — **Number Guess**, **Simon**, **Dial-A-Joke**, and
+**Trivia** — all written against the `plugin_sdk` facade so the same code runs
+on the Pi, in the scenario simulator, and in unit tests. See
+`PLUGIN_AUTHORING.md` to add your own.
 
 ### 🔄 Hot-Swappable
 - Switch plugins at runtime without restart
@@ -71,20 +84,20 @@ The build completed with only minor warnings that don't affect functionality:
 
 ### Plugin Switching Commands
 ```bash
-# Switch to Fortune Teller
-curl -X POST http://localhost:8080/api/control \
+# Switch to Fortune Teller (web dashboard/API is port 8081)
+curl -X POST http://localhost:8081/api/control \
   -H "Content-Type: application/json" \
-  -d '{"action": "activate_plugin Fortune Teller"}'
+  -d '{"action": "activate_plugin:Fortune Teller"}'
 
 # Switch to Jukebox
-curl -X POST http://localhost:8080/api/control \
+curl -X POST http://localhost:8081/api/control \
   -H "Content-Type: application/json" \
-  -d '{"action": "activate_plugin Jukebox"}'
+  -d '{"action": "activate_plugin:Jukebox"}'
 
 # Return to Classic Phone
-curl -X POST http://localhost:8080/api/control \
+curl -X POST http://localhost:8081/api/control \
   -H "Content-Type: application/json" \
-  -d '{"action": "activate_plugin Classic Phone"}'
+  -d '{"action": "activate_plugin:Classic Phone"}'
 ```
 
 ### Running the Daemon
@@ -93,7 +106,7 @@ curl -X POST http://localhost:8080/api/control \
 ./daemon
 
 # Access web portal
-# http://localhost:8080
+# http://localhost:8081   (metrics are on 8080)
 ```
 
 ## Architecture Benefits
