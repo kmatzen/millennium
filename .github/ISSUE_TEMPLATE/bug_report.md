@@ -25,7 +25,8 @@ What should happen.
 Paste relevant daemon log output, serial monitor output, or screenshots.
 
 **Environment**
+- Raspberry Pi model (e.g. Zero 2 W):
 - Raspbian version:
-- Baresip version:
+- libpjproject (PJSIP) version (`pkg-config --modversion libpjproject`):
 - Daemon git hash (`daemon --version` or web dashboard):
 - Arduino board definitions:

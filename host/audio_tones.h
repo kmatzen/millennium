@@ -23,6 +23,11 @@ void audio_tones_play_dtmf(char key);
 /* Cadenced ringback (440 Hz + 480 Hz, 2 s on / 4 s off). Plays until stop. */
 void audio_tones_play_ringback(void);
 
+/* Phone ringer for INCOMING calls — same 440/480 Hz ring cadence, played on
+ * the ringer until audio_tones_stop(). (Baresip used to ring via its
+ * audio_alert device; the daemon drives the ringer itself with PJSIP.) */
+void audio_tones_play_ring(void);
+
 /* Cadenced busy tone (480 Hz + 620 Hz, 0.5 s on / 0.5 s off). Until stop. */
 void audio_tones_play_busy_tone(void);
 

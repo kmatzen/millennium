@@ -21,10 +21,10 @@ ssh matzen@192.168.86.145   # Pi fixed address on local network
 ### Host Software (`host/`)
 
 ```bash
-# Build the full daemon (requires Baresip/libre/ALSA — Pi only)
+# Build the full daemon (requires PJSIP/libpjproject/ALSA — Pi only)
 make daemon
 
-# Build and run all tests (works on any platform, no Baresip/ALSA needed)
+# Build and run all tests (works on any platform, no PJSIP/ALSA needed)
 make test
 
 # Run unit tests only
@@ -63,6 +63,19 @@ make deploy_keypad    # flash Alpha using GPIO17 reset
 
 The deploy scripts assert reset via GPIO (open-drain: drive low, release to input), wait for the stock Arduino Micro bootloader to enumerate at `/dev/serial/by-id/usb-Arduino_LLC_Arduino_Micro-if00`, then flash with `avrdude`. Requires `raspi-gpio` and `avrdude` on the Pi.
 
+## Claude Code Skills (`.claude/skills/`)
+
+Repeatable workflows are captured as project skills (auto-discovered by Claude Code):
+
+| Skill | What it does |
+|-------|--------------|
+| `deploy-daemon` | Sync `host/` to the Pi, `make clean && make daemon`, swap the binary, restart, verify SIP registration (with rollback). |
+| `deploy-arduino` | Compile and GPIO-reset-flash the Alpha/Beta Micros in place over SSH. |
+| `new-plugin` | Scaffold a plugin against `plugin_sdk.h`, register it, wire the build, add a scenario test. |
+| `phone-status` | Health-check the live phone: service state, SIP registration, phone state, recent errors. |
+
+Note: the Pi's IP is DHCP and has changed before (.145 → .115 …), so the skills prefer the `raspberrypi.local` hostname and document how to find the current address.
+
 ## Architecture
 
 ### System Components
@@ -93,10 +106,12 @@ Single-process C daemon. Key files:
 | File | Role |
 |------|------|
 | `daemon.c` | Main event loop, all event handlers, `main()` |
-| `millennium_sdk.c` | Serial I/O, event queue, Baresip call wrappers |
+| `millennium_sdk.c` | Serial I/O, event queue, VoIP call wrappers (via `pjsip_interface.c`) |
+| `pjsip_interface.c` / `pjsip_interface.h` | PJSIP (PJSUA C API) wrapper: register/call/answer/hangup/DTMF. Header has plain declarations only (so `millennium_sdk.c` compiles on the Mac); the `.c` is built only on the Pi |
 | `daemon_state.c` | Phone state machine (5 states), keypad buffer |
 | `event_processor.c` | Routes queued events to handlers |
-| `plugins.c` + `plugins/` | Plugin registry; built-ins: Classic Phone, Fortune Teller, Jukebox |
+| `plugins.c` + `plugins/` | Plugin registry; built-ins: Classic Phone, Fortune Teller, Jukebox, Number Guess, Simon, Dial-A-Joke, Trivia |
+| `plugin_sdk.c` / `plugin_sdk.h` | Friendly facade for plugin authors (display, audio, calls, state, balance, logging, RNG) — see `host/PLUGIN_AUTHORING.md` |
 | `display_manager.c` | VFD abstraction with auto-scrolling for lines >20 chars |
 | `audio_tones.c` | ALSA tone generator: dial tone, DTMF, ringback, busy, coin chime |
 | `web_server.c` | HTTP+WebSocket server on port 8081; REST API + real-time events |
@@ -119,7 +134,11 @@ State is protected by `daemon_state_mutex`; the `running_mutex` guards the main 
 
 ### Plugin System
 
-Plugins register a `plugin_t` struct with function pointers for: `handle_coin`, `handle_keypad`, `handle_hook`, `handle_call_state`, `handle_card`, `handle_activation`, `handle_tick`. The active plugin can be switched at runtime via `POST /api/control` (`activate_plugin:<name>`) and persists across restarts.
+Plugins register a `plugin_t` struct with function pointers for: `handle_coin`, `handle_keypad`, `handle_hook`, `handle_call_state`, `handle_card`, `handle_activation`, `handle_tick`. The active plugin can be switched at runtime via `POST /api/control` (`activate_plugin:<name>`) and persists across restarts. The active plugin receives **every** keypress (digits, `*`, `#`, and matrix letters A–D) in all states, so plugins can use the full keypad.
+
+The web dashboard and `GET /api/plugins` enumerate the registry **dynamically** (`plugins_to_json`), so a newly registered plugin appears automatically — no hard-coded list to update.
+
+New plugins should be written against `plugin_sdk.h`, which wraps the hardware/subsystems behind a small, NULL-safe, no-op-on-missing-hardware API. The same plugin code then runs unchanged on the Pi, in the scenario simulator, and in unit tests. `plugins/number_guess.c` is the canonical example. See `host/PLUGIN_AUTHORING.md` for a step-by-step guide.
 
 ### Web API
 
@@ -138,7 +157,7 @@ Pure ALSA (`libasound`), no PipeWire. Left channel → ringer (TDA2822M ch A), r
 
 - **C89** for all files except `simulator.c`, `jukebox.c`, `audio_tones.c` (C99 needed for mixed declarations)
 - `-Wall -Wextra` on all targets; no separate linter configured
-- No external dependencies beyond ALSA, pthread, Baresip/libre, and libc
+- No external dependencies beyond ALSA, pthread, PJSIP (libpjproject), and libc
 - No C++ in the active daemon targets (`.cpp` files in `host/` are legacy/unused)
 
 ## Configuration

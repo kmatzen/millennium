@@ -1,0 +1,28 @@
+# Test: Simon memory game plugin
+# Free-to-play. Force the sequence so playback is deterministic, then play
+# back a wrong note to confirm game-over and scoring.
+
+# Force the sequence (round 1 uses the first note: '1')
+config simon.seq 1234
+activate_plugin Simon
+assert_display Simon
+
+# Press a key to start round 1
+key 1
+
+# Watch the sequence play back (one note, ~1s)
+wait 1
+assert_display Watch
+
+# Playback finishes -> player's turn
+wait 1
+assert_display Your turn
+
+# Press the wrong note (sequence is '1', we press '2') -> game over
+key 2
+assert_display Game Over
+assert_display Score: 0
+
+# After the game-over pause it returns to the idle splash
+wait 3
+assert_display Simon

@@ -7,6 +7,7 @@
 #include "../metrics.h"
 #include "../millennium_sdk.h"
 #include "../updater.h"
+#include "../plugin_sdk.h"
 #include <stdlib.h>
 
 /* ── Stubs for linker (plugins.c references these) ──────────────── */
@@ -404,6 +405,192 @@ static void test_plugins_duplicate_register(void) {
     plugins_cleanup();
 }
 
+/* ── Plugin registry / dynamic enumeration ─────────────────────────── */
+
+/* Pure comparison exported by plugins/number_guess.c */
+int number_guess_compare(int secret, int guess);
+
+static void test_plugins_builtins_registered(void) {
+    char buf[2048];
+    daemon_state_data_t ds;
+    daemon_state_init(&ds);
+    daemon_state = &ds;
+    client = millennium_client_create();
+
+    plugins_init();
+
+    /* Seven built-ins ship with the platform. */
+    TEST_ASSERT_EQ_INT(plugins_get_count(), 7);
+
+    TEST_ASSERT_EQ_INT(plugins_list(buf, sizeof(buf)), 0);
+    TEST_ASSERT_NOT_NULL(strstr(buf, "Classic Phone"));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "Fortune Teller"));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "Jukebox"));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "Number Guess"));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "Simon"));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "Dial-A-Joke"));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "Trivia"));
+
+    millennium_client_destroy(client);
+    client = NULL;
+    daemon_state = NULL;
+    plugins_cleanup();
+}
+
+static void test_plugins_get_info(void) {
+    const char *name = NULL;
+    const char *desc = NULL;
+    int active = -1;
+    daemon_state_data_t ds;
+    daemon_state_init(&ds);
+    daemon_state = &ds;
+    client = millennium_client_create();
+
+    plugins_init(); /* default-activates Classic Phone (index 0) */
+
+    TEST_ASSERT_EQ_INT(plugins_get_info(0, &name, &desc, &active), 0);
+    TEST_ASSERT_EQ_STR(name, "Classic Phone");
+    TEST_ASSERT_NOT_NULL((void *)desc);
+    TEST_ASSERT_EQ_INT(active, 1);
+
+    /* Out-of-range index is rejected. */
+    TEST_ASSERT_EQ_INT(plugins_get_info(999, &name, &desc, &active), -1);
+    TEST_ASSERT_EQ_INT(plugins_get_info(-1, NULL, NULL, NULL), -1);
+
+    millennium_client_destroy(client);
+    client = NULL;
+    daemon_state = NULL;
+    plugins_cleanup();
+}
+
+static void test_plugins_to_json(void) {
+    char buf[2048];
+    daemon_state_data_t ds;
+    daemon_state_init(&ds);
+    daemon_state = &ds;
+    client = millennium_client_create();
+
+    plugins_init();
+    plugins_activate("Simon");
+
+    TEST_ASSERT(plugins_to_json(buf, sizeof(buf)) > 0);
+    TEST_ASSERT_NOT_NULL(strstr(buf, "\"plugins\":["));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "\"name\":\"Number Guess\""));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "\"name\":\"Simon\""));
+    /* The active plugin is reported and flagged. */
+    TEST_ASSERT_NOT_NULL(strstr(buf, "\"active_plugin\":\"Simon\""));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "\"active\":true"));
+
+    millennium_client_destroy(client);
+    client = NULL;
+    daemon_state = NULL;
+    plugins_cleanup();
+}
+
+static void test_plugins_to_json_escapes(void) {
+    char buf[2048];
+    daemon_state_data_t ds;
+    daemon_state_init(&ds);
+    daemon_state = &ds;
+    client = millennium_client_create();
+
+    plugins_init();
+    /* Names are stored by pointer; a static literal with a quote is safe. */
+    TEST_ASSERT_EQ_INT(plugins_register("Quote\"Plugin", "desc\\with\\slash",
+        NULL, NULL, NULL, NULL, NULL, NULL, NULL), 0);
+
+    TEST_ASSERT(plugins_to_json(buf, sizeof(buf)) > 0);
+    /* The embedded quote and backslash must be escaped, not raw. */
+    TEST_ASSERT_NOT_NULL(strstr(buf, "Quote\\\"Plugin"));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "desc\\\\with\\\\slash"));
+
+    millennium_client_destroy(client);
+    client = NULL;
+    daemon_state = NULL;
+    plugins_cleanup();
+}
+
+static void test_number_guess_compare(void) {
+    TEST_ASSERT(number_guess_compare(50, 25) < 0);  /* guess too low */
+    TEST_ASSERT(number_guess_compare(50, 75) > 0);  /* guess too high */
+    TEST_ASSERT_EQ_INT(number_guess_compare(50, 50), 0); /* exact */
+    TEST_ASSERT(number_guess_compare(1, 99) > 0);
+    TEST_ASSERT(number_guess_compare(99, 1) < 0);
+}
+
+/* ── Plugin SDK ─────────────────────────────────────────────────────── */
+
+static void test_sdk_rand_bounds(void) {
+    int i;
+    TEST_ASSERT_EQ_INT(sdk_rand_below(0), 0);   /* defensive */
+    TEST_ASSERT_EQ_INT(sdk_rand_below(-5), 0);
+    TEST_ASSERT_EQ_INT(sdk_rand_below(1), 0);
+    TEST_ASSERT_EQ_INT(sdk_rand_range(5, 5), 5);
+    for (i = 0; i < 1000; i++) {
+        int b = sdk_rand_below(10);
+        int r = sdk_rand_range(3, 7);
+        int s = sdk_rand_range(7, 3); /* swapped args still valid */
+        TEST_ASSERT(b >= 0 && b < 10);
+        TEST_ASSERT(r >= 3 && r <= 7);
+        TEST_ASSERT(s >= 3 && s <= 7);
+    }
+}
+
+static void test_sdk_rand_choice(void) {
+    static const char *const opts[] = {"a", "b", "c"};
+    int i;
+    TEST_ASSERT_NULL((void *)sdk_rand_choice(NULL, 3));
+    TEST_ASSERT_NULL((void *)sdk_rand_choice(opts, 0));
+    for (i = 0; i < 100; i++) {
+        const char *c = sdk_rand_choice(opts, 3);
+        TEST_ASSERT(c == opts[0] || c == opts[1] || c == opts[2]);
+    }
+}
+
+static void test_sdk_balance(void) {
+    daemon_state_data_t ds;
+    daemon_state_init(&ds);
+    daemon_state = &ds;
+
+    TEST_ASSERT_EQ_INT(sdk_balance(), 0);
+    sdk_add_balance(25);
+    TEST_ASSERT_EQ_INT(sdk_balance(), 25);
+    sdk_spend_balance(10);
+    TEST_ASSERT_EQ_INT(sdk_balance(), 15);
+    sdk_spend_balance(1000);                 /* over-spend clamps at 0 */
+    TEST_ASSERT_EQ_INT(sdk_balance(), 0);
+    sdk_add_balance(50);
+    sdk_clear_balance();
+    TEST_ASSERT_EQ_INT(sdk_balance(), 0);
+
+    daemon_state = NULL;
+    TEST_ASSERT_EQ_INT(sdk_balance(), 0);    /* NULL-safe */
+}
+
+static void test_sdk_state(void) {
+    daemon_state_data_t ds;
+    daemon_state_init(&ds);
+    daemon_state = &ds;
+
+    ds.current_state = DAEMON_STATE_IDLE_DOWN;
+    TEST_ASSERT_EQ_INT((int)sdk_state(), (int)DAEMON_STATE_IDLE_DOWN);
+    TEST_ASSERT_EQ_INT(sdk_receiver_is_up(), 0);
+
+    ds.current_state = DAEMON_STATE_IDLE_UP;
+    TEST_ASSERT_EQ_INT(sdk_receiver_is_up(), 1);
+
+    ds.current_state = DAEMON_STATE_CALL_ACTIVE;
+    TEST_ASSERT_EQ_INT(sdk_receiver_is_up(), 1);
+
+    daemon_state_add_key(&ds, '4');
+    daemon_state_add_key(&ds, '2');
+    TEST_ASSERT_EQ_STR(sdk_keypad(), "42");
+
+    daemon_state = NULL;
+    TEST_ASSERT_EQ_INT((int)sdk_state(), (int)DAEMON_STATE_INVALID); /* NULL-safe */
+    TEST_ASSERT_EQ_STR(sdk_keypad(), "");
+}
+
 /* ── Emergency number tests ────────────────────────────────────── */
 
 static void test_free_number_911(void) {
@@ -562,6 +749,17 @@ int main(void) {
     TEST_SUITE_RUN(test_plugins_register_custom);
     TEST_SUITE_RUN(test_plugins_list);
     TEST_SUITE_RUN(test_plugins_duplicate_register);
+    TEST_SUITE_RUN(test_plugins_builtins_registered);
+    TEST_SUITE_RUN(test_plugins_get_info);
+    TEST_SUITE_RUN(test_plugins_to_json);
+    TEST_SUITE_RUN(test_plugins_to_json_escapes);
+    TEST_SUITE_RUN(test_number_guess_compare);
+
+    TEST_SUITE_BEGIN("Plugin SDK");
+    TEST_SUITE_RUN(test_sdk_rand_bounds);
+    TEST_SUITE_RUN(test_sdk_rand_choice);
+    TEST_SUITE_RUN(test_sdk_balance);
+    TEST_SUITE_RUN(test_sdk_state);
 
     TEST_SUITE_BEGIN("Emergency Numbers");
     TEST_SUITE_RUN(test_free_number_911);

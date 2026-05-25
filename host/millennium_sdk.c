@@ -3,7 +3,8 @@
 #define _XOPEN_SOURCE 700
 #include "millennium_sdk.h"
 #include "events.h"
-#include "baresip_interface.h"
+#include "pjsip_interface.h"
+#include "config.h"
 #include "logger.h"
 #include <errno.h>
 #include <fcntl.h>
@@ -19,8 +20,7 @@
 #include <unistd.h>
 
 /* Forward declarations */
-static void ua_event_handler(enum baresip_ua_event ev, struct bevent *event, void *client);
-static void *baresip_thread_func(void *arg);
+static void sip_event_cb(enum pjsip_iface_event ev, const char *text, void *client);
 static void event_queue_push(struct millennium_client *client, void *event);
 static void *event_queue_pop(struct millennium_client *client);
 static int event_queue_empty(struct millennium_client *client);
@@ -136,100 +136,51 @@ static void string_buffer_append(struct millennium_client *client, const char *d
     }
 }
 
-/* UA event handler */
-static void ua_event_handler(enum baresip_ua_event ev, struct bevent *event, void *client) {
-    struct call *call;
-    struct ua *ua;
+/* SIP event callback (invoked from a PJSUA worker thread). Mirrors the old
+ * baresip ua_event_handler: it tracks registration state for the health check
+ * and queues call-state events for the daemon's event loop. */
+static void sip_event_cb(enum pjsip_iface_event ev, const char *text, void *client) {
     call_state_t state_value;
     call_state_event_t *call_event;
-    
-    logger_infof_with_category("SDK", "UA event: %s", baresip_uag_event_str(ev));
+    const char *label;
 
-    /* Track SIP registration state for health check */
-    if (ev == BARESIP_UA_EVENT_REGISTER_OK) {
+    switch (ev) {
+    case PJSIP_IFACE_REG_OK:
         pthread_mutex_lock(&g_sip_mutex);
         g_sip_registered = 1;
         g_sip_last_error[0] = '\0';
         pthread_mutex_unlock(&g_sip_mutex);
-    } else if (ev == BARESIP_UA_EVENT_REGISTER_FAIL) {
+        return;
+    case PJSIP_IFACE_REG_FAIL:
         pthread_mutex_lock(&g_sip_mutex);
         g_sip_registered = -1;
-        ua = baresip_bevent_get_ua(event);
-        if (ua) {
-            struct account *acc = baresip_ua_account(ua);
-            const char *aor = acc ? baresip_account_aor(acc) : NULL;
-            const char *text = baresip_bevent_get_text(event);
-            if (text && text[0]) {
-                logger_warnf_with_category("SDK", "SIP registration failed%s%s (%.64s)",
-                    aor ? ": " : "", aor ? aor : "unknown", text);
-                snprintf(g_sip_last_error, sizeof(g_sip_last_error), "%.128s", text);
-            } else {
-                logger_warnf_with_category("SDK", "SIP registration failed%s%s",
-                    aor ? ": " : "", aor ? aor : "");
-                snprintf(g_sip_last_error, sizeof(g_sip_last_error), "Registration failed%s",
-                    aor ? "" : " (no account)");
-            }
-        } else {
-            g_sip_last_error[0] = '\0';
-        }
+        if (text && text[0])
+            snprintf(g_sip_last_error, sizeof(g_sip_last_error), "%.128s", text);
+        else
+            snprintf(g_sip_last_error, sizeof(g_sip_last_error), "Registration failed");
         pthread_mutex_unlock(&g_sip_mutex);
+        return;
+    case PJSIP_IFACE_CALL_INCOMING:
+        state_value = EVENT_CALL_STATE_INCOMING; label = "CALL_INCOMING"; break;
+    case PJSIP_IFACE_CALL_ESTABLISHED:
+        state_value = EVENT_CALL_STATE_ACTIVE; label = "CALL_ESTABLISHED"; break;
+    case PJSIP_IFACE_CALL_CLOSED:
+    default:
+        state_value = EVENT_CALL_STATE_INVALID; label = "CALL_CLOSED"; break;
     }
-    
+
     if (client) {
-        call = baresip_bevent_get_call(event);
-        if (call) {
-            /* For incoming calls, we need to set the UA pointer */
-            if (ev == BARESIP_UA_EVENT_CALL_INCOMING) {
-                ua = baresip_call_get_ua(call);
-                if (ua) {
-                    millennium_client_set_ua((struct millennium_client *)client, ua);
-                }
-            }
-        }
-
-        if (ev == BARESIP_UA_EVENT_CALL_INCOMING) {
-            state_value = EVENT_CALL_STATE_INCOMING;
-        } else if (ev == BARESIP_UA_EVENT_CALL_ESTABLISHED) {
-            state_value = EVENT_CALL_STATE_ACTIVE;
-        } else {
-            state_value = EVENT_CALL_STATE_INVALID;
-        }
-
-        call_event = call_state_event_create(baresip_uag_event_str(ev), call, state_value);
+        call_event = call_state_event_create(label, NULL, state_value);
         if (call_event) {
-            millennium_client_create_and_queue_event_ptr((struct millennium_client *)client, (void *)call_event);
+            millennium_client_create_and_queue_event_ptr(
+                (struct millennium_client *)client, (void *)call_event);
         }
     }
 }
 
-/* Thread function for baresip */
-static void *baresip_thread_func(void *arg) {
-    (void)arg; /* Suppress unused parameter warning */
-    baresip_re_main(NULL);
-    return NULL;
-}
-
-/* Audio device listing */
+/* Audio device listing (delegates to the PJSIP layer). */
 void list_audio_devices(void) {
-    struct le *le;
-    struct ausrc *ausrc;
-    struct auplay *auplay;
-
-    logger_info_with_category("SDK", "--- Audio Sources ---");
-    for (le = baresip_ausrcl_head(); le; le = baresip_list_next(le)) {
-        ausrc = baresip_list_data(le);
-        if (ausrc && baresip_ausrc_name(ausrc)) {
-            logger_infof_with_category("SDK", "Source: %s", baresip_ausrc_name(ausrc));
-        }
-    }
-
-    logger_info_with_category("SDK", "--- Audio Players ---");
-    for (le = baresip_auplayl_head(); le; le = baresip_list_next(le)) {
-        auplay = baresip_auplay_data(le);
-        if (auplay && baresip_auplay_name(auplay)) {
-            logger_infof_with_category("SDK", "Player: %s", baresip_auplay_name(auplay));
-        }
-    }
+    pjsip_iface_list_audio_devices();
 }
 
 void millennium_sdk_get_sip_status(int *registered, char *last_error, size_t last_error_size) {
@@ -330,61 +281,44 @@ struct millennium_client *millennium_client_create(void) {
         }
     }
 
-    logger_debug_with_category("SDK", "libre_init");
-    int err = baresip_libre_init();
-    if (err) {
-        logger_error_with_category("SDK", "libre_init failed");
-        millennium_client_destroy(client);
-        return NULL;
-    }
+    /* Build the SIP account from the daemon config and bring up PJSIP.
+     * Credentials live in /etc/millennium/daemon.conf (sip.*), so there is no
+     * separate accounts file and no need to run as a particular user. If SIP
+     * isn't configured (or fails to start), the daemon still runs — the phone
+     * just has no VoIP, which is fine for the games/plugins. */
+    {
+        config_data_t *cfg = config_get_instance();
+        pjsip_iface_account_t acc;
+        const char *transport;
 
-    baresip_re_thread_async_init(ASYNC_WORKERS);
+        memset(&acc, 0, sizeof(acc));
+        acc.id_uri      = config_get_string(cfg, "sip.id_uri", "");
+        acc.reg_uri     = config_get_string(cfg, "sip.registrar", "");
+        acc.realm       = config_get_string(cfg, "sip.realm", "*");
+        acc.username    = config_get_string(cfg, "sip.username", "");
+        acc.password    = config_get_string(cfg, "sip.password", "");
+        acc.stun_server = config_get_string(cfg, "sip.stun_server", "");
+        acc.local_port   = config_get_int(cfg, "sip.local_port", 0);
+        /* ALSA device names; defaults route call audio to the handset earpiece
+         * (right channel) and capture the C-Media mic via a plug device. */
+        acc.snd_capture  = config_get_string(cfg, "sip.snd_capture",  "plughw:CARD=Device,DEV=0");
+        acc.snd_playback = config_get_string(cfg, "sip.snd_playback", "out_right_solo");
 
-    baresip_log_enable_debug(1);
+        transport = config_get_string(cfg, "sip.transport", "tls");
+        if (strcmp(transport, "udp") == 0)
+            acc.transport = PJSIP_IFACE_TRANSPORT_UDP;
+        else if (strcmp(transport, "tcp") == 0)
+            acc.transport = PJSIP_IFACE_TRANSPORT_TCP;
+        else
+            acc.transport = PJSIP_IFACE_TRANSPORT_TLS;
 
-    int dbg_level = BARESIP_DBG_DEBUG;
-    int dbg_flags = BARESIP_DBG_ANSI | BARESIP_DBG_TIME;
-    baresip_dbg_init(dbg_level, dbg_flags);
-
-    logger_debug_with_category("SDK", "conf_configure");
-    err = baresip_conf_configure();
-    if (err) {
-        logger_error_with_category("SDK", "conf_configure failed");
-        millennium_client_destroy(client);
-        return NULL;
-    }
-
-    logger_debug_with_category("SDK", "baresip_init_c");
-    if (baresip_init_c(baresip_conf_config()) != 0) {
-        logger_error_with_category("SDK", "Failed to initialize Baresip.");
-        millennium_client_destroy(client);
-        return NULL;
-    }
-
-    baresip_play_set_path(baresip_player_c(), "/usr/local/share/baresip");
-
-    err = baresip_ua_init("baresip v2.0.0 (x86_64/linux)", 1, 1, 1);
-    if (err) {
-        logger_error_with_category("SDK", "ua_init failed");
-        millennium_client_destroy(client);
-        return NULL;
-    }
-
-    logger_debug_with_category("SDK", "conf_modules");
-    err = baresip_conf_modules();
-    if (err) {
-        logger_error_with_category("SDK", "conf_modules failed");
-        millennium_client_destroy(client);
-        return NULL;
-    }
-
-    baresip_bevent_register(ua_event_handler, client);
-
-    /* Create thread */
-    if (pthread_create((pthread_t *)&client->thread_handle, NULL, baresip_thread_func, NULL) != 0) {
-        logger_error_with_category("SDK", "Failed to create baresip thread");
-        millennium_client_destroy(client);
-        return NULL;
+        if (!acc.id_uri[0] || !acc.reg_uri[0]) {
+            logger_warn_with_category("SDK",
+                "SIP not configured (sip.id_uri/sip.registrar empty); VoIP disabled");
+        } else if (pjsip_iface_start(&acc, sip_event_cb, client) != 0) {
+            logger_error_with_category("SDK",
+                "Failed to start PJSIP; continuing with VoIP disabled");
+        }
     }
 
     logger_info_with_category("SDK", "MillenniumClient initialized successfully.");
@@ -415,115 +349,49 @@ void millennium_client_close(struct millennium_client *client) {
             client->display_fd = -1;
         }
         
-        baresip_ua_stop_all(1);
-        baresip_ua_close();
-        baresip_module_app_unload();
-        baresip_conf_close();
-        baresip_close_c();
-        baresip_mod_close();
-        baresip_re_thread_async_close();
-        baresip_libre_close();
-        
-        if (client->thread_handle) {
-            pthread_t *thread_ptr = (pthread_t *)client->thread_handle;
-            pthread_join(*thread_ptr, NULL);
-            client->thread_handle = NULL;
-        }
-        
+        pjsip_iface_stop();
+
         client->is_open = 0;
         logger_info_with_category("SDK", "MillenniumClient closed.");
     }
 }
 
 void millennium_client_call(struct millennium_client *client, const char *number) {
-    char target[64];
-    struct ua *ua;
-    char *uric;
-    int err;
-    struct call *call;
-    
-    snprintf(target, sizeof(target), "+1%s", number);
+    char user[64];
+    (void)client;
 
-    logger_debugf_with_category("SDK", "ua: %p", client->ua);
-    
-    logger_infof_with_category("SDK", "Initiating call to: %s", target);
-    
-    /* Find the appropriate UA for this request URI */
-    ua = baresip_ua_find_requri(target);
-    
-    if (!ua) {
-        logger_errorf_with_category("SDK", "Could not find UA for: %s", target);
-        return;
-    }
-    
-    /* Store the UA for later use in answer/hangup */
-    client->ua = ua;
-    
-    /* Complete the URI */
-    uric = NULL;
-    err = baresip_account_uri_complete_strdup(baresip_ua_account(ua), &uric, target);
-    if (err != 0) {
-        logger_errorf_with_category("SDK", "Failed to complete URI: %s %d", target, err);
-        return;
-    }
-    
-    logger_infof_with_category("SDK", "Using UA: %s", baresip_account_aor(baresip_ua_account(ua)));
-    
-    logger_infof_with_category("SDK", "Completed URI: %s", uric);
-    
-    /* Make the call */
-    call = NULL;
-    err = baresip_ua_connect(ua, &call, NULL, uric, BARESIP_VIDMODE_OFF);
-    
-    /* Clean up the completed URI */
-    baresip_mem_deref(uric);
-    
-    if (err != 0) {
-        logger_errorf_with_category("SDK", "Failed to initiate call to: %s %d", target, err);
+    if (!number) return;
+
+    /* North American dialing: prefix +1. The PJSIP layer appends the account
+     * domain and chooses the transport. */
+    snprintf(user, sizeof(user), "+1%s", number);
+    logger_infof_with_category("SDK", "Initiating call to: %s", user);
+
+    if (pjsip_iface_call(user) != 0) {
+        logger_errorf_with_category("SDK", "Failed to initiate call to: %s", user);
     } else {
         logger_infof_with_category("SDK", "Calling: %s", number);
     }
 }
 
 void millennium_client_answer_call(struct millennium_client *client) {
-    if (!client->ua) {
-        logger_error_with_category("SDK", "Cannot answer call: UA is null");
-        return;
+    (void)client;
+    if (pjsip_iface_answer() == 0) {
+        logger_info_with_category("SDK", "Call answered.");
+    } else {
+        logger_error_with_category("SDK", "Cannot answer call: no active call");
     }
-    
-    /* Find the current call for this UA */
-    struct call *call = baresip_ua_call((struct ua *)client->ua);
-    if (!call) {
-        logger_error_with_category("SDK", "Cannot answer call: No active call found");
-        return;
-    }
-    
-    baresip_ua_answer((struct ua *)client->ua, call, BARESIP_VIDMODE_OFF);
-    logger_info_with_category("SDK", "Call answered.");
 }
 
 void millennium_client_hangup(struct millennium_client *client) {
-    if (!client->ua) {
-        logger_error_with_category("SDK", "Cannot hangup call: UA is null");
-        return;
-    }
-    
-    /* Find the current call for this UA */
-    struct call *call = baresip_ua_call((struct ua *)client->ua);
-    if (!call) {
-        logger_warn_with_category("SDK", "Cannot hangup call: No active call found");
-        return;
-    }
-    
-    baresip_ua_hangup((struct ua *)client->ua, call, 0, "Call terminated");
+    (void)client;
+    pjsip_iface_hangup();
     logger_info_with_category("SDK", "Call terminated.");
 }
 
 int millennium_client_send_dtmf(struct millennium_client *client, char key) {
-    if (!client || !client->ua) return -1;
-    struct call *call = baresip_ua_call((struct ua *)client->ua);
-    if (!call) return -1;
-    return baresip_call_send_digit(call, key);
+    (void)client;
+    return pjsip_iface_send_dtmf(key);
 }
 
 void millennium_client_serial_activity(struct millennium_client *client) {

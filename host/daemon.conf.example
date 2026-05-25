@@ -13,6 +13,30 @@ call.free_numbers=911,311,0
 # Seconds of inactivity (handset up, no dialing) before phone resets
 call.idle_timeout_seconds=60
 
+# SIP / VoIP Configuration (PJSIP / PJSUA)
+# Credentials live here now (no separate ~/.baresip/accounts file). Leave
+# sip.id_uri / sip.registrar empty to run the phone without VoIP (games only).
+# Account-of-record URI (your DID @ provider domain):
+sip.id_uri=
+# Registrar URI (usually sip:<provider-domain>):
+sip.registrar=
+# Auth realm ("*" matches any realm the server offers):
+sip.realm=*
+sip.username=
+sip.password=
+# Signalling transport: udp | tcp | tls  (Twilio requires tls)
+sip.transport=tls
+# Optional STUN server for NAT traversal (host:port), e.g. stun.l.google.com:19302
+sip.stun_server=
+# Local SIP port (0 = auto/ephemeral)
+sip.local_port=0
+# ALSA sound device NAMES for the call leg (matched against PJSUA's device
+# list; empty = PJSUA auto). The raw "hw:..." device is stereo-only and fails
+# at mono telephony, so use plug-wrapped devices. Defaults route call audio to
+# the handset earpiece (right channel) and capture the C-Media mic:
+sip.snd_capture=plughw:CARD=Device,DEV=0
+sip.snd_playback=out_right_solo
+
 # Card Configuration (magstripe reader)
 card.enabled=true
 # Comma-separated 16-digit card numbers that grant free calling
@@ -42,3 +66,19 @@ metrics_server.port=8080
 # Web Server Configuration
 web_server.enabled=true
 web_server.port=8081
+
+# Plugin Configuration
+# Each plugin can read its own keys from this file. Built-in game plugins:
+#   Number Guess (Hi-Lo)
+guess.cost_cents=25
+# guess.secret forces the hidden number 1..99 (0 = random; for testing/demos)
+guess.secret=0
+#   Simon (memory game, free to play)
+# simon.seq forces the tone sequence, e.g. 1342 (empty = random)
+simon.seq=
+#   Dial-A-Joke (free joke line)
+# joke.index forces a starting joke (-1 = random)
+joke.index=-1
+#   Trivia (free True/False quiz)
+# trivia.start forces the first question index (-1 = random)
+trivia.start=-1

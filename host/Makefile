@@ -1,5 +1,7 @@
 CXXFLAGS=-g -O3 -std=c++17 -Wall -Wextra
-LDFLAGS=-lpthread -latomic -lasound `pkg-config libre --libs` `pkg-config libbaresip --libs`
+# pjproject ships static .a libs; its ssl/crypto/srtp/codec deps live in the
+# .pc Libs.private, so we need --static to pull them into the link.
+LDFLAGS=-lpthread -latomic -lasound `pkg-config --libs --static libpjproject`
 
 # C flags for C files
 CFLAGS=-g -O3 -Wall -Wextra -std=c89
@@ -36,8 +38,8 @@ websocket.o: websocket.c websocket.h
 web_server.o: web_server.c web_server.h websocket.h config.h logger.h metrics.h health_monitor.h version.h updater.h
 	gcc web_server.c -o web_server.o -c $(CFLAGS)
 
-baresip_interface.o: baresip_interface.c baresip_interface.h
-	gcc baresip_interface.c -o baresip_interface.o -c $(C99_CFLAGS) `pkg-config --cflags libre libbaresip`
+pjsip_interface.o: pjsip_interface.c pjsip_interface.h logger.h
+	gcc pjsip_interface.c -o pjsip_interface.o -c $(C99_CFLAGS) `pkg-config --cflags libpjproject`
 
 events.o: events.c events.h
 	gcc events.c -o events.o -c $(CFLAGS)
@@ -45,7 +47,7 @@ events.o: events.c events.h
 event_processor.o: event_processor.c event_processor.h events.h
 	gcc event_processor.c -o event_processor.o -c $(CFLAGS)
 
-millennium_sdk.o: millennium_sdk.c millennium_sdk.h events.h baresip_interface.h
+millennium_sdk.o: millennium_sdk.c millennium_sdk.h events.h pjsip_interface.h config.h
 	gcc millennium_sdk.c -o millennium_sdk.o -c $(CFLAGS)
 
 state_persistence.o: state_persistence.c state_persistence.h daemon_state.h logger.h
@@ -53,6 +55,9 @@ state_persistence.o: state_persistence.c state_persistence.h daemon_state.h logg
 
 display_manager.o: display_manager.c display_manager.h millennium_sdk.h
 	gcc display_manager.c -o display_manager.o -c $(CFLAGS)
+
+plugin_sdk.o: plugin_sdk.c plugin_sdk.h plugins.h display_manager.h audio_tones.h millennium_sdk.h logger.h daemon_state.h
+	gcc plugin_sdk.c -o plugin_sdk.o -c $(CFLAGS)
 
 version.o: version.c version.h
 	gcc version.c -o version.o -c $(CFLAGS) $(VERSION_CFLAGS)
@@ -79,15 +84,27 @@ plugins/fortune_teller.o: plugins/fortune_teller.c plugins.h
 plugins/jukebox.o: plugins/jukebox.c plugins.h
 	gcc plugins/jukebox.c -o plugins/jukebox.o -c $(C99_CFLAGS) -lpthread
 
-daemon: daemon.o daemon_state.o millennium_sdk.o baresip_interface.o events.o event_processor.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o websocket.o plugins.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o state_persistence.o display_manager.o version.o audio_tones.o updater.o
-	gcc daemon.o daemon_state.o millennium_sdk.o baresip_interface.o events.o event_processor.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o websocket.o plugins.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o state_persistence.o display_manager.o version.o audio_tones.o updater.o -o daemon $(LDFLAGS) -lm
+plugins/number_guess.o: plugins/number_guess.c plugins.h plugin_sdk.h config.h
+	gcc plugins/number_guess.c -o plugins/number_guess.o -c $(CFLAGS)
+
+plugins/simon.o: plugins/simon.c plugins.h plugin_sdk.h config.h
+	gcc plugins/simon.c -o plugins/simon.o -c $(CFLAGS)
+
+plugins/dial_a_joke.o: plugins/dial_a_joke.c plugins.h plugin_sdk.h config.h
+	gcc plugins/dial_a_joke.c -o plugins/dial_a_joke.o -c $(CFLAGS)
+
+plugins/trivia.o: plugins/trivia.c plugins.h plugin_sdk.h config.h
+	gcc plugins/trivia.c -o plugins/trivia.o -c $(CFLAGS)
+
+daemon: daemon.o daemon_state.o millennium_sdk.o pjsip_interface.o events.o event_processor.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o websocket.o plugins.o plugin_sdk.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o plugins/number_guess.o plugins/simon.o plugins/dial_a_joke.o plugins/trivia.o state_persistence.o display_manager.o version.o audio_tones.o updater.o
+	gcc daemon.o daemon_state.o millennium_sdk.o pjsip_interface.o events.o event_processor.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o websocket.o plugins.o plugin_sdk.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o plugins/number_guess.o plugins/simon.o plugins/dial_a_joke.o plugins/trivia.o state_persistence.o display_manager.o version.o audio_tones.o updater.o -o daemon $(LDFLAGS) -lm
 
 # Simulator object file (uses C99 for mixed declarations)
 simulator.o: simulator.c millennium_sdk.h events.h config.h daemon_state.h logger.h metrics.h plugins.h
 	gcc simulator.c -o simulator.o -c $(C99_CFLAGS)
 
 # Simulator objects — no baresip, no web server, no daemon.o
-SIM_OBJS = simulator.o daemon_state.o events.o event_processor.o config.o logger.o metrics.o plugins.o plugins/classic_phone.o plugins/fortune_teller.o state_persistence.o display_manager.o version.o
+SIM_OBJS = simulator.o daemon_state.o events.o event_processor.o config.o logger.o metrics.o plugins.o plugin_sdk.o plugins/classic_phone.o plugins/fortune_teller.o plugins/number_guess.o plugins/simon.o plugins/dial_a_joke.o plugins/trivia.o state_persistence.o display_manager.o version.o
 
 # On Linux, wrap time() for simulated time; elsewhere use real time
 SIM_LDFLAGS = -lpthread
@@ -101,7 +118,7 @@ simulator: $(SIM_OBJS)
 all: daemon
 
 # Unit test binary
-UNIT_TEST_OBJS = tests/unit_tests.o daemon_state.o events.o event_processor.o config.o logger.o metrics.o plugins.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o state_persistence.o display_manager.o version.o updater.o
+UNIT_TEST_OBJS = tests/unit_tests.o daemon_state.o events.o event_processor.o config.o logger.o metrics.o plugins.o plugin_sdk.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o plugins/number_guess.o plugins/simon.o plugins/dial_a_joke.o plugins/trivia.o state_persistence.o display_manager.o version.o updater.o
 
 tests/unit_tests.o: tests/unit_tests.c tests/test_framework.h config.h daemon_state.h plugins.h logger.h metrics.h millennium_sdk.h updater.h
 	gcc tests/unit_tests.c -o tests/unit_tests.o -c $(C99_CFLAGS) -I.
@@ -115,6 +132,15 @@ endif
 unit_tests: $(UNIT_TEST_OBJS)
 	gcc $(UNIT_TEST_OBJS) -o unit_tests $(UNIT_LDFLAGS)
 
+# Optional PJSIP runtime smoke test. Needs libpjproject on the dev box
+# (macOS: `brew install pjproject`; Pi: built from source). Brings PJSUA up and
+# down without a SIP peer or phone hardware — validates the PJSIP integration
+# compiles and runs. Not part of `make test` (which must run anywhere).
+pjsip-smoke: tests/pjsip_smoke.c pjsip_interface.c pjsip_interface.h logger.o
+	gcc tests/pjsip_smoke.c pjsip_interface.c logger.o -o pjsip_smoke \
+		$(C99_CFLAGS) `pkg-config --cflags libpjproject` \
+		`pkg-config --libs --static libpjproject` -lpthread -lm
+
 # Run all scenario tests via the simulator
 test: simulator unit_tests
 	@echo "Running unit tests..."
@@ -125,7 +151,7 @@ test: simulator unit_tests
 	@echo ""
 
 clean:
-	rm -rf *.o daemon simulator unit_tests plugins/*.o tests/*.o
+	rm -rf *.o daemon simulator unit_tests pjsip_smoke plugins/*.o tests/*.o
 
 install: daemon
 	@systemctl --user stop daemon.service 2>/dev/null || true
@@ -143,10 +169,6 @@ install: daemon
 	sudo mkdir -p /usr/local/share/millennium
 	sudo cp web_portal.html /usr/local/share/millennium/
 	sudo cp systemd/daemon.service /etc/systemd/system/
-	@if [ -f $$HOME/.baresip/config ] && grep -qE '^[[:space:]]*module[[:space:]]*stdio\.so' $$HOME/.baresip/config 2>/dev/null; then \
-		sed -i.bak 's/^[[:space:]]*module[[:space:]]*stdio\.so/# module stdio.so/' $$HOME/.baresip/config; \
-		echo "Commented out stdio module in ~/.baresip/config (backup: .bak)"; \
-	fi
 	sudo mkdir -p /etc/systemd/system/daemon.service.d
 	@printf '[Service]\nUser=%s\n' "$$(logname 2>/dev/null || whoami)" > daemon-override.conf.tmp && sudo cp daemon-override.conf.tmp /etc/systemd/system/daemon.service.d/override.conf; rm -f daemon-override.conf.tmp
 	sudo systemctl daemon-reload
@@ -180,4 +202,4 @@ break-test:
 	@chmod +x tests/break_test.sh
 	@HOST=$(HOST) ./tests/break_test.sh $(HOST)
 
-.PHONY: all clean install uninstall test unit_tests api-test device-test break-test
+.PHONY: all clean install uninstall test unit_tests api-test device-test break-test pjsip-smoke

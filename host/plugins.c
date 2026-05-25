@@ -9,8 +9,9 @@
 #include "logger.h"
 #include "millennium_sdk.h"
 
-/* Maximum number of plugins */
-#define MAX_PLUGINS 10
+/* Maximum number of plugins. Generous headroom so experimenters can add
+ * their own alongside the built-ins (7 ship by default). */
+#define MAX_PLUGINS 32
 
 /* Plugin registry */
 static plugin_t plugins[MAX_PLUGINS];
@@ -30,6 +31,10 @@ void plugins_init(void) {
     register_classic_phone_plugin();
     register_fortune_teller_plugin();
     register_jukebox_plugin();
+    register_number_guess_plugin();
+    register_simon_plugin();
+    register_dial_a_joke_plugin();
+    register_trivia_plugin();
     
     /* Activate classic phone by default */
     plugins_activate("Classic Phone");
@@ -154,6 +159,103 @@ int plugins_list(char *buffer, size_t buffer_size) {
     
     pthread_mutex_unlock(&plugins_mutex);
     return 0;
+}
+
+int plugins_get_count(void) {
+    int count;
+    pthread_mutex_lock(&plugins_mutex);
+    count = plugin_count;
+    pthread_mutex_unlock(&plugins_mutex);
+    return count;
+}
+
+int plugins_get_info(int index, const char **name, const char **description,
+                     int *is_active) {
+    pthread_mutex_lock(&plugins_mutex);
+    if (index < 0 || index >= plugin_count) {
+        pthread_mutex_unlock(&plugins_mutex);
+        return -1;
+    }
+    if (name) *name = plugins[index].name;
+    if (description) *description = plugins[index].description;
+    if (is_active) *is_active = (index == active_plugin_index) ? 1 : 0;
+    pthread_mutex_unlock(&plugins_mutex);
+    return 0;
+}
+
+/* Append src to dst (at *pos) with JSON-special characters escaped, never
+ * overflowing cap. Advances *pos. */
+static void json_append_escaped(char *dst, size_t cap, size_t *pos,
+                                const char *src) {
+    size_t i;
+    if (!src) src = "";
+    for (i = 0; src[i] != '\0'; i++) {
+        char esc[8];
+        const char *chunk;
+        size_t len;
+        unsigned char c = (unsigned char)src[i];
+        switch (c) {
+            case '"':  chunk = "\\\""; len = 2; break;
+            case '\\': chunk = "\\\\"; len = 2; break;
+            case '\n': chunk = "\\n";  len = 2; break;
+            case '\r': chunk = "\\r";  len = 2; break;
+            case '\t': chunk = "\\t";  len = 2; break;
+            default:
+                if (c < 0x20) {
+                    snprintf(esc, sizeof(esc), "\\u%04x", c);
+                    chunk = esc; len = 6;
+                } else {
+                    esc[0] = (char)c; esc[1] = '\0';
+                    chunk = esc; len = 1;
+                }
+                break;
+        }
+        if (*pos + len >= cap) break; /* leave room for NUL */
+        memcpy(dst + *pos, chunk, len);
+        *pos += len;
+    }
+    dst[*pos] = '\0';
+}
+
+static void json_append_lit(char *dst, size_t cap, size_t *pos,
+                            const char *lit) {
+    size_t len = strlen(lit);
+    if (*pos + len >= cap) return;
+    memcpy(dst + *pos, lit, len);
+    *pos += len;
+    dst[*pos] = '\0';
+}
+
+int plugins_to_json(char *buffer, size_t buffer_size) {
+    size_t pos = 0;
+    int i;
+
+    if (!buffer || buffer_size == 0) return -1;
+    buffer[0] = '\0';
+
+    pthread_mutex_lock(&plugins_mutex);
+
+    json_append_lit(buffer, buffer_size, &pos, "{\"plugins\":[");
+    for (i = 0; i < plugin_count; i++) {
+        if (i > 0) json_append_lit(buffer, buffer_size, &pos, ",");
+        json_append_lit(buffer, buffer_size, &pos, "{\"name\":\"");
+        json_append_escaped(buffer, buffer_size, &pos, plugins[i].name);
+        json_append_lit(buffer, buffer_size, &pos, "\",\"description\":\"");
+        json_append_escaped(buffer, buffer_size, &pos, plugins[i].description);
+        json_append_lit(buffer, buffer_size, &pos, "\",\"active\":");
+        json_append_lit(buffer, buffer_size, &pos,
+                        (i == active_plugin_index) ? "true" : "false");
+        json_append_lit(buffer, buffer_size, &pos, "}");
+    }
+    json_append_lit(buffer, buffer_size, &pos, "],\"active_plugin\":\"");
+    if (active_plugin_index >= 0 && active_plugin_index < plugin_count) {
+        json_append_escaped(buffer, buffer_size, &pos,
+                            plugins[active_plugin_index].name);
+    }
+    json_append_lit(buffer, buffer_size, &pos, "\"}");
+
+    pthread_mutex_unlock(&plugins_mutex);
+    return (int)pos;
 }
 
 int plugins_handle_coin(int coin_value, const char *coin_code) {

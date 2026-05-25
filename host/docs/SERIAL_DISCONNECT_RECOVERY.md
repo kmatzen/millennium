@@ -9,7 +9,7 @@ When the display Arduino or serial link disconnects during a call (USB unplug, c
 
 ## What Continues
 
-- **SIP call**: Baresip runs in a separate thread and uses the network. The call continues; audio is independent of the serial link.
+- **SIP call**: PJSIP (the PJSUA worker thread) runs separately and uses the network. The call continues; audio is independent of the serial link.
 - **Plugin state**: Daemon state, plugin state (e.g. `classic_phone_data`), and display_manager state keep updating via `plugins_tick` / `display_manager_tick`. These run in the main loop regardless of serial.
 
 ## Display Re-sync on Reconnect

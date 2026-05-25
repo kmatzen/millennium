@@ -1,0 +1,41 @@
+# Test: Trivia (True/False) quiz plugin
+# Force the starting question so the 3-question round is deterministic.
+# Questions 0,1,2 have answers True, False, True.
+
+config trivia.start 0
+activate_plugin Trivia
+
+# Receiver down -> invitation
+assert_display Lift to play
+
+# Lift the handset -> start splash
+hook_up
+assert_display Press key: start
+
+# Press a key to begin -> first question, answer prompt on line 2
+key 5
+assert_display 1=True 2=False
+
+# Q0 ("...a murder") is True -> press 1 -> Correct
+key 1
+assert_display Correct
+
+# Beat, then Q1 appears
+wait 2
+assert_display 1=True 2=False
+
+# Q1 ("Goldfish... 3-second memory") is False -> press 2 -> Correct
+key 2
+assert_display Correct
+
+# Beat, then Q2 appears
+wait 2
+assert_display 1=True 2=False
+
+# Q2 ("Honey never spoils") is True -> press 1 -> Correct
+key 1
+assert_display Correct
+
+# Beat, then the final score (3/3)
+wait 2
+assert_display Score: 3/3

@@ -72,7 +72,7 @@ static int classic_phone_handle_coin(int coin_value, const char *coin_code) {
 
 static int classic_phone_handle_keypad(char key) {
     if (classic_phone_data.is_in_call) {
-        /* #95: Send DTMF to Baresip for IVR/voicemail navigation */
+        /* #95: Send DTMF to the SIP stack for IVR/voicemail navigation */
         if (client && (isdigit((unsigned char)key) || key == '*' || key == '#')) {
             if (millennium_client_send_dtmf(client, key) == 0) {
                 audio_tones_play_dtmf(key);  /* Local feedback */
