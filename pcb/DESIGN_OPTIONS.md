@@ -114,7 +114,7 @@ The display Arduino uses its only hardware UART (Serial1) for the VFD. Pi commun
 - Keypad doesn’t talk to the Pi directly today; everything goes through the display.
 - To use Pi UART, we’d need the keypad to talk to the Pi over UART instead of I2C→display→USB. That’s a protocol/architecture change.
 
-**Conclusion:** Direct Pi UART is possible if we repin the display (Option 2a) and add level shifters. It removes USB for that link and avoids hub/ enumeration issues, at the cost of pin changes, new parts, and firmware updates.
+**Conclusion:** Direct Pi UART is possible if we repin the display (Option 2a) and add level shifters. It removes USB for that link and avoids hub/enumeration issues, at the cost of pin changes, new parts, and firmware updates.
 
 ---
 

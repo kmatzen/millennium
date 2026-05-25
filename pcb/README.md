@@ -23,10 +23,10 @@ channels, solving both the speaker coupling and quiet handset issues.
 ```
 USB audio card (stereo 3.5mm)
   ├─ Left channel → J7 tip → C_inA → TDA2822 IN_A (pin 3)
-  │                                    → OUT_A (pin 1) → C_outA → speaker_front+ → ringer
+  │                                  TDA2822 OUT_A (pin 1) → C_outA → speaker_front+ → ringer
   │
   └─ Right channel → J7 ring → C_inB → TDA2822 IN_B (pin 4)
-                                        → OUT_B (pin 5) → C_outB → speaker_receiver+ → J4 RJ9 → handset
+                                       TDA2822 OUT_B (pin 5) → C_outB → speaker_receiver+ → J4 RJ9 → handset
 ```
 
 Each channel has its own input coupling capacitor (100nF) and output coupling
@@ -128,7 +128,7 @@ self-resets when the fault is cleared.
 
 ### Power Indicator (D4, R3)
 
-A green LED on the 5V_MAIN rail provides visual confirmation that the board is
+A red LED on the 5V_MAIN rail provides visual confirmation that the board is
 powered, useful when debugging inside the payphone enclosure.
 
 ## Connector Pinouts
@@ -211,10 +211,10 @@ The board is powered from an external 5V supply. Power flows as follows:
 | TP6   | 12V_COIN | Boosted 12V rail for coin validator |
 
 **Note on USB connectivity**: Arduino ↔ Pi communication is via USB through an
-external hub. There are no discrete USB serial TX/RX nets on the PCB; TP6 and
-TP7 in older docs referred to USB serial, but that path does not exist as PCB
-nets. Only the test points above (5V_MAIN, GND, 12V_COIN, I2C) are actual PCB
-nets.
+external hub. There are no discrete USB serial TX/RX nets on the PCB. Older docs
+listed extra test points for USB serial, but that path does not exist as PCB
+nets. Only the test points above (5V_MAIN, 3.3V, GND, SDA, SCL, 12V_COIN) are
+actual PCB nets.
 
 ## Schematic Audit
 

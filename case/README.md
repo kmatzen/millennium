@@ -4,16 +4,16 @@ An enclosure for the custom PCB, designed in Blender and printed in PLA+.
 
 ## Dimensions
 
-| Measurement        | Value      |
-|--------------------|------------|
+| Measurement        | Value                   |
+|--------------------|-------------------------|
 | Outer size         | 109.5 × 134.0 × 38.0 mm |
-| Interior (approx)  | ~103 × 128 mm |
-| Wall thickness     | ~3 mm      |
-| Depth per half     | 19 mm      |
-| PCB size           | 88.9 × 124.5 mm |
-| PCB clearance (X)  | ~14.6 mm   |
-| PCB clearance (Y)  | ~3.5 mm    |
-| Triangle count     | 3,544      |
+| Interior (approx)  | ~103 × 128 mm           |
+| Wall thickness     | ~3 mm                   |
+| Depth per half     | 19 mm                   |
+| PCB size           | 88.9 × 124.5 mm         |
+| PCB clearance (X)  | ~14.6 mm                |
+| PCB clearance (Y)  | ~3.5 mm                 |
+| Triangle count     | 3,544                   |
 
 ## Design
 
@@ -45,14 +45,14 @@ The case is a two-piece clamshell that splits horizontally at the midplane:
 
 ### Recommended Settings
 
-| Setting           | Value                |
-|-------------------|----------------------|
-| Material          | PLA+ (or PETG for heat resistance) |
-| Layer height      | 0.2 mm               |
-| Infill            | 20–30%               |
-| Perimeters        | 3                    |
+| Setting           | Value                                  |
+|-------------------|----------------------------------------|
+| Material          | PLA+ (or PETG for heat resistance)     |
+| Layer height      | 0.2 mm                                 |
+| Infill            | 20–30%                                 |
+| Perimeters        | 3                                      |
 | Supports          | Not needed (flat bottom, no overhangs) |
-| Bed adhesion      | Brim recommended for the larger half |
+| Bed adhesion      | Brim recommended for the larger half   |
 
 The original was printed with PLA+ at default slicer settings. No supports
 are required since both halves print with the open face up.

@@ -32,34 +32,32 @@ This project reimagines the functionality of the Nortel Millennium telephone by 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                 Raspberry Pi Zero 2 W               │
-│                                                     │
-│  ┌──────────┐  ┌──────────┐  ┌───────────────────┐ │
-│  │  Daemon   │  │  PJSIP   │  │   Web Dashboard   │ │
-│  │          │──│  (VoIP)  │  │   :8081            │ │
-│  │ Plugins: │  └──────────┘  │ - Phone state      │ │
-│  │ - Phone  │                │ - Plugin switching  │ │
-│  │ - Fortune│  ┌──────────┐  │ - OTA updates      │ │
-│  │ - Jukebox│  │  ALSA    │  │ - Health/metrics   │ │
-│  │          │  │  Audio   │  └───────────────────┘ │
-│  └────┬─────┘  └──────────┘                         │
-│       │ USB Serial (9600 baud)                      │
-└───────┼─────────────────────────────────────────────┘
-        │
-┌───────┴──────────────────────────────────────────┐
-│              Custom PCB (phonev5)                 │
-│                                                  │
-│  ┌─────────────────┐    I2C    ┌───────────────┐ │
-│  │ Display Arduino  │◄────────│ Keypad Arduino │ │
-│  │ (millennium_beta)│         │(millennium_alpha)│
-│  │                  │         │                 │ │
-│  │ ► VFD Display    │         │ ► 4x7 Keypad   │ │
-│  │   (parallel 8b)  │         │ ► MagStripe    │ │
-│  │ ► Coin Validator  │         │ ► Hook Switch  │ │
-│  │   (SoftSerial)   │         │                 │ │
-│  └──────────────────┘         └─────────────────┘ │
-└──────────────────────────────────────────────────┘
+┌────────────────────────── Raspberry Pi Zero 2 W ───────────────────────────┐
+│                                                                            │
+│  ┌──────────────┐     ┌──────────────┐      ┌──────────────────────────┐   │
+│  │ Daemon       │────▶│ PJSIP (VoIP) │      │ Web Dashboard :8081      │   │
+│  │              │     └──────────────┘      │                          │   │
+│  │ Plugins:     │                           │ - phone state            │   │
+│  │ - Phone      │     ┌──────────────┐      │ - plugin switching       │   │
+│  │ - Fortune    │     │ ALSA Audio   │      │ - OTA updates            │   │
+│  │ - Jukebox    │     └──────────────┘      │ - health / metrics       │   │
+│  │ - +4 games   │                           └──────────────────────────┘   │
+│  └──────┬───────┘                                                          │
+│         │ USB serial (9600 baud)                                           │
+└─────────┬──────────────────────────────────────────────────────────────────┘
+          │
+┌─────────┴───────────────── Custom PCB (phonev5) ───────────────────────────┐
+│                                                                            │
+│  ┌──────────────────────┐ I2C      ┌────────────────────────┐              │
+│  │ Display Arduino      │◀─────────│ Keypad Arduino         │              │
+│  │ (millennium_beta)    │          │ (millennium_alpha)     │              │
+│  │                      │          │                        │              │
+│  │ - VFD display        │          │ - 4x7 keypad           │              │
+│  │   (parallel 8-bit)   │          │ - magstripe reader     │              │
+│  │ - coin validator     │          │ - hook switch          │              │
+│  │   (SoftSerial)       │          └────────────────────────┘              │
+│  └──────────────────────┘                                                  │
+└────────────────────────────────────────────────────────────────────────────┘
 ```
 
 **Data flow**: Keypad/hook/card events originate on the Keypad Arduino, are sent via I2C to the Display Arduino, which forwards them to the Raspberry Pi over USB serial. The daemon processes events through an event processor, dispatches them to the active plugin, and sends display updates back down the same path. VoIP calls are handled by PJSIP (PJSUA C API) with audio routed through ALSA (dmix + route plugins for mono channel splitting).

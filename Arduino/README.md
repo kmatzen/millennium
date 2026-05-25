@@ -2,10 +2,10 @@
 
 Two Arduino Micro boards (ATmega32U4) run the keypad/peripheral I/O:
 
-| Board             | FQBN                            | Sketch            | Role                                    |
-|-------------------|---------------------------------|-------------------|-----------------------------------------|
-| Millennium Alpha  | `arduino:avr:millennium_alpha`  | `sketches/keypad` | 4x7 keypad, magstripe reader, hook switch |
-| Millennium Beta   | `arduino:avr:millennium_beta`   | `sketches/display`| VFD display, coin validator, I2C→USB bridge |
+| Board             | FQBN                            | Sketch             | Role                                        |
+|-------------------|---------------------------------|--------------------|---------------------------------------------|
+| Millennium Alpha  | `arduino:avr:millennium_alpha`  | `sketches/keypad`  | 4x7 keypad, magstripe reader, hook switch   |
+| Millennium Beta   | `arduino:avr:millennium_beta`   | `sketches/display` | VFD display, coin validator, I2C→USB bridge |
 
 See [PINOUT.md](PINOUT.md) for complete pin assignments, I2C protocol, and serial command reference.
 
