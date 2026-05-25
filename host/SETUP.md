@@ -92,7 +92,7 @@ playback to the right channel. If needed, pin specific device IDs with
 `sip.snd_capture_dev` / `sip.snd_playback_dev` (the daemon logs available
 device IDs at startup).
 
-## 6. Clone and build the daemon
+## 5. Clone and build the daemon
 
 ```bash
 cd ~
@@ -101,7 +101,7 @@ cd millennium/host
 make daemon
 ```
 
-## 7. ALSA audio configuration
+## 6. ALSA audio configuration
 
 The USB audio card needs a custom ALSA config to split stereo into independent
 mono channels for the handset earpiece and ringer speaker. From the `host/`
@@ -127,7 +127,7 @@ speaker-test -D out_left_solo -c1 -twav   # should play through ringer
 speaker-test -D out_right_solo -c1 -twav  # should play through handset
 ```
 
-## 8. Configure the daemon
+## 7. Configure the daemon
 
 ```bash
 sudo mkdir -p /etc/millennium
@@ -153,7 +153,7 @@ With the custom board definitions flashed, the display Arduino appears as
 ls /dev/serial/by-id/
 ```
 
-## 9. Create the log and state directories
+## 8. Create the log and state directories
 
 ```bash
 sudo mkdir -p /var/log/millennium
@@ -162,7 +162,7 @@ sudo mkdir -p /var/lib/millennium
 sudo chown $USER:$USER /var/lib/millennium
 ```
 
-## 10. Install the systemd service
+## 9. Install the systemd service
 
 **Production** (recommended): Use `make install` for a system-wide service that
 starts at boot:
@@ -195,7 +195,7 @@ Ensure `/etc/millennium/daemon.conf` exists: `sudo cp daemon.conf.example /etc/m
 
 The web dashboard should now be accessible at `http://<pi-ip>:8081`.
 
-## 11. Disable unused services (optional cleanup)
+## 10. Disable unused services (optional cleanup)
 
 If you previously had PipeWire/WirePlumber installed, mask the leftover services:
 

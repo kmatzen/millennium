@@ -15,27 +15,27 @@ definitions only change the USB VID/PID so the Pi can distinguish them via
 
 ## Keypad Arduino (Millennium Alpha, A1)
 
-| Arduino Pin | ATmega32U4 Pin | Function             | Direction    | Notes                              |
-|-------------|----------------|----------------------|--------------|------------------------------------|
-| 0           | PD2 (RXD1)     | MagStripe RDT (data) | Input (ISR)  | Shared with HW UART RX — see note  |
-| 1           | PD3 (TXD1)     | MagStripe RCL (clock)| Input (ISR)  | Shared with HW UART TX — see note  |
-| 4           | PD4            | Hook down sense      | Input pullup |                                    |
-| 5           | PC6            | Hook up sense        | Input pullup |                                    |
-| 6           | PD7            | Keypad row 3 (* 0 #) | I/O         |                                    |
-| 7           | PE6            | Keypad row 2 (7 8 9) | I/O         |                                    |
-| 8           | PB4            | Keypad row 1 (4 5 6) | I/O         |                                    |
-| 9           | PB5            | Keypad row 0 (1 2 3) | I/O         |                                    |
-| 10          | PB6            | Keypad col 0         | I/O          |                                    |
-| 11          | PB7            | Keypad col 1         | I/O          |                                    |
-| 12          | PD6            | Keypad col 2         | I/O          |                                    |
-| 13          | PC7            | Keypad col 3         | I/O          | Extra columns (A-P keys)           |
-| 18 (A0)     | PF7            | Keypad col 4         | I/O          | Extra columns (A-P keys)           |
-| 19 (A1)     | PF6            | Keypad col 5         | I/O          | Extra columns (A-P keys)           |
-| 20 (A2)     | PF5            | Keypad col 6         | I/O          | Extra columns (A-P keys)           |
-| 21 (A3)     | PF4            | Hook common pin      | Output       | Driven LOW to scan, HIGH at idle   |
-| 22 (A4)     | PF1 (ADC1)     | MagStripe CLS (card present) | Input |                                    |
-| 2 (SDA)     | PD1            | I2C SDA (master)     | I/O          | To display Arduino                 |
-| 3 (SCL)     | PD0            | I2C SCL (master)     | I/O          | To display Arduino                 |
+| Arduino Pin | ATmega32U4 Pin | Function                     | Direction    | Notes                              |
+|-------------|----------------|------------------------------|--------------|------------------------------------|
+| 0           | PD2 (RXD1)     | MagStripe RDT (data)         | Input (ISR)  | Shared with HW UART RX — see note  |
+| 1           | PD3 (TXD1)     | MagStripe RCL (clock)        | Input (ISR)  | Shared with HW UART TX — see note  |
+| 4           | PD4            | Hook down sense              | Input pullup |                                    |
+| 5           | PC6            | Hook up sense                | Input pullup |                                    |
+| 6           | PD7            | Keypad row 3 (* 0 #)         | I/O          |                                    |
+| 7           | PE6            | Keypad row 2 (7 8 9)         | I/O          |                                    |
+| 8           | PB4            | Keypad row 1 (4 5 6)         | I/O          |                                    |
+| 9           | PB5            | Keypad row 0 (1 2 3)         | I/O          |                                    |
+| 10          | PB6            | Keypad col 0                 | I/O          |                                    |
+| 11          | PB7            | Keypad col 1                 | I/O          |                                    |
+| 12          | PD6            | Keypad col 2                 | I/O          |                                    |
+| 13          | PC7            | Keypad col 3                 | I/O          | Extra columns (A-P keys)           |
+| 18 (A0)     | PF7            | Keypad col 4                 | I/O          | Extra columns (A-P keys)           |
+| 19 (A1)     | PF6            | Keypad col 5                 | I/O          | Extra columns (A-P keys)           |
+| 20 (A2)     | PF5            | Keypad col 6                 | I/O          | Extra columns (A-P keys)           |
+| 21 (A3)     | PF4            | Hook common pin              | Output       | Driven LOW to scan, HIGH at idle   |
+| 22 (A4)     | PF1 (ADC1)     | MagStripe CLS (card present) | Input        |                                    |
+| 2 (SDA)     | PD1            | I2C SDA (master)             | I/O          | To display Arduino                 |
+| 3 (SCL)     | PD0            | I2C SCL (master)             | I/O          | To display Arduino                 |
 
 ### Notes
 
@@ -57,26 +57,26 @@ keypad PCB (volume, language, etc.).
 
 | Arduino Pin | ATmega32U4 Pin | Function             | Direction | Notes                        |
 |-------------|----------------|----------------------|-----------|------------------------------|
-| 0 (RX)      | PD2 (RXD1)     | VFD RD (read strobe) | Output   |                              |
-| 1 (TX)      | PD3 (TXD1)     | VFD AD (address)     | Output   |                              |
-| 4           | PD4            | VFD WR (write strobe)| Output   |                              |
-| 5           | PC6            | VFD D0               | Output   |                              |
-| 6           | PD7            | VFD D1               | Output   |                              |
-| 7           | PE6            | VFD D2               | Output   |                              |
-| 8           | PB4            | VFD D3               | Output   |                              |
-| 9           | PB5            | VFD D4               | Output   |                              |
-| 10          | PB6            | VFD D5               | Output   |                              |
-| 11          | PB7            | VFD D6               | Output   |                              |
-| 12          | PD6            | VFD D7               | Output   |                              |
-| 13          | PC7            | VFD RESET            | Output   |                              |
-| 14 (MISO)   | PB3            | Coin validator RX    | Input    | SoftwareSerial at 600 baud   |
-| 15          | PB1            | Coin validator RESET | Output   | Active-low reset              |
-| 16          | PB2            | VFD TEST             | Output   |                              |
-| 17 (SS)     | PB0            | VFD CS (chip select) | Output   |                              |
-| 23          | N/A            | Coin validator TX    | Output   | SoftwareSerial (pin 23 is TX)|
-| 2 (SDA)     | PD1            | I2C SDA (slave)      | I/O      | Slave address 0              |
-| 3 (SCL)     | PD0            | I2C SCL (slave)      | I/O      |                              |
-| USB         | Native USB     | SerialUSB to Pi      | I/O      | 9600 baud                    |
+| 0 (RX)      | PD2 (RXD1)     | VFD RD (read strobe) | Output    |                              |
+| 1 (TX)      | PD3 (TXD1)     | VFD AD (address)     | Output    |                              |
+| 4           | PD4            | VFD WR (write strobe)| Output    |                              |
+| 5           | PC6            | VFD D0               | Output    |                              |
+| 6           | PD7            | VFD D1               | Output    |                              |
+| 7           | PE6            | VFD D2               | Output    |                              |
+| 8           | PB4            | VFD D3               | Output    |                              |
+| 9           | PB5            | VFD D4               | Output    |                              |
+| 10          | PB6            | VFD D5               | Output    |                              |
+| 11          | PB7            | VFD D6               | Output    |                              |
+| 12          | PD6            | VFD D7               | Output    |                              |
+| 13          | PC7            | VFD RESET            | Output    |                              |
+| 14 (MISO)   | PB3            | Coin validator RX    | Input     | SoftwareSerial at 600 baud   |
+| 15          | PB1            | Coin validator RESET | Output    | Active-low reset             |
+| 16          | PB2            | VFD TEST             | Output    |                              |
+| 17 (SS)     | PB0            | VFD CS (chip select) | Output    |                              |
+| 23          | N/A            | Coin validator TX    | Output    | SoftwareSerial (pin 23 is TX)|
+| 2 (SDA)     | PD1            | I2C SDA (slave)      | I/O       | Slave address 0              |
+| 3 (SCL)     | PD0            | I2C SCL (slave)      | I/O       |                              |
+| USB         | Native USB     | SerialUSB to Pi      | I/O       | 9600 baud                    |
 
 ### VFD Pin Mapping (Noritake CU20026SCPB-T23A)
 
@@ -110,30 +110,30 @@ The keypad Arduino sends short I2C messages to the display Arduino. The display
 Arduino's `receiveEvent` ISR immediately forwards each byte over USB serial to
 the Pi.
 
-| Event       | I2C Bytes | USB Serial to Pi |
-|-------------|-----------|------------------|
-| Key press   | `K` + key char (e.g. `K5`) | `K5`    |
-| Hook up     | `H` `U`   | `HU`            |
-| Hook down   | `H` `D`   | `HD`            |
-| Card swipe  | `C` + PAN (up to 16 chars) | `C1234567890123456` |
+| Event       | I2C Bytes                    | USB Serial to Pi      |
+|-------------|------------------------------|-----------------------|
+| Key press   | `K` + key char (e.g. `K5`)   | `K5`                  |
+| Hook up     | `H` `U`                      | `HU`                  |
+| Hook down   | `H` `D`                      | `HD`                  |
+| Card swipe  | `C` + PAN (up to 16 chars)   | `C1234567890123456`   |
 
 ### Pi → Display Arduino (USB Serial)
 
-| Command | Bytes                          | Action                                    |
-|---------|--------------------------------|-------------------------------------------|
-| Display | `0x02` + length + data bytes   | Clear and write text to VFD               |
-| Coin cmd| `0x03` + byte                  | Send byte to coin validator (`@` = reset) |
-| EEPROM  | `0x04`                         | Program coin validator EEPROM (256 bytes) |
-| Verify  | `0x05`                         | Read back and verify coin validator EEPROM|
-| Keepalive | `0x06`                       | No-op; resets serial watchdog when idle (#59) |
+| Command   | Bytes                        | Action                                          |
+|-----------|------------------------------|-------------------------------------------------|
+| Display   | `0x02` + length + data bytes | Clear and write text to VFD                     |
+| Coin cmd  | `0x03` + byte                | Send byte to coin validator (`@` = reset)       |
+| EEPROM    | `0x04`                       | Program coin validator EEPROM (256 bytes)       |
+| Verify    | `0x05`                       | Read back and verify coin validator EEPROM      |
+| Keepalive | `0x06`                       | No-op; resets serial watchdog when idle (#59)   |
 
 ### Coin Validator → Pi
 
 When the coin validator sends a byte over SoftwareSerial, the display Arduino
 prefixes it with `V` and forwards over USB serial:
 
-| USB Serial | Meaning |
-|------------|---------|
+| USB Serial | Meaning                                             |
+|------------|-----------------------------------------------------|
 | `V` + byte | Coin validator event (byte value encodes coin type) |
 
 ## Custom Board Definitions
@@ -145,11 +145,11 @@ The custom boards are appended to the stock Arduino AVR `boards.txt` at:
 
 Key differences from stock Arduino Micro:
 
-| Property       | Stock Micro    | Millennium Alpha   | Millennium Beta    |
-|----------------|----------------|--------------------|--------------------|
-| USB PID (app)  | 0x0037         | 0x0045             | 0x0046             |
-| USB PID (boot) | 0x8037         | 0x8045             | 0x8046             |
-| Product name   | Arduino Micro  | Millennium Alpha   | Millennium Beta    |
+| Property       | Stock Micro    | Millennium Alpha                | Millennium Beta                |
+|----------------|----------------|---------------------------------|--------------------------------|
+| USB PID (app)  | 0x0037         | 0x0045                          | 0x0046                         |
+| USB PID (boot) | 0x8037         | 0x8045                          | 0x8046                         |
+| Product name   | Arduino Micro  | Millennium Alpha                | Millennium Beta                |
 | Bootloader     | Caterina-Micro | Caterina-Micro-Millennium-Alpha | Caterina-Micro-Millennium-Beta |
 
 **Issue**: The custom bootloader hex files (`Caterina-Micro-Millennium-Alpha.hex`,
