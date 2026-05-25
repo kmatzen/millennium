@@ -7,7 +7,7 @@ and notes from the current build.
 
 | Component                    | Model / Part             | Notes                           |
 |------------------------------|--------------------------|---------------------------------|
-| Single-board computer        | Raspberry Pi Zero W      | Single USB port, needs hub      |
+| Single-board computer        | Raspberry Pi Zero 2 W    | Single USB port, needs hub      |
 | Keypad microcontroller       | Arduino Micro (custom)   | "Millennium Alpha" board def    |
 | Display microcontroller      | Arduino Micro (custom)   | "Millennium Beta" board def     |
 | USB audio card               | C-Media CM109 (Unitek Y-247A) | USB class-compliant, stereo out + mono mic in |
@@ -24,11 +24,11 @@ and notes from the current build.
 
 ## USB Topology
 
-The Raspberry Pi Zero W has a single micro-USB OTG port. A USB hub provides
+The Raspberry Pi Zero 2 W has a single micro-USB OTG port. A USB hub provides
 connectivity for all USB peripherals:
 
 ```
-Pi Zero W (USB OTG)
+Pi Zero 2 W (USB OTG)
   └─ USB Hub #1
        ├─ USB Hub #2
        │    ├─ Arduino "Millennium Alpha" (keypad)
@@ -72,7 +72,7 @@ Total estimated current draw:
 
 | Rail        | Component              | Current (typical) |
 |-------------|------------------------|-------------------|
-| 5V_MAIN     | Raspberry Pi Zero W    | 150 mA            |
+| 5V_MAIN     | Raspberry Pi Zero 2 W  | 150 mA            |
 | 5V_MAIN     | Arduino Micro × 2      | 50 mA each        |
 | 5V_MAIN     | VFD display            | 100 mA            |
 | 5V_MAIN     | USB audio card         | 50 mA             |
@@ -83,12 +83,16 @@ Total estimated current draw:
 
 The external 5V supply must provide enough current for both 5V_MAIN loads and
 the XL6009 input (which draws from 5V to produce 12V_COIN for the coin validator).
+The quad-core Zero 2 W can draw well above the ~150 mA typical figure under
+sustained multi-core load, so size the supply with headroom (a 2 A+ supply is
+recommended).
 
 ## Thermal
 
-The Pi Zero W runs at approximately 38°C inside the closed case with no
-active cooling. This is well within operating limits (throttling starts at
-80°C). The phone's metal enclosure acts as a passive heat sink.
+The original Pi Zero W ran at approximately 38°C inside the closed case with no
+active cooling. The quad-core Zero 2 W runs warmer under sustained load but
+stays well within operating limits (throttling starts at 80°C). The phone's
+metal enclosure acts as a passive heat sink.
 
 ## Physical Mounting
 

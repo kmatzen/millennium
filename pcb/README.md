@@ -208,13 +208,13 @@ The board is powered from an external 5V supply. Power flows as follows:
 | TP3   | GND      | Ground reference                  |
 | TP4   | SDA      | I2C data (Arduino ↔ Arduino)      |
 | TP5   | SCL      | I2C clock                         |
-| TP6   | 12V_COIN | Boosted 12V rail for coin validator |
+
+The board has five test points (TP1–TP5), matching the BOM. The 12V_COIN rail
+exists on the board but has no dedicated test point.
 
 **Note on USB connectivity**: Arduino ↔ Pi communication is via USB through an
-external hub. There are no discrete USB serial TX/RX nets on the PCB. Older docs
-listed extra test points for USB serial, but that path does not exist as PCB
-nets. Only the test points above (5V_MAIN, 3.3V, GND, SDA, SCL, 12V_COIN) are
-actual PCB nets.
+external hub — there are no discrete USB serial TX/RX nets on the PCB, so
+(despite older docs) there are no TX/RX test points.
 
 ## Schematic Audit
 
