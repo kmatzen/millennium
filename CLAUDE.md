@@ -63,6 +63,19 @@ make deploy_keypad    # flash Alpha using GPIO17 reset
 
 The deploy scripts assert reset via GPIO (open-drain: drive low, release to input), wait for the stock Arduino Micro bootloader to enumerate at `/dev/serial/by-id/usb-Arduino_LLC_Arduino_Micro-if00`, then flash with `avrdude`. Requires `raspi-gpio` and `avrdude` on the Pi.
 
+## Claude Code Skills (`.claude/skills/`)
+
+Repeatable workflows are captured as project skills (auto-discovered by Claude Code):
+
+| Skill | What it does |
+|-------|--------------|
+| `deploy-daemon` | Sync `host/` to the Pi, `make clean && make daemon`, swap the binary, restart, verify SIP registration (with rollback). |
+| `deploy-arduino` | Compile and GPIO-reset-flash the Alpha/Beta Micros in place over SSH. |
+| `new-plugin` | Scaffold a plugin against `plugin_sdk.h`, register it, wire the build, add a scenario test. |
+| `phone-status` | Health-check the live phone: service state, SIP registration, phone state, recent errors. |
+
+Note: the Pi's IP is DHCP and has changed before (.145 → .115 …), so the skills prefer the `raspberrypi.local` hostname and document how to find the current address.
+
 ## Architecture
 
 ### System Components
