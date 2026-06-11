@@ -259,61 +259,70 @@ int plugins_to_json(char *buffer, size_t buffer_size) {
     return (int)pos;
 }
 
-int plugins_handle_coin(int coin_value, const char *coin_code) {
+/* Capture the active plugin's table entry under the registry mutex.
+ *
+ * Dispatch happens on the daemon event thread while activation
+ * (plugins_activate) can run concurrently on the web-server thread, so
+ * reading active_plugin_index without the lock is a data race. We snapshot
+ * the pointer here under the lock and let the caller invoke the handler
+ * *outside* the lock: the plugins[] table is a fixed static array whose
+ * entries are never moved or unregistered, so the returned pointer stays
+ * valid, and dispatching unlocked avoids holding the mutex across a plugin
+ * callback (which may re-enter the registry and would otherwise deadlock).
+ * Returns NULL when no plugin is active. */
+static plugin_t *plugins_snapshot_active(void) {
+    plugin_t *active = NULL;
+    pthread_mutex_lock(&plugins_mutex);
     if (active_plugin_index >= 0 && active_plugin_index < plugin_count) {
-        plugin_t *active_plugin = &plugins[active_plugin_index];
-        if (active_plugin->handle_coin) {
-            return active_plugin->handle_coin(coin_value, coin_code);
-        }
+        active = &plugins[active_plugin_index];
+    }
+    pthread_mutex_unlock(&plugins_mutex);
+    return active;
+}
+
+int plugins_handle_coin(int coin_value, const char *coin_code) {
+    plugin_t *active = plugins_snapshot_active();
+    if (active && active->handle_coin) {
+        return active->handle_coin(coin_value, coin_code);
     }
     return -1; /* No active plugin or handler */
 }
 
 int plugins_handle_keypad(char key) {
-    if (active_plugin_index >= 0 && active_plugin_index < plugin_count) {
-        plugin_t *active_plugin = &plugins[active_plugin_index];
-        if (active_plugin->handle_keypad) {
-            return active_plugin->handle_keypad(key);
-        }
+    plugin_t *active = plugins_snapshot_active();
+    if (active && active->handle_keypad) {
+        return active->handle_keypad(key);
     }
     return -1; /* No active plugin or handler */
 }
 
 int plugins_handle_hook(int hook_up, int hook_down) {
-    if (active_plugin_index >= 0 && active_plugin_index < plugin_count) {
-        plugin_t *active_plugin = &plugins[active_plugin_index];
-        if (active_plugin->handle_hook) {
-            return active_plugin->handle_hook(hook_up, hook_down);
-        }
+    plugin_t *active = plugins_snapshot_active();
+    if (active && active->handle_hook) {
+        return active->handle_hook(hook_up, hook_down);
     }
     return -1; /* No active plugin or handler */
 }
 
 int plugins_handle_call_state(int call_state) {
-    if (active_plugin_index >= 0 && active_plugin_index < plugin_count) {
-        plugin_t *active_plugin = &plugins[active_plugin_index];
-        if (active_plugin->handle_call_state) {
-            return active_plugin->handle_call_state(call_state);
-        }
+    plugin_t *active = plugins_snapshot_active();
+    if (active && active->handle_call_state) {
+        return active->handle_call_state(call_state);
     }
     return -1; /* No active plugin or handler */
 }
 
 int plugins_handle_card(const char *card_number) {
-    if (active_plugin_index >= 0 && active_plugin_index < plugin_count) {
-        plugin_t *active_plugin = &plugins[active_plugin_index];
-        if (active_plugin->handle_card) {
-            return active_plugin->handle_card(card_number);
-        }
+    plugin_t *active = plugins_snapshot_active();
+    if (active && active->handle_card) {
+        return active->handle_card(card_number);
     }
     return -1;
 }
 
 void plugins_tick(void) {
-    if (active_plugin_index >= 0 && active_plugin_index < plugin_count) {
-        plugin_t *active_plugin = &plugins[active_plugin_index];
-        if (active_plugin->handle_tick) {
-            active_plugin->handle_tick();
-        }
+    plugin_t *active = plugins_snapshot_active();
+    if (active && active->handle_tick) {
+        active->handle_tick();
     }
 }
