@@ -1,0 +1,34 @@
+# Test: Per-denomination coin metrics
+# Verifies that each accepted coin is tallied into a denomination-specific
+# counter (coins_5c / coins_10c / coins_25c) in addition to the aggregate
+# coins_inserted (count) and coins_value_cents (total). The breakdown lets an
+# operator reconcile the coin box by coin, not just by dollar value.
+
+hook_up
+assert_state IDLE_UP
+
+# Insert a mix: two quarters, one dime, three nickels.
+coin 25
+coin 25
+coin 10
+coin 5
+coin 5
+coin 5
+assert_display Have: 75c
+
+# Aggregate counters: 6 coins worth 75c total.
+assert_metric coins_inserted 6
+assert_metric coins_value_cents 75
+
+# Per-denomination breakdown sums back to the same coins and value.
+assert_metric coins_25c 2
+assert_metric coins_10c 1
+assert_metric coins_5c 3
+
+# Coins arriving while the handset is down are not accepted (validator off),
+# so none of the denomination counters move.
+hook_down
+assert_state IDLE_DOWN
+coin 25
+assert_metric coins_25c 2
+assert_metric coins_inserted 6

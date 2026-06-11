@@ -276,6 +276,18 @@ static void daemon_broadcast_state(const char *event_type) {
     web_server_broadcast_to_websockets(web_server, msg);
 }
 
+/* Prometheus counter name for a coin of the given cent value. Used to tally
+ * the coin-box denomination mix. Falls back to a catch-all bucket for any
+ * future/unknown coin so no accepted coin goes uncounted. */
+static const char *coin_denomination_metric(int coin_value) {
+    switch (coin_value) {
+        case 5:  return "coins_5c";
+        case 10: return "coins_10c";
+        case 25: return "coins_25c";
+        default: return "coins_other";
+    }
+}
+
 void handle_coin_event(coin_event_t *coin_event) {
     char *coin_code_str;
     int coin_value = 0;
@@ -309,8 +321,13 @@ void handle_coin_event(coin_event_t *coin_event) {
             
             metrics_increment_counter("coins_inserted", 1);
             metrics_increment_counter("coins_value_cents", coin_value);
-            
-            logger_infof_with_category("Coin", 
+            /* Per-denomination tally so the coin box can be reconciled by coin
+             * (capacity is per-coin, not per-dollar): a $5.00 take is 20
+             * quarters or 100 nickels, and only this breakdown tells them
+             * apart. coins_inserted/coins_value_cents stay the aggregate view. */
+            metrics_increment_counter(coin_denomination_metric(coin_value), 1);
+
+            logger_infof_with_category("Coin",
                     "Coin inserted: %s, value: %d cents, total: %d cents",
                     coin_code_str, coin_value, daemon_state->inserted_cents);
             
