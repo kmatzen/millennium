@@ -18,6 +18,10 @@ config_data_t* config_get_instance(void);
 int config_load_from_file(config_data_t* config, const char* config_path);
 int config_load_from_environment(config_data_t* config);
 int config_validate(const config_data_t* config);
+/* Like config_validate(), but on failure writes a human-readable reason
+   (e.g. "web_server.port 99999 out of range 1..65535") into err, which may
+   be NULL. Returns 1 on success, 0 on the first validation failure. */
+int config_validate_ex(const config_data_t* config, char* err, size_t err_size);
 
 /* Configuration getters */
 const char* config_get_string(const config_data_t* config, const char* key, const char* default_value);

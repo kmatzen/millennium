@@ -146,6 +146,126 @@ static void test_config_validate_bad_cost(void) {
     TEST_ASSERT_EQ_INT(config_validate(&cfg), 0);
 }
 
+/* config_validate_ex fills a descriptive reason on failure and clears it on
+   success, so the operator learns which setting is wrong. */
+static void test_config_validate_ex_reports_reason(void) {
+    config_data_t cfg;
+    char err[256];
+
+    cfg.count = 0;
+    config_set_default_values(&cfg);
+    err[0] = 'x';
+    TEST_ASSERT_EQ_INT(config_validate_ex(&cfg, err, sizeof(err)), 1);
+    TEST_ASSERT_EQ_STR(err, "");
+
+    config_set_value(&cfg, "call.cost_cents", "-5");
+    TEST_ASSERT_EQ_INT(config_validate_ex(&cfg, err, sizeof(err)), 0);
+    TEST_ASSERT_NOT_NULL(strstr(err, "call.cost_cents"));
+}
+
+/* A NULL error buffer must be tolerated (config_validate() relies on this). */
+static void test_config_validate_ex_null_buffer(void) {
+    config_data_t cfg;
+    cfg.count = 0;
+    config_set_default_values(&cfg);
+    TEST_ASSERT_EQ_INT(config_validate_ex(&cfg, NULL, 0), 1);
+
+    config_set_value(&cfg, "call.cost_cents", "0");
+    TEST_ASSERT_EQ_INT(config_validate_ex(&cfg, NULL, 0), 0);
+}
+
+/* Out-of-range / nonsensical numeric settings are rejected. */
+static void test_config_validate_ranges(void) {
+    config_data_t cfg;
+
+    cfg.count = 0;
+    config_set_default_values(&cfg);
+    config_set_value(&cfg, "call.timeout_seconds", "0");
+    TEST_ASSERT_EQ_INT(config_validate(&cfg), 0);
+
+    cfg.count = 0;
+    config_set_default_values(&cfg);
+    config_set_value(&cfg, "call.idle_timeout_seconds", "-1");
+    TEST_ASSERT_EQ_INT(config_validate(&cfg), 0);
+
+    cfg.count = 0;
+    config_set_default_values(&cfg);
+    config_set_value(&cfg, "hardware.baud_rate", "0");
+    TEST_ASSERT_EQ_INT(config_validate(&cfg), 0);
+
+    cfg.count = 0;
+    config_set_default_values(&cfg);
+    config_set_value(&cfg, "logging.max_files", "0");
+    TEST_ASSERT_EQ_INT(config_validate(&cfg), 0);
+}
+
+/* Web and metrics ports must be in range. */
+static void test_config_validate_ports(void) {
+    config_data_t cfg;
+
+    cfg.count = 0;
+    config_set_default_values(&cfg);
+    config_set_value(&cfg, "web_server.port", "99999");
+    TEST_ASSERT_EQ_INT(config_validate(&cfg), 0);
+
+    cfg.count = 0;
+    config_set_default_values(&cfg);
+    config_set_value(&cfg, "metrics_server.port", "0");
+    TEST_ASSERT_EQ_INT(config_validate(&cfg), 0);
+
+    cfg.count = 0;
+    config_set_default_values(&cfg);
+    config_set_value(&cfg, "web_server.port", "8080");
+    TEST_ASSERT_EQ_INT(config_validate(&cfg), 1);
+}
+
+/* Both servers enabled on the same port is a misconfiguration. */
+static void test_config_validate_port_conflict(void) {
+    config_data_t cfg;
+    cfg.count = 0;
+    config_set_default_values(&cfg);
+
+    config_set_value(&cfg, "web_server.enabled", "true");
+    config_set_value(&cfg, "metrics_server.enabled", "true");
+    config_set_value(&cfg, "web_server.port", "9000");
+    config_set_value(&cfg, "metrics_server.port", "9000");
+    TEST_ASSERT_EQ_INT(config_validate(&cfg), 0);
+
+    /* Same port but metrics disabled: no conflict. */
+    config_set_value(&cfg, "metrics_server.enabled", "false");
+    TEST_ASSERT_EQ_INT(config_validate(&cfg), 1);
+}
+
+/* Logging level and SIP transport accept only known tokens. */
+static void test_config_validate_enums(void) {
+    config_data_t cfg;
+
+    cfg.count = 0;
+    config_set_default_values(&cfg);
+    config_set_value(&cfg, "logging.level", "INF");
+    TEST_ASSERT_EQ_INT(config_validate(&cfg), 0);
+
+    cfg.count = 0;
+    config_set_default_values(&cfg);
+    config_set_value(&cfg, "logging.level", "warn"); /* case-insensitive */
+    TEST_ASSERT_EQ_INT(config_validate(&cfg), 1);
+
+    cfg.count = 0;
+    config_set_default_values(&cfg);
+    config_set_value(&cfg, "sip.transport", "sctp");
+    TEST_ASSERT_EQ_INT(config_validate(&cfg), 0);
+
+    cfg.count = 0;
+    config_set_default_values(&cfg);
+    config_set_value(&cfg, "sip.transport", "TLS"); /* case-insensitive */
+    TEST_ASSERT_EQ_INT(config_validate(&cfg), 1);
+
+    /* Unset sip.transport must not fail validation. */
+    cfg.count = 0;
+    config_set_default_values(&cfg);
+    TEST_ASSERT_EQ_INT(config_validate(&cfg), 1);
+}
+
 static void test_config_trim(void) {
     char result[64];
 
@@ -949,6 +1069,12 @@ int main(void) {
     TEST_SUITE_RUN(test_config_get_bool_variants);
     TEST_SUITE_RUN(test_config_validate_good);
     TEST_SUITE_RUN(test_config_validate_bad_cost);
+    TEST_SUITE_RUN(test_config_validate_ex_reports_reason);
+    TEST_SUITE_RUN(test_config_validate_ex_null_buffer);
+    TEST_SUITE_RUN(test_config_validate_ranges);
+    TEST_SUITE_RUN(test_config_validate_ports);
+    TEST_SUITE_RUN(test_config_validate_port_conflict);
+    TEST_SUITE_RUN(test_config_validate_enums);
     TEST_SUITE_RUN(test_config_trim);
     TEST_SUITE_RUN(test_config_null_safety);
     TEST_SUITE_RUN(test_config_overwrite_value);
