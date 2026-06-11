@@ -90,6 +90,18 @@ static int classic_phone_handle_keypad(char key) {
         classic_phone_update_display();
         classic_phone_check_and_call();
     }
+    /* '*' is the "correct" key: erase the last dialed digit so a misdial can be
+     * fixed without hanging up. Only meaningful while building a number with the
+     * handset up (handset DTMF is handled above); ignored with an empty buffer. */
+    else if (key == '*' && daemon_state &&
+             daemon_state->current_state == DAEMON_STATE_IDLE_UP &&
+             !classic_phone_data.is_dialing && !classic_phone_data.is_in_call &&
+             classic_phone_data.keypad_length > 0) {
+        audio_tones_play_dtmf(key);
+        classic_phone_remove_last_key();
+        classic_phone_data.last_activity = sdk_now();
+        classic_phone_update_display();
+    }
     return 0;
 }
 
@@ -281,16 +293,13 @@ static void classic_phone_add_key(char key) {
     }
 }
 
-/* Helper function for future keypad functionality - kept for extensibility */
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-function"
+/* Erase the last dialed digit (the '*' "correct" key). */
 static void classic_phone_remove_last_key(void) {
     if (classic_phone_data.keypad_length > 0) {
         classic_phone_data.keypad_length--;
         classic_phone_data.keypad_buffer[classic_phone_data.keypad_length] = '\0';
     }
 }
-#pragma GCC diagnostic pop
 
 static int classic_phone_has_enough_money(void) {
     return classic_phone_data.inserted_cents >= classic_phone_data.call_cost_cents;
