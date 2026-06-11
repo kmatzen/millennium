@@ -9,6 +9,7 @@
 #include "../updater.h"
 #include "../plugin_sdk.h"
 #include "../clock_source.h"
+#include "../state_persistence.h"
 #include <stdlib.h>
 
 /* ── Stubs for linker (plugins.c references these) ──────────────── */
@@ -936,6 +937,141 @@ static void test_logger_queue_stats(void) {
     remove(path);
 }
 
+/* ── State persistence tests ────────────────────────────────────── */
+
+#define SP_PATH "/tmp/millennium_test_persist"
+
+/* Write the given body to the persistence test file. */
+static void sp_write(const char *body) {
+    FILE *f = fopen(SP_PATH, "w");
+    if (f) { fputs(body, f); fclose(f); }
+}
+
+static void test_persist_save_load_roundtrip(void) {
+    persisted_state_t in, out;
+    in.inserted_cents = 75;
+    in.last_state = (int)DAEMON_STATE_IDLE_UP;
+    strcpy(in.active_plugin, "Fortune Teller");
+
+    TEST_ASSERT_EQ_INT(state_persistence_save(&in, SP_PATH), 0);
+    TEST_ASSERT_EQ_INT(state_persistence_load(&out, SP_PATH), 0);
+    TEST_ASSERT_EQ_INT(out.inserted_cents, 75);
+    TEST_ASSERT_EQ_INT(out.last_state, (int)DAEMON_STATE_IDLE_UP);
+    TEST_ASSERT_EQ_STR(out.active_plugin, "Fortune Teller");
+    remove(SP_PATH);
+}
+
+static void test_persist_load_valid(void) {
+    persisted_state_t st;
+    sp_write("inserted_cents=50\nlast_state=2\nactive_plugin=Jukebox\n");
+    TEST_ASSERT_EQ_INT(state_persistence_load(&st, SP_PATH), 0);
+    TEST_ASSERT_EQ_INT(st.inserted_cents, 50);
+    TEST_ASSERT_EQ_INT(st.last_state, 2);
+    TEST_ASSERT_EQ_STR(st.active_plugin, "Jukebox");
+    remove(SP_PATH);
+}
+
+static void test_persist_missing_file(void) {
+    persisted_state_t st;
+    remove(SP_PATH);
+    TEST_ASSERT_EQ_INT(state_persistence_load(&st, SP_PATH), -1);
+    TEST_ASSERT_EQ_INT(st.inserted_cents, 0);
+}
+
+static void test_persist_null_args(void) {
+    persisted_state_t st;
+    TEST_ASSERT_EQ_INT(state_persistence_load(NULL, SP_PATH), -1);
+    TEST_ASSERT_EQ_INT(state_persistence_load(&st, NULL), -1);
+}
+
+/* A file with no recognizable keys is corrupt: reject and zero out. */
+static void test_persist_garbage_rejected(void) {
+    persisted_state_t st;
+    sp_write("this is not a valid state file\n\x01\x02\x03\n");
+    TEST_ASSERT_EQ_INT(state_persistence_load(&st, SP_PATH), -1);
+    TEST_ASSERT_EQ_INT(st.inserted_cents, 0);
+    TEST_ASSERT_EQ_INT(st.last_state, 0);
+    remove(SP_PATH);
+}
+
+/* Missing required field (only active_plugin present) is corrupt. */
+static void test_persist_missing_fields_rejected(void) {
+    persisted_state_t st;
+    sp_write("active_plugin=Simon\n");
+    TEST_ASSERT_EQ_INT(state_persistence_load(&st, SP_PATH), -1);
+    TEST_ASSERT_EQ_STR(st.active_plugin, "");
+    remove(SP_PATH);
+}
+
+static void test_persist_nonnumeric_cents_rejected(void) {
+    persisted_state_t st;
+    sp_write("inserted_cents=lots\nlast_state=1\n");
+    TEST_ASSERT_EQ_INT(state_persistence_load(&st, SP_PATH), -1);
+    TEST_ASSERT_EQ_INT(st.inserted_cents, 0);
+    remove(SP_PATH);
+}
+
+/* atoi() would have accepted "25xyz" as 25; the strict parser rejects it. */
+static void test_persist_trailing_garbage_rejected(void) {
+    persisted_state_t st;
+    sp_write("inserted_cents=25xyz\nlast_state=1\n");
+    TEST_ASSERT_EQ_INT(state_persistence_load(&st, SP_PATH), -1);
+    remove(SP_PATH);
+}
+
+static void test_persist_negative_cents_rejected(void) {
+    persisted_state_t st;
+    sp_write("inserted_cents=-5\nlast_state=1\n");
+    TEST_ASSERT_EQ_INT(state_persistence_load(&st, SP_PATH), -1);
+    remove(SP_PATH);
+}
+
+static void test_persist_huge_cents_rejected(void) {
+    persisted_state_t st;
+    sp_write("inserted_cents=999999\nlast_state=1\n");
+    TEST_ASSERT_EQ_INT(state_persistence_load(&st, SP_PATH), -1);
+    remove(SP_PATH);
+}
+
+static void test_persist_bad_last_state_rejected(void) {
+    persisted_state_t st;
+    /* 9 is outside the daemon_state_t enum range (0..4). */
+    sp_write("inserted_cents=10\nlast_state=9\n");
+    TEST_ASSERT_EQ_INT(state_persistence_load(&st, SP_PATH), -1);
+    remove(SP_PATH);
+}
+
+static void test_persist_negative_last_state_rejected(void) {
+    persisted_state_t st;
+    sp_write("inserted_cents=10\nlast_state=-1\n");
+    TEST_ASSERT_EQ_INT(state_persistence_load(&st, SP_PATH), -1);
+    remove(SP_PATH);
+}
+
+/* Boundary values must be accepted: cents at the cap, last_state at the
+ * top of the enum. */
+static void test_persist_boundary_values_accepted(void) {
+    persisted_state_t st;
+    char body[128];
+    sprintf(body, "inserted_cents=%d\nlast_state=%d\n",
+            STATE_MAX_INSERTED_CENTS, (int)DAEMON_STATE_CALL_ACTIVE);
+    sp_write(body);
+    TEST_ASSERT_EQ_INT(state_persistence_load(&st, SP_PATH), 0);
+    TEST_ASSERT_EQ_INT(st.inserted_cents, STATE_MAX_INSERTED_CENTS);
+    TEST_ASSERT_EQ_INT(st.last_state, (int)DAEMON_STATE_CALL_ACTIVE);
+    remove(SP_PATH);
+}
+
+/* A CRLF file (stray carriage returns) must still parse cleanly. */
+static void test_persist_crlf_tolerated(void) {
+    persisted_state_t st;
+    sp_write("inserted_cents=30\r\nlast_state=1\r\nactive_plugin=Trivia\r\n");
+    TEST_ASSERT_EQ_INT(state_persistence_load(&st, SP_PATH), 0);
+    TEST_ASSERT_EQ_INT(st.inserted_cents, 30);
+    TEST_ASSERT_EQ_STR(st.active_plugin, "Trivia");
+    remove(SP_PATH);
+}
+
 /* ── Main ───────────────────────────────────────────────────────── */
 
 int main(void) {
@@ -1017,6 +1153,22 @@ int main(void) {
     TEST_SUITE_BEGIN("Logger");
     TEST_SUITE_RUN(test_logger_async_file_write);
     TEST_SUITE_RUN(test_logger_queue_stats);
+
+    TEST_SUITE_BEGIN("State Persistence");
+    TEST_SUITE_RUN(test_persist_save_load_roundtrip);
+    TEST_SUITE_RUN(test_persist_load_valid);
+    TEST_SUITE_RUN(test_persist_missing_file);
+    TEST_SUITE_RUN(test_persist_null_args);
+    TEST_SUITE_RUN(test_persist_garbage_rejected);
+    TEST_SUITE_RUN(test_persist_missing_fields_rejected);
+    TEST_SUITE_RUN(test_persist_nonnumeric_cents_rejected);
+    TEST_SUITE_RUN(test_persist_trailing_garbage_rejected);
+    TEST_SUITE_RUN(test_persist_negative_cents_rejected);
+    TEST_SUITE_RUN(test_persist_huge_cents_rejected);
+    TEST_SUITE_RUN(test_persist_bad_last_state_rejected);
+    TEST_SUITE_RUN(test_persist_negative_last_state_rejected);
+    TEST_SUITE_RUN(test_persist_boundary_values_accepted);
+    TEST_SUITE_RUN(test_persist_crlf_tolerated);
 
     TEST_REPORT();
 }

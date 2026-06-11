@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <errno.h>
+#include <limits.h>
 
 int state_persistence_save(const persisted_state_t *state, const char *filepath) {
     FILE *f;
@@ -42,9 +44,30 @@ int state_persistence_save(const persisted_state_t *state, const char *filepath)
     return 0;
 }
 
+/*
+ * Parse a whole token as a base-10 int. Returns 1 only if the entire (trimmed)
+ * token is a valid integer with no trailing garbage; 0 otherwise. This is
+ * stricter than atoi(), which silently yields 0 for non-numeric input.
+ */
+static int parse_strict_int(const char *s, int *out) {
+    char *end;
+    long val;
+
+    if (!s || *s == '\0') return 0;
+    errno = 0;
+    val = strtol(s, &end, 10);
+    if (end == s) return 0;          /* no digits consumed */
+    while (*end == ' ' || *end == '\t') end++;
+    if (*end != '\0') return 0;      /* trailing non-numeric garbage */
+    if (errno == ERANGE || val < INT_MIN || val > INT_MAX) return 0;
+    *out = (int)val;
+    return 1;
+}
+
 int state_persistence_load(persisted_state_t *state, const char *filepath) {
     FILE *f;
     char line[256];
+    int have_cents = 0, have_state = 0;
 
     if (!state || !filepath) return -1;
 
@@ -52,30 +75,62 @@ int state_persistence_load(persisted_state_t *state, const char *filepath) {
 
     f = fopen(filepath, "r");
     if (!f) {
+        /* Missing file is the normal first-boot case; not an error worth logging. */
         return -1;
     }
 
     while (fgets(line, sizeof(line), f)) {
         char *eq = strchr(line, '=');
-        char *newline;
+        char *val, *nl;
         if (!eq) continue;
 
         *eq = '\0';
-        eq++;
+        val = eq + 1;
 
-        newline = strchr(eq, '\n');
-        if (newline) *newline = '\0';
+        /* Strip the trailing newline (and a stray CR from CRLF files). */
+        nl = val + strlen(val);
+        while (nl > val && (nl[-1] == '\n' || nl[-1] == '\r')) *--nl = '\0';
 
         if (strcmp(line, "inserted_cents") == 0) {
-            state->inserted_cents = atoi(eq);
+            int v;
+            if (!parse_strict_int(val, &v) || v < 0 || v > STATE_MAX_INSERTED_CENTS) {
+                logger_warn_with_category("Persistence",
+                    "Corrupt state file: invalid inserted_cents; ignoring");
+                goto corrupt;
+            }
+            state->inserted_cents = v;
+            have_cents = 1;
         } else if (strcmp(line, "last_state") == 0) {
-            state->last_state = atoi(eq);
+            int v;
+            if (!parse_strict_int(val, &v) ||
+                v < (int)DAEMON_STATE_INVALID || v > (int)DAEMON_STATE_CALL_ACTIVE) {
+                logger_warn_with_category("Persistence",
+                    "Corrupt state file: invalid last_state; ignoring");
+                goto corrupt;
+            }
+            state->last_state = v;
+            have_state = 1;
         } else if (strcmp(line, "active_plugin") == 0) {
-            strncpy(state->active_plugin, eq, sizeof(state->active_plugin) - 1);
+            strncpy(state->active_plugin, val, sizeof(state->active_plugin) - 1);
             state->active_plugin[sizeof(state->active_plugin) - 1] = '\0';
         }
     }
 
     fclose(f);
+
+    /* The writer always emits both numeric fields; a file missing either one is
+     * truncated/corrupt, so reject it rather than restore a half-state. */
+    if (!have_cents || !have_state) {
+        logger_warn_with_category("Persistence",
+            "Corrupt state file: missing required fields; ignoring");
+        memset(state, 0, sizeof(persisted_state_t));
+        return -1;
+    }
+
     return 0;
+
+corrupt:
+    fclose(f);
+    memset(state, 0, sizeof(persisted_state_t));
+    return -1;
 }
