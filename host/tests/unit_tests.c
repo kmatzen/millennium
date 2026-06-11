@@ -1000,6 +1000,78 @@ static void test_call_duration_histogram(void) {
     metrics_cleanup();
 }
 
+/* The ring functions time the pre-connect phase of an incoming call and record
+ * the seconds into call_ring_seconds. _missed() also bumps the calls_missed
+ * counter, while _answered() does not — that is how a missed ring is told from
+ * an answered one. Crucially, both are no-ops without a started ring, so the
+ * web-initiated outbound start_call path (which reuses CALL_INCOMING but never
+ * rings) is never miscounted as a miss. */
+static void test_call_ring_metrics(void) {
+    metrics_histogram_stats_t stats;
+
+    TEST_ASSERT_EQ_INT(metrics_init(), 0);
+    mclock_set_source(fake_clock_source);
+    call_metrics_reset();
+
+    /* An incoming call that rang 8 seconds and was then answered: the ring time
+     * is recorded, but no miss is counted. */
+    g_fake_clock = 5000;
+    call_metrics_ringing_started();
+    g_fake_clock = 5008;
+    call_metrics_ringing_answered();
+
+    TEST_ASSERT_EQ_INT(metrics_get_histogram_stats("call_ring_seconds", &stats), 0);
+    TEST_ASSERT_EQ_INT((int)stats.count, 1);
+    TEST_ASSERT(stats.sum == 8.0);
+    TEST_ASSERT(stats.max == 8.0);
+    TEST_ASSERT_EQ_INT((int)metrics_get_counter("calls_missed"), 0);
+
+    /* An incoming call that rang 30 seconds and was abandoned: ring time is
+     * recorded into the same histogram, and the miss is counted. */
+    g_fake_clock = 6000;
+    call_metrics_ringing_started();
+    g_fake_clock = 6030;
+    call_metrics_ringing_missed();
+
+    TEST_ASSERT_EQ_INT(metrics_get_histogram_stats("call_ring_seconds", &stats), 0);
+    TEST_ASSERT_EQ_INT((int)stats.count, 2);
+    TEST_ASSERT(stats.sum == 38.0);
+    TEST_ASSERT(stats.max == 30.0);
+    TEST_ASSERT_EQ_INT((int)metrics_get_counter("calls_missed"), 1);
+
+    /* A resolution with no ring in progress records nothing and counts no miss:
+     * this is the outbound start_call (CALL_INCOMING without a ring) path. */
+    call_metrics_ringing_missed();
+    call_metrics_ringing_answered();
+    TEST_ASSERT_EQ_INT(metrics_get_histogram_stats("call_ring_seconds", &stats), 0);
+    TEST_ASSERT_EQ_INT((int)stats.count, 2);
+    TEST_ASSERT_EQ_INT((int)metrics_get_counter("calls_missed"), 1);
+
+    /* reset() discards an in-progress ring so it is never recorded. */
+    g_fake_clock = 7000;
+    call_metrics_ringing_started();
+    call_metrics_reset();
+    g_fake_clock = 7100;
+    call_metrics_ringing_missed();
+    TEST_ASSERT_EQ_INT(metrics_get_histogram_stats("call_ring_seconds", &stats), 0);
+    TEST_ASSERT_EQ_INT((int)stats.count, 2);
+    TEST_ASSERT_EQ_INT((int)metrics_get_counter("calls_missed"), 1);
+
+    /* A clock that steps backwards clamps the ring duration to 0, never
+     * negative, and still counts the miss. */
+    g_fake_clock = 8000;
+    call_metrics_ringing_started();
+    g_fake_clock = 7950;
+    call_metrics_ringing_missed();
+    TEST_ASSERT_EQ_INT(metrics_get_histogram_stats("call_ring_seconds", &stats), 0);
+    TEST_ASSERT_EQ_INT((int)stats.count, 3);
+    TEST_ASSERT(stats.sum == 38.0);   /* the clamped 0 added nothing */
+    TEST_ASSERT_EQ_INT((int)metrics_get_counter("calls_missed"), 2);
+
+    mclock_set_source(NULL);
+    metrics_cleanup();
+}
+
 /* ── Main ───────────────────────────────────────────────────────── */
 
 int main(void) {
@@ -1084,6 +1156,7 @@ int main(void) {
 
     TEST_SUITE_BEGIN("Call Metrics");
     TEST_SUITE_RUN(test_call_duration_histogram);
+    TEST_SUITE_RUN(test_call_ring_metrics);
 
     TEST_REPORT();
 }

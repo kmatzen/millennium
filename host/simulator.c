@@ -319,6 +319,7 @@ static void sim_handle_hook(hook_state_change_event_t *ev) {
     if (hook_up) {
         if (daemon_state->current_state == DAEMON_STATE_CALL_INCOMING) {
             daemon_state->current_state = DAEMON_STATE_CALL_ACTIVE;
+            call_metrics_ringing_answered();  /* mirror daemon.c: ring answered */
             call_metrics_started();  /* mirror daemon.c: incoming call answered */
         } else if (daemon_state->current_state == DAEMON_STATE_IDLE_DOWN) {
             daemon_state->current_state = DAEMON_STATE_IDLE_UP;
@@ -371,18 +372,23 @@ static void sim_handle_call_state(call_state_event_t *ev) {
     if (st == EVENT_CALL_STATE_INCOMING && (phone_down || phone_up)) {
         /* #92: Accept incoming when handset down or up */
         daemon_state->current_state = DAEMON_STATE_CALL_INCOMING;
+        call_metrics_ringing_started();  /* mirror daemon.c: ring started */
         daemon_state_update_activity(daemon_state);
     } else if (st == EVENT_CALL_STATE_ACTIVE) {
         daemon_state->current_state = DAEMON_STATE_CALL_ACTIVE;
         daemon_state_update_activity(daemon_state);
+        call_metrics_ringing_answered();  /* mirror daemon.c: SIP-side answer */
         call_metrics_started();  /* mirror daemon.c: call established */
     } else if (st == EVENT_CALL_STATE_INVALID) {
         /* #90: Remote hung up */
         if (daemon_state->current_state == DAEMON_STATE_CALL_ACTIVE ||
             daemon_state->current_state == DAEMON_STATE_CALL_INCOMING) {
-            /* Only a connected (CALL_ACTIVE) call has a duration to record. */
+            /* A connected (CALL_ACTIVE) call has a duration to record; a call
+             * still ringing (CALL_INCOMING) ended unanswered — a missed call. */
             if (daemon_state->current_state == DAEMON_STATE_CALL_ACTIVE) {
                 call_metrics_ended();
+            } else {
+                call_metrics_ringing_missed();
             }
             daemon_state_clear_keypad(daemon_state);
             daemon_state->inserted_cents = 0;
@@ -678,6 +684,28 @@ static int run_scenario(const char *path) {
             } else {
                 fprintf(stderr,
                         "  ERROR: assert_histogram needs <name> <count> <sum>\n");
+                failures++;
+            }
+        }
+
+        /* ── assert_counter <name> <value> ───────────────────────── */
+        else if (strncmp(cmd, "assert_counter ", 15) == 0) {
+            char name[128];
+            unsigned long long want;
+            if (sscanf(cmd + 15, "%127s %llu", name, &want) == 2) {
+                unsigned long long got =
+                    (unsigned long long)metrics_get_counter(name);
+                if (got != want) {
+                    fprintf(stderr,
+                            "  FAIL: counter %s expected %llu, got %llu\n",
+                            name, want, got);
+                    failures++;
+                } else {
+                    fprintf(stderr, "  PASS: counter %s = %llu\n", name, got);
+                }
+            } else {
+                fprintf(stderr,
+                        "  ERROR: assert_counter needs <name> <value>\n");
                 failures++;
             }
         }
