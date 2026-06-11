@@ -14,11 +14,12 @@ The host software includes:
 ## Files
 
 - `Makefile` — Builds the daemon, simulator, and unit tests
-- `DEVICE_TEST.md` — Run API tests against the real device (192.168.86.145)
+- `DEVICE_TEST.md` — Run API tests against the live phone over the network
 - `daemon.conf.example` — Example configuration file (copy to `/etc/millennium/daemon.conf`)
 - `asoundrc.example` — Example ALSA configuration for the USB audio device
 - `systemd/daemon.service` — Systemd service for the daemon
-- `plugins/` — Plugin implementations (classic_phone, fortune_teller, jukebox)
+- `plugins/` — Plugin implementations (classic_phone, fortune_teller, jukebox, number_guess, simon, dial_a_joke, trivia)
+- `PLUGIN_AUTHORING.md` / `PLUGIN_SYSTEM_SUMMARY.md` — Plugin authoring guide and system overview
 - `tests/` — Unit tests and scenario test files
 
 ## Dependencies

@@ -192,9 +192,8 @@ See [host/PLUGIN_AUTHORING.md](host/PLUGIN_AUTHORING.md) for the full guide. In 
 
 ### Coding style
 
-- C89 for most files (`-std=c89`) — no mixed declarations/code
-- C99 for files that need it (`-std=c99`) — simulator, jukebox (block-scoped declarations)
-- `-Wall -Wextra` — all warnings enabled, treat them seriously
+- C89 across the whole codebase, compiled with `-std=gnu89` (the C89 language plus the GNU extensions the ALSA/PJSIP headers require, e.g. `inline`; strict `-std=c89` can't parse those headers)
+- `-Wall -Wextra -Wdeclaration-after-statement -Werror` on every target — warnings are errors, and `-Wdeclaration-after-statement` keeps the source free of C99-style mixed declarations
 - No unnecessary comments — code should be self-documenting
 
 ---

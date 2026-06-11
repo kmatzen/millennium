@@ -227,7 +227,7 @@ systemctl --user disable audio-mux.service
 5. **API integration test**: From the Pi (or any machine that can reach it):
    ```bash
    cd ~/millennium/host && make api-test
-   # Or: HOST=192.168.86.145 ./tests/api_test.sh
+   # Or from another machine: HOST=<pi-ip> ./tests/api_test.sh
    ```
 
 ## Updating
