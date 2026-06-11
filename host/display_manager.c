@@ -16,6 +16,26 @@ static int dm_scroll2_pos;
 static int dm_line1_scrolling;
 static int dm_line2_scrolling;
 
+/*
+ * Replace C0 control characters (bytes below 0x20) and DEL (0x7F) with spaces,
+ * in place. The Beta firmware forwards every display byte straight to the VFD
+ * module, which interprets these low bytes as commands (cursor moves, scroll
+ * mode, display on/off) and treats 0x0A as a line break. The display manager
+ * inserts its own single 0x0A line separator when packing the two lines, so any
+ * control byte arriving in plugin-supplied text could only corrupt the layout
+ * or issue an unintended VFD command. Printable ASCII and high-bit bytes (which
+ * may map to the VFD's extended glyphs) are left untouched.
+ */
+static void dm_sanitize(char *s) {
+    size_t i;
+    for (i = 0; s[i] != '\0'; i++) {
+        unsigned char c = (unsigned char)s[i];
+        if (c < 0x20 || c == 0x7F) {
+            s[i] = ' ';
+        }
+    }
+}
+
 static void dm_send_display(void) {
     char display_bytes[100];
     char visible1[DISPLAY_WIDTH + 1];
@@ -90,6 +110,7 @@ void display_manager_set_text(const char *line1, const char *line2) {
     if (line1) {
         strncpy(dm_line1_full, line1, MAX_TEXT_LEN - 1);
         dm_line1_full[MAX_TEXT_LEN - 1] = '\0';
+        dm_sanitize(dm_line1_full);
         dm_line1_len = (int)strlen(dm_line1_full);
     } else {
         dm_line1_full[0] = '\0';
@@ -101,6 +122,7 @@ void display_manager_set_text(const char *line1, const char *line2) {
     if (line2) {
         strncpy(dm_line2_full, line2, MAX_TEXT_LEN - 1);
         dm_line2_full[MAX_TEXT_LEN - 1] = '\0';
+        dm_sanitize(dm_line2_full);
         dm_line2_len = (int)strlen(dm_line2_full);
     } else {
         dm_line2_full[0] = '\0';

@@ -16,6 +16,11 @@ void display_manager_init(millennium_client_t *client);
  * Set display text. Lines longer than 20 characters will scroll
  * automatically on each tick. Short lines are displayed statically.
  * Passing NULL for a line clears that line.
+ *
+ * Control characters (bytes below 0x20, plus DEL 0x7F) in the supplied text
+ * are replaced with spaces before storage: the VFD treats those bytes as
+ * commands or line breaks, so they would otherwise corrupt the display. Plugin
+ * authors can therefore pass arbitrary text without sanitizing it themselves.
  */
 void display_manager_set_text(const char *line1, const char *line2);
 
