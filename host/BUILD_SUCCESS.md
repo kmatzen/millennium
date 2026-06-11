@@ -84,18 +84,18 @@ on the Pi, in the scenario simulator, and in unit tests. See
 
 ### Plugin Switching Commands
 ```bash
-# Switch to Fortune Teller (web dashboard/API is port 8081)
-curl -X POST http://localhost:8081/api/control \
+# Switch to Fortune Teller (web dashboard/API is port 80)
+curl -X POST http://localhost:80/api/control \
   -H "Content-Type: application/json" \
   -d '{"action": "activate_plugin:Fortune Teller"}'
 
 # Switch to Jukebox
-curl -X POST http://localhost:8081/api/control \
+curl -X POST http://localhost:80/api/control \
   -H "Content-Type: application/json" \
   -d '{"action": "activate_plugin:Jukebox"}'
 
 # Return to Classic Phone
-curl -X POST http://localhost:8081/api/control \
+curl -X POST http://localhost:80/api/control \
   -H "Content-Type: application/json" \
   -d '{"action": "activate_plugin:Classic Phone"}'
 ```
@@ -106,7 +106,7 @@ curl -X POST http://localhost:8081/api/control \
 ./daemon
 
 # Access web portal
-# http://localhost:8081   (metrics are on 8080)
+# http://localhost:80   (metrics are on 8080)
 ```
 
 ## Architecture Benefits

@@ -433,5 +433,6 @@ int config_get_web_server_enabled(const config_data_t* config) {
 }
 
 int config_get_web_server_port(const config_data_t* config) {
-    return config_get_int(config, "web_server.port", 8081);
+    /* Privileged port 80; the systemd unit grants CAP_NET_BIND_SERVICE. */
+    return config_get_int(config, "web_server.port", 80);
 }

@@ -4,7 +4,7 @@
 # Verifies: daemon doesn't crash, JSON responses stay valid
 set -e
 HOST="${HOST:-${1:-192.168.86.145}}"
-BASE="http://${HOST}:8081"
+BASE="http://${HOST}:80"
 FAILED=0
 
 # Verify JSON is parseable (python -c "import json; json.loads(...)")

@@ -10,7 +10,7 @@ Run integration tests against the real Millennium payphone when it's connected a
 ## Prerequisites
 
 - Daemon running on the device (`sudo systemctl status daemon.service`)
-- Device reachable on the network (port 8081 for HTTP API)
+- Device reachable on the network (port 80 for HTTP API)
 
 ## Run API Tests (from your machine)
 
@@ -38,5 +38,5 @@ ssh matzen@192.168.86.145 'cd millennium/host && make api-test'
 If tests fail with "Cannot reach":
 
 1. Check daemon is running: `ssh matzen@192.168.86.145 'sudo systemctl status daemon.service'`
-2. Verify port 8081 is listening: `ssh matzen@192.168.86.145 'ss -tlnp | grep 8081'`
-3. Confirm network connectivity: `curl -s http://192.168.86.145:8081/api/health`
+2. Verify port 80 is listening: `ssh matzen@192.168.86.145 'ss -tlnp | grep ":80 "'`
+3. Confirm network connectivity: `curl -s http://192.168.86.145/api/health`

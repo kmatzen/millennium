@@ -8,7 +8,7 @@
 
 set -e
 HOST="${HOST:-${1:-localhost}}"
-BASE="http://${HOST}:8081"
+BASE="http://${HOST}:80"
 FAILED=0
 
 run() {

@@ -51,10 +51,10 @@ Game plugins read optional per-plugin settings from `daemon.conf` (see
 
 ## Switching plugins
 
-From the dashboard (`http://<pi>:8081`) use the **Plugins** panel, or via REST:
+From the dashboard (`http://<pi>:80`) use the **Plugins** panel, or via REST:
 
 ```bash
-curl -X POST http://<pi>:8081/api/control \
+curl -X POST http://<pi>:80/api/control \
   -H 'Content-Type: application/json' \
   -d '{"action":"activate_plugin","plugin":"Trivia"}'
 ```
