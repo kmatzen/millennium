@@ -25,8 +25,27 @@ struct conn_queue {
     int head;   /* index of the next fd to pop */
     int count;  /* number of fds currently queued */
     int closed; /* set by conn_queue_close(); pop drains then returns -1 */
+    /* Lifetime health counters (see conn_queue_get_stats). Cheap to maintain
+     * under the existing lock; let the daemon publish queue saturation and load
+     * shedding as metrics. */
+    unsigned long high_water;          /* max depth observed since init */
+    unsigned long long pushed_total;   /* connections enqueued (accepted) */
+    unsigned long long rejected_total; /* connections shed because queue was full */
     pthread_mutex_t mutex;
     pthread_cond_t not_empty;
+};
+
+/* Read-only snapshot of a queue's health. depth/capacity are instantaneous;
+ * high_water/pushed_total/rejected_total are lifetime totals so a metrics
+ * counter can rate() over them. rejected_total rising means the accept loop is
+ * shedding load (queue saturated) — the signal that the worker pool is
+ * undersized for current demand. */
+struct conn_queue_stats {
+    int capacity;
+    int depth;
+    unsigned long high_water;
+    unsigned long long pushed_total;
+    unsigned long long rejected_total;
 };
 
 /* Initialize a queue with room for `capacity` fds. Returns 0 on success,
@@ -50,6 +69,10 @@ void conn_queue_close(struct conn_queue* q);
 
 /* Current number of queued fds (snapshot). */
 int conn_queue_count(struct conn_queue* q);
+
+/* Snapshot the queue's health counters under its lock. NULL-safe (zeroes the
+ * output). Cheap enough to poll every metrics tick. */
+void conn_queue_get_stats(struct conn_queue* q, struct conn_queue_stats* out);
 
 #ifdef __cplusplus
 }

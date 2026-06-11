@@ -1041,6 +1041,76 @@ static void test_conn_queue_blocking_pop_wakes(void) {
     conn_queue_destroy(&q);
 }
 
+/* The health snapshot (#125 follow-up) feeds the worker-pool metrics the daemon
+ * publishes. Verify the contract: capacity is reported, depth tracks the live
+ * count, high_water records the deepest the queue ever got (not the current
+ * depth), pushed_total counts only accepted fds, and rejected_total counts only
+ * connections shed when the queue was full. */
+static void test_conn_queue_stats(void) {
+    struct conn_queue q;
+    struct conn_queue_stats st;
+
+    TEST_ASSERT_EQ_INT(conn_queue_init(&q, 2), 0);
+
+    conn_queue_get_stats(&q, &st);
+    TEST_ASSERT_EQ_INT(st.capacity, 2);
+    TEST_ASSERT_EQ_INT(st.depth, 0);
+    TEST_ASSERT_EQ_INT((int)st.high_water, 0);
+    TEST_ASSERT_EQ_INT((int)st.pushed_total, 0);
+    TEST_ASSERT_EQ_INT((int)st.rejected_total, 0);
+
+    /* Fill to capacity, then overflow twice — both overflows are shed. */
+    TEST_ASSERT_EQ_INT(conn_queue_try_push(&q, 1), 0);
+    TEST_ASSERT_EQ_INT(conn_queue_try_push(&q, 2), 0);
+    TEST_ASSERT_EQ_INT(conn_queue_try_push(&q, 3), -1);
+    TEST_ASSERT_EQ_INT(conn_queue_try_push(&q, 4), -1);
+
+    conn_queue_get_stats(&q, &st);
+    TEST_ASSERT_EQ_INT(st.depth, 2);
+    TEST_ASSERT_EQ_INT((int)st.high_water, 2);
+    TEST_ASSERT_EQ_INT((int)st.pushed_total, 2);
+    TEST_ASSERT_EQ_INT((int)st.rejected_total, 2);
+
+    /* Draining leaves high_water and the lifetime totals intact. */
+    TEST_ASSERT_EQ_INT(conn_queue_pop(&q), 1);
+    TEST_ASSERT_EQ_INT(conn_queue_pop(&q), 2);
+    conn_queue_get_stats(&q, &st);
+    TEST_ASSERT_EQ_INT(st.depth, 0);
+    TEST_ASSERT_EQ_INT((int)st.high_water, 2);
+    TEST_ASSERT_EQ_INT((int)st.pushed_total, 2);
+    TEST_ASSERT_EQ_INT((int)st.rejected_total, 2);
+
+    /* Closing the queue is shutdown, not load shedding: try_push fails but the
+     * rejection counter must not move. */
+    conn_queue_close(&q);
+    TEST_ASSERT_EQ_INT(conn_queue_try_push(&q, 5), -1);
+    conn_queue_get_stats(&q, &st);
+    TEST_ASSERT_EQ_INT((int)st.rejected_total, 2);
+
+    conn_queue_destroy(&q);
+}
+
+/* The snapshot must be NULL-safe both ways: a NULL output is ignored, and a
+ * NULL queue zeroes the output (the daemon polls it when the web server is
+ * disabled). */
+static void test_conn_queue_stats_null_safety(void) {
+    struct conn_queue_stats st;
+
+    conn_queue_get_stats(NULL, NULL);   /* must not crash */
+
+    st.capacity = 7;
+    st.depth = 7;
+    st.high_water = 7;
+    st.pushed_total = 7;
+    st.rejected_total = 7;
+    conn_queue_get_stats(NULL, &st);
+    TEST_ASSERT_EQ_INT(st.capacity, 0);
+    TEST_ASSERT_EQ_INT(st.depth, 0);
+    TEST_ASSERT_EQ_INT((int)st.high_water, 0);
+    TEST_ASSERT_EQ_INT((int)st.pushed_total, 0);
+    TEST_ASSERT_EQ_INT((int)st.rejected_total, 0);
+}
+
 /* ── Main ───────────────────────────────────────────────────────── */
 
 int main(void) {
@@ -1130,6 +1200,8 @@ int main(void) {
     TEST_SUITE_RUN(test_conn_queue_close_drains_then_signals);
     TEST_SUITE_RUN(test_conn_queue_null_safety);
     TEST_SUITE_RUN(test_conn_queue_blocking_pop_wakes);
+    TEST_SUITE_RUN(test_conn_queue_stats);
+    TEST_SUITE_RUN(test_conn_queue_stats_null_safety);
 
     TEST_REPORT();
 }

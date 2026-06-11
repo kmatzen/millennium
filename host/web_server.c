@@ -275,6 +275,12 @@ int web_server_is_paused(const struct web_server* server) {
     return server ? server->paused : 0;
 }
 
+void web_server_get_conn_stats(struct web_server* server, struct conn_queue_stats* out) {
+    if (!out) return;
+    /* conn_queue_get_stats zeroes the output when handed a NULL queue. */
+    conn_queue_get_stats(server ? &server->conn_queue : NULL, out);
+}
+
 void web_server_set_port(struct web_server* server, int port) {
     if (!server) return;
     

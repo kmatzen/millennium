@@ -131,6 +131,12 @@ void web_server_resume(struct web_server* server);
 int web_server_is_running(const struct web_server* server);
 int web_server_is_paused(const struct web_server* server);
 
+/* Snapshot the worker pool's connection-queue health (depth, high-water mark,
+ * connections accepted, connections shed under back-pressure). NULL-safe: zeroes
+ * the output if the server isn't running. Lets the daemon publish worker-pool
+ * saturation as metrics, the way #170 did for the async logger queue. */
+void web_server_get_conn_stats(struct web_server* server, struct conn_queue_stats* out);
+
 /* Configuration */
 void web_server_set_port(struct web_server* server, int port);
 int web_server_get_port(const struct web_server* server);

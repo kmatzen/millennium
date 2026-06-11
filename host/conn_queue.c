@@ -12,6 +12,9 @@ int conn_queue_init(struct conn_queue* q, int capacity) {
     q->head = 0;
     q->count = 0;
     q->closed = 0;
+    q->high_water = 0;
+    q->pushed_total = 0;
+    q->rejected_total = 0;
 
     if (pthread_mutex_init(&q->mutex, NULL) != 0) {
         free(q->fds);
@@ -43,13 +46,23 @@ int conn_queue_try_push(struct conn_queue* q, int fd) {
     if (!q) return -1;
 
     pthread_mutex_lock(&q->mutex);
-    if (q->closed || q->count >= q->capacity) {
+    if (q->closed) {
+        /* Shutting down — not load shedding, so don't count as a rejection. */
+        pthread_mutex_unlock(&q->mutex);
+        return -1;
+    }
+    if (q->count >= q->capacity) {
+        q->rejected_total++; /* queue saturated: a shed connection */
         pthread_mutex_unlock(&q->mutex);
         return -1;
     }
     tail = (q->head + q->count) % q->capacity;
     q->fds[tail] = fd;
     q->count++;
+    q->pushed_total++;
+    if ((unsigned long)q->count > q->high_water) {
+        q->high_water = (unsigned long)q->count;
+    }
     pthread_cond_signal(&q->not_empty);
     pthread_mutex_unlock(&q->mutex);
     return 0;
@@ -90,4 +103,23 @@ int conn_queue_count(struct conn_queue* q) {
     c = q->count;
     pthread_mutex_unlock(&q->mutex);
     return c;
+}
+
+void conn_queue_get_stats(struct conn_queue* q, struct conn_queue_stats* out) {
+    if (!out) return;
+    if (!q) {
+        out->capacity = 0;
+        out->depth = 0;
+        out->high_water = 0;
+        out->pushed_total = 0;
+        out->rejected_total = 0;
+        return;
+    }
+    pthread_mutex_lock(&q->mutex);
+    out->capacity = q->capacity;
+    out->depth = q->count;
+    out->high_water = q->high_water;
+    out->pushed_total = q->pushed_total;
+    out->rejected_total = q->rejected_total;
+    pthread_mutex_unlock(&q->mutex);
 }
