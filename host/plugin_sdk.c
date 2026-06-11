@@ -37,7 +37,9 @@ void sdk_display_line(const char *line1) {
 }
 
 void sdk_displayf(const char *fmt, ...) {
-    char line1[64];
+    char line1[DISPLAY_MAX_TEXT_LEN];   /* match the display line budget so a
+                                         * long formatted line scrolls rather
+                                         * than being truncated here first */
     va_list ap;
     if (!fmt) { display_manager_set_text(NULL, NULL); return; }
     va_start(ap, fmt);

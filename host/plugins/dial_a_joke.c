@@ -107,6 +107,20 @@ static void dj_handle_tick(void) {
     }
 }
 
+/* Test/introspection hook (see test_plugin_display_lines_fit): expose every
+ * static display string so the unit-test guardrail can verify none exceeds the
+ * display line budget. Returns the total count; fills up to `max` into out[]. */
+int dial_a_joke_display_strings(const char **out, int max) {
+    int n = 0, i;
+    for (i = 0; i < NUM_JOKES; i++) {
+        if (out && n < max) out[n] = jokes[i].setup;
+        n++;
+        if (out && n < max) out[n] = jokes[i].punch;
+        n++;
+    }
+    return n;
+}
+
 void register_dial_a_joke_plugin(void) {
     memset(&dj, 0, sizeof(dj));
     dj.phase = DJ_IDLE;

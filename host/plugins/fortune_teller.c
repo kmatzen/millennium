@@ -228,6 +228,32 @@ static const char* fortune_teller_get_random_fortune(int category) {
     return "The future is unclear";
 }
 
+/* Test/introspection hook (see test_plugin_display_lines_fit): expose every
+ * category label and fortune so the unit-test guardrail can verify none
+ * exceeds the display line budget. Returns the count; fills up to `max`. */
+int fortune_teller_display_strings(const char **out, int max) {
+    const char **groups[5];
+    int n = 0, g, i;
+
+    groups[0] = love_fortunes;
+    groups[1] = career_fortunes;
+    groups[2] = health_fortunes;
+    groups[3] = money_fortunes;
+    groups[4] = general_fortunes;
+
+    for (i = 0; i < 5; i++) {
+        if (out && n < max) out[n] = fortune_categories[i];
+        n++;
+    }
+    for (g = 0; g < 5; g++) {
+        for (i = 0; i < 4; i++) {
+            if (out && n < max) out[n] = groups[g][i];
+            n++;
+        }
+    }
+    return n;
+}
+
 /* Plugin registration function */
 void register_fortune_teller_plugin(void) {
     /* Initialize plugin data */

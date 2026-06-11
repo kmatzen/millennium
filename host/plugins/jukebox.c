@@ -452,6 +452,20 @@ static void jukebox_stop_audio(void) {
     logger_info_with_category("Jukebox", "Audio stopped");
 }
 
+/* Test/introspection hook (see test_plugin_display_lines_fit): expose every
+ * static song title and artist so the unit-test guardrail can verify none
+ * exceeds the display line budget. Returns the count; fills up to `max`. */
+int jukebox_display_strings(const char **out, int max) {
+    int n = 0, i;
+    for (i = 0; i < (int)NUM_SONGS; i++) {
+        if (out && n < max) out[n] = songs[i].title;
+        n++;
+        if (out && n < max) out[n] = songs[i].artist;
+        n++;
+    }
+    return n;
+}
+
 /* Plugin registration function */
 void register_jukebox_plugin(void) {
     /* Initialize plugin data */
