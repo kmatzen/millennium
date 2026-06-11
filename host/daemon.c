@@ -838,6 +838,25 @@ static void update_metrics(void) {
     metrics_set_gauge("current_state", current_state);
     metrics_set_gauge("inserted_cents", inserted_cents);
     metrics_set_gauge("keypad_buffer_size", keypad_size);
+
+    /* Async logger health (issue #123 follow-up). Publishes queue depth, the
+     * high-water mark (capacity headroom), and a true counter of dropped log
+     * lines so log loss is alertable out-of-band — the in-file drop notice is
+     * unreachable exactly when a slow/full disk is the cause. Called from the
+     * single main-loop tick, so the static delta tracker needs no lock. */
+    {
+        logger_queue_stats_t lstats;
+        static unsigned long long last_dropped = 0;
+
+        logger_get_queue_stats(&lstats);
+        metrics_set_gauge("log_queue_depth", (double)lstats.depth);
+        metrics_set_gauge("log_queue_high_water", (double)lstats.high_water);
+        if (lstats.dropped_total > last_dropped) {
+            metrics_increment_counter("log_lines_dropped",
+                (uint64_t)(lstats.dropped_total - last_dropped));
+            last_dropped = lstats.dropped_total;
+        }
+    }
 }
 
 int main(int argc, char *argv[]) {

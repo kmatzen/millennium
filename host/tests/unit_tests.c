@@ -898,6 +898,44 @@ static void test_logger_async_file_write(void) {
     remove(path);
 }
 
+/* The queue-health snapshot (issue #123 follow-up) feeds the metrics endpoint.
+ * Verify the contract the daemon relies on: capacity is reported, the writer is
+ * marked running while file logging is on, the queue drains to depth 0 after a
+ * flush, every enqueued line shows up in the high-water mark, and a normal run
+ * well under capacity drops nothing. */
+static void test_logger_queue_stats(void) {
+    const char *path = "/tmp/millennium_logger_stats_test.log";
+    logger_queue_stats_t st;
+    int i;
+
+    remove(path);
+    logger_set_log_to_console(0);
+    logger_set_level(LOG_LEVEL_VERBOSE);
+    logger_set_log_file(path);
+    logger_set_log_to_file(1);
+
+    /* Capacity is reported and the writer runs while file logging is enabled. */
+    logger_get_queue_stats(&st);
+    TEST_ASSERT_EQ_INT((int)st.capacity, 1024);
+    TEST_ASSERT_EQ_INT(st.started, 1);
+
+    for (i = 0; i < 50; i++) {
+        logger_infof_with_category("StatsTest", "line %d", i);
+    }
+    logger_flush();   /* block until the writer has drained the queue */
+
+    logger_get_queue_stats(&st);
+    TEST_ASSERT_EQ_INT((int)st.depth, 0);          /* drained after flush */
+    TEST_ASSERT_EQ_INT((int)st.dropped_total, 0);  /* 50 lines << 1024 cap */
+    TEST_ASSERT((int)st.high_water >= 1);          /* lines did pass through */
+
+    logger_shutdown();
+    logger_set_log_to_file(0);
+    logger_set_log_to_console(1);
+    logger_set_level(LOG_LEVEL_ERROR);
+    remove(path);
+}
+
 /* ── Main ───────────────────────────────────────────────────────── */
 
 int main(void) {
@@ -978,6 +1016,7 @@ int main(void) {
 
     TEST_SUITE_BEGIN("Logger");
     TEST_SUITE_RUN(test_logger_async_file_write);
+    TEST_SUITE_RUN(test_logger_queue_stats);
 
     TEST_REPORT();
 }
