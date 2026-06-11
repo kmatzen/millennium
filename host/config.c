@@ -1,9 +1,11 @@
 #define _POSIX_C_SOURCE 200112L
 #include "config.h"
+#include "logger.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <limits.h>
 
 /* Global config instance */
 config_data_t* g_config = NULL;
@@ -168,17 +170,53 @@ int config_get_bool(const config_data_t* config, const char* key, int default_va
     return 0;
 }
 
-int config_validate(const config_data_t* config) {
-    /* Validate numeric values */
-    if (config_get_call_cost_cents(config) <= 0) {
+/* Range-check a single numeric setting. On failure, log which key and the
+ * accepted bounds so the operator sees exactly what to fix instead of a bare
+ * "validation failed". Returns 1 if in range, 0 otherwise. */
+static int config_validate_range(const char* key, int value, int min, int max) {
+    if (value < min || value > max) {
+        logger_errorf_with_category("Config",
+            "Invalid %s=%d (must be %d..%d)", key, value, min, max);
         return 0;
     }
-    
-    if (config_get_update_interval_ms(config) <= 0) {
-        return 0;
-    }
-    
     return 1;
+}
+
+int config_validate(const config_data_t* config) {
+    int ok = 1;
+
+    if (config == NULL) {
+        return 0;
+    }
+
+    /* Bitwise-AND (not &&) so every setting is checked in a single pass and the
+     * operator sees all problems at once, rather than fixing them one restart at
+     * a time. Each helper returns 0 or 1. */
+    ok &= config_validate_range("call.cost_cents",
+        config_get_call_cost_cents(config), 1, 100000);
+    ok &= config_validate_range("call.timeout_seconds",
+        config_get_call_timeout_seconds(config), 1, 86400);
+    ok &= config_validate_range("call.idle_timeout_seconds",
+        config_get_idle_timeout_seconds(config), 1, 86400);
+    ok &= config_validate_range("hardware.baud_rate",
+        config_get_baud_rate(config), 1, 4000000);
+    ok &= config_validate_range("system.update_interval_ms",
+        config_get_update_interval_ms(config), 1, 60000);
+    ok &= config_validate_range("system.max_retries",
+        config_get_max_retries(config), 0, 1000);
+    ok &= config_validate_range("logging.max_size_bytes",
+        config_get_log_max_size_bytes(config), 1, INT_MAX);
+    ok &= config_validate_range("logging.max_files",
+        config_get_log_max_files(config), 1, 1000);
+    ok &= config_validate_range("metrics_server.port",
+        config_get_metrics_server_port(config), 1, 65535);
+    ok &= config_validate_range("web_server.port",
+        config_get_web_server_port(config), 1, 65535);
+    /* sip.local_port: 0 is valid and means "auto/ephemeral". */
+    ok &= config_validate_range("sip.local_port",
+        config_get_int(config, "sip.local_port", 0), 0, 65535);
+
+    return ok;
 }
 
 void config_set_default_values(config_data_t* config) {

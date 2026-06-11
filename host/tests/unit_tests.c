@@ -146,6 +146,75 @@ static void test_config_validate_bad_cost(void) {
     TEST_ASSERT_EQ_INT(config_validate(&cfg), 0);
 }
 
+/* Ports must be in 1..65535; 0 and out-of-range values are rejected. */
+static void test_config_validate_bad_ports(void) {
+    config_data_t cfg;
+    cfg.count = 0;
+    config_set_default_values(&cfg);
+    config_set_value(&cfg, "web_server.port", "0");
+    TEST_ASSERT_EQ_INT(config_validate(&cfg), 0);
+
+    cfg.count = 0;
+    config_set_default_values(&cfg);
+    config_set_value(&cfg, "web_server.port", "70000");
+    TEST_ASSERT_EQ_INT(config_validate(&cfg), 0);
+
+    cfg.count = 0;
+    config_set_default_values(&cfg);
+    config_set_value(&cfg, "metrics_server.port", "-1");
+    TEST_ASSERT_EQ_INT(config_validate(&cfg), 0);
+}
+
+/* Negative or zero timeouts would disable the call/idle watchdogs. */
+static void test_config_validate_bad_timeouts(void) {
+    config_data_t cfg;
+    cfg.count = 0;
+    config_set_default_values(&cfg);
+    config_set_value(&cfg, "call.timeout_seconds", "0");
+    TEST_ASSERT_EQ_INT(config_validate(&cfg), 0);
+
+    cfg.count = 0;
+    config_set_default_values(&cfg);
+    config_set_value(&cfg, "call.idle_timeout_seconds", "-5");
+    TEST_ASSERT_EQ_INT(config_validate(&cfg), 0);
+}
+
+/* Non-numeric garbage parses to 0 via atoi and must be rejected by the
+ * range check rather than silently accepted. */
+static void test_config_validate_garbage_int(void) {
+    config_data_t cfg;
+    cfg.count = 0;
+    config_set_default_values(&cfg);
+    config_set_value(&cfg, "hardware.baud_rate", "fast");
+    TEST_ASSERT_EQ_INT(config_validate(&cfg), 0);
+}
+
+/* Log rotation needs at least one file and a positive size cap. */
+static void test_config_validate_bad_log_rotation(void) {
+    config_data_t cfg;
+    cfg.count = 0;
+    config_set_default_values(&cfg);
+    config_set_value(&cfg, "logging.max_files", "0");
+    TEST_ASSERT_EQ_INT(config_validate(&cfg), 0);
+
+    cfg.count = 0;
+    config_set_default_values(&cfg);
+    config_set_value(&cfg, "logging.max_size_bytes", "0");
+    TEST_ASSERT_EQ_INT(config_validate(&cfg), 0);
+}
+
+/* sip.local_port == 0 means auto/ephemeral and must stay valid. */
+static void test_config_validate_sip_port_auto(void) {
+    config_data_t cfg;
+    cfg.count = 0;
+    config_set_default_values(&cfg);
+    config_set_value(&cfg, "sip.local_port", "0");
+    TEST_ASSERT_EQ_INT(config_validate(&cfg), 1);
+
+    config_set_value(&cfg, "sip.local_port", "99999");
+    TEST_ASSERT_EQ_INT(config_validate(&cfg), 0);
+}
+
 static void test_config_trim(void) {
     char result[64];
 
@@ -949,6 +1018,11 @@ int main(void) {
     TEST_SUITE_RUN(test_config_get_bool_variants);
     TEST_SUITE_RUN(test_config_validate_good);
     TEST_SUITE_RUN(test_config_validate_bad_cost);
+    TEST_SUITE_RUN(test_config_validate_bad_ports);
+    TEST_SUITE_RUN(test_config_validate_bad_timeouts);
+    TEST_SUITE_RUN(test_config_validate_garbage_int);
+    TEST_SUITE_RUN(test_config_validate_bad_log_rotation);
+    TEST_SUITE_RUN(test_config_validate_sip_port_auto);
     TEST_SUITE_RUN(test_config_trim);
     TEST_SUITE_RUN(test_config_null_safety);
     TEST_SUITE_RUN(test_config_overwrite_value);
