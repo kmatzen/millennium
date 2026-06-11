@@ -300,6 +300,75 @@ static void test_state_null_safety(void) {
     TEST_ASSERT(1);
 }
 
+/* ── Call-duration accounting ───────────────────────────────────── */
+
+static time_t g_call_clock = 0;
+static time_t call_clock_source(void) { return g_call_clock; }
+
+static void test_call_duration_records_histogram(void) {
+    daemon_state_data_t state;
+    metrics_histogram_stats_t stats;
+
+    metrics_init();
+    metrics_reset_all();
+    daemon_state_init(&state);
+    mclock_set_source(call_clock_source);
+
+    /* A 30-second call records one sample of 30 and clears the stamp. */
+    g_call_clock = 10000;
+    daemon_state_call_begin(&state);
+    TEST_ASSERT(state.call_active_since == 10000);
+
+    g_call_clock = 10030;
+    TEST_ASSERT_EQ_INT((int)daemon_state_call_end(&state), 30);
+    TEST_ASSERT(state.call_active_since == 0);
+
+    TEST_ASSERT_EQ_INT(metrics_get_histogram_stats("call_duration_seconds", &stats), 0);
+    TEST_ASSERT_EQ_INT((int)stats.count, 1);
+    TEST_ASSERT_EQ_INT((int)stats.sum, 30);
+    TEST_ASSERT_EQ_INT((int)stats.max, 30);
+    TEST_ASSERT_EQ_INT((int)metrics_get_gauge("last_call_duration_seconds"), 30);
+
+    mclock_set_source(NULL);
+}
+
+static void test_call_duration_no_active_call(void) {
+    daemon_state_data_t state;
+    metrics_histogram_stats_t stats;
+
+    metrics_init();
+    metrics_reset_all();
+    daemon_state_init(&state);  /* call_active_since == 0, no call in progress */
+
+    /* Ending without a begin records nothing and reports -1. */
+    TEST_ASSERT_EQ_INT((int)daemon_state_call_end(&state), -1);
+    TEST_ASSERT(metrics_get_histogram_stats("call_duration_seconds", &stats) != 0
+                || stats.count == 0);
+
+    /* NULL-safe. */
+    TEST_ASSERT_EQ_INT((int)daemon_state_call_end(NULL), -1);
+    daemon_state_call_begin(NULL);
+    TEST_ASSERT(1);
+}
+
+static void test_call_duration_clock_skew_clamps_to_zero(void) {
+    daemon_state_data_t state;
+
+    metrics_init();
+    metrics_reset_all();
+    daemon_state_init(&state);
+    mclock_set_source(call_clock_source);
+
+    /* If the clock moves backwards mid-call, the duration clamps to 0 rather
+     * than recording a negative sample. */
+    g_call_clock = 5000;
+    daemon_state_call_begin(&state);
+    g_call_clock = 4990;
+    TEST_ASSERT_EQ_INT((int)daemon_state_call_end(&state), 0);
+
+    mclock_set_source(NULL);
+}
+
 /* ── Plugin tests ───────────────────────────────────────────────── */
 
 static int test_coin_handler(int v, const char *c) { (void)v; (void)c; return 0; }
@@ -964,6 +1033,9 @@ int main(void) {
     TEST_SUITE_RUN(test_state_keypad_rejects_non_digit);
     TEST_SUITE_RUN(test_state_reset);
     TEST_SUITE_RUN(test_state_null_safety);
+    TEST_SUITE_RUN(test_call_duration_records_histogram);
+    TEST_SUITE_RUN(test_call_duration_no_active_call);
+    TEST_SUITE_RUN(test_call_duration_clock_skew_clamps_to_zero);
 
     TEST_SUITE_BEGIN("Plugins");
     TEST_SUITE_RUN(test_plugins_register_and_activate);

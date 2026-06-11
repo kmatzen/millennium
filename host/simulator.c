@@ -175,11 +175,13 @@ void millennium_client_call(millennium_client_t *c, const char *number) {
     (void)c;
     fprintf(stderr, "[CALL] Dialing %s\n", number ? number : "(null)");
     sim_call_pending = 1;
+    sim_hangup_called = 0;  /* a fresh call clears any stale hangup signal */
 }
 
 void millennium_client_answer_call(millennium_client_t *c) {
     (void)c;
     fprintf(stderr, "[CALL] Answered\n");
+    sim_hangup_called = 0;  /* a fresh call clears any stale hangup signal */
 }
 
 void millennium_client_hangup(millennium_client_t *c) {
@@ -318,6 +320,7 @@ static void sim_handle_hook(hook_state_change_event_t *ev) {
     if (hook_up) {
         if (daemon_state->current_state == DAEMON_STATE_CALL_INCOMING) {
             daemon_state->current_state = DAEMON_STATE_CALL_ACTIVE;
+            daemon_state_call_begin(daemon_state);
         } else if (daemon_state->current_state == DAEMON_STATE_IDLE_DOWN) {
             daemon_state->current_state = DAEMON_STATE_IDLE_UP;
             daemon_state->inserted_cents = 0;
@@ -325,6 +328,8 @@ static void sim_handle_hook(hook_state_change_event_t *ev) {
         }
         daemon_state_update_activity(daemon_state);
     } else if (hook_down) {
+        if (daemon_state->current_state == DAEMON_STATE_CALL_ACTIVE)
+            daemon_state_call_end(daemon_state);
         daemon_state_clear_keypad(daemon_state);
         daemon_state->inserted_cents = 0;
         daemon_state->current_state = DAEMON_STATE_IDLE_DOWN;
@@ -369,11 +374,14 @@ static void sim_handle_call_state(call_state_event_t *ev) {
         daemon_state_update_activity(daemon_state);
     } else if (st == EVENT_CALL_STATE_ACTIVE) {
         daemon_state->current_state = DAEMON_STATE_CALL_ACTIVE;
+        daemon_state_call_begin(daemon_state);
         daemon_state_update_activity(daemon_state);
     } else if (st == EVENT_CALL_STATE_INVALID) {
         /* #90: Remote hung up */
         if (daemon_state->current_state == DAEMON_STATE_CALL_ACTIVE ||
             daemon_state->current_state == DAEMON_STATE_CALL_INCOMING) {
+            if (daemon_state->current_state == DAEMON_STATE_CALL_ACTIVE)
+                daemon_state_call_end(daemon_state);
             daemon_state_clear_keypad(daemon_state);
             daemon_state->inserted_cents = 0;
             daemon_state->current_state = DAEMON_STATE_IDLE_UP;
@@ -455,6 +463,40 @@ static int display_contains(const char *text) {
     return 0;
 }
 
+/*
+ * Resolve a metric reference to a numeric value for assert_metric.
+ *   <name>                  counter or gauge (gauge wins if both exist)
+ *   <name>.count|.sum|.min|.max|.mean|.median|.p95|.p99   histogram stat
+ * Returns 0 on success (value in *out), -1 if the metric is unknown.
+ */
+static int sim_read_metric(const char *ref, double *out) {
+    const char *dot = strrchr(ref, '.');
+    if (dot) {
+        char base[128];
+        size_t blen = (size_t)(dot - ref);
+        metrics_histogram_stats_t st;
+        const char *field = dot + 1;
+        if (blen >= sizeof(base)) return -1;
+        memcpy(base, ref, blen);
+        base[blen] = '\0';
+        if (metrics_get_histogram_stats(base, &st) != 0) return -1;
+        if      (strcmp(field, "count")  == 0) *out = (double)st.count;
+        else if (strcmp(field, "sum")    == 0) *out = st.sum;
+        else if (strcmp(field, "min")    == 0) *out = st.min;
+        else if (strcmp(field, "max")    == 0) *out = st.max;
+        else if (strcmp(field, "mean")   == 0) *out = st.mean;
+        else if (strcmp(field, "median") == 0) *out = st.median;
+        else if (strcmp(field, "p95")    == 0) *out = st.p95;
+        else if (strcmp(field, "p99")    == 0) *out = st.p99;
+        else return -1;
+        return 0;
+    }
+    /* No dot: gauge takes precedence over counter (gauges can read 0). */
+    if (metrics_get_gauge(ref) != 0.0) { *out = metrics_get_gauge(ref); return 0; }
+    *out = (double)metrics_get_counter(ref);
+    return 0;
+}
+
 /* ── Scenario runner ───────────────────────────────────────────────── */
 
 static int run_scenario(const char *path) {
@@ -472,6 +514,7 @@ static int run_scenario(const char *path) {
     }
 
     sim_sip_registered = 1;  /* default: SIP registered for each scenario */
+    metrics_reset_all();     /* isolate metric assertions from prior scenarios */
 
     while (fgets(line, sizeof(line), f)) {
         line_num++;
@@ -586,7 +629,10 @@ static int run_scenario(const char *path) {
                 sim_drain_events();
                 if (sim_hangup_called) {
                     sim_hangup_called = 0;
-                    daemon_state->current_state = DAEMON_STATE_IDLE_DOWN;
+                    if (daemon_state->current_state == DAEMON_STATE_CALL_ACTIVE) {
+                        daemon_state_call_end(daemon_state);
+                        daemon_state->current_state = DAEMON_STATE_IDLE_DOWN;
+                    }
                 }
             }
         }
@@ -627,6 +673,38 @@ static int run_scenario(const char *path) {
                 fprintf(stderr, "  FAIL: expected state containing \"%s\", got \"%s\"\n",
                         arg, actual);
                 failures++;
+            }
+        }
+
+        /* ── assert_metric <name> <op> <value> ───────────────────── */
+        /* op is one of == != >= <= > < ; <name> may be a counter, gauge,
+         * or a histogram stat via the <name>.count|sum|min|max|mean|... form */
+        else if (strncmp(cmd, "assert_metric ", 14) == 0) {
+            char name[128], op[4];
+            double expected, actual = 0.0;
+            arg = trim(cmd + 14);
+            if (sscanf(arg, "%127s %3s %lf", name, op, &expected) != 3) {
+                fprintf(stderr, "  ERROR: usage: assert_metric <name> <op> <value>\n");
+                failures++;
+            } else if (sim_read_metric(name, &actual) != 0) {
+                fprintf(stderr, "  FAIL: unknown metric \"%s\"\n", name);
+                failures++;
+            } else {
+                int ok;
+                if      (strcmp(op, "==") == 0) ok = (actual == expected);
+                else if (strcmp(op, "!=") == 0) ok = (actual != expected);
+                else if (strcmp(op, ">=") == 0) ok = (actual >= expected);
+                else if (strcmp(op, "<=") == 0) ok = (actual <= expected);
+                else if (strcmp(op, ">")  == 0) ok = (actual >  expected);
+                else if (strcmp(op, "<")  == 0) ok = (actual <  expected);
+                else { ok = 0; fprintf(stderr, "  ERROR: bad operator \"%s\"\n", op); }
+                if (ok) {
+                    fprintf(stderr, "  PASS: %s (%.2f) %s %.2f\n", name, actual, op, expected);
+                } else {
+                    fprintf(stderr, "  FAIL: %s is %.2f, expected %s %.2f\n",
+                            name, actual, op, expected);
+                    failures++;
+                }
             }
         }
 

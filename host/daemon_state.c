@@ -1,5 +1,6 @@
 #include "daemon_state.h"
 #include "clock_source.h"
+#include "metrics.h"
 #include <string.h>
 #include <time.h>
 #include <ctype.h>
@@ -11,20 +12,41 @@ void daemon_state_init(daemon_state_data_t* state) {
     memset(state->keypad_buffer, 0, sizeof(state->keypad_buffer));
     state->inserted_cents = 0;
     state->last_activity = mclock_now();
+    state->call_active_since = 0;
 }
 
 void daemon_state_reset(daemon_state_data_t* state) {
     if (!state) return;
-    
+
     state->current_state = DAEMON_STATE_IDLE_DOWN;
     daemon_state_clear_keypad(state);
     state->inserted_cents = 0;
     state->last_activity = mclock_now();
+    state->call_active_since = 0;
 }
 
 void daemon_state_update_activity(daemon_state_data_t* state) {
     if (!state) return;
     state->last_activity = mclock_now();
+}
+
+void daemon_state_call_begin(daemon_state_data_t* state) {
+    if (!state) return;
+    state->call_active_since = mclock_now();
+}
+
+long daemon_state_call_end(daemon_state_data_t* state) {
+    long duration;
+    if (!state || state->call_active_since <= 0) {
+        if (state) state->call_active_since = 0;
+        return -1;
+    }
+    duration = (long)(mclock_now() - state->call_active_since);
+    if (duration < 0) duration = 0;  /* clock skew guard */
+    state->call_active_since = 0;
+    metrics_observe_histogram("call_duration_seconds", (double)duration);
+    metrics_set_gauge("last_call_duration_seconds", (double)duration);
+    return duration;
 }
 
 const char* daemon_state_to_string(daemon_state_t state) {

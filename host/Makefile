@@ -23,7 +23,7 @@ config.o: config.c config.h
 clock_source.o: clock_source.c clock_source.h
 	gcc clock_source.c -o clock_source.o -c $(CFLAGS)
 
-daemon_state.o: daemon_state.c daemon_state.h clock_source.h
+daemon_state.o: daemon_state.c daemon_state.h clock_source.h metrics.h
 	gcc daemon_state.c -o daemon_state.o -c $(CFLAGS)
 
 logger.o: logger.c logger.h

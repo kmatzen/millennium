@@ -363,14 +363,16 @@ void handle_call_state_event(call_state_event_t *call_state_event) {
         metrics_increment_counter("calls_established", 1);
         
         update_display_with_content("Call active", "Audio connected");
-        
+
         daemon_state->current_state = DAEMON_STATE_CALL_ACTIVE;
+        daemon_state_call_begin(daemon_state);
         daemon_state_update_activity(daemon_state);
     } else if (call_state_event_get_state(call_state_event) == EVENT_CALL_STATE_INVALID) {
         /* #90/#91: Call ended - remote hung up or call failed during dial */
         if (daemon_state->current_state == DAEMON_STATE_CALL_ACTIVE) {
             logger_info_with_category("Call", "Call ended by remote party");
             metrics_increment_counter("calls_ended", 1);
+            daemon_state_call_end(daemon_state);
             daemon_state_clear_keypad(daemon_state);
             daemon_state->inserted_cents = 0;
             daemon_state->current_state = DAEMON_STATE_IDLE_UP;
@@ -439,10 +441,11 @@ void handle_hook_event(hook_state_change_event_t *hook_event) {
         if (call_incoming) {
             logger_info_with_category("Call", "Call answered");
             metrics_increment_counter("calls_answered", 1);
-            
+
             daemon_state->current_state = DAEMON_STATE_CALL_ACTIVE;
+            daemon_state_call_begin(daemon_state);
             daemon_state_update_activity(daemon_state);
-            
+
         } else if (phone_down) {
             logger_info_with_category("Hook", "Hook lifted, transitioning to IDLE_UP");
             metrics_increment_counter("hook_lifted", 1);
@@ -461,8 +464,9 @@ void handle_hook_event(hook_state_change_event_t *hook_event) {
         
         if (daemon_state->current_state == DAEMON_STATE_CALL_ACTIVE) {
             metrics_increment_counter("calls_ended", 1);
+            daemon_state_call_end(daemon_state);
         }
-        
+
         daemon_state_clear_keypad(daemon_state);
         daemon_state->inserted_cents = 0;
         

@@ -1,0 +1,45 @@
+# Test: Call duration metric
+# Verifies that ending a call records its length into the
+# call_duration_seconds histogram and the last_call_duration_seconds gauge.
+# Durations are timed via the simulated clock, so `wait N` yields exactly N
+# seconds of call time. Both call-end paths are exercised: a local hang-up
+# (hook down) and a remote hang-up (CALL_CLOSED). Each call stays under the
+# simulator's 5s call timeout so the timeout path doesn't end it early.
+
+# --- Call 1: local hang-up after 3 seconds ---
+hook_up
+assert_state IDLE_UP
+coin 25
+coin 25
+assert_display Have: 50c
+keys 5551234567
+assert_state CALL_ACTIVE
+assert_display Call active
+
+wait 3
+hook_down
+assert_state IDLE_DOWN
+
+assert_metric call_duration_seconds.count == 1
+assert_metric call_duration_seconds.max >= 3
+assert_metric last_call_duration_seconds == 3
+
+# --- Call 2: remote hang-up after 2 seconds ---
+hook_up
+assert_state IDLE_UP
+coin 25
+coin 25
+keys 5551234567
+assert_state CALL_ACTIVE
+
+wait 2
+call_ended
+assert_state IDLE_UP
+
+# Second sample recorded; histogram now holds both calls (3 + 2 = 5 seconds).
+assert_metric call_duration_seconds.count == 2
+assert_metric call_duration_seconds.sum == 5
+assert_metric last_call_duration_seconds == 2
+
+hook_down
+assert_state IDLE_DOWN
