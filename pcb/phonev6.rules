@@ -1,5 +1,5 @@
 
-(rules PCB phonev5.dsn
+(rules PCB phonev6.dsn
   (snap_angle 
     fortyfive_degree
   )
@@ -116,8 +116,9 @@
     "unconnected-(J3-Pin_18-Pad18)" "unconnected-(J3-Pin_22-Pad22)" "unconnected-(J3-Pin_24-Pad24)" "12V_COIN" "coin_tx" "coin_rx" "coin_reset" "key_col_2"
     "key_col_5" "key_col_6" "key_col_3" "key_row_1" "key_col_7" "key_row_2" "key_col_4" "key_row_3"
     "key_col_1" "key_row_4" "unconnected-(A3-GPIO12-Pad32)" "unconnected-(A3-GPIO13-Pad33)" "speaker_front_pre+" "unconnected-(A2-PadA0)" "unconnected-(A1-PadA5)" "unconnected-(A2-PadA1)"
-    "unconnected-(A2-PadA2)" "unconnected-(A2-PadA3)" "speaker_receiver_pre+" "Net-(U2-OUT_A)" "Net-(U2-OUT_B)" "Net-(U2-RIPPLE)" "Net-(Q1-S)" "BOOST_IN+"
-    "Net-(D4-A)" "Net-(U2-IN_A)" "Net-(U2-IN_B)"
+    "unconnected-(A2-PadA2)" "unconnected-(A2-PadA3)" "speaker_receiver_pre+" "unconnected-(A1-3.3V-Pad3V3)" "unconnected-(A2-3.3V-Pad3V3)" "Net-(U2-RIPPLE)" "Net-(Q1-S)" "BOOST_IN+"
+    "Net-(D4-A)" "AMP_IN1" "AMP_IN2" "Net-(U2-OUT1)" "Net-(U2-OUT2)" NF1 NF2 ZOBEL1
+    ZOBEL2 "LED_3V3" "LED_12V" "LED_RST1" "LED_RST2" "LED_SDA" "LED_SCL"
     (clearance_class "kicad_default")
     (via_rule "kicad_default")
     (rule

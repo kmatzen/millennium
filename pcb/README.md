@@ -5,12 +5,16 @@ This directory contains the PCB design files created with [KiCad](https://www.ki
 ## Design History
 
 - **phonev2** (removed): Dual LM358 op-amps, raw power connector, pin headers for audio.
-- **phonev4** (previous fabrication): Single LM386 power amplifier for ringer only,
+- **phonev4** (earlier fabrication): Single LM386 power amplifier for ringer only,
   XL6009 boost converter, RJ9 and 3.5mm jacks. Had two design flaws: speaker
   output coupling (#42) and unamplified handset earpiece (#44).
-- **phonev5 (current schematic)**: TDA2822M dual-channel amplifier replacing the
+- **phonev5** (previous schematic): TDA2822M dual-channel amplifier replacing the
   LM386, fixing both audio design flaws. Adds reverse polarity protection, ESD
   protection, power LED, fuse, test points, and improved I2C pull-ups.
+- **phonev6 (current — fabricated and installed)**: through-hole → SMD migration of
+  the phonev5 design, plus a `make verify` guardrail suite (netlist sync, footprint
+  parity, pinout and footprint checks, ERC, DRC) that must be all-green before
+  ordering. This is the revision currently installed in the phone.
 
 ## Audio Circuit (TDA2822M)
 
@@ -23,10 +27,10 @@ channels, solving both the speaker coupling and quiet handset issues.
 ```
 USB audio card (stereo 3.5mm)
   ├─ Left channel → J7 tip → C_inA → TDA2822 IN_A (pin 3)
-  │                                  TDA2822 OUT_A (pin 1) → C_outA → speaker_front+ → ringer
+  │                                    → OUT_A (pin 1) → C_outA → speaker_front+ → ringer
   │
   └─ Right channel → J7 ring → C_inB → TDA2822 IN_B (pin 4)
-                                       TDA2822 OUT_B (pin 5) → C_outB → speaker_receiver+ → J4 RJ9 → handset
+                                        → OUT_B (pin 5) → C_outB → speaker_receiver+ → J4 RJ9 → handset
 ```
 
 Each channel has its own input coupling capacitor (100nF) and output coupling
@@ -35,16 +39,16 @@ eliminating the crosstalk present in the v4 LM386 design.
 
 ### TDA2822M Pin Connections
 
-| Pin | Function   | Net                          |
-|-----|------------|------------------------------|
-| 1   | OUT_A      | → C_outA → `speaker_front+`  |
-| 2   | GND        | `gnd`                        |
-| 3   | IN_A       | `speaker_front_pre+` via C_inA |
-| 4   | IN_B       | `speaker_receiver_pre+` via C_inB |
-| 5   | OUT_B      | → C_outB → `speaker_receiver+` |
-| 6   | V+         | `5V_MAIN`                    |
-| 7   | RIPPLE     | → C_ripple (4.7µF) to GND   |
-| 8   | NC         | Not connected                |
+| Pin | Function | Net                               |
+|-----|----------|-----------------------------------|
+| 1   | OUT_A    | → C_outA → `speaker_front+`       |
+| 2   | GND      | `gnd`                             |
+| 3   | IN_A     | `speaker_front_pre+` via C_inA    |
+| 4   | IN_B     | `speaker_receiver_pre+` via C_inB |
+| 5   | OUT_B    | → C_outB → `speaker_receiver+`    |
+| 6   | V+       | `5V_MAIN`                         |
+| 7   | RIPPLE   | → C_ripple (4.7µF) to GND         |
+| 8   | NC       | Not connected                     |
 
 ### Component Values
 
@@ -60,36 +64,36 @@ eliminating the crosstalk present in the v4 LM386 design.
 
 ## Bill of Materials
 
-| Ref   | Value / Part                  | Qty | Footprint                       | Notes                            |
-|-------|-------------------------------|-----|----------------------------------|----------------------------------|
-| A1    | Arduino Micro (keypad)        | 1   | Socket headers                   | Millennium Alpha board           |
-| A2    | Arduino Micro (display)       | 1   | Socket headers                   | Millennium Beta board            |
-| A3    | Raspberry Pi Zero WH          | 1   | ADA3708 footprint                | Adafruit ADA3708                 |
-| U1    | XL6009 boost converter        | 1   | Module                           | 12V output (from 5V input), coin validator supply |
-| U2    | TDA2822M                      | 1   | DIP-8                            | Dual audio amplifier             |
-| R1    | 4.7kΩ resistor                | 1   | Axial                            | I2C pull-up (SDA)                |
-| R2    | 4.7kΩ resistor                | 1   | Axial                            | I2C pull-up (SCL)                |
-| R3    | 1kΩ resistor                  | 1   | Axial                            | Power LED current limit          |
-| C_inA | 100nF ceramic                 | 1   | Axial L3.8mm THT                 | TDA2822 ch A input coupling      |
-| C_inB | 100nF ceramic                 | 1   | Axial L3.8mm THT                 | TDA2822 ch B input coupling      |
-| C_outA| 100µF 16V electrolytic        | 1   | Radial D8mm P3.8mm                | TDA2822 ch A output coupling     |
-| C_outB| 100µF 16V electrolytic        | 1   | Radial D8mm P3.8mm                | TDA2822 ch B output coupling     |
-| C_vcc | 100µF 16V electrolytic        | 1   | Radial D8mm P3.8mm                | TDA2822 Vcc bypass               |
-| C_ripple | 4.7µF electrolytic         | 1   | Radial D5mm P2.0mm               | TDA2822 ripple rejection         |
-| C_dec | 100nF ceramic                 | 1   | Axial L3.8mm THT                 | TDA2822 Vcc decoupling           |
-| C-*   | 100nF ceramic                 | 5   | Axial L3.8mm THT                 | Decoupling (see below)           |
-| D1–D3 | P6KE6.8CA                     | 3   | DO-15 (THT axial)               | TVS clamp signal lines to GND (600W bidirectional)    |
-| Q1    | AO3401A P-ch MOSFET           | 1   | SOT-23 (SMD, JLCPCB basic C15127) | Reverse polarity protection      |
-| F1    | 1A PTC fuse                   | 1   | Radial D10mm THT                 | Resettable overcurrent fuse      |
-| D4    | Red LED (0603, C2286 basic)   | 1   | LED_0603 SMD                     | Power indicator                  |
-| J1    | Coin validator                | 1   | 2x5 pin header                   | 10-pin IDC                      |
-| J2    | Keypad                        | 1   | 2x10 pin header                  | 20-pin IDC                      |
-| J3    | VFD display                   | 1   | 2x13 pin header                  | 26-pin IDC                      |
-| J4    | Handset (RJ9)                 | 1   | RJ9 jack                         | 4P4C handset connector          |
-| J5    | Microphone                    | 1   | 3.5mm stereo jack                | Handset mic input                |
-| J6    | Card reader                   | 1   | 2x7 pin header                   | 14-pin for magstripe reader     |
-| J7    | Speaker                       | 1   | 3.5mm stereo jack                | Stereo audio from USB card      |
-| TP1-5 | Test points                   | 5   | Through-hole loop D2.5mm         | 5V_MAIN, Pi 3.3V, GND, SDA, SCL (see Test Points section) |
+| Ref      | Value / Part                | Qty | Footprint                         | Notes                                                    |
+|----------|-----------------------------|-----|-----------------------------------|----------------------------------------------------------|
+| A1       | Arduino Micro (keypad)      | 1   | Socket headers                    | Millennium Alpha board                                   |
+| A2       | Arduino Micro (display)     | 1   | Socket headers                    | Millennium Beta board                                    |
+| A3       | Raspberry Pi Zero WH        | 1   | ADA3708 footprint                 | Adafruit ADA3708                                         |
+| U1       | XL6009 boost converter      | 1   | Module                            | 12V output (from 5V input), coin validator supply        |
+| U2       | TDA2822M                    | 1   | DIP-8                             | Dual audio amplifier                                     |
+| R1       | 4.7kΩ resistor              | 1   | Axial                             | I2C pull-up (SDA)                                        |
+| R2       | 4.7kΩ resistor              | 1   | Axial                             | I2C pull-up (SCL)                                        |
+| R3       | 1kΩ resistor                | 1   | Axial                             | Power LED current limit                                  |
+| C_inA    | 100nF ceramic               | 1   | Axial L3.8mm THT                  | TDA2822 ch A input coupling                              |
+| C_inB    | 100nF ceramic               | 1   | Axial L3.8mm THT                  | TDA2822 ch B input coupling                              |
+| C_outA   | 100µF 16V electrolytic      | 1   | Radial D8mm P3.8mm                | TDA2822 ch A output coupling                             |
+| C_outB   | 100µF 16V electrolytic      | 1   | Radial D8mm P3.8mm                | TDA2822 ch B output coupling                             |
+| C_vcc    | 100µF 16V electrolytic      | 1   | Radial D8mm P3.8mm                | TDA2822 Vcc bypass                                       |
+| C_ripple | 4.7µF electrolytic          | 1   | Radial D5mm P2.0mm                | TDA2822 ripple rejection                                 |
+| C_dec    | 100nF ceramic               | 1   | Axial L3.8mm THT                  | TDA2822 Vcc decoupling                                   |
+| C-*      | 100nF ceramic               | 5   | Axial L3.8mm THT                  | Decoupling (see below)                                   |
+| D1–D3    | P6KE6.8CA                   | 3   | DO-15 (THT axial)                 | TVS clamp signal lines to GND (600W bidirectional)       |
+| Q1       | AO3401A P-ch MOSFET         | 1   | SOT-23 (SMD, JLCPCB basic C15127) | Reverse polarity protection                              |
+| F1       | 1A PTC fuse                 | 1   | Radial D10mm THT                  | Resettable overcurrent fuse                              |
+| D4       | Red LED (0603, C2286 basic) | 1   | LED_0603 SMD                      | Power indicator                                          |
+| J1       | Coin validator              | 1   | 2x5 pin header                    | 10-pin IDC                                               |
+| J2       | Keypad                      | 1   | 2x10 pin header                   | 20-pin IDC                                               |
+| J3       | VFD display                 | 1   | 2x13 pin header                   | 26-pin IDC                                               |
+| J4       | Handset (RJ9)               | 1   | RJ9 jack                          | 4P4C handset connector                                   |
+| J5       | Microphone                  | 1   | 3.5mm stereo jack                 | Handset mic input                                        |
+| J6       | Card reader                 | 1   | 2x7 pin header                    | 14-pin for magstripe reader                              |
+| J7       | Speaker                     | 1   | 3.5mm stereo jack                 | Stereo audio from USB card                               |
+| TP1–5    | Test points                 | 5   | Through-hole loop D2.5mm          | 5V_MAIN, Pi 3.3V, GND, SDA, SCL (see Test Points section)|
 
 ### Decoupling Capacitors (C-*)
 
@@ -168,11 +172,11 @@ RDT/data (pin 0), RCL/clock (pin 1).
 
 ### J7 — Speaker/Audio (3.5mm stereo)
 
-| Contact | Signal                 | Destination             |
-|---------|------------------------|-------------------------|
-| Tip     | `speaker_receiver_pre+`| → TDA2822 ch B → handset |
-| Ring    | `speaker_front_pre+`   | → TDA2822 ch A → ringer  |
-| Sleeve  | `gnd`                  | Ground                   |
+| Contact | Signal                  | Destination              |
+|---------|-------------------------|--------------------------|
+| Tip     | `speaker_receiver_pre+` | → TDA2822 ch B → handset |
+| Ring    | `speaker_front_pre+`    | → TDA2822 ch A → ringer  |
+| Sleeve  | `gnd`                   | Ground                   |
 
 ## I2C Bus
 
@@ -201,20 +205,20 @@ The board is powered from an external 5V supply. Power flows as follows:
 
 ## Test Points
 
-| Label | Signal   | Purpose                           |
-|-------|----------|-----------------------------------|
-| TP1   | 5V_MAIN  | Main 5V power rail                |
-| TP2   | 3.3V     | Pi's 3.3V output (if accessible)  |
-| TP3   | GND      | Ground reference                  |
-| TP4   | SDA      | I2C data (Arduino ↔ Arduino)      |
-| TP5   | SCL      | I2C clock                         |
-
-The board has five test points (TP1–TP5), matching the BOM. The 12V_COIN rail
-exists on the board but has no dedicated test point.
+| Label | Signal   | Purpose                             |
+|-------|----------|-------------------------------------|
+| TP1   | 5V_MAIN  | Main 5V power rail                   |
+| TP2   | 3.3V     | Pi's 3.3V output (if accessible)    |
+| TP3   | GND      | Ground reference                    |
+| TP4   | SDA      | I2C data (Arduino ↔ Arduino)        |
+| TP5   | SCL      | I2C clock                           |
+| TP6   | 12V_COIN | Boosted 12V rail for coin validator |
 
 **Note on USB connectivity**: Arduino ↔ Pi communication is via USB through an
-external hub — there are no discrete USB serial TX/RX nets on the PCB, so
-(despite older docs) there are no TX/RX test points.
+external hub. There are no discrete USB serial TX/RX nets on the PCB; TP6 and
+TP7 in older docs referred to USB serial, but that path does not exist as PCB
+nets. Only the test points above (5V_MAIN, GND, 12V_COIN, I2C) are actual PCB
+nets.
 
 ## Schematic Audit
 
@@ -222,27 +226,27 @@ Run `python3 audit_schematic.py` to check component/BOM alignment, net labels, a
 
 ## Files
 
-| File              | Description                                  |
-|-------------------|----------------------------------------------|
-| `phonev5.kicad_pro` | KiCad project file                         |
-| `phonev5.kicad_sch` | Schematic (updated with TDA2822M)          |
-| `phonev5.kicad_pcb` | PCB layout (needs re-layout for new parts) |
-| `phonev5.kicad_prl` | KiCad preferences (local)                  |
-| `phonev5.csv`      | Bill of materials (updated)                 |
-| `phone.kicad_sym`  | Custom symbol library (xl6009, TDA2822M, P6KE6.8CA) |
-| `footprints.pretty/` | Project footprint lib (F1: Fuse_Radial_D10.0mm_P5.00mm) |
-| `fp-lib-table` | Footprint library table (includes project footprints) |
-| `jlcpcb/production_files/` | Gerbers zip, BOM, CPL (JLCPCB upload) |
-| `audit_schematic.py` | Python script to audit schematic vs BOM vs README |
-| `AUDIT.md`         | Audit findings and action items             |
-| `SCHEMATIC_D2_CHANGES.md` | TVS diode wiring (D1, D2, D3 P6KE6.8CA) and net reference |
+| File                       | Description                                              |
+|----------------------------|---------------------------------------------------------|
+| `phonev6.kicad_pro`        | KiCad project file                                      |
+| `phonev6.kicad_sch`        | Schematic (updated with TDA2822M)                       |
+| `phonev6.kicad_pcb`        | PCB layout (needs re-layout for new parts)              |
+| `phonev6.kicad_prl`        | KiCad preferences (local)                               |
+| `phonev6.csv`              | Bill of materials (updated)                             |
+| `phone.kicad_sym`          | Custom symbol library (xl6009, TDA2822M, P6KE6.8CA)     |
+| `footprints.pretty/`       | Project footprint lib (F1: Fuse_Radial_D10.0mm_P5.00mm) |
+| `fp-lib-table`             | Footprint library table (includes project footprints)   |
+| `jlcpcb/production_files/` | Gerbers zip, BOM, CPL (JLCPCB upload)                   |
+| `audit_schematic.py`       | Python script to audit schematic vs BOM vs README       |
+| `AUDIT.md`                 | Audit findings and action items                         |
+| `SCHEMATIC_D2_CHANGES.md`  | TVS diode wiring (D1, D2, D3 P6KE6.8CA) and net reference |
 
 ## Manufacturing
 
 See **[JLCPCB_WORKFLOW.md](JLCPCB_WORKFLOW.md)** for fabrication steps.
 
 Quick summary:
-1. Run `./pcb/scripts/export_jlcpcb.sh` to generate `jlcpcb/production_files/GERBER-phonev5.zip`
+1. Run `./pcb/scripts/export_jlcpcb.sh` to generate `jlcpcb/production_files/GERBER-phonev6.zip`
 2. Use KiCad's JLCPCB Fabrication Toolkit plugin for BOM/CPL
 3. Upload all three from `jlcpcb/production_files/` to JLCPCB
 

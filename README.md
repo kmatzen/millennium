@@ -46,7 +46,7 @@ This project reimagines the functionality of the Nortel Millennium telephone by 
 │         │ USB serial (9600 baud)                                           │
 └─────────┬──────────────────────────────────────────────────────────────────┘
           │
-┌─────────┴───────────────── Custom PCB (phonev5) ───────────────────────────┐
+┌─────────┴───────────────── Custom PCB (phonev6) ───────────────────────────┐
 │                                                                            │
 │  ┌──────────────────────┐ I2C      ┌────────────────────────┐              │
 │  │ Display Arduino      │◀─────────│ Keypad Arduino         │              │
@@ -86,7 +86,7 @@ This project reimagines the functionality of the Nortel Millennium telephone by 
 
 - **`Arduino/`**: Arduino sketches for the keypad and display microcontrollers, plus a Makefile for building and flashing.
 - **`case/`**: 3D model files (`.blend` and `.stl`) for a custom enclosure. See [case/README.md](case/README.md) for dimensions and print settings.
-- **`pcb/`**: KiCad schematic, PCB layout, BOM, and Gerber files for the custom PCB (phonev5).
+- **`pcb/`**: KiCad schematic, PCB layout, BOM, and Gerber files for the custom PCB (phonev6).
 - **`HARDWARE.md`**: Physical assembly reference — USB topology, cable routing, power budget, and component list.
 - **`host/`**: Raspberry Pi software:
   - `daemon.c` — Main daemon loop and event routing

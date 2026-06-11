@@ -18,9 +18,9 @@ Clamps transient voltage between signal and GND (~10.5V max). In stock at DigiKe
 
 ### Net Reference
 
-| Net                 | Nodes                                         |
-|---------------------|-----------------------------------------------|
-| coin_rx             | A2 MISO, J1 Pin_3                             |
-| speaker_front+      | C_outA pin 2, J2 Pin_19, **D2 pin 2**         |
-| speaker_receiver+   | C_outB pin 2, **D1 pin 2**, J4 pin 2          |
-| gnd (TVS pin 1)     | D1, D2, D3 pin 1 → GND                        |
+| Net               | Nodes                                  |
+|-------------------|----------------------------------------|
+| coin_rx           | A2 MISO, J1 Pin_3                       |
+| speaker_front+    | C_outA pin 2, J2 Pin_19, **D2 pin 2**  |
+| speaker_receiver+ | C_outB pin 2, **D1 pin 2**, J4 pin 2   |
+| gnd (TVS pin 1)   | D1, D2, D3 pin 1 → GND                  |
