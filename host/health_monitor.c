@@ -1,5 +1,6 @@
 #include "health_monitor.h"
 #include "logger.h"
+#include "metrics.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -278,8 +279,41 @@ int health_monitor_get_statistics(health_statistics_t* stats_out) {
     pthread_mutex_lock(&g_monitor_mutex);
     *stats_out = monitor->statistics;
     pthread_mutex_unlock(&g_monitor_mutex);
-    
+
     return 1;
+}
+
+void health_monitor_publish_metrics(void) {
+    health_check_t checks[32];
+    health_statistics_t stats;
+    int count;
+    int i;
+
+    /* Per-check status as a gauge (0=healthy, 1=warning, 2=critical,
+     * 3=unknown) so an operator scraping /metrics can alert on a specific
+     * subsystem — the serial link or SIP registration — going unhealthy,
+     * out-of-band from the web dashboard. */
+    count = health_monitor_get_all_checks(checks, 32);
+    for (i = 0; i < count; i++) {
+        char metric_name[128];
+        /* Bound the %s to the check name's field capacity (name[64]) so gcc's
+         * -Werror=format-truncation can see the output fits — the buffer holds
+         * "health_check_" (13) + 63 + "_status" (7) + NUL = 84 <= 128. */
+        snprintf(metric_name, sizeof(metric_name),
+                 "health_check_%.63s_status", checks[i].name);
+        metrics_set_gauge(metric_name, (double)checks[i].last_status);
+    }
+
+    /* Worst status across all checks: a single rollup to alert on. */
+    metrics_set_gauge("health_overall_status",
+                      (double)health_monitor_get_overall_status());
+
+    /* Cumulative check tallies (running totals the monitor maintains). */
+    if (health_monitor_get_statistics(&stats)) {
+        metrics_set_gauge("health_checks_total", (double)stats.total_checks);
+        metrics_set_gauge("health_checks_failed", (double)stats.failed_checks);
+        metrics_set_gauge("health_checks_warning", (double)stats.warning_checks);
+    }
 }
 
 const char* health_monitor_status_to_string(health_status_t status) {

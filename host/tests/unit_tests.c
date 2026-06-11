@@ -1959,6 +1959,48 @@ static void test_health_overall_reflects_checks(void) {
     health_monitor_unregister_check("steerable");
 }
 
+/* ── Health monitor → metrics ───────────────────────────────────── */
+
+static health_status_t ut_health_ok(char *message, size_t message_len) {
+    (void)message; (void)message_len;
+    return HEALTH_STATUS_HEALTHY;
+}
+static health_status_t ut_health_critical(char *message, size_t message_len) {
+    (void)message; (void)message_len;
+    return HEALTH_STATUS_CRITICAL;
+}
+
+/* The background health checks (serial link, SIP registration) are surfaced as
+ * gauges so subsystem failures are alertable via /metrics. Verify the contract
+ * the daemon's metrics tick relies on: each check publishes its last status,
+ * the overall gauge is the worst of them, and the cumulative tallies advance. */
+static void test_health_metrics_published(void) {
+    metrics_init();
+
+    health_monitor_register_check("ut_serial", ut_health_ok, 30);
+    health_monitor_register_check("ut_sip", ut_health_critical, 60);
+    health_monitor_run_all_checks();
+
+    health_monitor_publish_metrics();
+
+    /* Per-check status gauges mirror each check's last result. */
+    TEST_ASSERT_EQ_INT((int)metrics_get_gauge("health_check_ut_serial_status"),
+                       (int)HEALTH_STATUS_HEALTHY);
+    TEST_ASSERT_EQ_INT((int)metrics_get_gauge("health_check_ut_sip_status"),
+                       (int)HEALTH_STATUS_CRITICAL);
+
+    /* Overall rollup is the worst status across all checks. */
+    TEST_ASSERT_EQ_INT((int)metrics_get_gauge("health_overall_status"),
+                       (int)HEALTH_STATUS_CRITICAL);
+
+    /* Cumulative tallies: at least the two we ran, one of them failed. */
+    TEST_ASSERT((int)metrics_get_gauge("health_checks_total") >= 2);
+    TEST_ASSERT((int)metrics_get_gauge("health_checks_failed") >= 1);
+
+    health_monitor_unregister_check("ut_serial");
+    health_monitor_unregister_check("ut_sip");
+}
+
 /* ── Main ───────────────────────────────────────────────────────── */
 
 int main(void) {
@@ -2108,6 +2150,9 @@ int main(void) {
     TEST_SUITE_RUN(test_health_check_default_message);
     TEST_SUITE_RUN(test_health_status_is_serving);
     TEST_SUITE_RUN(test_health_overall_reflects_checks);
+
+    TEST_SUITE_BEGIN("Health Metrics");
+    TEST_SUITE_RUN(test_health_metrics_published);
 
     TEST_REPORT();
 }

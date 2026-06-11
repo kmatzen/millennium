@@ -939,11 +939,15 @@ static void update_metrics(void) {
             last_rejected = wstats.rejected_total;
         }
     }
+
+    /* Surface the background health checks (serial link, SIP registration,
+     * daemon activity) as gauges so subsystem failures are alertable via the
+     * metrics endpoint, not just the web dashboard. */
+    health_monitor_publish_metrics();
 }
 
 int main(int argc, char *argv[]) {
     config_data_t* config;
-    /* health_monitor_t* health_monitor = health_monitor_get_instance(); */
     char config_file[MAX_STRING_LEN];
     cli_options_t cli;
 
