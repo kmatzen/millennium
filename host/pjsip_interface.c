@@ -191,11 +191,17 @@ int pjsip_iface_start(const pjsip_iface_account_t *acc,
      * the resample under the audio thread. */
     media_cfg.snd_clock_rate = 48000;
     media_cfg.channel_count = 1;        /* mono handset */
-    /* Big playback buffer: the playback ALSA chain (route+softvol+dmix) starves
-     * on this single core and underruns (crackle). A larger buffer absorbs the
-     * scheduling jitter, trading a little extra audio latency for clean sound. */
-    media_cfg.snd_play_latency = 200;
-    media_cfg.snd_rec_latency = 100;
+    /* Higher resampler quality for cleaner 8<->48 kHz conversion. The CPU cost
+     * of the larger resample filter is fine after the multicore upgrade (it was
+     * what the old single-core build avoided). 10 = best. */
+    media_cfg.quality = 10;
+    /* Playback/capture buffering. These were inflated (200/100 ms) on the old
+     * single core so the ALSA chain (route+softvol+dmix) wouldn't starve and
+     * underrun (crackle). The multicore CPU no longer needs that cushion, so
+     * trim them for noticeably lower call latency. If crackle returns under
+     * load, raise snd_play_latency back toward 200. */
+    media_cfg.snd_play_latency = 120;
+    media_cfg.snd_rec_latency = 60;
     /* No echo canceller: this is a handset (not a speakerphone), so AEC isn't
      * needed and only muddies the audio and burns CPU on the single-core Pi.
      * baresip ran with no AEC module, so this restores that behaviour. */
