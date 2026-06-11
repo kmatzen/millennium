@@ -1,0 +1,62 @@
+# Test: Call payment-type counters (calls_emergency / calls_card / calls_coin)
+# `calls_established` counts connected calls but throws away HOW each was paid
+# for. At the moment a call is placed, the Classic Phone plugin knows whether it
+# is a free emergency-number call (911/311/0), a calling-card call, or a
+# coin-paid call, and records exactly one of three mutually-exclusive counters.
+# For a payphone the free-vs-paid usage mix — and free-911 usage in particular —
+# is a headline business and compliance signal the undifferentiated call
+# counters can't show. This drives all three paths through the real plugin and
+# proves precisely one counter moves per placed call.
+#
+# Default config: call.cost_cents=50, call.free_numbers includes 911, and card
+# support is enabled, so each path is reachable without extra setup beyond a
+# registered free calling card.
+config card.free_cards 1234567890123456
+
+# ── 1) Emergency / free-number call: dial 911 with no coins ───────────────
+hook_up
+assert_state IDLE_UP
+keys 911
+# A free number connects immediately with no money inserted.
+call_active
+assert_state CALL_ACTIVE
+assert_counter calls_emergency 1
+assert_counter calls_coin 0
+assert_counter calls_card 0
+hook_down
+assert_state IDLE_DOWN
+
+# ── 2) Coin-paid call: insert 50c, dial a 10-digit number ─────────────────
+hook_up
+assert_state IDLE_UP
+coin 25
+coin 25
+assert_display Have: 50c
+keys 2125551234
+# 10 digits with enough money — call starts and is billed as a coin call.
+call_active
+assert_state CALL_ACTIVE
+assert_counter calls_coin 1
+assert_counter calls_emergency 1
+assert_counter calls_card 0
+hook_down
+assert_state IDLE_DOWN
+
+# ── 3) Calling-card call: swipe a free card, dial without coins ───────────
+hook_up
+assert_state IDLE_UP
+card 1234567890123456
+assert_display Card accepted
+keys 2125559876
+call_active
+assert_state CALL_ACTIVE
+assert_counter calls_card 1
+assert_counter calls_coin 1
+assert_counter calls_emergency 1
+hook_down
+assert_state IDLE_DOWN
+
+# Final tally: one of each, never double-counted.
+assert_counter calls_emergency 1
+assert_counter calls_card 1
+assert_counter calls_coin 1

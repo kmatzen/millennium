@@ -630,6 +630,30 @@ static int run_scenario(const char *path) {
             }
         }
 
+        /* ── assert_counter <name> <value> ───────────────────────── */
+        else if (strncmp(cmd, "assert_counter ", 15) == 0) {
+            char name[128];
+            const char *p = trim(cmd + 15);
+            int ni = 0;
+            while (*p && *p != ' ' && ni < 127) { name[ni++] = *p++; }
+            name[ni] = '\0';
+            while (*p == ' ') p++;
+            if (name[0] == '\0' || *p == '\0') {
+                fprintf(stderr, "  ERROR: assert_counter needs <name> <value>\n");
+                failures++;
+            } else {
+                unsigned long long expected = strtoull(p, NULL, 10);
+                unsigned long long actual = (unsigned long long)metrics_get_counter(name);
+                if (actual == expected) {
+                    fprintf(stderr, "  PASS: counter %s == %llu\n", name, actual);
+                } else {
+                    fprintf(stderr, "  FAIL: counter %s expected %llu, got %llu\n",
+                            name, expected, actual);
+                    failures++;
+                }
+            }
+        }
+
         /* ── print (debug) ───────────────────────────────────────── */
         else if (strcmp(cmd, "print") == 0) {
             fprintf(stderr, "  state=%s  coins=%d  display=\"%s\" | \"%s\"\n",
@@ -799,6 +823,7 @@ int main(int argc, char *argv[]) {
 
         /* Reset state between scenarios */
         daemon_state_init(daemon_state);
+        metrics_reset_all();  /* zero counters/gauges so metric asserts are per-scenario */
         sim_display_line1[0] = '\0';
         sim_display_line2[0] = '\0';
         sim_display_count    = 0;

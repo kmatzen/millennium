@@ -355,6 +355,21 @@ static void classic_phone_start_call(void) {
 
     millennium_client_call(client, classic_phone_data.current_number);
 
+    /* Record the payment type of the call we just placed. `calls_established`
+     * counts connected calls but can't reveal the usage mix; for a payphone the
+     * split between free emergency calls (911/311/0), calling-card calls, and
+     * coin-paid calls is the headline business + compliance signal. The three
+     * counters are mutually exclusive — exactly one moves per placed call, in
+     * the same priority order as classic_phone_check_and_call() selects the
+     * type (free number first, then card, then coin). */
+    if (classic_phone_data.is_emergency_call) {
+        metrics_increment_counter("calls_emergency", 1);
+    } else if (classic_phone_data.is_card_call) {
+        metrics_increment_counter("calls_card", 1);
+    } else {
+        metrics_increment_counter("calls_coin", 1);
+    }
+
     snprintf(log_msg, sizeof(log_msg), "%s call to %s",
              classic_phone_data.is_emergency_call ? "Emergency" : "Starting",
              classic_phone_data.current_number);
