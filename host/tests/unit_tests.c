@@ -112,6 +112,29 @@ static void test_config_get_int_default(void) {
     TEST_ASSERT_EQ_INT(config_get_int(&cfg, "nonexistent", 42), 42);
 }
 
+static void test_config_get_int_strict(void) {
+    config_data_t cfg;
+    cfg.count = 0;
+
+    /* Well-formed values parse, including sign and surrounding whitespace. */
+    config_set_value(&cfg, "good", "8080");
+    TEST_ASSERT_EQ_INT(config_get_int(&cfg, "good", -1), 8080);
+    config_set_value(&cfg, "neg", "-42");
+    TEST_ASSERT_EQ_INT(config_get_int(&cfg, "neg", 0), -42);
+    config_set_value(&cfg, "padded", "  17  ");
+    TEST_ASSERT_EQ_INT(config_get_int(&cfg, "padded", 0), 17);
+
+    /* Malformed values fall back to the default instead of atoi()'s silent 0. */
+    config_set_value(&cfg, "garbage", "abc");
+    TEST_ASSERT_EQ_INT(config_get_int(&cfg, "garbage", 9600), 9600);
+    config_set_value(&cfg, "trailing", "96O0");        /* letter O, not zero */
+    TEST_ASSERT_EQ_INT(config_get_int(&cfg, "trailing", 9600), 9600);
+    config_set_value(&cfg, "empty", "   ");
+    TEST_ASSERT_EQ_INT(config_get_int(&cfg, "empty", 33), 33);
+    config_set_value(&cfg, "huge", "99999999999999999999");
+    TEST_ASSERT_EQ_INT(config_get_int(&cfg, "huge", 50), 50);
+}
+
 static void test_config_get_bool_variants(void) {
     config_data_t cfg;
     cfg.count = 0;
@@ -946,6 +969,7 @@ int main(void) {
     TEST_SUITE_RUN(test_config_set_and_get);
     TEST_SUITE_RUN(test_config_get_string_default);
     TEST_SUITE_RUN(test_config_get_int_default);
+    TEST_SUITE_RUN(test_config_get_int_strict);
     TEST_SUITE_RUN(test_config_get_bool_variants);
     TEST_SUITE_RUN(test_config_validate_good);
     TEST_SUITE_RUN(test_config_validate_bad_cost);

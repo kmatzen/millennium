@@ -1,9 +1,11 @@
 #define _POSIX_C_SOURCE 200112L
 #include "config.h"
+#include "logger.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <errno.h>
 
 /* Global config instance */
 config_data_t* g_config = NULL;
@@ -132,15 +134,44 @@ const char* config_get_string(const config_data_t* config, const char* key, cons
 
 int config_get_int(const config_data_t* config, const char* key, int default_value) {
     const char* value_str;
-    int value;
-    
+    const char* s;
+    char* end;
+    long value;
+
     value_str = config_get_string(config, key, NULL);
     if (value_str == NULL) {
         return default_value;
     }
-    
-    value = atoi(value_str);
-    return value;
+
+    /*
+     * Strict parse: reject empty, non-numeric, trailing junk, or out-of-int-range
+     * input rather than letting atoi() silently coerce garbage to 0. A typo in
+     * the config file then falls back to the documented default (and is logged)
+     * instead of, say, zeroing a port or disabling a timeout. Mirrors the strict
+     * parsing the state file already uses for the same reason.
+     */
+    s = value_str;
+    while (*s == ' ' || *s == '\t') s++;
+    if (*s == '\0') {
+        logger_warnf_with_category("Config",
+            "%s is empty; using default %d", key, default_value);
+        return default_value;
+    }
+
+    errno = 0;
+    value = strtol(s, &end, 10);
+    while (*end == ' ' || *end == '\t' || *end == '\r' || *end == '\n') end++;
+    /* value != (long)(int)value catches int overflow portably: on a 32-bit
+     * long (the Pi) it can never fire, so it avoids a -Wtype-limits warning. */
+    if (end == s || *end != '\0' || errno == ERANGE ||
+        value != (long)(int)value) {
+        logger_warnf_with_category("Config",
+            "%s='%s' is not a valid integer; using default %d",
+            key, value_str, default_value);
+        return default_value;
+    }
+
+    return (int)value;
 }
 
 int config_get_bool(const config_data_t* config, const char* key, int default_value) {
