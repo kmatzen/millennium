@@ -150,6 +150,24 @@ test: simulator unit_tests
 	@./simulator tests/*.scenario
 	@echo ""
 
+# Compile-check every daemon translation unit EXCEPT pjsip_interface.o (the only
+# one needing libpjproject, which isn't available off the Pi). The simulator and
+# unit-test builds stub the hardware layer, so daemon-only code — notably the
+# ALSA paths in audio_tones.c, plus web_server/websocket/health_monitor — is
+# never compiled by `make test`. This target catches type/syntax errors in that
+# code on any Linux box with libasound2-dev (e.g. CI), short of a full link.
+COMPILE_CHECK_OBJS = daemon.o daemon_state.o millennium_sdk.o events.o \
+	event_processor.o config.o logger.o health_monitor.o metrics.o \
+	metrics_server.o web_server.o websocket.o plugins.o plugin_sdk.o \
+	plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o \
+	plugins/number_guess.o plugins/simon.o plugins/dial_a_joke.o \
+	plugins/trivia.o state_persistence.o display_manager.o version.o \
+	audio_tones.o updater.o
+
+.PHONY: compile-check
+compile-check: $(COMPILE_CHECK_OBJS)
+	@echo "compile-check OK: all daemon sources (except pjsip_interface) compiled"
+
 clean:
 	rm -rf *.o daemon simulator unit_tests pjsip_smoke plugins/*.o tests/*.o
 

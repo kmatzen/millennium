@@ -15,6 +15,15 @@ jobs:
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y libasound2-dev
 
+      # Compile the real daemon sources (incl. the ALSA paths in audio_tones.c,
+      # web_server, websocket, health_monitor) that the simulator/unit-test
+      # builds stub out. Catches type/syntax breakage that would otherwise only
+      # surface on the Pi's `make daemon`. pjsip_interface.c is excluded — it
+      # needs libpjproject, which isn't available here.
+      - name: Compile-check daemon sources
+        working-directory: host
+        run: make compile-check
+
       - name: Build simulator
         working-directory: host
         run: make simulator
