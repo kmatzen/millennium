@@ -13,6 +13,8 @@
 #include "state_persistence.h"
 #include "display_manager.h"
 #include "audio_tones.h"
+#include "cli.h"
+#include "version.h"
 #include <signal.h>
 #include <string.h>
 #include <stdio.h>
@@ -863,6 +865,28 @@ int main(int argc, char *argv[]) {
     config_data_t* config;
     /* health_monitor_t* health_monitor = health_monitor_get_instance(); */
     char config_file[MAX_STRING_LEN];
+    cli_options_t cli;
+
+    /* Parse the command line before touching any hardware or state: --help and
+     * --version must work cheaply and side-effect-free even on the dev box. */
+    cli_parse_args(argc, argv, &cli);
+    switch (cli.mode) {
+    case CLI_MODE_HELP:
+        cli_print_usage(stdout, argv[0]);
+        return 0;
+    case CLI_MODE_VERSION:
+        printf("millennium-daemon %s (git %s, built %s)\n",
+               version_get_string(), version_get_git_hash(),
+               version_get_build_time());
+        return 0;
+    case CLI_MODE_ERROR:
+        fprintf(stderr, "millennium-daemon: %s\n", cli.error);
+        cli_print_usage(stderr, argv[0]);
+        return 2;
+    case CLI_MODE_RUN:
+    default:
+        break;
+    }
 
     /* Daemon has no controlling terminal: point stdin at /dev/null so nothing
      * accidentally polls fd 0 (which under systemd can be a non-pollable fd). */
@@ -885,8 +909,8 @@ int main(int argc, char *argv[]) {
     
     /* Load configuration */
     strcpy(config_file, "/etc/millennium/daemon.conf");
-    if (argc > 2 && strcmp(argv[1], "--config") == 0) {
-        strncpy(config_file, argv[2], MAX_STRING_LEN - 1);
+    if (cli.config_file != NULL) {
+        strncpy(config_file, cli.config_file, MAX_STRING_LEN - 1);
         config_file[MAX_STRING_LEN - 1] = '\0';
     }
     
