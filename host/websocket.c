@@ -121,7 +121,7 @@ static void base64_encode(const uint8_t *in, size_t in_len, char *out, size_t ou
 
 int ws_compute_accept_key(const char *client_key, char *out, size_t out_size) {
     char concat[128];
-    uint8_t digest[20];
+    uint8_t digest[20] = {0};
 
     if (!client_key || !out || out_size < 29) return -1;
 

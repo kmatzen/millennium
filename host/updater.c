@@ -82,8 +82,9 @@ static int do_check(void) {
 }
 
 static void *check_thread_func(void *arg) {
+    int rc;
     (void)arg;
-    int rc = do_check();
+    rc = do_check();
     pthread_mutex_lock(&check_mutex);
     check_state = 2;  /* checked */
     if (rc != 0) latest_version[0] = '\0';
@@ -162,8 +163,9 @@ const char *updater_get_apply_status(void) {
 
 /* #118: Run apply in background; returns immediately. */
 static void *apply_thread_func(void *arg) {
+    int rc;
     (void)arg;
-    int rc = updater_apply(apply_source_dir);
+    rc = updater_apply(apply_source_dir);
     if (rc != 0) {
         pthread_mutex_lock(&apply_mutex);
         apply_state = 0;
@@ -213,13 +215,10 @@ int updater_is_applying(void) {
 
 static int run_command(const char *cmd) {
     int rc;
-    char log_msg[512];
-    snprintf(log_msg, sizeof(log_msg), "Running: %s", cmd);
-    logger_info_with_category("Updater", log_msg);
+    logger_infof_with_category("Updater", "Running: %s", cmd);
     rc = system(cmd);
     if (rc != 0) {
-        snprintf(log_msg, sizeof(log_msg), "Command failed (exit %d): %s", rc, cmd);
-        logger_warn_with_category("Updater", log_msg);
+        logger_warnf_with_category("Updater", "Command failed (exit %d): %s", rc, cmd);
     }
     return rc;
 }

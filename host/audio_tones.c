@@ -68,8 +68,6 @@ static int dtmf_freqs(char key, double *f1, double *f2) {
 
 static void *tone_thread_func(void *arg) {
     tone_spec_t spec = *(tone_spec_t *)arg;
-    free(arg);
-
     snd_pcm_t *pcm = NULL;
     int err;
     int16_t buf[SAMPLE_RATE / 10]; /* 100 ms buffer */
@@ -77,6 +75,8 @@ static void *tone_thread_func(void *arg) {
     unsigned long sample_idx = 0;
     int elapsed_ms = 0;
     int cadence_pos = 0; /* ms into current on/off cycle */
+
+    free(arg);
 
     err = snd_pcm_open(&pcm, spec.device ? spec.device : "default",
                        SND_PCM_STREAM_PLAYBACK, 0);
@@ -103,6 +103,7 @@ static void *tone_thread_func(void *arg) {
     while (!tone_stop_flag) {
         int i;
         int silent = 0;
+        snd_pcm_sframes_t frames;
 
         /* Check cadence: are we in the off period? */
         if (spec.on_ms > 0 && spec.off_ms > 0) {
@@ -123,7 +124,7 @@ static void *tone_thread_func(void *arg) {
             sample_idx++;
         }
 
-        snd_pcm_sframes_t frames = snd_pcm_writei(pcm, buf, buf_frames);
+        frames = snd_pcm_writei(pcm, buf, buf_frames);
         if (frames < 0) {
             frames = snd_pcm_recover(pcm, (int)frames, 0);
             if (frames < 0) break;

@@ -155,8 +155,7 @@ Pure ALSA (`libasound`), no PipeWire. Left channel → ringer (TDA2822M ch A), r
 
 ## Coding Conventions
 
-- **C89** for all files except `simulator.c`, `jukebox.c`, `audio_tones.c` (C99 needed for mixed declarations)
-- `-Wall -Wextra` on all targets; no separate linter configured
+- **C89** across the whole codebase, compiled with `-std=gnu89` (the C89 language plus the GNU extensions the ALSA/PJSIP system headers require, e.g. `inline`; strict `-std=c89` can't parse those headers). `-Wall -Wextra -Wdeclaration-after-statement` on all targets keeps the source free of C99-style mixed declarations; no separate linter configured
 - No external dependencies beyond ALSA, pthread, PJSIP (libpjproject), and libc
 - No C++ in the active daemon targets (`.cpp` files in `host/` are legacy/unused)
 

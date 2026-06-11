@@ -85,6 +85,10 @@ const char* logger_level_to_string(log_level_t level);
 
 /* In-memory log storage */
 int logger_get_recent_logs(char logs[][512], int max_entries);
+/* Newest entries whose level is >= min_level, scanning the full ring buffer
+ * (so INFO+ events surface even when DEBUG output floods the recent window).
+ * Returns them oldest-first, like logger_get_recent_logs. */
+int logger_get_recent_logs_min_level(char logs[][512], int max_entries, log_level_t min_level);
 
 /* Internal functions */
 void logger_write_log(log_level_t level, const char* category, const char* message);

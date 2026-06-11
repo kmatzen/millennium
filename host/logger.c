@@ -277,21 +277,23 @@ const char* logger_format_level(log_level_t level) {
 void logger_add_to_memory(const char* formatted_message) {
     logger_data_t* logger = logger_get_instance();
     int index;
-    
+    size_t mlen, mcap;
+
     if (logger == NULL || formatted_message == NULL) {
         return;
     }
-    
+
     /* Use circular buffer */
     index = (logger->memory_logs_start + logger->memory_logs_count) % 1000;
-    
-    /* Safe copy with guaranteed null termination - truncation is intentional */
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wstringop-truncation"
-    strncpy(logger->memory_logs[index], formatted_message, sizeof(logger->memory_logs[index]) - 1);
-#pragma GCC diagnostic pop
-    logger->memory_logs[index][sizeof(logger->memory_logs[index]) - 1] = '\0';
-    
+
+    /* Copy with intentional truncation, always null-terminated. (memcpy rather
+     * than strncpy so neither gcc -Wstringop-truncation nor clang complains.) */
+    mcap = sizeof(logger->memory_logs[index]) - 1;
+    mlen = strlen(formatted_message);
+    if (mlen > mcap) mlen = mcap;
+    memcpy(logger->memory_logs[index], formatted_message, mlen);
+    logger->memory_logs[index][mlen] = '\0';
+
     if (logger->memory_logs_count < 1000) {
         logger->memory_logs_count++;
     } else {
@@ -303,24 +305,76 @@ void logger_add_to_memory(const char* formatted_message) {
 int logger_get_recent_logs(char logs[][512], int max_entries) {
     logger_data_t* logger = logger_get_instance();
     int i, j, count;
-    
+
     if (logger == NULL || logs == NULL || max_entries <= 0) {
         return 0;
     }
-    
+
     pthread_mutex_lock(&logger_mutex);
-    
+
     count = (max_entries < logger->memory_logs_count) ? max_entries : logger->memory_logs_count;
-    
+
     for (i = 0, j = logger->memory_logs_start; i < count; i++) {
         strncpy(logs[i], logger->memory_logs[j], sizeof(logs[i]) - 1);
         logs[i][sizeof(logs[i]) - 1] = '\0';
         j = (j + 1) % 1000;
     }
-    
+
     pthread_mutex_unlock(&logger_mutex);
-    
+
     return count;
+}
+
+/* Parse the severity out of a stored line: "[timestamp] [LEVEL] ..." */
+static log_level_t logger_parse_line_level(const char* line) {
+    const char* p;
+    if (line == NULL) return LOG_LEVEL_INFO;
+    p = strchr(line, ']');            /* end of [timestamp] */
+    if (p == NULL) return LOG_LEVEL_INFO;
+    p = strchr(p + 1, '[');           /* start of [LEVEL]   */
+    if (p == NULL) return LOG_LEVEL_INFO;
+    p++;
+    if (strncmp(p, "VERBOSE", 7) == 0) return LOG_LEVEL_VERBOSE;
+    if (strncmp(p, "DEBUG", 5) == 0)   return LOG_LEVEL_DEBUG;
+    if (strncmp(p, "INFO", 4) == 0)    return LOG_LEVEL_INFO;
+    if (strncmp(p, "WARN", 4) == 0)    return LOG_LEVEL_WARN;
+    if (strncmp(p, "ERROR", 5) == 0)   return LOG_LEVEL_ERROR;
+    return LOG_LEVEL_INFO;
+}
+
+int logger_get_recent_logs_min_level(char logs[][512], int max_entries, log_level_t min_level) {
+    logger_data_t* logger = logger_get_instance();
+    int n, k, idx, collected, a, b;
+    char tmp[512];
+
+    if (logger == NULL || logs == NULL || max_entries <= 0) {
+        return 0;
+    }
+
+    pthread_mutex_lock(&logger_mutex);
+
+    n = logger->memory_logs_count;
+    collected = 0;
+    /* Walk newest -> oldest across the whole ring, keep up to max_entries
+     * matching the minimum level. */
+    for (k = 1; k <= n && collected < max_entries; k++) {
+        idx = (logger->memory_logs_start + n - k) % 1000;
+        if (logger_parse_line_level(logger->memory_logs[idx]) >= min_level) {
+            strncpy(logs[collected], logger->memory_logs[idx], 511);
+            logs[collected][511] = '\0';
+            collected++;
+        }
+    }
+    /* Collected newest-first; reverse to oldest-first to match the other API. */
+    for (a = 0, b = collected - 1; a < b; a++, b--) {
+        memcpy(tmp, logs[a], 512);
+        memcpy(logs[a], logs[b], 512);
+        memcpy(logs[b], tmp, 512);
+    }
+
+    pthread_mutex_unlock(&logger_mutex);
+
+    return collected;
 }
 
 /* Convenience methods */

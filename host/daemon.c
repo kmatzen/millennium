@@ -165,23 +165,25 @@ void generate_display_bytes(char *output, size_t output_size) {
 
 /* Helper function to safely copy strings with bounds checking */
 static void safe_strcpy(char *dest, const char *src, size_t dest_size) {
+    size_t n;
     if (!dest || dest_size == 0) return;
-    
-    if (src) {
-        strncpy(dest, src, dest_size - 1);
-    } else {
+    if (!src) {
         dest[0] = '\0';
+        return;
     }
-    dest[dest_size - 1] = '\0';
+    n = strlen(src);
+    if (n >= dest_size) n = dest_size - 1;
+    memcpy(dest, src, n);
+    dest[n] = '\0';
 }
 
 /* Helper function to update display - consolidates repetitive code */
 static void update_display(void) {
+    char display_bytes[100];
     if (!client || !daemon_state) {
         return;
     }
-    
-    char display_bytes[100];
+
     generate_display_bytes(display_bytes, sizeof(display_bytes));
     millennium_client_set_display(client, display_bytes);
 }
@@ -275,20 +277,21 @@ static void daemon_broadcast_state(const char *event_type) {
 }
 
 void handle_coin_event(coin_event_t *coin_event) {
+    char *coin_code_str;
+    int coin_value = 0;
     if (!coin_event) {
         logger_error_with_category("Coin", "Received null coin event");
         return;
     }
     VALIDATE_BASICS();
-    
-    char *coin_code_str = coin_event_get_coin_code(coin_event);
+
+    coin_code_str = coin_event_get_coin_code(coin_event);
     if (!coin_code_str) {
         logger_error_with_category("Coin", "Failed to get coin code");
         return;
     }
-    
-    int coin_value = 0;
-    
+
+
     if (strcmp(coin_code_str, "COIN_6") == 0) {
         coin_value = 5;
     } else if (strcmp(coin_code_str, "COIN_7") == 0) {
@@ -328,17 +331,20 @@ void handle_coin_event(coin_event_t *coin_event) {
 
 void handle_call_state_event(call_state_event_t *call_state_event) {
     int need_hangup_sync = 0;
-    
+    int is_incoming;
+    int phone_down;
+    int phone_up;
+
     if (!call_state_event) {
         logger_error_with_category("Call", "Received null call state event");
         return;
     }
     VALIDATE_BASICS();
-    
+
     pthread_mutex_lock(&daemon_state_mutex);
-    int is_incoming = (call_state_event_get_state(call_state_event) == EVENT_CALL_STATE_INCOMING);
-    int phone_down = (daemon_state->current_state == DAEMON_STATE_IDLE_DOWN);
-    int phone_up = (daemon_state->current_state == DAEMON_STATE_IDLE_UP);
+    is_incoming = (call_state_event_get_state(call_state_event) == EVENT_CALL_STATE_INCOMING);
+    phone_down = (daemon_state->current_state == DAEMON_STATE_IDLE_DOWN);
+    phone_up = (daemon_state->current_state == DAEMON_STATE_IDLE_UP);
     
     /* #92: Accept incoming when handset down (ring) or up (e.g. interrupt dialing) */
     if (is_incoming && (phone_down || phone_up)) {
@@ -412,15 +418,19 @@ void handle_call_state_event(call_state_event_t *call_state_event) {
 }
 
 void handle_hook_event(hook_state_change_event_t *hook_event) {
+    int hook_up;
+    int hook_down;
+    int resulting_state;
+
     if (!hook_event) {
         logger_error_with_category("Hook", "Received null hook event");
         return;
     }
     VALIDATE_BASICS();
-    
+
     pthread_mutex_lock(&daemon_state_mutex);
-    int hook_up = (hook_state_change_event_get_direction(hook_event) == 'U');
-    int hook_down = (hook_state_change_event_get_direction(hook_event) == 'D');
+    hook_up = (hook_state_change_event_get_direction(hook_event) == 'U');
+    hook_down = (hook_state_change_event_get_direction(hook_event) == 'D');
     
     if (hook_up) {
         int call_incoming = (daemon_state->current_state == DAEMON_STATE_CALL_INCOMING);
@@ -462,9 +472,9 @@ void handle_hook_event(hook_state_change_event_t *hook_event) {
         daemon_state->current_state = DAEMON_STATE_IDLE_DOWN;
         daemon_state_update_activity(daemon_state);
     }
-    int resulting_state = (int)daemon_state->current_state;
+    resulting_state = (int)daemon_state->current_state;
     pthread_mutex_unlock(&daemon_state_mutex);
-    
+
     /* Let active plugin handle the hook event */
     plugins_handle_hook(hook_up, hook_down);
     
@@ -486,13 +496,14 @@ void handle_hook_event(hook_state_change_event_t *hook_event) {
 }
 
 void handle_keypad_event(keypad_event_t *keypad_event) {
+    char key;
     if (!keypad_event) {
         logger_error_with_category("Keypad", "Received null keypad event");
         return;
     }
     VALIDATE_BASICS();
-    
-    char key = keypad_event_get_key(keypad_event);
+
+    key = keypad_event_get_key(keypad_event);
 
     /* Digits feed the shared dial buffer (for Classic Phone dialing) only
      * while the phone is ready and the buffer has room. */
@@ -531,6 +542,9 @@ void handle_card_event(card_event_t *card_event) {
 
 /* Implementation of sendControlCommand */
 int send_control_command(const char* action) {
+    char command[MAX_STRING_LEN];
+    char arg[MAX_STRING_LEN];
+    const char *colon_pos;
     if (!daemon_state) {
         logger_error_with_category("Control", "Daemon state is null");
         return 0;
@@ -549,10 +563,8 @@ int send_control_command(const char* action) {
     printf("[CONTROL] Received command: %s\n", action);
     
     /* Parse command and arguments */
-    char command[MAX_STRING_LEN];
-    char arg[MAX_STRING_LEN];
-    const char *colon_pos = strchr(action, ':');
-    
+    colon_pos = strchr(action, ':');
+
     if (colon_pos) {
         size_t cmd_len = colon_pos - action;
         if (cmd_len >= MAX_STRING_LEN) {
@@ -621,6 +633,7 @@ int send_control_command(const char* action) {
         }
         
     } else if (strcmp(command, "keypad_clear") == 0) {
+        int success;
         /* Only allow clear when handset is up (same as physical keypad logic) */
         pthread_mutex_lock(&daemon_state_mutex);
         if (is_phone_ready_for_operation()) {
@@ -628,54 +641,58 @@ int send_control_command(const char* action) {
             daemon_state_update_activity(daemon_state);
             metrics_increment_counter("keypad_clears", 1);
             logger_info_with_category("Control", "Keypad cleared via web portal");
-            
+
             /* Let plugins handle display updates */
         } else {
             logger_warn_with_category("Control", "Keypad clear ignored - handset down");
         }
-        int success = is_phone_ready_for_operation();
+        success = is_phone_ready_for_operation();
         pthread_mutex_unlock(&daemon_state_mutex);
         return success;
         
     } else if (strcmp(command, "keypad_backspace") == 0) {
+        int buffer_not_empty;
+        int success;
         /* Only allow backspace when handset is up and buffer is not empty */
         pthread_mutex_lock(&daemon_state_mutex);
-        int buffer_not_empty = (daemon_state_get_keypad_length(daemon_state) > 0);
-        
+        buffer_not_empty = (daemon_state_get_keypad_length(daemon_state) > 0);
+
         if (is_phone_ready_for_operation() && buffer_not_empty) {
             daemon_state_remove_last_key(daemon_state);
             daemon_state_update_activity(daemon_state);
             metrics_increment_counter("keypad_backspaces", 1);
             logger_info_with_category("Control", "Keypad backspace via web portal");
-            
+
             /* Let plugins handle display updates */
         } else {
             logger_warn_with_category("Control", "Keypad backspace ignored - handset down or buffer empty");
         }
-        int success = (is_phone_ready_for_operation() && buffer_not_empty);
+        success = (is_phone_ready_for_operation() && buffer_not_empty);
         pthread_mutex_unlock(&daemon_state_mutex);
         return success;
         
     } else if (strcmp(command, "coin_insert") == 0) {
+        int cents;
+        uint8_t coin_code;
+        coin_event_t *coin_event;
         /* Extract cents from argument and inject as coin event */
         if (strlen(arg) == 0) {
             logger_warn_with_category("Control", "Coin insert command missing argument");
             return 0;
         }
-        
+
         logger_infof_with_category("Control", "Extracted cents string: '%s'", arg);
         printf("[CONTROL] Extracted cents: '%s'\n", arg);
-        
-        int cents = atoi(arg);
-        
+
+        cents = atoi(arg);
+
         /* Validate coin value */
         if (cents <= 0) {
             logger_warnf_with_category("Control", "Invalid coin value: %d¢", cents);
             return 0;
         }
-        
+
         /* Map cents to coin codes (same as physical coin reader) */
-        uint8_t coin_code;
         switch (cents) {
             case 5:  coin_code = 0x36; break; /* COIN_6 */
             case 10: coin_code = 0x37; break; /* COIN_7 */
@@ -685,7 +702,7 @@ int send_control_command(const char* action) {
                 return 0;
         }
         
-        coin_event_t *coin_event = coin_event_create(coin_code);
+        coin_event = coin_event_create(coin_code);
         if (coin_event) {
             event_processor_process_event(event_processor, (event_t *)coin_event);
             event_destroy((event_t *)coin_event);
@@ -776,19 +793,21 @@ health_status_t check_sip_connection(void) {
 }
 
 health_status_t check_daemon_activity(void) {
+    time_t now;
+    time_t last_activity;
+    time_t time_since_activity;
     if (!daemon_state) {
         return HEALTH_STATUS_CRITICAL;
     }
-    
-    time_t now = time(NULL);
-    time_t last_activity;
-    
+
+    now = time(NULL);
+
     pthread_mutex_lock(&daemon_state_mutex);
     last_activity = daemon_state->last_activity;
     pthread_mutex_unlock(&daemon_state_mutex);
-    
-    time_t time_since_activity = now - last_activity;
-    
+
+    time_since_activity = now - last_activity;
+
     if (time_since_activity > 3600) { /* No activity for more than 1 hour */
         return HEALTH_STATUS_WARNING;
     }
@@ -798,17 +817,21 @@ health_status_t check_daemon_activity(void) {
 
 /* Helper function to update metrics - consolidated from thread */
 static void update_metrics(void) {
+    time_t uptime;
+    double current_state;
+    double inserted_cents;
+    double keypad_size;
     if (!daemon_state) return;
-    
+
     /* Update system metrics */
-    time_t uptime = time(NULL) - daemon_start_time;
+    uptime = time(NULL) - daemon_start_time;
     metrics_set_gauge("daemon_uptime_seconds", (double)uptime);
-    
+
     /* Quick snapshot of state without holding mutex too long */
     pthread_mutex_lock(&daemon_state_mutex);
-    double current_state = (double)daemon_state->current_state;
-    double inserted_cents = (double)daemon_state->inserted_cents;
-    double keypad_size = (double)daemon_state_get_keypad_length(daemon_state);
+    current_state = (double)daemon_state->current_state;
+    inserted_cents = (double)daemon_state->inserted_cents;
+    keypad_size = (double)daemon_state_get_keypad_length(daemon_state);
     pthread_mutex_unlock(&daemon_state_mutex);
     
     /* Update metrics outside of mutex */
@@ -818,6 +841,10 @@ static void update_metrics(void) {
 }
 
 int main(int argc, char *argv[]) {
+    config_data_t* config;
+    /* health_monitor_t* health_monitor = health_monitor_get_instance(); */
+    char config_file[MAX_STRING_LEN];
+
     /* Daemon has no controlling terminal: point stdin at /dev/null so nothing
      * accidentally polls fd 0 (which under systemd can be a non-pollable fd). */
     {
@@ -828,10 +855,8 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    config_data_t* config = config_get_instance();
-    /* health_monitor_t* health_monitor = health_monitor_get_instance(); */
-    char config_file[MAX_STRING_LEN];
-    
+    config = config_get_instance();
+
     /* Record daemon start time for uptime calculation */
     daemon_start_time = time(NULL);
     
@@ -984,16 +1009,17 @@ int main(int argc, char *argv[]) {
     
     /* Main event loop */
     while (1) {
+        event_t *event;
         pthread_mutex_lock(&running_mutex);
         if (!running) {
             pthread_mutex_unlock(&running_mutex);
             break;
         }
         pthread_mutex_unlock(&running_mutex);
-        
+
         millennium_client_update(client);
-        
-        event_t *event = (event_t *)millennium_client_next_event(client);
+
+        event = (event_t *)millennium_client_next_event(client);
         if (event) {
             event_processor_process_event(event_processor, event);
             event_destroy(event);

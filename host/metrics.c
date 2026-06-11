@@ -65,27 +65,30 @@ static int find_histogram_index(const char *name) {
 
 /* Helper function to add a counter */
 static int add_counter(const char *name) {
+    int index;
     if (g_metrics->counter_count >= g_metrics->counter_capacity) {
         size_t new_capacity = g_metrics->counter_capacity * 2;
+        metrics_counter_t *new_counters;
+        char **new_names;
         if (new_capacity == 0) new_capacity = 16;
-        
-        metrics_counter_t *new_counters = realloc(g_metrics->counters, 
+
+        new_counters = realloc(g_metrics->counters,
             new_capacity * sizeof(metrics_counter_t));
         if (!new_counters) return -1;
-        
-        char **new_names = realloc(g_metrics->counter_names, 
+
+        new_names = realloc(g_metrics->counter_names,
             new_capacity * sizeof(char*));
         if (!new_names) {
             free(new_counters);
             return -1;
         }
-        
+
         g_metrics->counters = new_counters;
         g_metrics->counter_names = new_names;
         g_metrics->counter_capacity = new_capacity;
     }
-    
-    int index = (int)g_metrics->counter_count;
+
+    index = (int)g_metrics->counter_count;
     g_metrics->counter_names[index] = my_strdup(name);
     if (!g_metrics->counter_names[index]) return -1;
     
@@ -98,27 +101,30 @@ static int add_counter(const char *name) {
 
 /* Helper function to add a gauge */
 static int add_gauge(const char *name) {
+    int index;
     if (g_metrics->gauge_count >= g_metrics->gauge_capacity) {
         size_t new_capacity = g_metrics->gauge_capacity * 2;
+        metrics_gauge_t *new_gauges;
+        char **new_names;
         if (new_capacity == 0) new_capacity = 16;
-        
-        metrics_gauge_t *new_gauges = realloc(g_metrics->gauges, 
+
+        new_gauges = realloc(g_metrics->gauges,
             new_capacity * sizeof(metrics_gauge_t));
         if (!new_gauges) return -1;
-        
-        char **new_names = realloc(g_metrics->gauge_names, 
+
+        new_names = realloc(g_metrics->gauge_names,
             new_capacity * sizeof(char*));
         if (!new_names) {
             free(new_gauges);
             return -1;
         }
-        
+
         g_metrics->gauges = new_gauges;
         g_metrics->gauge_names = new_names;
         g_metrics->gauge_capacity = new_capacity;
     }
-    
-    int index = (int)g_metrics->gauge_count;
+
+    index = (int)g_metrics->gauge_count;
     g_metrics->gauge_names[index] = my_strdup(name);
     if (!g_metrics->gauge_names[index]) return -1;
     
@@ -131,27 +137,30 @@ static int add_gauge(const char *name) {
 
 /* Helper function to add a histogram */
 static int add_histogram(const char *name) {
+    int index;
     if (g_metrics->histogram_count >= g_metrics->histogram_capacity) {
         size_t new_capacity = g_metrics->histogram_capacity * 2;
+        metrics_histogram_t *new_histograms;
+        char **new_names;
         if (new_capacity == 0) new_capacity = 16;
-        
-        metrics_histogram_t *new_histograms = realloc(g_metrics->histograms, 
+
+        new_histograms = realloc(g_metrics->histograms,
             new_capacity * sizeof(metrics_histogram_t));
         if (!new_histograms) return -1;
-        
-        char **new_names = realloc(g_metrics->histogram_names, 
+
+        new_names = realloc(g_metrics->histogram_names,
             new_capacity * sizeof(char*));
         if (!new_names) {
             free(new_histograms);
             return -1;
         }
-        
+
         g_metrics->histograms = new_histograms;
         g_metrics->histogram_names = new_names;
         g_metrics->histogram_capacity = new_capacity;
     }
-    
-    int index = (int)g_metrics->histogram_count;
+
+    index = (int)g_metrics->histogram_count;
     g_metrics->histogram_names[index] = my_strdup(name);
     if (!g_metrics->histogram_names[index]) return -1;
     
@@ -389,9 +398,10 @@ int metrics_observe_histogram(const char *name, double value) {
     /* Add value to the values array */
     if (hist->values_size >= hist->values_capacity) {
         size_t new_capacity = hist->values_capacity * 2;
+        double *new_values;
         if (new_capacity == 0) new_capacity = 16;
-        
-        double *new_values = realloc(hist->values, new_capacity * sizeof(double));
+
+        new_values = realloc(hist->values, new_capacity * sizeof(double));
         if (!new_values) {
             pthread_mutex_unlock(&metrics_mutex);
             return -1;
@@ -539,8 +549,9 @@ char *metrics_export_prometheus(void) {
     #define GROW_IF_NEEDED() do { \
         if (pos + 512 >= len && len < METRICS_EXPORT_MAX_SIZE) { \
             size_t new_len = len * 2; \
+            char *tmp; \
             if (new_len > METRICS_EXPORT_MAX_SIZE) new_len = METRICS_EXPORT_MAX_SIZE; \
-            char *tmp = realloc(result, new_len); \
+            tmp = realloc(result, new_len); \
             if (tmp) { result = tmp; len = new_len; } \
         } \
     } while (0)

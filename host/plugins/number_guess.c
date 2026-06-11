@@ -106,7 +106,7 @@ int number_guess_compare(int secret, int guess) {
 
 static void ng_submit(void) {
     int guess, cmp;
-    char l2[21];
+    char l2[32];   /* room for "Higher (try %d)" with a worst-case int */
 
     if (ng.entry_len == 0) return; /* nothing entered */
     guess = atoi(ng.entry);
