@@ -45,6 +45,13 @@ void logger_set_log_to_console(int enable);
 void logger_set_log_to_file(int enable);
 void logger_set_rotation(long max_file_size, int max_rotated_files);
 
+/* Asynchronous file writer control (issue #123). File output is drained to
+ * disk by a dedicated writer thread so a slow log target never blocks a thread
+ * that logs. logger_flush() blocks until the queue is on disk; logger_shutdown()
+ * drains the queue, stops the writer, and closes the file (call once at exit). */
+void logger_flush(void);
+void logger_shutdown(void);
+
 /* Logging methods */
 void logger_log(log_level_t level, const char* message);
 void logger_log_with_category(log_level_t level, const char* category, const char* message);
