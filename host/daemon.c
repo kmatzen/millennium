@@ -713,12 +713,21 @@ int send_control_command(const char* action) {
         return 1;
         
     } else if (strcmp(command, "coin_return") == 0) {
+        int returned_cents;
         pthread_mutex_lock(&daemon_state_mutex);
+        returned_cents = daemon_state->inserted_cents;
         daemon_state->inserted_cents = 0;
         daemon_state_update_activity(daemon_state);
         metrics_set_gauge("inserted_cents", 0.0);
         metrics_increment_counter("coin_returns", 1);
-        logger_info_with_category("Control", "Coins returned via web portal");
+        /* Track the value handed back so net revenue is observable:
+         * net = coins_value_cents - coins_returned_cents */
+        if (returned_cents > 0) {
+            metrics_increment_counter("coins_returned_cents",
+                                      (uint64_t)returned_cents);
+        }
+        logger_infof_with_category("Control",
+                "Coins returned via web portal: %d cents", returned_cents);
         
         /* Let plugins handle display updates */
         

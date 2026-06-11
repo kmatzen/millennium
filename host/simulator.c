@@ -514,6 +514,18 @@ static int run_scenario(const char *path) {
             sim_drain_events();
         }
 
+        /* ── coin_return — return inserted coins to the customer ─────── */
+        else if (strcmp(cmd, "coin_return") == 0) {
+            int returned_cents = daemon_state->inserted_cents;
+            daemon_state->inserted_cents = 0;
+            daemon_state_update_activity(daemon_state);
+            metrics_increment_counter("coin_returns", 1);
+            if (returned_cents > 0) {
+                metrics_increment_counter("coins_returned_cents",
+                                          (uint64_t)returned_cents);
+            }
+        }
+
         /* ── key <char> — any keypad key: 0-9, *, #, A-D ─────────────── */
         else if (strncmp(cmd, "key ", 4) == 0) {
             char key = cmd[4];
@@ -626,6 +638,26 @@ static int run_scenario(const char *path) {
             } else {
                 fprintf(stderr, "  FAIL: expected state containing \"%s\", got \"%s\"\n",
                         arg, actual);
+                failures++;
+            }
+        }
+
+        /* ── assert_metric <counter_name> <expected> ─────────────── */
+        else if (strncmp(cmd, "assert_metric ", 14) == 0) {
+            char name[128];
+            unsigned long long expected;
+            if (sscanf(cmd + 14, "%127s %llu", name, &expected) == 2) {
+                unsigned long long actual =
+                    (unsigned long long)metrics_get_counter(name);
+                if (actual == expected) {
+                    fprintf(stderr, "  PASS: metric %s == %llu\n", name, expected);
+                } else {
+                    fprintf(stderr, "  FAIL: metric %s expected %llu, got %llu\n",
+                            name, expected, actual);
+                    failures++;
+                }
+            } else {
+                fprintf(stderr, "  ERROR: assert_metric needs <name> <expected>\n");
                 failures++;
             }
         }
@@ -799,6 +831,7 @@ int main(int argc, char *argv[]) {
 
         /* Reset state between scenarios */
         daemon_state_init(daemon_state);
+        metrics_reset_all();   /* keep per-scenario assert_metric independent */
         sim_display_line1[0] = '\0';
         sim_display_line2[0] = '\0';
         sim_display_count    = 0;
