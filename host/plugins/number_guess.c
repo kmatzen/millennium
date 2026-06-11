@@ -121,7 +121,7 @@ static void ng_submit(void) {
         sdk_display("Correct!", l2);
         sdk_logf(GUESS_CAT, "Solved in %d guesses", ng.guesses);
         ng.phase = NG_PLAY_WON;
-        ng.reset_at = time(NULL) + 3;
+        ng.reset_at = sdk_now() + 3;
     } else if (cmp < 0) {
         snprintf(l2, sizeof(l2), "Higher (try %d)", ng.guesses);
         sdk_display("Too low!", l2);
@@ -183,7 +183,7 @@ static void ng_handle_activation(void) {
 }
 
 static void ng_handle_tick(void) {
-    if (ng.phase == NG_PLAY_WON && time(NULL) >= ng.reset_at) {
+    if (ng.phase == NG_PLAY_WON && sdk_now() >= ng.reset_at) {
         ng_reset();
     }
 }

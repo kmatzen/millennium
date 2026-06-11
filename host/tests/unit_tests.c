@@ -8,6 +8,7 @@
 #include "../millennium_sdk.h"
 #include "../updater.h"
 #include "../plugin_sdk.h"
+#include "../clock_source.h"
 #include <stdlib.h>
 
 /* ── Stubs for linker (plugins.c references these) ──────────────── */
@@ -706,6 +707,32 @@ static void test_sdk_state(void) {
     TEST_ASSERT_EQ_STR(sdk_keypad(), "");
 }
 
+/* ── Clock seam tests ──────────────────────────────────────────── */
+
+static time_t g_fake_clock = 0;
+static time_t fake_clock_source(void) { return g_fake_clock; }
+
+static void test_clock_default_is_real_time(void) {
+    /* With no source installed, mclock_now() tracks the real clock. */
+    mclock_set_source(NULL);
+    TEST_ASSERT(mclock_now() > 0);
+    TEST_ASSERT(mclock_now() >= time(NULL) - 2);
+}
+
+static void test_clock_source_override(void) {
+    g_fake_clock = 1000;
+    mclock_set_source(fake_clock_source);
+    TEST_ASSERT_EQ_INT((int)mclock_now(), 1000);
+    TEST_ASSERT_EQ_INT((int)sdk_now(), 1000); /* SDK reads through the seam */
+
+    g_fake_clock = 1042;                       /* advancing is instant */
+    TEST_ASSERT_EQ_INT((int)sdk_now(), 1042);
+    TEST_ASSERT_EQ_INT(sdk_elapsed(1000), 42); /* whole seconds since */
+    TEST_ASSERT_EQ_INT(sdk_elapsed(2000), 0);  /* future clamps to 0 */
+
+    mclock_set_source(NULL);                    /* restore for later tests */
+}
+
 /* ── Emergency number tests ────────────────────────────────────── */
 
 static void test_free_number_911(void) {
@@ -878,6 +905,10 @@ int main(void) {
     TEST_SUITE_RUN(test_sdk_rand_choice);
     TEST_SUITE_RUN(test_sdk_balance);
     TEST_SUITE_RUN(test_sdk_state);
+
+    TEST_SUITE_BEGIN("Clock Seam");
+    TEST_SUITE_RUN(test_clock_default_is_real_time);
+    TEST_SUITE_RUN(test_clock_source_override);
 
     TEST_SUITE_BEGIN("Emergency Numbers");
     TEST_SUITE_RUN(test_free_number_911);

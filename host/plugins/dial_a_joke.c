@@ -74,7 +74,7 @@ static void dj_tell(void) {
     sdk_display(jokes[dj.current].setup, "...");
     sdk_logf(JOKE_CAT, "Telling joke %d", dj.current);
     dj.phase = DJ_SETUP;
-    dj.reveal_at = time(NULL) + 2;
+    dj.reveal_at = sdk_now() + 2;
 }
 
 /* ── Plugin callbacks ────────────────────────────────────────────────── */
@@ -101,7 +101,7 @@ static void dj_handle_activation(void) {
 }
 
 static void dj_handle_tick(void) {
-    if (dj.phase == DJ_SETUP && time(NULL) >= dj.reveal_at) {
+    if (dj.phase == DJ_SETUP && sdk_now() >= dj.reveal_at) {
         sdk_display(jokes[dj.current].punch, "Press key: more");
         dj.phase = DJ_IDLE;
     }
