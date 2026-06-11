@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <stdarg.h>
 
 /* Global config instance */
 config_data_t* g_config = NULL;
@@ -168,17 +169,132 @@ int config_get_bool(const config_data_t* config, const char* key, int default_va
     return 0;
 }
 
-int config_validate(const config_data_t* config) {
-    /* Validate numeric values */
+/* Write a formatted reason into errmsg if it is non-NULL, then return 0 so
+   callers can `return config_fail(...)` from a failed check in one line. */
+static int config_fail(char* errmsg, size_t errmsg_size, const char* fmt, ...) {
+    va_list ap;
+    if (errmsg != NULL && errmsg_size > 0) {
+        va_start(ap, fmt);
+        vsnprintf(errmsg, errmsg_size, fmt, ap);
+        va_end(ap);
+    }
+    return 0;
+}
+
+/* Case-insensitive check that a logging.level string names a real level.
+   logger_parse_level() silently maps unknown strings to INFO, so a typo in
+   the config would otherwise pass unnoticed; validation rejects it here. */
+static int config_log_level_is_valid(const char* level) {
+    static const char* const valid[] = {
+        "VERBOSE", "DEBUG", "INFO", "WARN", "ERROR"
+    };
+    char upper[32];
+    size_t i;
+    int j;
+
+    if (level == NULL) {
+        return 0;
+    }
+    for (i = 0; level[i] != '\0' && i < sizeof(upper) - 1; i++) {
+        upper[i] = (char)toupper((unsigned char)level[i]);
+    }
+    upper[i] = '\0';
+
+    for (j = 0; j < (int)(sizeof(valid) / sizeof(valid[0])); j++) {
+        if (strcmp(upper, valid[j]) == 0) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+int config_validate_detailed(const config_data_t* config, char* errmsg, size_t errmsg_size) {
+    int port;
+
+    if (errmsg != NULL && errmsg_size > 0) {
+        errmsg[0] = '\0';
+    }
+
+    if (config == NULL) {
+        return config_fail(errmsg, errmsg_size, "config is NULL");
+    }
+
+    /* Call pricing and timeouts */
     if (config_get_call_cost_cents(config) <= 0) {
-        return 0;
+        return config_fail(errmsg, errmsg_size,
+            "call.cost_cents must be positive (got %d)",
+            config_get_call_cost_cents(config));
     }
-    
+    if (config_get_call_timeout_seconds(config) <= 0) {
+        return config_fail(errmsg, errmsg_size,
+            "call.timeout_seconds must be positive (got %d)",
+            config_get_call_timeout_seconds(config));
+    }
+    if (config_get_idle_timeout_seconds(config) <= 0) {
+        return config_fail(errmsg, errmsg_size,
+            "call.idle_timeout_seconds must be positive (got %d)",
+            config_get_idle_timeout_seconds(config));
+    }
+
+    /* Hardware */
+    if (config_get_baud_rate(config) <= 0) {
+        return config_fail(errmsg, errmsg_size,
+            "hardware.baud_rate must be positive (got %d)",
+            config_get_baud_rate(config));
+    }
+
+    /* System loop */
     if (config_get_update_interval_ms(config) <= 0) {
-        return 0;
+        return config_fail(errmsg, errmsg_size,
+            "system.update_interval_ms must be positive (got %d)",
+            config_get_update_interval_ms(config));
     }
-    
+    if (config_get_max_retries(config) < 0) {
+        return config_fail(errmsg, errmsg_size,
+            "system.max_retries must not be negative (got %d)",
+            config_get_max_retries(config));
+    }
+
+    /* Logging */
+    if (!config_log_level_is_valid(config_get_log_level(config))) {
+        return config_fail(errmsg, errmsg_size,
+            "logging.level '%s' is not a valid level "
+            "(VERBOSE, DEBUG, INFO, WARN, ERROR)",
+            config_get_log_level(config));
+    }
+    if (config_get_log_max_size_bytes(config) <= 0) {
+        return config_fail(errmsg, errmsg_size,
+            "logging.max_size_bytes must be positive (got %d)",
+            config_get_log_max_size_bytes(config));
+    }
+    if (config_get_log_max_files(config) <= 0) {
+        return config_fail(errmsg, errmsg_size,
+            "logging.max_files must be positive (got %d)",
+            config_get_log_max_files(config));
+    }
+
+    /* Network ports (1..65535) */
+    port = config_get_web_server_port(config);
+    if (port < 1 || port > 65535) {
+        return config_fail(errmsg, errmsg_size,
+            "web_server.port must be 1..65535 (got %d)", port);
+    }
+    port = config_get_metrics_server_port(config);
+    if (port < 1 || port > 65535) {
+        return config_fail(errmsg, errmsg_size,
+            "metrics_server.port must be 1..65535 (got %d)", port);
+    }
+    if (config_get_web_server_port(config) == config_get_metrics_server_port(config)) {
+        return config_fail(errmsg, errmsg_size,
+            "web_server.port and metrics_server.port must differ (both %d)",
+            config_get_web_server_port(config));
+    }
+
     return 1;
+}
+
+int config_validate(const config_data_t* config) {
+    return config_validate_detailed(config, NULL, 0);
 }
 
 void config_set_default_values(config_data_t* config) {

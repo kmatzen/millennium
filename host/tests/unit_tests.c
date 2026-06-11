@@ -10,6 +10,7 @@
 #include "../plugin_sdk.h"
 #include "../clock_source.h"
 #include <stdlib.h>
+#include <string.h>
 
 /* ── Stubs for linker (plugins.c references these) ──────────────── */
 
@@ -144,6 +145,82 @@ static void test_config_validate_bad_cost(void) {
 
     config_set_value(&cfg, "call.cost_cents", "0");
     TEST_ASSERT_EQ_INT(config_validate(&cfg), 0);
+}
+
+/* config_validate_detailed() reports the specific failing key. */
+static void test_config_validate_detailed_reports_reason(void) {
+    config_data_t cfg;
+    char err[256];
+
+    cfg.count = 0;
+    config_set_default_values(&cfg);
+
+    /* Good config leaves err empty and returns 1. */
+    err[0] = 'x';
+    TEST_ASSERT_EQ_INT(config_validate_detailed(&cfg, err, sizeof(err)), 1);
+    TEST_ASSERT_EQ_STR(err, "");
+
+    /* Bad cost names call.cost_cents in the message. */
+    config_set_value(&cfg, "call.cost_cents", "-5");
+    TEST_ASSERT_EQ_INT(config_validate_detailed(&cfg, err, sizeof(err)), 0);
+    TEST_ASSERT(strstr(err, "call.cost_cents") != NULL);
+}
+
+/* An out-of-range port is rejected with a port-specific message. */
+static void test_config_validate_bad_port(void) {
+    config_data_t cfg;
+    char err[256];
+
+    cfg.count = 0;
+    config_set_default_values(&cfg);
+
+    config_set_value(&cfg, "web_server.port", "70000");
+    TEST_ASSERT_EQ_INT(config_validate_detailed(&cfg, err, sizeof(err)), 0);
+    TEST_ASSERT(strstr(err, "web_server.port") != NULL);
+
+    config_set_value(&cfg, "web_server.port", "0");
+    TEST_ASSERT_EQ_INT(config_validate(&cfg), 0);
+}
+
+/* web and metrics ports must not collide. */
+static void test_config_validate_port_collision(void) {
+    config_data_t cfg;
+    char err[256];
+
+    cfg.count = 0;
+    config_set_default_values(&cfg);
+
+    config_set_value(&cfg, "web_server.port", "8080");
+    config_set_value(&cfg, "metrics_server.port", "8080");
+    TEST_ASSERT_EQ_INT(config_validate_detailed(&cfg, err, sizeof(err)), 0);
+    TEST_ASSERT(strstr(err, "differ") != NULL);
+}
+
+/* A typo'd logging.level is rejected rather than silently defaulting. */
+static void test_config_validate_bad_log_level(void) {
+    config_data_t cfg;
+    char err[256];
+
+    cfg.count = 0;
+    config_set_default_values(&cfg);
+
+    config_set_value(&cfg, "logging.level", "TRACE");
+    TEST_ASSERT_EQ_INT(config_validate_detailed(&cfg, err, sizeof(err)), 0);
+    TEST_ASSERT(strstr(err, "logging.level") != NULL);
+
+    /* Valid levels (any case) still pass. */
+    config_set_value(&cfg, "logging.level", "warn");
+    TEST_ASSERT_EQ_INT(config_validate(&cfg), 1);
+}
+
+/* errmsg may be NULL; result is still correct, and config NULL is rejected. */
+static void test_config_validate_detailed_null_safety(void) {
+    config_data_t cfg;
+    cfg.count = 0;
+    config_set_default_values(&cfg);
+
+    TEST_ASSERT_EQ_INT(config_validate_detailed(&cfg, NULL, 0), 1);
+    TEST_ASSERT_EQ_INT(config_validate_detailed(NULL, NULL, 0), 0);
 }
 
 static void test_config_trim(void) {
@@ -949,6 +1026,11 @@ int main(void) {
     TEST_SUITE_RUN(test_config_get_bool_variants);
     TEST_SUITE_RUN(test_config_validate_good);
     TEST_SUITE_RUN(test_config_validate_bad_cost);
+    TEST_SUITE_RUN(test_config_validate_detailed_reports_reason);
+    TEST_SUITE_RUN(test_config_validate_bad_port);
+    TEST_SUITE_RUN(test_config_validate_port_collision);
+    TEST_SUITE_RUN(test_config_validate_bad_log_level);
+    TEST_SUITE_RUN(test_config_validate_detailed_null_safety);
     TEST_SUITE_RUN(test_config_trim);
     TEST_SUITE_RUN(test_config_null_safety);
     TEST_SUITE_RUN(test_config_overwrite_value);

@@ -18,6 +18,10 @@ config_data_t* config_get_instance(void);
 int config_load_from_file(config_data_t* config, const char* config_path);
 int config_load_from_environment(config_data_t* config);
 int config_validate(const config_data_t* config);
+/* Like config_validate(), but writes a human-readable reason for the first
+   failure into errmsg (truncated to errmsg_size). On success errmsg[0] is set
+   to '\0'. errmsg may be NULL if the caller only wants the 0/1 result. */
+int config_validate_detailed(const config_data_t* config, char* errmsg, size_t errmsg_size);
 
 /* Configuration getters */
 const char* config_get_string(const config_data_t* config, const char* key, const char* default_value);

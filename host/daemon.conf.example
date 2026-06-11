@@ -1,5 +1,13 @@
 # Millennium Daemon Configuration File
 # Copy this file to /etc/millennium/daemon.conf and modify as needed
+#
+# The daemon validates this file on startup and refuses to run on a bad value,
+# logging the specific offending key. Constraints:
+#   - call.cost_cents, call.timeout_seconds, call.idle_timeout_seconds > 0
+#   - hardware.baud_rate, system.update_interval_ms > 0; system.max_retries >= 0
+#   - logging.level is one of VERBOSE, DEBUG, INFO, WARN, ERROR
+#   - logging.max_size_bytes, logging.max_files > 0
+#   - web_server.port and metrics_server.port are 1..65535 and must differ
 
 # Hardware Configuration
 hardware.display_device=/dev/serial/by-id/usb-Arduino_LLC_Millennium_Beta-if00
