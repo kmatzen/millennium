@@ -383,12 +383,13 @@ static void sim_handle_call_state(call_state_event_t *ev) {
         /* #90: Remote hung up */
         if (daemon_state->current_state == DAEMON_STATE_CALL_ACTIVE ||
             daemon_state->current_state == DAEMON_STATE_CALL_INCOMING) {
-            /* A connected (CALL_ACTIVE) call has a duration to record; a call
-             * still ringing (CALL_INCOMING) ended unanswered — a missed call. */
+            /* A connected (CALL_ACTIVE) call has a duration to record; a
+             * CALL_INCOMING phase that ended before connecting is resolved as
+             * either a missed inbound ring or a failed outbound dial. */
             if (daemon_state->current_state == DAEMON_STATE_CALL_ACTIVE) {
                 call_metrics_ended();
             } else {
-                call_metrics_ringing_missed();
+                call_metrics_incoming_ended();
             }
             daemon_state_clear_keypad(daemon_state);
             daemon_state->inserted_cents = 0;
@@ -587,6 +588,16 @@ static int run_scenario(const char *path) {
                 "CALL_CLOSED", NULL, EVENT_CALL_STATE_INVALID);
             if (ev) { sim_process_event((event_t *)ev); event_destroy((event_t *)ev); }
             sim_call_active = 0;
+            sim_drain_events();
+        }
+        /* start_call: mirror daemon.c's web "start_call" control action — place
+         * an OUTBOUND call by entering CALL_INCOMING WITHOUT arming a ring, so a
+         * subsequent call_ended is counted as a dial failure (calls_failed),
+         * never as a missed inbound call. */
+        else if (strcmp(cmd, "start_call") == 0) {
+            daemon_state->current_state = DAEMON_STATE_CALL_INCOMING;
+            metrics_increment_counter("calls_initiated", 1);
+            daemon_state_update_activity(daemon_state);
             sim_drain_events();
         }
 

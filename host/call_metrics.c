@@ -5,9 +5,10 @@
 /* Name of the histogram populated by call_metrics_ended(). */
 #define CALL_DURATION_HISTOGRAM "call_duration_seconds"
 
-/* Histogram and counter populated by the ring functions. */
+/* Histogram and counters populated by the ring / incoming-ended functions. */
 #define CALL_RING_HISTOGRAM "call_ring_seconds"
 #define CALLS_MISSED_COUNTER "calls_missed"
+#define CALLS_FAILED_COUNTER "calls_failed"
 
 /* In-progress call/ring timing. Accessed only from the daemon's main event-loop
  * thread (and the single-threaded simulator / unit tests), each under the same
@@ -77,9 +78,18 @@ void call_metrics_ringing_answered(void) {
     (void)call_metrics_ringing_observe();
 }
 
-void call_metrics_ringing_missed(void) {
+void call_metrics_incoming_ended(void) {
+    /* The CALL_INCOMING phase ended before the call became active. Exactly one
+     * of two things happened, told apart by whether a genuine inbound ring was
+     * in progress: */
     if (call_metrics_ringing_observe()) {
+        /* A real inbound ring went unanswered — the caller gave up. */
         metrics_increment_counter(CALLS_MISSED_COUNTER, 1);
+    } else {
+        /* No ring was ever armed, so the phone was placing an OUTBOUND call
+         * that never connected (callee busy, no answer, rejected, or a SIP /
+         * network error). This is the #91 "Call failed during dial" path. */
+        metrics_increment_counter(CALLS_FAILED_COUNTER, 1);
     }
 }
 

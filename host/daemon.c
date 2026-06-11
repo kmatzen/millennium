@@ -386,11 +386,11 @@ void handle_call_state_event(call_state_event_t *call_state_event) {
         } else if (daemon_state->current_state == DAEMON_STATE_CALL_INCOMING) {
             /* #91: Call failed during dial - don't clear coins (refund via plugin) */
             logger_info_with_category("Call", "Call failed during dial");
-            /* A genuine inbound ring that ended here was never answered: record
-             * the ring time and count the miss. No-op for the web-initiated
-             * outbound start_call path, which reuses CALL_INCOMING without a
-             * ring, so outbound dial failures are not counted as missed. */
-            call_metrics_ringing_missed();
+            /* Resolve the ended CALL_INCOMING phase: a genuine inbound ring that
+             * was never answered counts a miss (call_ring_seconds + calls_missed),
+             * while the web-initiated outbound start_call path (CALL_INCOMING
+             * without a ring) counts an outbound dial failure (calls_failed). */
+            call_metrics_incoming_ended();
             daemon_state_clear_keypad(daemon_state);
             daemon_state->current_state = DAEMON_STATE_IDLE_UP;
             daemon_state_update_activity(daemon_state);
