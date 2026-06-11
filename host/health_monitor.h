@@ -72,6 +72,13 @@ int health_monitor_get_statistics(health_statistics_t* stats_out);
 const char* health_monitor_status_to_string(health_status_t status);
 health_status_t health_monitor_string_to_status(const char* status_str);
 
+/* Returns 1 if a status means the daemon should still be considered "up" and
+ * able to serve traffic, 0 otherwise. HEALTHY and WARNING are serving (the
+ * latter is degraded but operational); CRITICAL and UNKNOWN are not (UNKNOWN
+ * fails safe, e.g. before the first check has run). Used to map the overall
+ * health onto an HTTP status code for liveness/readiness probes. */
+int health_monitor_status_is_serving(health_status_t status);
+
 /* Predefined system health checks */
 health_status_t system_health_check_serial_connection(void);
 health_status_t system_health_check_sip_connection(void);

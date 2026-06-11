@@ -5,6 +5,7 @@
 #include "../plugins.h"
 #include "../logger.h"
 #include "../metrics.h"
+#include "../health_monitor.h"
 #include "../millennium_sdk.h"
 #include "../updater.h"
 #include "../plugin_sdk.h"
@@ -936,6 +937,54 @@ static void test_logger_queue_stats(void) {
     remove(path);
 }
 
+/* The /api/health handler maps the overall health onto an HTTP status code via
+ * health_monitor_status_is_serving() so probes can react to the code alone.
+ * HEALTHY and WARNING serve (200); CRITICAL and UNKNOWN do not (503), with
+ * UNKNOWN failing safe before any check has run. */
+static void test_health_status_is_serving(void) {
+    TEST_ASSERT_EQ_INT(health_monitor_status_is_serving(HEALTH_STATUS_HEALTHY), 1);
+    TEST_ASSERT_EQ_INT(health_monitor_status_is_serving(HEALTH_STATUS_WARNING), 1);
+    TEST_ASSERT_EQ_INT(health_monitor_status_is_serving(HEALTH_STATUS_CRITICAL), 0);
+    TEST_ASSERT_EQ_INT(health_monitor_status_is_serving(HEALTH_STATUS_UNKNOWN), 0);
+}
+
+/* A check-backed status reporter the test can steer, so we can drive the
+ * monitor's overall status through every level. */
+static health_status_t g_test_check_status = HEALTH_STATUS_HEALTHY;
+static health_status_t test_steerable_check(void) { return g_test_check_status; }
+
+/* With no checks registered the overall status is UNKNOWN and therefore not
+ * serving; once a check runs, the overall status follows it and the serving
+ * verdict tracks accordingly. This is the exact path /api/health takes. */
+static void test_health_overall_reflects_checks(void) {
+    health_check_t check;
+
+    /* Fresh monitor: nothing registered yet -> UNKNOWN -> not serving. */
+    TEST_ASSERT_EQ_INT(health_monitor_get_overall_status(), HEALTH_STATUS_UNKNOWN);
+    TEST_ASSERT_EQ_INT(health_monitor_status_is_serving(
+        health_monitor_get_overall_status()), 0);
+
+    health_monitor_register_check("steerable", test_steerable_check, 30);
+
+    g_test_check_status = HEALTH_STATUS_HEALTHY;
+    health_monitor_run_check("steerable");
+    TEST_ASSERT_EQ_INT(health_monitor_get_overall_status(), HEALTH_STATUS_HEALTHY);
+    TEST_ASSERT_EQ_INT(health_monitor_status_is_serving(
+        health_monitor_get_overall_status()), 1);
+
+    g_test_check_status = HEALTH_STATUS_CRITICAL;
+    health_monitor_run_check("steerable");
+    TEST_ASSERT_EQ_INT(health_monitor_get_overall_status(), HEALTH_STATUS_CRITICAL);
+    TEST_ASSERT_EQ_INT(health_monitor_status_is_serving(
+        health_monitor_get_overall_status()), 0);
+
+    /* The stored check carries the latest status for the JSON body too. */
+    TEST_ASSERT_EQ_INT(health_monitor_get_check("steerable", &check), 1);
+    TEST_ASSERT_EQ_INT(check.last_status, HEALTH_STATUS_CRITICAL);
+
+    health_monitor_unregister_check("steerable");
+}
+
 /* ── Main ───────────────────────────────────────────────────────── */
 
 int main(void) {
@@ -1017,6 +1066,10 @@ int main(void) {
     TEST_SUITE_BEGIN("Logger");
     TEST_SUITE_RUN(test_logger_async_file_write);
     TEST_SUITE_RUN(test_logger_queue_stats);
+
+    TEST_SUITE_BEGIN("Health Monitor");
+    TEST_SUITE_RUN(test_health_status_is_serving);
+    TEST_SUITE_RUN(test_health_overall_reflects_checks);
 
     TEST_REPORT();
 }

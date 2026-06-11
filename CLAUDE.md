@@ -146,6 +146,7 @@ New plugins should be written against `plugin_sdk.h`, which wraps the hardware/s
 Base URL: `http://<pi>` (port 80)
 
 - `GET /api/state` — phone state, coins, keypad, SIP status
+- `GET /api/health` — health-check JSON; returns HTTP **200** when serving (overall HEALTHY/WARNING) and **503** when not (CRITICAL/UNKNOWN), so liveness/readiness probes can key off the status code alone
 - `GET /api/metrics` — Prometheus or JSON metrics
 - `POST /api/control` — inject events (coin, keypad, hook, plugin activation)
 - `GET /ws` — WebSocket real-time state broadcasts
