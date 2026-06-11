@@ -1,0 +1,34 @@
+# Test: Coin-return revenue accounting
+# Verifies that returning inserted coins records their value in the
+# coins_returned_cents counter, so net revenue (inserted - returned)
+# is observable in the metrics endpoint.
+
+hook_up
+assert_state IDLE_UP
+
+# Insert 25 + 10 = 35 cents
+coin 25
+coin 10
+assert_display Have: 35c
+
+# Everything inserted so far is counted as revenue-in
+assert_metric coins_value_cents 35
+assert_metric coins_returned_cents 0
+
+# Return the coins to the customer
+coin_return
+assert_metric coin_returns 1
+assert_metric coins_returned_cents 35
+
+# Insert again and return only part of the session, twice over,
+# to confirm the counter accumulates across returns.
+coin 25
+assert_metric coins_value_cents 60
+coin_return
+assert_metric coin_returns 2
+assert_metric coins_returned_cents 60
+
+# A coin_return with nothing inserted must NOT change the cents counter
+coin_return
+assert_metric coin_returns 3
+assert_metric coins_returned_cents 60

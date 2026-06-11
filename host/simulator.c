@@ -535,6 +535,18 @@ static int run_scenario(const char *path) {
             sim_drain_events();
         }
 
+        /* ── coin_return — return inserted coins to the customer ─────── */
+        else if (strcmp(cmd, "coin_return") == 0) {
+            int returned_cents = daemon_state->inserted_cents;
+            daemon_state->inserted_cents = 0;
+            daemon_state_update_activity(daemon_state);
+            metrics_increment_counter("coin_returns", 1);
+            if (returned_cents > 0) {
+                metrics_increment_counter("coins_returned_cents",
+                                          (uint64_t)returned_cents);
+            }
+        }
+
         /* ── key <char> — any keypad key: 0-9, *, #, A-D ─────────────── */
         else if (strncmp(cmd, "key ", 4) == 0) {
             char key = cmd[4];
