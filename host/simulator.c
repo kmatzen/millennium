@@ -300,10 +300,14 @@ static void sim_handle_coin(coin_event_t *ev) {
     else if (strcmp(code, "COIN_8") == 0) val = 25;
 
     if (val > 0 && daemon_state->current_state == DAEMON_STATE_IDLE_UP) {
+        const char *denom = (val == 5)  ? "coins_5c"  :
+                            (val == 10) ? "coins_10c" :
+                            (val == 25) ? "coins_25c" : "coins_other";
         daemon_state->inserted_cents += val;
         daemon_state_update_activity(daemon_state);
         metrics_increment_counter("coins_inserted", 1);
         metrics_increment_counter("coins_value_cents", val);
+        metrics_increment_counter(denom, 1);  /* mirror daemon.c per-denomination tally */
         plugins_handle_coin(val, code);
     }
     free(code);
@@ -721,6 +725,26 @@ static int run_scenario(const char *path) {
             }
         }
 
+        /* ── assert_metric <counter_name> <expected> ─────────────── */
+        else if (strncmp(cmd, "assert_metric ", 14) == 0) {
+            char name[128];
+            unsigned long long expected;
+            if (sscanf(cmd + 14, "%127s %llu", name, &expected) == 2) {
+                unsigned long long actual =
+                    (unsigned long long)metrics_get_counter(name);
+                if (actual == expected) {
+                    fprintf(stderr, "  PASS: metric %s == %llu\n", name, expected);
+                } else {
+                    fprintf(stderr, "  FAIL: metric %s expected %llu, got %llu\n",
+                            name, expected, actual);
+                    failures++;
+                }
+            } else {
+                fprintf(stderr, "  ERROR: assert_metric needs <name> <expected>\n");
+                failures++;
+            }
+        }
+
         /* ── print (debug) ───────────────────────────────────────── */
         else if (strcmp(cmd, "print") == 0) {
             fprintf(stderr, "  state=%s  coins=%d  display=\"%s\" | \"%s\"\n",
@@ -890,6 +914,7 @@ int main(int argc, char *argv[]) {
 
         /* Reset state between scenarios */
         daemon_state_init(daemon_state);
+        metrics_reset_all();   /* keep per-scenario assert_metric independent */
         sim_display_line1[0] = '\0';
         sim_display_line2[0] = '\0';
         sim_display_count    = 0;
