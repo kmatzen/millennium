@@ -405,6 +405,121 @@ static void test_plugins_duplicate_register(void) {
     plugins_cleanup();
 }
 
+/* ── Plugin dispatch (plugins_handle_*) ─────────────────────────────── */
+
+/* Counting handlers that record their last argument so we can verify the
+ * active plugin actually receives each event and its return value is
+ * propagated back to the caller. */
+static int g_disp_coin_calls, g_disp_coin_value;
+static int g_disp_key_calls; static char g_disp_key_char;
+static int g_disp_hook_calls, g_disp_hook_up, g_disp_hook_down;
+static int g_disp_call_calls, g_disp_call_state;
+static int g_disp_card_calls; static char g_disp_card_last[32];
+static int g_disp_tick_calls;
+
+static int disp_coin_handler(int v, const char *c) {
+    (void)c; g_disp_coin_calls++; g_disp_coin_value = v; return 42;
+}
+static int disp_key_handler(char k) {
+    g_disp_key_calls++; g_disp_key_char = k; return 0;
+}
+static int disp_hook_handler(int u, int d) {
+    g_disp_hook_calls++; g_disp_hook_up = u; g_disp_hook_down = d; return 0;
+}
+static int disp_call_handler(int s) {
+    g_disp_call_calls++; g_disp_call_state = s; return 0;
+}
+static int disp_card_handler(const char *n) {
+    g_disp_card_calls++;
+    strncpy(g_disp_card_last, n ? n : "", sizeof(g_disp_card_last) - 1);
+    g_disp_card_last[sizeof(g_disp_card_last) - 1] = '\0';
+    return 0;
+}
+static void disp_tick_handler(void) { g_disp_tick_calls++; }
+
+static void test_plugins_dispatch_to_active(void) {
+    daemon_state_data_t ds;
+    daemon_state_init(&ds);
+    daemon_state = &ds;
+    client = millennium_client_create();
+
+    plugins_init();
+    g_disp_coin_calls = g_disp_key_calls = g_disp_hook_calls = 0;
+    g_disp_call_calls = g_disp_card_calls = g_disp_tick_calls = 0;
+
+    TEST_ASSERT_EQ_INT(plugins_register("Dispatch Test", "Counts events",
+        disp_coin_handler, disp_key_handler, disp_hook_handler,
+        disp_call_handler, disp_card_handler, NULL, disp_tick_handler), 0);
+    TEST_ASSERT_EQ_INT(plugins_activate("Dispatch Test"), 0);
+
+    /* Each dispatch reaches the active plugin and propagates its return. */
+    TEST_ASSERT_EQ_INT(plugins_handle_coin(25, "COIN_8"), 42);
+    TEST_ASSERT_EQ_INT(g_disp_coin_calls, 1);
+    TEST_ASSERT_EQ_INT(g_disp_coin_value, 25);
+
+    plugins_handle_keypad('7');
+    TEST_ASSERT_EQ_INT(g_disp_key_calls, 1);
+    TEST_ASSERT_EQ_INT((int)g_disp_key_char, (int)'7');
+
+    plugins_handle_hook(1, 0);
+    TEST_ASSERT_EQ_INT(g_disp_hook_calls, 1);
+    TEST_ASSERT_EQ_INT(g_disp_hook_up, 1);
+    TEST_ASSERT_EQ_INT(g_disp_hook_down, 0);
+
+    plugins_handle_call_state(3);
+    TEST_ASSERT_EQ_INT(g_disp_call_calls, 1);
+    TEST_ASSERT_EQ_INT(g_disp_call_state, 3);
+
+    plugins_handle_card("4111111111111111");
+    TEST_ASSERT_EQ_INT(g_disp_card_calls, 1);
+    TEST_ASSERT_EQ_STR(g_disp_card_last, "4111111111111111");
+
+    plugins_tick();
+    TEST_ASSERT_EQ_INT(g_disp_tick_calls, 1);
+
+    millennium_client_destroy(client);
+    client = NULL;
+    daemon_state = NULL;
+    plugins_cleanup();
+}
+
+static void test_plugins_dispatch_no_active(void) {
+    /* With no plugin active, dispatch is a safe no-op returning -1 and never
+     * touches a stale handler. */
+    plugins_cleanup();
+    TEST_ASSERT_EQ_INT(plugins_handle_coin(5, "COIN_1"), -1);
+    TEST_ASSERT_EQ_INT(plugins_handle_keypad('1'), -1);
+    TEST_ASSERT_EQ_INT(plugins_handle_hook(0, 1), -1);
+    TEST_ASSERT_EQ_INT(plugins_handle_call_state(0), -1);
+    TEST_ASSERT_EQ_INT(plugins_handle_card("0"), -1);
+    plugins_tick(); /* must not crash */
+}
+
+static void test_plugins_dispatch_missing_handler(void) {
+    /* A plugin that registers NULL for a handler returns -1 for that event
+     * rather than dereferencing a NULL function pointer. */
+    daemon_state_data_t ds;
+    daemon_state_init(&ds);
+    daemon_state = &ds;
+    client = millennium_client_create();
+
+    plugins_init();
+
+    TEST_ASSERT_EQ_INT(plugins_register("No Handlers", "All NULL",
+        NULL, NULL, NULL, NULL, NULL, NULL, NULL), 0);
+    TEST_ASSERT_EQ_INT(plugins_activate("No Handlers"), 0);
+
+    TEST_ASSERT_EQ_INT(plugins_handle_coin(25, "COIN_8"), -1);
+    TEST_ASSERT_EQ_INT(plugins_handle_keypad('7'), -1);
+    TEST_ASSERT_EQ_INT(plugins_handle_card("0"), -1);
+    plugins_tick(); /* NULL tick handler must not crash */
+
+    millennium_client_destroy(client);
+    client = NULL;
+    daemon_state = NULL;
+    plugins_cleanup();
+}
+
 /* ── Plugin registry / dynamic enumeration ─────────────────────────── */
 
 /* Pure comparison exported by plugins/number_guess.c */
@@ -749,6 +864,9 @@ int main(void) {
     TEST_SUITE_RUN(test_plugins_register_custom);
     TEST_SUITE_RUN(test_plugins_list);
     TEST_SUITE_RUN(test_plugins_duplicate_register);
+    TEST_SUITE_RUN(test_plugins_dispatch_to_active);
+    TEST_SUITE_RUN(test_plugins_dispatch_no_active);
+    TEST_SUITE_RUN(test_plugins_dispatch_missing_handler);
     TEST_SUITE_RUN(test_plugins_builtins_registered);
     TEST_SUITE_RUN(test_plugins_get_info);
     TEST_SUITE_RUN(test_plugins_to_json);
