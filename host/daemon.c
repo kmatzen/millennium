@@ -997,7 +997,9 @@ int main(int argc, char *argv[]) {
     /* Restore persisted state */
     {
         persisted_state_t ps;
-        if (state_persistence_load(&ps, state_file_path) == 0) {
+        char load_err[160];
+        if (state_persistence_load_ex(&ps, state_file_path,
+                                      load_err, sizeof(load_err)) == 0) {
             logger_infof_with_category("Daemon",
                 "Restored state: coins=%d, plugin=%s, last_state=%d",
                 ps.inserted_cents, ps.active_plugin, ps.last_state);
@@ -1021,6 +1023,12 @@ int main(int argc, char *argv[]) {
                 daemon_state_update_activity(daemon_state);
                 pthread_mutex_unlock(&daemon_state_mutex);
             }
+        } else if (load_err[0] != '\0') {
+            /* File existed but was corrupt: start fresh, but say why. */
+            logger_warnf_with_category("Daemon",
+                "Ignoring corrupt state file %s: %s (starting fresh)",
+                state_file_path, load_err);
+            metrics_increment_counter("corrupt_state_loads", 1);
         }
     }
 
