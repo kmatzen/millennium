@@ -1,0 +1,51 @@
+# Test: call duration is recorded as a metrics histogram
+# Verifies that every connected call contributes its length (in seconds) to the
+# `call_duration_seconds` histogram, so operators get a duration distribution
+# (mean/median/p95/p99) exported via /metrics. Covers both ways a call ends:
+# the local handset going down, and the remote party hanging up.
+
+# Phone starts with receiver down
+assert_state IDLE_DOWN
+
+# ── Call 1: ends when the local handset is hung up ──────────────────
+hook_up
+assert_state IDLE_UP
+coin 25
+coin 25
+assert_display Have: 50c
+keys 5551234567
+assert_display Call active
+assert_state CALL_ACTIVE
+
+# Stay connected for 3 seconds, then hang up locally
+wait 3
+hook_down
+assert_state IDLE_DOWN
+
+# One call recorded, totalling 3 seconds
+assert_histogram_count call_duration_seconds 1
+assert_histogram_sum call_duration_seconds 3.00
+
+# ── Call 2: ends when the remote party hangs up ─────────────────────
+hook_up
+assert_state IDLE_UP
+coin 25
+coin 25
+assert_display Have: 50c
+keys 5559876543
+assert_display Call active
+assert_state CALL_ACTIVE
+
+# Stay connected for 2 seconds, then the far end drops the call
+wait 2
+call_ended
+assert_state IDLE_UP
+
+# Two calls recorded now, totalling 3 + 2 = 5 seconds
+assert_histogram_count call_duration_seconds 2
+assert_histogram_sum call_duration_seconds 5.00
+
+# Hang up cleanly — no extra duration recorded (no call was active)
+hook_down
+assert_state IDLE_DOWN
+assert_histogram_count call_duration_seconds 2

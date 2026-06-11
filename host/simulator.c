@@ -430,6 +430,10 @@ static void sim_check_pending_call(void) {
     if (!sim_call_pending) return;
     sim_call_pending = 0;
     sim_call_active  = 1;
+    /* A fresh call must not inherit a teardown flag left set by the previous
+     * call's hangup (e.g. after a local hook_down), which would otherwise fire
+     * on this call's first `wait` tick and drop it on-hook prematurely. */
+    sim_hangup_called = 0;
 
     ev = call_state_event_create("CALL_ESTABLISHED", NULL, EVENT_CALL_STATE_ACTIVE);
     if (ev) {
@@ -630,6 +634,46 @@ static int run_scenario(const char *path) {
             }
         }
 
+        /* ── assert_histogram_count <name> <expected> ───────────────
+         * Assert a metrics histogram has recorded exactly <expected>
+         * observations (e.g. the number of calls whose duration we logged). */
+        else if (strncmp(cmd, "assert_histogram_count ", 23) == 0) {
+            metrics_histogram_stats_t stats;
+            char hname[64];
+            unsigned long long expected = 0;
+            if (sscanf(cmd + 23, "%63s %llu", hname, &expected) == 2 &&
+                metrics_get_histogram_stats(hname, &stats) == 0 &&
+                (unsigned long long)stats.count == expected) {
+                fprintf(stderr, "  PASS: histogram %s count == %llu\n", hname, expected);
+            } else {
+                unsigned long long got = (metrics_get_histogram_stats(hname, &stats) == 0)
+                                       ? (unsigned long long)stats.count : 0ULL;
+                fprintf(stderr, "  FAIL: histogram %s count: expected %llu, got %llu\n",
+                        hname, expected, got);
+                failures++;
+            }
+        }
+
+        /* ── assert_histogram_sum <name> <expected> ─────────────────
+         * Assert the sum of a histogram's observations equals <expected>
+         * (e.g. total recorded call seconds). Compared with a small epsilon. */
+        else if (strncmp(cmd, "assert_histogram_sum ", 21) == 0) {
+            metrics_histogram_stats_t stats;
+            char hname[64];
+            double expected = 0.0;
+            if (sscanf(cmd + 21, "%63s %lf", hname, &expected) == 2 &&
+                metrics_get_histogram_stats(hname, &stats) == 0 &&
+                stats.sum >= expected - 0.001 && stats.sum <= expected + 0.001) {
+                fprintf(stderr, "  PASS: histogram %s sum == %.2f\n", hname, expected);
+            } else {
+                double got = (metrics_get_histogram_stats(hname, &stats) == 0)
+                           ? stats.sum : -1.0;
+                fprintf(stderr, "  FAIL: histogram %s sum: expected %.2f, got %.2f\n",
+                        hname, expected, got);
+                failures++;
+            }
+        }
+
         /* ── print (debug) ───────────────────────────────────────── */
         else if (strcmp(cmd, "print") == 0) {
             fprintf(stderr, "  state=%s  coins=%d  display=\"%s\" | \"%s\"\n",
@@ -806,6 +850,10 @@ int main(int argc, char *argv[]) {
         sim_call_active      = 0;
         sim_hangup_called    = 0;
         sim_time_init();
+        /* Give each scenario a clean metrics slate so counter/histogram
+         * assertions are isolated and don't accumulate across files. */
+        metrics_cleanup();
+        metrics_init();
         plugins_activate("Classic Phone");
 
         failures = run_scenario(argv[i]);

@@ -362,6 +362,16 @@ static void classic_phone_start_call(void) {
 }
 
 static void classic_phone_end_call(void) {
+    /* Record how long the connected call lasted so operators get a duration
+     * distribution (mean/median/p95/p99) via the metrics histogram. Only a
+     * call that actually connected has a non-zero start time. */
+    if (classic_phone_data.is_in_call && classic_phone_data.call_start_time > 0) {
+        double duration = (double)(sdk_now() - classic_phone_data.call_start_time);
+        if (duration < 0) duration = 0;
+        metrics_observe_histogram("call_duration_seconds", duration);
+    }
+    classic_phone_data.call_start_time = 0;
+
     classic_phone_data.is_dialing = 0;
     classic_phone_data.is_in_call = 0;
     classic_phone_data.is_emergency_call = 0;
