@@ -7,6 +7,7 @@
 #include "../plugins.h"
 #include "../logger.h"
 #include "../millennium_sdk.h"
+#include "../plugin_sdk.h"
 #include "../config.h"
 #include "../metrics.h"
 #include "../display_manager.h"
@@ -58,7 +59,7 @@ static int classic_phone_handle_coin(int coin_value, const char *coin_code) {
     if (coin_value > 0 && daemon_state && daemon_state->current_state == DAEMON_STATE_IDLE_UP) {
         audio_tones_play_coin_tone();
         classic_phone_data.inserted_cents += coin_value;
-        classic_phone_data.last_activity = time(NULL);
+        classic_phone_data.last_activity = sdk_now();
 
         classic_phone_update_display();
         classic_phone_check_and_call();
@@ -85,7 +86,7 @@ static int classic_phone_handle_keypad(char key) {
         classic_phone_data.keypad_length < 10) {
         audio_tones_play_dtmf(key);
         classic_phone_add_key(key);
-        classic_phone_data.last_activity = time(NULL);
+        classic_phone_data.last_activity = sdk_now();
         classic_phone_update_display();
         classic_phone_check_and_call();
     }
@@ -97,13 +98,13 @@ static int classic_phone_handle_hook(int hook_up, int hook_down) {
         if (classic_phone_data.is_in_call) {
             logger_info_with_category("ClassicPhone", "Handset lifted during incoming call");
             audio_tones_stop();
-            classic_phone_data.call_start_time = time(NULL);
+            classic_phone_data.call_start_time = sdk_now();
             classic_phone_update_display();
         } else {
             /* Start new call session — play dial tone */
             classic_phone_data.inserted_cents = 0;
             classic_phone_data.keypad_length = 0;
-            classic_phone_data.last_activity = time(NULL);
+            classic_phone_data.last_activity = sdk_now();
             audio_tones_play_dial_tone();
             classic_phone_update_display();
         }
@@ -133,14 +134,14 @@ static int classic_phone_handle_call_state(int call_state) {
     if (call_state == EVENT_CALL_STATE_INCOMING) {
         audio_tones_stop();
         classic_phone_data.is_in_call = 1;
-        classic_phone_data.call_start_time = time(NULL);
+        classic_phone_data.call_start_time = sdk_now();
         classic_phone_update_display();
         logger_info_with_category("ClassicPhone", "Incoming call received");
     } else if (call_state == EVENT_CALL_STATE_ACTIVE) {
         audio_tones_stop();
         classic_phone_data.is_dialing = 0;  /* Call connected - no longer dialing */
         classic_phone_data.is_in_call = 1;
-        classic_phone_data.call_start_time = time(NULL);
+        classic_phone_data.call_start_time = sdk_now();
         classic_phone_update_display();
         logger_info_with_category("ClassicPhone", "Call established");
     } else if (call_state == EVENT_CALL_STATE_INVALID) {
@@ -183,7 +184,7 @@ static int classic_phone_handle_card(const char *card_number) {
         classic_phone_data.is_card_call = 1;
         strncpy(classic_phone_data.card_number, card_number, sizeof(classic_phone_data.card_number) - 1);
         classic_phone_data.card_number[sizeof(classic_phone_data.card_number) - 1] = '\0';
-        classic_phone_data.last_activity = time(NULL);
+        classic_phone_data.last_activity = sdk_now();
         display_manager_set_text("Card accepted", "Dial number");
         logger_infof_with_category("ClassicPhone", "Free calling card accepted: %.4s...", card_number);
         return 1;
@@ -207,7 +208,7 @@ static void classic_phone_on_activation(void) {
     classic_phone_data.keypad_length = 0;
     classic_phone_data.is_dialing = 0;
     classic_phone_data.is_in_call = 0;
-    classic_phone_data.last_activity = time(NULL);
+    classic_phone_data.last_activity = sdk_now();
     classic_phone_update_display();
 }
 
@@ -408,13 +409,13 @@ static void classic_phone_tick(void) {
     if (!classic_phone_data.is_in_call && !classic_phone_data.is_dialing &&
         daemon_state && daemon_state->current_state == DAEMON_STATE_IDLE_UP &&
         classic_phone_data.idle_timeout_seconds > 0) {
-        int idle_secs = (int)(time(NULL) - classic_phone_data.last_activity);
+        int idle_secs = (int)(sdk_now() - classic_phone_data.last_activity);
         if (idle_secs >= classic_phone_data.idle_timeout_seconds) {
             logger_info_with_category("ClassicPhone", "Idle timeout — resetting");
             audio_tones_stop();
             classic_phone_data.keypad_length = 0;
             classic_phone_data.inserted_cents = 0;
-            classic_phone_data.last_activity = time(NULL);
+            classic_phone_data.last_activity = sdk_now();
             classic_phone_update_display();
         }
     }
@@ -433,7 +434,7 @@ static void classic_phone_tick(void) {
     }
 
     remaining = classic_phone_data.call_timeout_seconds
-              - (int)(time(NULL) - classic_phone_data.call_start_time);
+              - (int)(sdk_now() - classic_phone_data.call_start_time);
 
     if (remaining <= 0) {
         logger_info_with_category("ClassicPhone",
@@ -466,7 +467,7 @@ void register_classic_phone_plugin(void) {
     classic_phone_data.is_in_call = 0;
     classic_phone_data.call_timeout_seconds = config_get_call_timeout_seconds(config_get_instance());
     classic_phone_data.idle_timeout_seconds = config_get_idle_timeout_seconds(config_get_instance());
-    classic_phone_data.last_activity = time(NULL);
+    classic_phone_data.last_activity = sdk_now();
     
     plugins_register("Classic Phone",
                     "Traditional pay phone functionality with VoIP calling",

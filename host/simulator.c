@@ -13,6 +13,7 @@ extern daemon_state_data_t *daemon_state;
 #include "state_persistence.h"
 #include "display_manager.h"
 #include "audio_tones.h"
+#include "clock_source.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -20,26 +21,21 @@ extern daemon_state_data_t *daemon_state;
 #include <time.h>
 #include <pthread.h>
 
-/* ── Simulated time ────────────────────────────────────────────────── */
+/* ── Simulated time ──────────────────────────────────────────────────
+ * The daemon and plugins read the clock through mclock_now() (clock_source.h).
+ * We install sim_clock_now() as that source so `wait` can advance time
+ * instantly on every platform — no real sleeping, and no Linux-only
+ * -Wl,--wrap=time linker trick. */
 
 static time_t sim_clock;
-static int    sim_clock_initialized = 0;
 
-#ifdef __linux__
-extern time_t __real_time(time_t *tloc);
-
-time_t __wrap_time(time_t *tloc) {
-    if (sim_clock_initialized) {
-        if (tloc) *tloc = sim_clock;
-        return sim_clock;
-    }
-    return __real_time(tloc);
+static time_t sim_clock_now(void) {
+    return sim_clock;
 }
-#endif
 
 static void sim_time_init(void) {
     sim_clock = time(NULL);
-    sim_clock_initialized = 1;
+    mclock_set_source(sim_clock_now);
 }
 
 static void sim_time_advance(int seconds) {
@@ -584,12 +580,7 @@ static int run_scenario(const char *path) {
             int i;
             fprintf(stderr, "  advancing %d seconds...\n", secs);
             for (i = 0; i < secs; i++) {
-#ifdef __linux__
                 sim_time_advance(1);
-#else
-                { struct timespec ts = {1, 0}; nanosleep(&ts, NULL); }
-                sim_time_advance(1);
-#endif
                 plugins_tick();
                 display_manager_tick();
                 sim_drain_events();

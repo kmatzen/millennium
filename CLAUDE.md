@@ -119,7 +119,8 @@ Single-process C daemon. Key files:
 | `health_monitor.c` | Background checks: serial connection, SIP registration |
 | `config.c` | `key=value` config file parser with environment variable fallback |
 | `state_persistence.c` | Save/restore coin balance and active plugin across restarts |
-| `simulator.c` | Test harness: stubs hardware, wraps `time()` for scenario tests |
+| `clock_source.c` | Clock seam (`mclock_now()`): real `time()` in production, an advanceable clock under the simulator. Plugins read it via `sdk_now()` |
+| `simulator.c` | Test harness: stubs hardware, drives the `clock_source` clock so scenario tests advance time instantly on any platform (no real sleeping, no Linux-only `--wrap` trick) |
 | `tests/unit_tests.c` | Unit tests (config, state transitions, emergency detection, plugin registry) |
 
 ### State Machine

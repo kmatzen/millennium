@@ -8,6 +8,7 @@
 #include "../plugins.h"
 #include "../logger.h"
 #include "../millennium_sdk.h"
+#include "../plugin_sdk.h"
 #include "../display_manager.h"
 #include "../audio_tones.h"
 
@@ -84,7 +85,7 @@ static void jukebox_check_playback(void);
 static int jukebox_handle_coin(int coin_value, const char *coin_code) {
     if (coin_value > 0) {
         jukebox_data.inserted_cents += coin_value;
-        jukebox_data.last_activity = time(NULL);
+        jukebox_data.last_activity = sdk_now();
         
         if (jukebox_data.inserted_cents >= jukebox_data.song_cost_cents) {
             jukebox_show_menu();
@@ -131,7 +132,7 @@ static int jukebox_handle_hook(int hook_up, int hook_down) {
         jukebox_data.inserted_cents = 0;
         jukebox_data.selected_song = -1;
         jukebox_data.is_playing = 0;
-        jukebox_data.last_activity = time(NULL);
+        jukebox_data.last_activity = sdk_now();
         jukebox_show_welcome();
     } else if (hook_down) {
         /* Stop playback and return coins */
@@ -160,7 +161,7 @@ static void jukebox_on_activation(void) {
     jukebox_data.inserted_cents = 0;
     jukebox_data.selected_song = -1;
     jukebox_data.is_playing = 0;
-    jukebox_data.last_activity = time(NULL);
+    jukebox_data.last_activity = sdk_now();
     jukebox_data.play_start_time = 0;
     jukebox_data.play_duration_seconds = 0;
     jukebox_data.stop_audio = 0;
@@ -208,7 +209,7 @@ static void jukebox_play_song(int song_number) {
 
     jukebox_data.selected_song = song_number;
     jukebox_data.is_playing = 1;
-    jukebox_data.play_start_time = time(NULL);
+    jukebox_data.play_start_time = sdk_now();
     jukebox_data.play_duration_seconds = songs[song_number].duration_seconds;
 
     jukebox_show_playing();
@@ -254,7 +255,7 @@ static void jukebox_stop_song(void) {
 #pragma GCC diagnostic ignored "-Wunused-function"
 static void jukebox_check_playback(void) {
     if (jukebox_data.is_playing) {
-        time_t now = time(NULL);
+        time_t now = sdk_now();
         if (now - jukebox_data.play_start_time >= jukebox_data.play_duration_seconds) {
             /* Song finished */
             jukebox_stop_song();
@@ -458,7 +459,7 @@ void register_jukebox_plugin(void) {
     jukebox_data.song_cost_cents = 25; /* 25 cents per song */
     jukebox_data.selected_song = -1;
     jukebox_data.is_playing = 0;
-    jukebox_data.last_activity = time(NULL);
+    jukebox_data.last_activity = sdk_now();
     jukebox_data.play_start_time = 0;
     jukebox_data.play_duration_seconds = 0;
 #if HAVE_ALSA

@@ -95,9 +95,12 @@ void register_hello_plugin(void) {
 - **Receiver state.** Gate behaviour on `sdk_receiver_is_up()`; show a
   "Lift receiver" splash when it's down (every built-in does this).
 - **Non-blocking delays.** Never `sleep()`. Record a deadline
-  (`time(NULL) + n`) and check it in `handle_tick()` — see the celebration
-  delay in `number_guess.c` or the playback pacing in `simon.c`. (`time()` has
-  1-second resolution.)
+  (`sdk_now() + n`) and check it in `handle_tick()` — see the celebration
+  delay in `number_guess.c` or the playback pacing in `simon.c`. Always read
+  the clock with `sdk_now()` (or age a timestamp with `sdk_elapsed(t)`), never
+  `time(NULL)` directly: `sdk_now()` honors the scenario simulator's
+  advanceable clock, so `wait` advances time instantly instead of really
+  sleeping. (Resolution is 1 second.)
 - **Config.** Read per-plugin settings from `daemon.conf` with
   `config_get_int/string/bool(config_get_instance(), "your.key", default)`.
   Exposing a "forced" value (e.g. `guess.secret`) makes scenario tests
@@ -128,10 +131,10 @@ them directly.
 
 ## Reference
 
-See [`plugin_sdk.h`](plugin_sdk.h) for the full API: display
-(`sdk_display`, `sdk_displayf`), audio (`sdk_beep`, `sdk_coin_chime`,
-`sdk_dial_tone`, …), calls (`sdk_call`, `sdk_answer`, `sdk_hangup`,
-`sdk_send_dtmf`), state (`sdk_state`, `sdk_receiver_is_up`, `sdk_keypad`),
-balance (`sdk_balance`, `sdk_spend_balance`, …), logging (`sdk_log`,
-`sdk_logf`), and randomness (`sdk_rand_below`, `sdk_rand_range`,
+See [`plugin_sdk.h`](plugin_sdk.h) for the full API: time (`sdk_now`,
+`sdk_elapsed`), display (`sdk_display`, `sdk_displayf`), audio (`sdk_beep`,
+`sdk_coin_chime`, `sdk_dial_tone`, …), calls (`sdk_call`, `sdk_answer`,
+`sdk_hangup`, `sdk_send_dtmf`), state (`sdk_state`, `sdk_receiver_is_up`,
+`sdk_keypad`), balance (`sdk_balance`, `sdk_spend_balance`, …), logging
+(`sdk_log`, `sdk_logf`), and randomness (`sdk_rand_below`, `sdk_rand_range`,
 `sdk_rand_choice`).

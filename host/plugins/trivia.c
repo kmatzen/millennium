@@ -84,7 +84,7 @@ static void tq_finish(void) {
     sdk_display("Quiz complete!", l2);
     sdk_logf(TRIVIA_CAT, "Quiz complete, score %d/%d", tq.score, TRIVIA_ROUND);
     tq.phase = TQ_DONE;
-    tq.next_at = time(NULL) + 3;
+    tq.next_at = sdk_now() + 3;
 }
 
 static void tq_answer(int said_true) {
@@ -100,7 +100,7 @@ static void tq_answer(int said_true) {
     tq.asked++;
     tq.idx = (tq.idx + 1) % NUM_Q;
     tq.phase = TQ_FEEDBACK;
-    tq.next_at = time(NULL) + 2;
+    tq.next_at = sdk_now() + 2;
 }
 
 /* ── Plugin callbacks ────────────────────────────────────────────────── */
@@ -128,13 +128,13 @@ static void tq_handle_activation(void) {
 }
 
 static void tq_handle_tick(void) {
-    if (tq.phase == TQ_FEEDBACK && time(NULL) >= tq.next_at) {
+    if (tq.phase == TQ_FEEDBACK && sdk_now() >= tq.next_at) {
         if (tq.asked >= TRIVIA_ROUND) {
             tq_finish();
         } else {
             tq_ask();
         }
-    } else if (tq.phase == TQ_DONE && time(NULL) >= tq.next_at) {
+    } else if (tq.phase == TQ_DONE && sdk_now() >= tq.next_at) {
         tq.phase = TQ_IDLE;
         tq_show_idle();
     }

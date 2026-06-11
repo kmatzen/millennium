@@ -10,11 +10,21 @@
 #include "display_manager.h"
 #include "audio_tones.h"
 #include "millennium_sdk.h"
+#include "clock_source.h"
 #include "logger.h"
 
 /* Globals owned by the daemon / simulator / test harness. */
 extern daemon_state_data_t *daemon_state;
 extern millennium_client_t *client;
+
+/* ── Time ────────────────────────────────────────────────────────────── */
+
+time_t sdk_now(void) { return mclock_now(); }
+
+int sdk_elapsed(time_t past) {
+    time_t now = mclock_now();
+    return now > past ? (int)(now - past) : 0;
+}
 
 /* ── Display ─────────────────────────────────────────────────────────── */
 

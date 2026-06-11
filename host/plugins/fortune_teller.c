@@ -6,6 +6,7 @@
 #include "../plugins.h"
 #include "../logger.h"
 #include "../millennium_sdk.h"
+#include "../plugin_sdk.h"
 #include "../display_manager.h"
 
 /* Delay states: non-blocking fortune flow (#114) */
@@ -86,7 +87,7 @@ static const char* fortune_teller_get_random_fortune(int category);
 static int fortune_teller_handle_coin(int coin_value, const char *coin_code) {
     if (coin_value > 0) {
         fortune_teller_data.inserted_cents += coin_value;
-        fortune_teller_data.last_activity = time(NULL);
+        fortune_teller_data.last_activity = sdk_now();
         
         if (fortune_teller_data.inserted_cents >= fortune_teller_data.fortune_cost_cents) {
             fortune_teller_data.is_ready = 1;
@@ -122,7 +123,7 @@ static int fortune_teller_handle_hook(int hook_up, int hook_down) {
         fortune_teller_data.inserted_cents = 0;
         fortune_teller_data.fortune_type = 0;
         fortune_teller_data.is_ready = 0;
-        fortune_teller_data.last_activity = time(NULL);
+        fortune_teller_data.last_activity = sdk_now();
         fortune_teller_show_welcome();
     } else if (hook_down) {
         /* Return coins if handset down without fortune */
@@ -148,7 +149,7 @@ static void fortune_teller_on_activation(void) {
     fortune_teller_data.fortune_type = 0;
     fortune_teller_data.is_ready = 0;
     fortune_teller_data.delay_state = FT_STATE_IDLE;
-    fortune_teller_data.last_activity = time(NULL);
+    fortune_teller_data.last_activity = sdk_now();
     fortune_teller_show_welcome();
 }
 
@@ -182,11 +183,11 @@ static void fortune_teller_show_reading(void) {
 static void fortune_teller_give_fortune(void) {
     fortune_teller_show_reading();
     fortune_teller_data.delay_state = FT_STATE_READING;
-    fortune_teller_data.delay_until = time(NULL) + 2;
+    fortune_teller_data.delay_until = sdk_now() + 2;
 }
 
 static void fortune_teller_tick(void) {
-    time_t now = time(NULL);
+    time_t now = sdk_now();
     if (fortune_teller_data.delay_state == FT_STATE_READING && now >= fortune_teller_data.delay_until) {
         const char* fortune = fortune_teller_get_random_fortune(fortune_teller_data.fortune_type);
         const char* category = fortune_categories[fortune_teller_data.fortune_type];
@@ -234,7 +235,7 @@ void register_fortune_teller_plugin(void) {
     fortune_teller_data.fortune_cost_cents = 25; /* 25 cents per fortune */
     fortune_teller_data.fortune_type = 0;
     fortune_teller_data.is_ready = 0;
-    fortune_teller_data.last_activity = time(NULL);
+    fortune_teller_data.last_activity = sdk_now();
     
     /* Seed random number generator */
     srand(time(NULL));

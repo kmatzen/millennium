@@ -20,7 +20,10 @@ config.o: config.c config.h
 	gcc config.c -o config.o -c $(CFLAGS)
 
 # C object files
-daemon_state.o: daemon_state.c daemon_state.h
+clock_source.o: clock_source.c clock_source.h
+	gcc clock_source.c -o clock_source.o -c $(CFLAGS)
+
+daemon_state.o: daemon_state.c daemon_state.h clock_source.h
 	gcc daemon_state.c -o daemon_state.o -c $(CFLAGS)
 
 logger.o: logger.c logger.h
@@ -59,7 +62,7 @@ state_persistence.o: state_persistence.c state_persistence.h daemon_state.h logg
 display_manager.o: display_manager.c display_manager.h millennium_sdk.h
 	gcc display_manager.c -o display_manager.o -c $(CFLAGS)
 
-plugin_sdk.o: plugin_sdk.c plugin_sdk.h plugins.h display_manager.h audio_tones.h millennium_sdk.h logger.h daemon_state.h
+plugin_sdk.o: plugin_sdk.c plugin_sdk.h plugins.h display_manager.h audio_tones.h millennium_sdk.h clock_source.h logger.h daemon_state.h
 	gcc plugin_sdk.c -o plugin_sdk.o -c $(CFLAGS)
 
 version.o: version.c version.h
@@ -78,13 +81,13 @@ daemon.o: daemon.c millennium_sdk.h events.h event_processor.h config.h logger.h
 plugins.o: plugins.c plugins.h
 	gcc plugins.c -o plugins.o -c $(CFLAGS)
 
-plugins/classic_phone.o: plugins/classic_phone.c plugins.h audio_tones.h config.h
+plugins/classic_phone.o: plugins/classic_phone.c plugins.h plugin_sdk.h audio_tones.h config.h
 	gcc plugins/classic_phone.c -o plugins/classic_phone.o -c $(CFLAGS)
 
-plugins/fortune_teller.o: plugins/fortune_teller.c plugins.h
+plugins/fortune_teller.o: plugins/fortune_teller.c plugins.h plugin_sdk.h
 	gcc plugins/fortune_teller.c -o plugins/fortune_teller.o -c $(CFLAGS)
 
-plugins/jukebox.o: plugins/jukebox.c plugins.h
+plugins/jukebox.o: plugins/jukebox.c plugins.h plugin_sdk.h
 	gcc plugins/jukebox.c -o plugins/jukebox.o -c $(CFLAGS)
 
 plugins/number_guess.o: plugins/number_guess.c plugins.h plugin_sdk.h config.h
@@ -99,21 +102,19 @@ plugins/dial_a_joke.o: plugins/dial_a_joke.c plugins.h plugin_sdk.h config.h
 plugins/trivia.o: plugins/trivia.c plugins.h plugin_sdk.h config.h
 	gcc plugins/trivia.c -o plugins/trivia.o -c $(CFLAGS)
 
-daemon: daemon.o daemon_state.o millennium_sdk.o pjsip_interface.o events.o event_processor.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o websocket.o plugins.o plugin_sdk.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o plugins/number_guess.o plugins/simon.o plugins/dial_a_joke.o plugins/trivia.o state_persistence.o display_manager.o version.o audio_tones.o updater.o
-	gcc daemon.o daemon_state.o millennium_sdk.o pjsip_interface.o events.o event_processor.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o websocket.o plugins.o plugin_sdk.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o plugins/number_guess.o plugins/simon.o plugins/dial_a_joke.o plugins/trivia.o state_persistence.o display_manager.o version.o audio_tones.o updater.o -o daemon $(LDFLAGS) -lm
+daemon: daemon.o daemon_state.o clock_source.o millennium_sdk.o pjsip_interface.o events.o event_processor.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o websocket.o plugins.o plugin_sdk.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o plugins/number_guess.o plugins/simon.o plugins/dial_a_joke.o plugins/trivia.o state_persistence.o display_manager.o version.o audio_tones.o updater.o
+	gcc daemon.o daemon_state.o clock_source.o millennium_sdk.o pjsip_interface.o events.o event_processor.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o websocket.o plugins.o plugin_sdk.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o plugins/number_guess.o plugins/simon.o plugins/dial_a_joke.o plugins/trivia.o state_persistence.o display_manager.o version.o audio_tones.o updater.o -o daemon $(LDFLAGS) -lm
 
 # Simulator object file
 simulator.o: simulator.c millennium_sdk.h events.h config.h daemon_state.h logger.h metrics.h plugins.h
 	gcc simulator.c -o simulator.o -c $(CFLAGS)
 
 # Simulator objects — no baresip, no web server, no daemon.o
-SIM_OBJS = simulator.o daemon_state.o events.o event_processor.o config.o logger.o metrics.o plugins.o plugin_sdk.o plugins/classic_phone.o plugins/fortune_teller.o plugins/number_guess.o plugins/simon.o plugins/dial_a_joke.o plugins/trivia.o state_persistence.o display_manager.o version.o
+SIM_OBJS = simulator.o daemon_state.o clock_source.o events.o event_processor.o config.o logger.o metrics.o plugins.o plugin_sdk.o plugins/classic_phone.o plugins/fortune_teller.o plugins/number_guess.o plugins/simon.o plugins/dial_a_joke.o plugins/trivia.o state_persistence.o display_manager.o version.o
 
-# On Linux, wrap time() for simulated time; elsewhere use real time
+# Simulated time is portable: the simulator installs a clock source
+# (clock_source.h) that the daemon/plugins read through, so no -Wl,--wrap hack.
 SIM_LDFLAGS = -lpthread
-ifeq ($(shell uname -s),Linux)
-SIM_LDFLAGS += -Wl,--wrap=time
-endif
 
 simulator: $(SIM_OBJS)
 	gcc $(SIM_OBJS) -o simulator $(SIM_LDFLAGS)
@@ -121,7 +122,7 @@ simulator: $(SIM_OBJS)
 all: daemon
 
 # Unit test binary
-UNIT_TEST_OBJS = tests/unit_tests.o daemon_state.o events.o event_processor.o config.o logger.o metrics.o plugins.o plugin_sdk.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o plugins/number_guess.o plugins/simon.o plugins/dial_a_joke.o plugins/trivia.o state_persistence.o display_manager.o version.o updater.o
+UNIT_TEST_OBJS = tests/unit_tests.o daemon_state.o clock_source.o events.o event_processor.o config.o logger.o metrics.o plugins.o plugin_sdk.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o plugins/number_guess.o plugins/simon.o plugins/dial_a_joke.o plugins/trivia.o state_persistence.o display_manager.o version.o updater.o
 
 tests/unit_tests.o: tests/unit_tests.c tests/test_framework.h config.h daemon_state.h plugins.h logger.h metrics.h millennium_sdk.h updater.h
 	gcc tests/unit_tests.c -o tests/unit_tests.o -c $(CFLAGS) -I.
@@ -159,7 +160,7 @@ test: simulator unit_tests
 # ALSA paths in audio_tones.c, plus web_server/websocket/health_monitor — is
 # never compiled by `make test`. This target catches type/syntax errors in that
 # code on any Linux box with libasound2-dev (e.g. CI), short of a full link.
-COMPILE_CHECK_OBJS = daemon.o daemon_state.o millennium_sdk.o events.o \
+COMPILE_CHECK_OBJS = daemon.o daemon_state.o clock_source.o millennium_sdk.o events.o \
 	event_processor.o config.o logger.o health_monitor.o metrics.o \
 	metrics_server.o web_server.o websocket.o plugins.o plugin_sdk.o \
 	plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o \

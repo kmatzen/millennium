@@ -35,7 +35,21 @@
  *   }
  */
 
+#include <time.h>
 #include "daemon_state.h"
+
+/* ── Time ────────────────────────────────────────────────────────────────
+ * Always read the clock through these instead of time(NULL). They honor the
+ * scenario simulator's advanceable clock, so a plugin's timing logic (e.g.
+ * "reveal the answer 2 seconds later") behaves identically on the Pi and in
+ * the instant, no-sleep scenario tests. */
+
+/* Current time in seconds, like time(NULL) but simulator-aware. */
+time_t sdk_now(void);
+
+/* Whole seconds elapsed since `past` (clamped to >= 0). Equivalent to
+ * sdk_now() - past, the idiom plugins use to age timestamps. */
+int sdk_elapsed(time_t past);
 
 /* ── Display ─────────────────────────────────────────────────────────────
  * The VFD is two lines of 20 chars. Lines longer than 20 chars auto-scroll.

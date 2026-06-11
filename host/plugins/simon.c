@@ -22,7 +22,7 @@
 
 #define SIMON_CAT "Simon"
 #define SIMON_MAX 16        /* longest sequence we track */
-#define SIMON_NOTE_SECS 1   /* playback pace (time() has 1s resolution) */
+#define SIMON_NOTE_SECS 1   /* playback pace (sdk_now() has 1s resolution) */
 
 #define S_IDLE  0   /* waiting for a key to start */
 #define S_SHOW  1   /* playing back the sequence */
@@ -64,7 +64,7 @@ static void simon_begin(void) {
     sm.round = 0;
     sm.show_idx = 0;
     sm.phase = S_SHOW;
-    sm.next_at = time(NULL); /* reveal first note on the next tick */
+    sm.next_at = sdk_now(); /* reveal first note on the next tick */
     sdk_log(SIMON_CAT, "Game started");
 }
 
@@ -76,7 +76,7 @@ static void simon_next_round(void) {
     }
     sm.show_idx = 0;
     sm.phase = S_SHOW;
-    sm.next_at = time(NULL);
+    sm.next_at = sdk_now();
 }
 
 static void simon_enter_input(void) {
@@ -91,7 +91,7 @@ static void simon_game_over(void) {
     sdk_display("Game Over", l2);
     sdk_logf(SIMON_CAT, "Game over, score %d", sm.round);
     sm.phase = S_OVER;
-    sm.next_at = time(NULL) + 3;
+    sm.next_at = sdk_now() + 3;
 }
 
 /* ── Plugin callbacks ────────────────────────────────────────────────── */
@@ -132,7 +132,7 @@ static void simon_handle_activation(void) {
 }
 
 static void simon_handle_tick(void) {
-    time_t now = time(NULL);
+    time_t now = sdk_now();
 
     if (sm.phase == S_SHOW) {
         if (now < sm.next_at) return;
