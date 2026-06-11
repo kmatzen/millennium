@@ -21,6 +21,7 @@ pcb/*.lck
 pcb/erc_report.txt
 pcb/drc_report.txt
 # PCB build artifacts
+pcb/__pycache__/
 pcb/gerbers_export/
 pcb/jlcpcb/
 pcb/*-backups/
