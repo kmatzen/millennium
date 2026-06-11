@@ -26,7 +26,7 @@ $SSH $PI '
   echo "== service =="; systemctl is-active daemon.service; \
   echo "NRestarts=$(systemctl show daemon.service -p NRestarts --value)"; \
   echo "uptime: $(systemctl show daemon.service -p ActiveEnterTimestamp --value)"; \
-  echo "== state =="; curl -s --max-time 4 http://127.0.0.1:8081/api/state; echo; \
+  echo "== state =="; curl -s --max-time 4 http://127.0.0.1:80/api/state; echo; \
   echo "== recent errors =="; \
   sudo journalctl -u daemon.service --since "10 min ago" --no-pager \
     | grep -iE "error|fail|warn|segf|core|underrun" | tail -15'

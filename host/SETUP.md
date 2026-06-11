@@ -142,7 +142,7 @@ hardware.baud_rate=9600
 call.cost_cents=50
 call.timeout_seconds=300
 web_server.enabled=true
-web_server.port=8081
+web_server.port=80
 ```
 
 The `hardware.display_device` path depends on the Arduino's USB product name.
@@ -193,7 +193,7 @@ systemctl --user start daemon.service
 
 Ensure `/etc/millennium/daemon.conf` exists: `sudo cp daemon.conf.example /etc/millennium/daemon.conf`.
 
-The web dashboard should now be accessible at `http://<pi-ip>:8081`.
+The web dashboard should now be accessible at `http://<pi-ip>:80`.
 
 ## 10. Disable unused services (optional cleanup)
 
@@ -221,7 +221,7 @@ systemctl --user disable audio-mux.service
    through the handset earpiece. If no audio, verify the ALSA config and USB
    audio card detection.
 
-4. **Web dashboard**: Open `http://<pi-ip>:8081` in a browser. You should see
+4. **Web dashboard**: Open `http://<pi-ip>:80` in a browser. You should see
    the phone state, active plugin, and health status.
 
 5. **API integration test**: From the Pi (or any machine that can reach it):

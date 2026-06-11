@@ -40,7 +40,7 @@ the Mac.
 
 3. **Verify** after flashing — the display should re-init and the daemon should
    resume seeing serial events. Quick check (see the `phone-status` skill):
-   `curl -s http://<pi>:8081/api/state`, then lift/replace the handset and
+   `curl -s http://<pi>:80/api/state`, then lift/replace the handset and
    confirm `HU`/`HD` hook events appear in `journalctl -u daemon.service -f`.
 
 ## Notes

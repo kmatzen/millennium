@@ -26,7 +26,7 @@ non-interactive key in this environment (passwordless sudo on the Pi).
 
 Pi layout: scratch build dir `~/millennium-pjsip/host` · installed binary
 `/usr/local/bin/millennium-daemon` · systemd unit `daemon.service` · config
-`/etc/millennium/daemon.conf` · web API on `:8081`, metrics on `:8080`.
+`/etc/millennium/daemon.conf` · web API on `:80`, metrics on `:8080`.
 
 ## Steps
 
@@ -63,7 +63,7 @@ Pi layout: scratch build dir `~/millennium-pjsip/host` · installed binary
    ```bash
    $SSH $PI 'systemctl is-active daemon.service; \
      echo NRestarts=$(systemctl show daemon.service -p NRestarts --value); \
-     curl -s --max-time 4 http://127.0.0.1:8081/api/state'
+     curl -s --max-time 4 http://127.0.0.1:80/api/state'
    ```
    Expect `active`, `NRestarts=0`, `"sip_registered":1`, empty `sip_last_error`.
    On failure: check `sip.*` keys in `/etc/millennium/daemon.conf` and

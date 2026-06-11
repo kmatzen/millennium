@@ -35,7 +35,7 @@ This project reimagines the functionality of the Nortel Millennium telephone by 
 ┌────────────────────────── Raspberry Pi Zero 2 W ───────────────────────────┐
 │                                                                            │
 │  ┌──────────────┐     ┌──────────────┐      ┌──────────────────────────┐   │
-│  │ Daemon       │────▶│ PJSIP (VoIP) │      │ Web Dashboard :8081      │   │
+│  │ Daemon       │────▶│ PJSIP (VoIP) │      │ Web Dashboard :80        │   │
 │  │              │     └──────────────┘      │                          │   │
 │  │ Plugins:     │                           │ - phone state            │   │
 │  │ - Phone      │     ┌──────────────┐      │ - plugin switching       │   │
@@ -150,7 +150,7 @@ The daemon reads configuration from `/etc/millennium/daemon.conf`. See `host/dae
 | `card.free_cards` | *(empty)* | Comma-separated card numbers for free calling |
 | `card.admin_cards` | *(empty)* | Comma-separated card numbers for admin access |
 | `web_server.enabled` | `true` | Enable the web dashboard |
-| `web_server.port` | `8081` | Web dashboard port |
+| `web_server.port` | `80` | Web dashboard port |
 | `system.source_dir` | `/home/matzen/millennium` | Source directory for OTA updates |
 
 ---

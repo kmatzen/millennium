@@ -114,7 +114,7 @@ Single-process C daemon. Key files:
 | `plugin_sdk.c` / `plugin_sdk.h` | Friendly facade for plugin authors (display, audio, calls, state, balance, logging, RNG) — see `host/PLUGIN_AUTHORING.md` |
 | `display_manager.c` | VFD abstraction with auto-scrolling for lines >20 chars |
 | `audio_tones.c` | ALSA tone generator: dial tone, DTMF, ringback, busy, coin chime |
-| `web_server.c` | HTTP+WebSocket server on port 8081; REST API + real-time events |
+| `web_server.c` | HTTP+WebSocket server on port 80; REST API + real-time events |
 | `metrics.c` / `metrics_server.c` | Prometheus/JSON metrics on port 8080 |
 | `health_monitor.c` | Background checks: serial connection, SIP registration |
 | `config.c` | `key=value` config file parser with environment variable fallback |
@@ -142,7 +142,7 @@ New plugins should be written against `plugin_sdk.h`, which wraps the hardware/s
 
 ### Web API
 
-Base URL: `http://<pi>:8081`
+Base URL: `http://<pi>` (port 80)
 
 - `GET /api/state` — phone state, coins, keypad, SIP status
 - `GET /api/metrics` — Prometheus or JSON metrics
@@ -162,7 +162,7 @@ Pure ALSA (`libasound`), no PipeWire. Left channel → ringer (TDA2822M ch A), r
 
 ## Configuration
 
-Config file: `/etc/millennium/daemon.conf` (key=value). See `host/daemon.conf.example` for all options. Key settings: `hardware.display_device`, `call.cost_cents`, `call.free_numbers`, `card.enabled`, `web_server.port` (8081), `metrics_server.port` (8080), `persistence.state_file`.
+Config file: `/etc/millennium/daemon.conf` (key=value). See `host/daemon.conf.example` for all options. Key settings: `hardware.display_device`, `call.cost_cents`, `call.free_numbers`, `card.enabled`, `web_server.port` (80, via `CAP_NET_BIND_SERVICE`), `metrics_server.port` (8080), `persistence.state_file`.
 
 ## PCB Design (`pcb/`)
 

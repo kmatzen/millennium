@@ -58,14 +58,17 @@ system.source_dir=/home/matzen/millennium
 # State Persistence
 persistence.state_file=/var/lib/millennium/state
 
-# Metrics Server Configuration - DISABLED for single-core optimization
-# Metrics are now collected in the main loop instead of a separate thread
-metrics_server.enabled=false
+# Metrics Server Configuration
+# Standalone Prometheus/JSON metrics endpoint. (Metrics are also always exposed
+# via the web server at /api/metrics regardless of this setting.) Was disabled
+# on the single-core Pi Zero W; re-enabled after the multicore upgrade.
+metrics_server.enabled=true
 metrics_server.port=8080
 
 # Web Server Configuration
+# Port 80 (privileged) — granted via CAP_NET_BIND_SERVICE in the systemd unit.
 web_server.enabled=true
-web_server.port=8081
+web_server.port=80
 
 # Plugin Configuration
 # Each plugin can read its own keys from this file. Built-in game plugins:

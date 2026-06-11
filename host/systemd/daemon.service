@@ -21,6 +21,14 @@ StandardError=journal
 PrivateDevices=no
 ProtectSystem=no
 NoNewPrivileges=no
+# Capabilities for the non-root daemon user (User= comes from the install-time
+# daemon.service.d/override.conf):
+#   CAP_NET_BIND_SERVICE — bind the web dashboard on privileged port 80
+#   CAP_SYS_NICE + CAP_IPC_LOCK / LimitRTPRIO + LimitMEMLOCK — real-time audio
+#     scheduling and mlock for the ALSA threads
+AmbientCapabilities=CAP_NET_BIND_SERVICE CAP_SYS_NICE CAP_IPC_LOCK
+LimitRTPRIO=99
+LimitMEMLOCK=infinity
 
 [Install]
 WantedBy=default.target
