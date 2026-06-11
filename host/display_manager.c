@@ -87,27 +87,42 @@ void display_manager_init(millennium_client_t *client) {
 }
 
 void display_manager_set_text(const char *line1, const char *line2) {
-    if (line1) {
-        strncpy(dm_line1_full, line1, MAX_TEXT_LEN - 1);
-        dm_line1_full[MAX_TEXT_LEN - 1] = '\0';
-        dm_line1_len = (int)strlen(dm_line1_full);
-    } else {
-        dm_line1_full[0] = '\0';
-        dm_line1_len = 0;
-    }
-    dm_scroll1_pos = 0;
-    dm_line1_scrolling = (dm_line1_len > DISPLAY_WIDTH);
+    char new1[MAX_TEXT_LEN];
+    char new2[MAX_TEXT_LEN];
 
-    if (line2) {
-        strncpy(dm_line2_full, line2, MAX_TEXT_LEN - 1);
-        dm_line2_full[MAX_TEXT_LEN - 1] = '\0';
-        dm_line2_len = (int)strlen(dm_line2_full);
+    /* Normalize NULL (clear) to an empty string so comparison is uniform. */
+    if (line1) {
+        strncpy(new1, line1, MAX_TEXT_LEN - 1);
+        new1[MAX_TEXT_LEN - 1] = '\0';
     } else {
-        dm_line2_full[0] = '\0';
-        dm_line2_len = 0;
+        new1[0] = '\0';
     }
-    dm_scroll2_pos = 0;
-    dm_line2_scrolling = (dm_line2_len > DISPLAY_WIDTH);
+    if (line2) {
+        strncpy(new2, line2, MAX_TEXT_LEN - 1);
+        new2[MAX_TEXT_LEN - 1] = '\0';
+    } else {
+        new2[0] = '\0';
+    }
+
+    /*
+     * Only reset the scroll position when a line's content actually changes.
+     * A plugin that idempotently repaints its current state on every tick (the
+     * canonical pattern) would otherwise snap a long, scrolling line back to
+     * its start on each repaint and never advance. Re-sending identical text
+     * now preserves the in-progress scroll animation.
+     */
+    if (strcmp(new1, dm_line1_full) != 0) {
+        strcpy(dm_line1_full, new1);
+        dm_line1_len = (int)strlen(dm_line1_full);
+        dm_scroll1_pos = 0;
+        dm_line1_scrolling = (dm_line1_len > DISPLAY_WIDTH);
+    }
+    if (strcmp(new2, dm_line2_full) != 0) {
+        strcpy(dm_line2_full, new2);
+        dm_line2_len = (int)strlen(dm_line2_full);
+        dm_scroll2_pos = 0;
+        dm_line2_scrolling = (dm_line2_len > DISPLAY_WIDTH);
+    }
 
     dm_send_display();
 }

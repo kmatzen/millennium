@@ -16,6 +16,10 @@ void display_manager_init(millennium_client_t *client);
  * Set display text. Lines longer than 20 characters will scroll
  * automatically on each tick. Short lines are displayed statically.
  * Passing NULL for a line clears that line.
+ *
+ * Re-setting a line to text identical to what it already shows preserves the
+ * in-progress scroll position, so a plugin may safely repaint its current
+ * state every tick without freezing a scrolling line at its start.
  */
 void display_manager_set_text(const char *line1, const char *line2);
 

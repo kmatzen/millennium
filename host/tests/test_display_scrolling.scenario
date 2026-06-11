@@ -31,3 +31,18 @@ set_display Static|Text
 tick_display 20
 assert_display Static
 assert_display Text
+
+# Repainting identical text must preserve the scroll position.
+# A plugin that repaints its current state every tick should keep scrolling
+# instead of snapping the line back to its start on each repaint.
+set_display Header|This is a very long fortune message that scrolls
+tick_display 6
+assert_display s a very long fortun
+# Repaint byte-for-byte identical content...
+set_display Header|This is a very long fortune message that scrolls
+# ...the scroll position is preserved (not reset to the start of the line)
+assert_display s a very long fortun
+assert_no_display This is a very long
+# ...and ticking keeps advancing from where it left off
+tick_display 1
+assert_display a very long fortune
