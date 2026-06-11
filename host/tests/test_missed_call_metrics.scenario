@@ -1,0 +1,48 @@
+# Test: Ring-duration histogram and missed-call counter
+# Before a call connects it "rings": an incoming call sits in CALL_INCOMING from
+# the moment it arrives until it is answered (handset lifted) or ends unanswered.
+# The daemon stamps that interval through the clock seam and records the elapsed
+# seconds into the call_ring_seconds histogram; a ring that ends without an
+# answer also bumps the calls_missed counter. Together they show how long the
+# phone rings and how often a ring goes unanswered — which the existing
+# calls_incoming/calls_answered counters can't reveal. `wait` advances the
+# simulated clock instantly, so the recorded ring times are exact.
+#
+# Run under a plugin with no call-time limit so a ring lasts exactly as long as
+# we let it.
+activate_plugin Number Guess
+
+# 1) An incoming call that rings 20 seconds and is then abandoned (the caller
+#    gives up). It never reaches CALL_ACTIVE, so it is a missed call.
+call_incoming
+assert_state CALL_INCOMING
+wait 20
+call_ended
+assert_state IDLE_UP
+
+# One ring recorded (20s); one miss counted.
+assert_histogram call_ring_seconds 1 20
+assert_counter calls_missed 1
+
+# 2) A second abandoned ring (10s); the miss counter keeps climbing.
+call_incoming
+assert_state CALL_INCOMING
+wait 10
+call_ended
+assert_state IDLE_UP
+
+# Two rings recorded now (20 + 10 = 30s); two misses.
+assert_histogram call_ring_seconds 2 30
+assert_counter calls_missed 2
+
+# 3) An incoming call that rings 5 seconds and is answered by lifting the
+#    handset. The ring time is recorded, but it is NOT a miss.
+call_incoming
+assert_state CALL_INCOMING
+wait 5
+hook_up
+assert_state CALL_ACTIVE
+
+# Three rings recorded now (30 + 5 = 35s); the miss count is unchanged at 2.
+assert_histogram call_ring_seconds 3 35
+assert_counter calls_missed 2

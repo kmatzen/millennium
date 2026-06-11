@@ -35,6 +35,9 @@ health_monitor.o: health_monitor.c health_monitor.h logger.h
 metrics.o: metrics.c metrics.h
 	gcc metrics.c -o metrics.o -c $(CFLAGS)
 
+call_metrics.o: call_metrics.c call_metrics.h metrics.h clock_source.h
+	gcc call_metrics.c -o call_metrics.o -c $(CFLAGS)
+
 metrics_server.o: metrics_server.c metrics_server.h metrics.h logger.h
 	gcc metrics_server.c -o metrics_server.o -c $(CFLAGS)
 
@@ -74,7 +77,7 @@ audio_tones.o: audio_tones.c audio_tones.h logger.h
 updater.o: updater.c updater.h version.h logger.h
 	gcc updater.c -o updater.o -c $(CFLAGS)
 
-daemon.o: daemon.c millennium_sdk.h events.h event_processor.h config.h logger.h health_monitor.h metrics.h metrics_server.h web_server.h plugins.h state_persistence.h display_manager.h audio_tones.h
+daemon.o: daemon.c millennium_sdk.h events.h event_processor.h config.h logger.h health_monitor.h metrics.h metrics_server.h call_metrics.h web_server.h plugins.h state_persistence.h display_manager.h audio_tones.h
 	gcc daemon.c -o daemon.o -c $(CFLAGS)
 
 # Executables
@@ -102,15 +105,15 @@ plugins/dial_a_joke.o: plugins/dial_a_joke.c plugins.h plugin_sdk.h config.h
 plugins/trivia.o: plugins/trivia.c plugins.h plugin_sdk.h config.h
 	gcc plugins/trivia.c -o plugins/trivia.o -c $(CFLAGS)
 
-daemon: daemon.o daemon_state.o clock_source.o millennium_sdk.o pjsip_interface.o events.o event_processor.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o websocket.o plugins.o plugin_sdk.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o plugins/number_guess.o plugins/simon.o plugins/dial_a_joke.o plugins/trivia.o state_persistence.o display_manager.o version.o audio_tones.o updater.o
-	gcc daemon.o daemon_state.o clock_source.o millennium_sdk.o pjsip_interface.o events.o event_processor.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o websocket.o plugins.o plugin_sdk.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o plugins/number_guess.o plugins/simon.o plugins/dial_a_joke.o plugins/trivia.o state_persistence.o display_manager.o version.o audio_tones.o updater.o -o daemon $(LDFLAGS) -lm
+daemon: daemon.o daemon_state.o clock_source.o millennium_sdk.o pjsip_interface.o events.o event_processor.o config.o logger.o health_monitor.o metrics.o metrics_server.o call_metrics.o web_server.o websocket.o plugins.o plugin_sdk.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o plugins/number_guess.o plugins/simon.o plugins/dial_a_joke.o plugins/trivia.o state_persistence.o display_manager.o version.o audio_tones.o updater.o
+	gcc daemon.o daemon_state.o clock_source.o millennium_sdk.o pjsip_interface.o events.o event_processor.o config.o logger.o health_monitor.o metrics.o metrics_server.o call_metrics.o web_server.o websocket.o plugins.o plugin_sdk.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o plugins/number_guess.o plugins/simon.o plugins/dial_a_joke.o plugins/trivia.o state_persistence.o display_manager.o version.o audio_tones.o updater.o -o daemon $(LDFLAGS) -lm
 
 # Simulator object file
-simulator.o: simulator.c millennium_sdk.h events.h config.h daemon_state.h logger.h metrics.h plugins.h
+simulator.o: simulator.c millennium_sdk.h events.h config.h daemon_state.h logger.h metrics.h call_metrics.h plugins.h
 	gcc simulator.c -o simulator.o -c $(CFLAGS)
 
 # Simulator objects — no baresip, no web server, no daemon.o
-SIM_OBJS = simulator.o daemon_state.o clock_source.o events.o event_processor.o config.o logger.o metrics.o plugins.o plugin_sdk.o plugins/classic_phone.o plugins/fortune_teller.o plugins/number_guess.o plugins/simon.o plugins/dial_a_joke.o plugins/trivia.o state_persistence.o display_manager.o version.o
+SIM_OBJS = simulator.o daemon_state.o clock_source.o events.o event_processor.o config.o logger.o metrics.o call_metrics.o plugins.o plugin_sdk.o plugins/classic_phone.o plugins/fortune_teller.o plugins/number_guess.o plugins/simon.o plugins/dial_a_joke.o plugins/trivia.o state_persistence.o display_manager.o version.o
 
 # Simulated time is portable: the simulator installs a clock source
 # (clock_source.h) that the daemon/plugins read through, so no -Wl,--wrap hack.
@@ -122,9 +125,9 @@ simulator: $(SIM_OBJS)
 all: daemon
 
 # Unit test binary
-UNIT_TEST_OBJS = tests/unit_tests.o daemon_state.o clock_source.o events.o event_processor.o config.o logger.o metrics.o plugins.o plugin_sdk.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o plugins/number_guess.o plugins/simon.o plugins/dial_a_joke.o plugins/trivia.o state_persistence.o display_manager.o version.o updater.o
+UNIT_TEST_OBJS = tests/unit_tests.o daemon_state.o clock_source.o events.o event_processor.o config.o logger.o metrics.o call_metrics.o plugins.o plugin_sdk.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o plugins/number_guess.o plugins/simon.o plugins/dial_a_joke.o plugins/trivia.o state_persistence.o display_manager.o version.o updater.o
 
-tests/unit_tests.o: tests/unit_tests.c tests/test_framework.h config.h daemon_state.h plugins.h logger.h metrics.h millennium_sdk.h updater.h
+tests/unit_tests.o: tests/unit_tests.c tests/test_framework.h config.h daemon_state.h plugins.h logger.h metrics.h call_metrics.h millennium_sdk.h updater.h
 	gcc tests/unit_tests.c -o tests/unit_tests.o -c $(CFLAGS) -I.
 
 # Unit tests don't use time wrapping; link ALSA on Linux for jukebox
@@ -162,7 +165,7 @@ test: simulator unit_tests
 # code on any Linux box with libasound2-dev (e.g. CI), short of a full link.
 COMPILE_CHECK_OBJS = daemon.o daemon_state.o clock_source.o millennium_sdk.o events.o \
 	event_processor.o config.o logger.o health_monitor.o metrics.o \
-	metrics_server.o web_server.o websocket.o plugins.o plugin_sdk.o \
+	metrics_server.o call_metrics.o web_server.o websocket.o plugins.o plugin_sdk.o \
 	plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o \
 	plugins/number_guess.o plugins/simon.o plugins/dial_a_joke.o \
 	plugins/trivia.o state_persistence.o display_manager.o version.o \

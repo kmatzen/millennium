@@ -1,0 +1,44 @@
+# Test: Call-duration histogram metric
+# A call is "connected" only from CALL_ACTIVE until either party hangs up. The
+# daemon stamps that interval and records the elapsed seconds into the
+# call_duration_seconds histogram, so an operator can see the spread of call
+# lengths (count/sum/percentiles) the coin counters can't show. Durations are
+# measured through the clock seam, so the simulator's `wait` advances time
+# instantly and the recorded values are exact.
+#
+# Run under a game plugin that imposes no call-time limit, so a call lasts
+# exactly until we end it (the Classic Phone plugin would auto-hang-up on its
+# own timeout, which is exercised separately by the unit tests).
+activate_plugin Number Guess
+
+# 1) An incoming call that is never answered reaches CALL_INCOMING but not
+#    CALL_ACTIVE, so it contributes no duration.
+call_incoming
+assert_state CALL_INCOMING
+call_ended
+assert_state IDLE_UP
+
+# 2) An incoming call answered by lifting the handset, then ended by the far
+#    end. Connected for 30 seconds.
+call_incoming
+assert_state CALL_INCOMING
+hook_up
+assert_state CALL_ACTIVE
+wait 30
+call_ended
+assert_state IDLE_UP
+
+# Only the answered call was recorded: one observation of 30 seconds. The
+# unanswered call in step 1 added nothing.
+assert_histogram call_duration_seconds 1 30
+
+# 3) An outgoing call that connects (CALL_ESTABLISHED) and is ended by hanging
+#    up the handset locally. Connected for 45 seconds.
+call_active
+assert_state CALL_ACTIVE
+wait 45
+hook_down
+assert_state IDLE_DOWN
+
+# Two calls recorded now, totalling 30 + 45 = 75 seconds.
+assert_histogram call_duration_seconds 2 75

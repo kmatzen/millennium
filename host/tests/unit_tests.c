@@ -5,6 +5,7 @@
 #include "../plugins.h"
 #include "../logger.h"
 #include "../metrics.h"
+#include "../call_metrics.h"
 #include "../millennium_sdk.h"
 #include "../updater.h"
 #include "../plugin_sdk.h"
@@ -1008,6 +1009,148 @@ static void test_metrics_export_no_overflow(void) {
     metrics_cleanup();
 }
 
+/* ── Call-duration metric tests ────────────────────────────────── */
+
+/* call_metrics times a connected call between started()/ended() using the
+ * clock seam and records the elapsed seconds into the call_duration_seconds
+ * histogram. Drive it with the fake clock so "elapsed time" is exact and
+ * instant, then verify the histogram count/sum and the order-tolerance and
+ * backwards-clock guards. */
+static void test_call_duration_histogram(void) {
+    metrics_histogram_stats_t stats;
+
+    TEST_ASSERT_EQ_INT(metrics_init(), 0);
+    mclock_set_source(fake_clock_source);
+    call_metrics_reset();
+
+    /* A 42-second call. */
+    g_fake_clock = 5000;
+    call_metrics_started();
+    g_fake_clock = 5042;
+    call_metrics_ended();
+
+    TEST_ASSERT_EQ_INT(metrics_get_histogram_stats("call_duration_seconds", &stats), 0);
+    TEST_ASSERT_EQ_INT((int)stats.count, 1);
+    TEST_ASSERT(stats.sum == 42.0);
+    TEST_ASSERT(stats.max == 42.0);
+
+    /* A second, 60-second call accumulates into the same histogram. */
+    g_fake_clock = 5042;
+    call_metrics_started();
+    g_fake_clock = 5102;
+    call_metrics_ended();
+
+    TEST_ASSERT_EQ_INT(metrics_get_histogram_stats("call_duration_seconds", &stats), 0);
+    TEST_ASSERT_EQ_INT((int)stats.count, 2);
+    TEST_ASSERT(stats.sum == 102.0);
+    TEST_ASSERT(stats.max == 60.0);
+
+    /* ended() without a matching started() records nothing. */
+    call_metrics_ended();
+    TEST_ASSERT_EQ_INT(metrics_get_histogram_stats("call_duration_seconds", &stats), 0);
+    TEST_ASSERT_EQ_INT((int)stats.count, 2);
+
+    /* reset() discards an in-progress call so it is never recorded. */
+    g_fake_clock = 6000;
+    call_metrics_started();
+    call_metrics_reset();
+    g_fake_clock = 6100;
+    call_metrics_ended();
+    TEST_ASSERT_EQ_INT(metrics_get_histogram_stats("call_duration_seconds", &stats), 0);
+    TEST_ASSERT_EQ_INT((int)stats.count, 2);
+
+    /* A clock that steps backwards clamps the duration to 0, never negative. */
+    g_fake_clock = 7000;
+    call_metrics_started();
+    g_fake_clock = 6950;
+    call_metrics_ended();
+    TEST_ASSERT_EQ_INT(metrics_get_histogram_stats("call_duration_seconds", &stats), 0);
+    TEST_ASSERT_EQ_INT((int)stats.count, 3);
+    TEST_ASSERT(stats.sum == 102.0);   /* the clamped 0 added nothing */
+
+    mclock_set_source(NULL);
+    metrics_cleanup();
+}
+
+/* call_metrics_ringing_started()/_answered() time the pre-connect phase of an
+ * incoming call into call_ring_seconds. call_metrics_incoming_ended() resolves a
+ * CALL_INCOMING phase that ended before connecting: with a ring in progress it
+ * counts a missed inbound call (calls_missed), and with no ring it counts a
+ * failed outbound dial (calls_failed) — the two are mutually exclusive, so the
+ * web-initiated outbound start_call path (CALL_INCOMING without a ring) is never
+ * miscounted as a miss. */
+static void test_call_ring_and_failure_metrics(void) {
+    metrics_histogram_stats_t stats;
+
+    TEST_ASSERT_EQ_INT(metrics_init(), 0);
+    mclock_set_source(fake_clock_source);
+    call_metrics_reset();
+
+    /* An incoming call that rang 8 seconds and was then answered: the ring time
+     * is recorded, but no miss is counted. */
+    g_fake_clock = 5000;
+    call_metrics_ringing_started();
+    g_fake_clock = 5008;
+    call_metrics_ringing_answered();
+
+    TEST_ASSERT_EQ_INT(metrics_get_histogram_stats("call_ring_seconds", &stats), 0);
+    TEST_ASSERT_EQ_INT((int)stats.count, 1);
+    TEST_ASSERT(stats.sum == 8.0);
+    TEST_ASSERT(stats.max == 8.0);
+    TEST_ASSERT_EQ_INT((int)metrics_get_counter("calls_missed"), 0);
+    TEST_ASSERT_EQ_INT((int)metrics_get_counter("calls_failed"), 0);
+
+    /* An incoming call that rang 30 seconds and was abandoned: ring time is
+     * recorded into the same histogram, and the miss is counted. */
+    g_fake_clock = 6000;
+    call_metrics_ringing_started();
+    g_fake_clock = 6030;
+    call_metrics_incoming_ended();
+
+    TEST_ASSERT_EQ_INT(metrics_get_histogram_stats("call_ring_seconds", &stats), 0);
+    TEST_ASSERT_EQ_INT((int)stats.count, 2);
+    TEST_ASSERT(stats.sum == 38.0);
+    TEST_ASSERT(stats.max == 30.0);
+    TEST_ASSERT_EQ_INT((int)metrics_get_counter("calls_missed"), 1);
+    TEST_ASSERT_EQ_INT((int)metrics_get_counter("calls_failed"), 0);
+
+    /* incoming_ended() with no ring in progress is the outbound start_call path:
+     * the dial never connected, so it counts a failure and not a miss, and
+     * records nothing into the ring histogram. */
+    call_metrics_incoming_ended();
+    TEST_ASSERT_EQ_INT(metrics_get_histogram_stats("call_ring_seconds", &stats), 0);
+    TEST_ASSERT_EQ_INT((int)stats.count, 2);
+    TEST_ASSERT_EQ_INT((int)metrics_get_counter("calls_missed"), 1);
+    TEST_ASSERT_EQ_INT((int)metrics_get_counter("calls_failed"), 1);
+
+    /* reset() discards an in-progress ring so it is never recorded; the ended
+     * phase then looks like an outbound dial and is counted as a failure. */
+    g_fake_clock = 7000;
+    call_metrics_ringing_started();
+    call_metrics_reset();
+    g_fake_clock = 7100;
+    call_metrics_incoming_ended();
+    TEST_ASSERT_EQ_INT(metrics_get_histogram_stats("call_ring_seconds", &stats), 0);
+    TEST_ASSERT_EQ_INT((int)stats.count, 2);
+    TEST_ASSERT_EQ_INT((int)metrics_get_counter("calls_missed"), 1);
+    TEST_ASSERT_EQ_INT((int)metrics_get_counter("calls_failed"), 2);
+
+    /* A clock that steps backwards clamps the ring duration to 0, never
+     * negative, and still counts the miss. */
+    g_fake_clock = 8000;
+    call_metrics_ringing_started();
+    g_fake_clock = 7950;
+    call_metrics_incoming_ended();
+    TEST_ASSERT_EQ_INT(metrics_get_histogram_stats("call_ring_seconds", &stats), 0);
+    TEST_ASSERT_EQ_INT((int)stats.count, 3);
+    TEST_ASSERT(stats.sum == 38.0);   /* the clamped 0 added nothing */
+    TEST_ASSERT_EQ_INT((int)metrics_get_counter("calls_missed"), 2);
+    TEST_ASSERT_EQ_INT((int)metrics_get_counter("calls_failed"), 2);
+
+    mclock_set_source(NULL);
+    metrics_cleanup();
+}
+
 /* ── Main ───────────────────────────────────────────────────────── */
 
 int main(void) {
@@ -1094,6 +1237,10 @@ int main(void) {
     TEST_SUITE_RUN(test_metrics_export_prometheus_basic);
     TEST_SUITE_RUN(test_metrics_export_json_basic);
     TEST_SUITE_RUN(test_metrics_export_no_overflow);
+
+    TEST_SUITE_BEGIN("Call Metrics");
+    TEST_SUITE_RUN(test_call_duration_histogram);
+    TEST_SUITE_RUN(test_call_ring_and_failure_metrics);
 
     TEST_REPORT();
 }

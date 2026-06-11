@@ -1,0 +1,49 @@
+# Test: Outbound dial-failure counter (calls_failed)
+# When the phone places an outbound call (the web "start_call" control action),
+# it enters CALL_INCOMING WITHOUT arming a ring — unlike a genuine inbound call.
+# If that call never connects (callee busy, no answer, rejected, or a SIP /
+# network error) it ends straight from CALL_INCOMING, and the daemon counts it
+# as a dial failure in `calls_failed`, NOT as a missed inbound call. For a
+# payphone that bills by the call, the connect-failure rate — the gap between
+# calls_initiated and calls_established — is the headline reliability signal,
+# and it must never be conflated with the calls_missed counter that tracks
+# unanswered inbound rings.
+#
+# Run under a plugin with no call-time limit so timing is driven only by us.
+activate_plugin Number Guess
+
+# 1) Place an outbound call. start_call enters CALL_INCOMING but arms no ring.
+start_call
+assert_state CALL_INCOMING
+
+# It rings out for 12 seconds (from the caller's side) and never connects.
+wait 12
+call_ended
+assert_state IDLE_UP
+
+# The attempt is counted as a failure, not a miss. (That no ring time is
+# recorded is proven in step 3: only the one genuine inbound ring lands in the
+# call_ring_seconds histogram — these outbound failures never touch it.)
+assert_counter calls_failed 1
+assert_counter calls_missed 0
+
+# 2) A second outbound attempt that also fails: the failure counter climbs.
+start_call
+assert_state CALL_INCOMING
+call_ended
+assert_state IDLE_UP
+
+assert_counter calls_failed 2
+assert_counter calls_missed 0
+
+# 3) A genuine inbound ring that goes unanswered is still a miss, not a failure:
+#    the two counters stay cleanly separated.
+call_incoming
+assert_state CALL_INCOMING
+wait 5
+call_ended
+assert_state IDLE_UP
+
+assert_counter calls_missed 1
+assert_counter calls_failed 2
+assert_histogram call_ring_seconds 1 5

@@ -4,6 +4,7 @@
 #include "logger.h"
 #include "metrics.h"
 #include "metrics_server.h"
+#include "call_metrics.h"
 #include "health_monitor.h"
 #include "web_server.h"
 #include "millennium_sdk.h"
@@ -351,7 +352,8 @@ void handle_call_state_event(call_state_event_t *call_state_event) {
         
         logger_info_with_category("Call", "Incoming call received");
         metrics_increment_counter("calls_incoming", 1);
-        
+        call_metrics_ringing_started();
+
         update_display_with_content("Call incoming...", line2);
         
         daemon_state->current_state = DAEMON_STATE_CALL_INCOMING;
@@ -363,14 +365,19 @@ void handle_call_state_event(call_state_event_t *call_state_event) {
         metrics_increment_counter("calls_established", 1);
         
         update_display_with_content("Call active", "Audio connected");
-        
+
         daemon_state->current_state = DAEMON_STATE_CALL_ACTIVE;
         daemon_state_update_activity(daemon_state);
+        /* If this transition answered a ring (SIP-side answer), close it out;
+         * a no-op for outbound calls that were never ringing. */
+        call_metrics_ringing_answered();
+        call_metrics_started();
     } else if (call_state_event_get_state(call_state_event) == EVENT_CALL_STATE_INVALID) {
         /* #90/#91: Call ended - remote hung up or call failed during dial */
         if (daemon_state->current_state == DAEMON_STATE_CALL_ACTIVE) {
             logger_info_with_category("Call", "Call ended by remote party");
             metrics_increment_counter("calls_ended", 1);
+            call_metrics_ended();
             daemon_state_clear_keypad(daemon_state);
             daemon_state->inserted_cents = 0;
             daemon_state->current_state = DAEMON_STATE_IDLE_UP;
@@ -379,6 +386,11 @@ void handle_call_state_event(call_state_event_t *call_state_event) {
         } else if (daemon_state->current_state == DAEMON_STATE_CALL_INCOMING) {
             /* #91: Call failed during dial - don't clear coins (refund via plugin) */
             logger_info_with_category("Call", "Call failed during dial");
+            /* Resolve the ended CALL_INCOMING phase: a genuine inbound ring that
+             * was never answered counts a miss (call_ring_seconds + calls_missed),
+             * while the web-initiated outbound start_call path (CALL_INCOMING
+             * without a ring) counts an outbound dial failure (calls_failed). */
+            call_metrics_incoming_ended();
             daemon_state_clear_keypad(daemon_state);
             daemon_state->current_state = DAEMON_STATE_IDLE_UP;
             daemon_state_update_activity(daemon_state);
@@ -439,10 +451,12 @@ void handle_hook_event(hook_state_change_event_t *hook_event) {
         if (call_incoming) {
             logger_info_with_category("Call", "Call answered");
             metrics_increment_counter("calls_answered", 1);
-            
+
             daemon_state->current_state = DAEMON_STATE_CALL_ACTIVE;
             daemon_state_update_activity(daemon_state);
-            
+            call_metrics_ringing_answered();
+            call_metrics_started();
+
         } else if (phone_down) {
             logger_info_with_category("Hook", "Hook lifted, transitioning to IDLE_UP");
             metrics_increment_counter("hook_lifted", 1);
@@ -461,8 +475,9 @@ void handle_hook_event(hook_state_change_event_t *hook_event) {
         
         if (daemon_state->current_state == DAEMON_STATE_CALL_ACTIVE) {
             metrics_increment_counter("calls_ended", 1);
+            call_metrics_ended();
         }
-        
+
         daemon_state_clear_keypad(daemon_state);
         daemon_state->inserted_cents = 0;
         
