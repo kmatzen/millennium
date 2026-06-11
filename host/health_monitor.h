@@ -12,8 +12,14 @@ typedef enum {
     HEALTH_STATUS_UNKNOWN = 3
 } health_status_t;
 
-/* Function pointer type for health check functions */
-typedef health_status_t (*health_check_func_t)(void);
+/* Function pointer type for health check functions.
+ *
+ * A check returns its status and may write a short, human-readable diagnostic
+ * into `message` (at most message_len bytes, NUL-terminated). The monitor
+ * records this as the check's last_message, surfaced verbatim by /api/health.
+ * A check that leaves the buffer empty gets a status-derived default message,
+ * so the reported message always reflects the actual finding. */
+typedef health_status_t (*health_check_func_t)(char *message, size_t message_len);
 
 /* C89 compatible health check structure */
 typedef struct {
@@ -73,10 +79,10 @@ const char* health_monitor_status_to_string(health_status_t status);
 health_status_t health_monitor_string_to_status(const char* status_str);
 
 /* Predefined system health checks */
-health_status_t system_health_check_serial_connection(void);
-health_status_t system_health_check_sip_connection(void);
-health_status_t system_health_check_memory_usage(void);
-health_status_t system_health_check_disk_space(void);
-health_status_t system_health_check_system_load(void);
+health_status_t system_health_check_serial_connection(char *message, size_t message_len);
+health_status_t system_health_check_sip_connection(char *message, size_t message_len);
+health_status_t system_health_check_memory_usage(char *message, size_t message_len);
+health_status_t system_health_check_disk_space(char *message, size_t message_len);
+health_status_t system_health_check_system_load(char *message, size_t message_len);
 
 #endif /* HEALTH_MONITOR_H */

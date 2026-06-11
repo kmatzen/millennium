@@ -9,6 +9,7 @@
 #include "../updater.h"
 #include "../plugin_sdk.h"
 #include "../clock_source.h"
+#include "../health_monitor.h"
 #include <stdlib.h>
 
 /* ── Stubs for linker (plugins.c references these) ──────────────── */
@@ -936,6 +937,46 @@ static void test_logger_queue_stats(void) {
     remove(path);
 }
 
+/* Health checks return a status and may write a human-readable diagnostic.
+ * /api/health surfaces that message verbatim, so the monitor must record what
+ * the check wrote — and synthesize a status-derived default when a check writes
+ * nothing — instead of the old hard-coded "Check completed successfully" that
+ * was reported even for a CRITICAL check. */
+static health_status_t ut_health_with_message(char *message, size_t message_len) {
+    snprintf(message, message_len, "serial link down: no data for 45s");
+    return HEALTH_STATUS_CRITICAL;
+}
+
+static health_status_t ut_health_silent_warning(char *message, size_t message_len) {
+    (void)message;       /* deliberately writes no message */
+    (void)message_len;
+    return HEALTH_STATUS_WARNING;
+}
+
+static void test_health_check_records_message(void) {
+    health_check_t check;
+
+    health_monitor_register_check("ut_msg", ut_health_with_message, 30);
+    health_monitor_run_all_checks();
+    TEST_ASSERT(health_monitor_get_check("ut_msg", &check));
+    TEST_ASSERT_EQ_INT((int)check.last_status, (int)HEALTH_STATUS_CRITICAL);
+    TEST_ASSERT(strcmp(check.last_message, "serial link down: no data for 45s") == 0);
+    health_monitor_unregister_check("ut_msg");
+}
+
+static void test_health_check_default_message(void) {
+    health_check_t check;
+
+    health_monitor_register_check("ut_silent", ut_health_silent_warning, 30);
+    health_monitor_run_all_checks();
+    TEST_ASSERT(health_monitor_get_check("ut_silent", &check));
+    TEST_ASSERT_EQ_INT((int)check.last_status, (int)HEALTH_STATUS_WARNING);
+    /* No hard-coded success string; the default reflects the real status. */
+    TEST_ASSERT(strstr(check.last_message, "Check completed successfully") == NULL);
+    TEST_ASSERT(strstr(check.last_message, "WARNING") != NULL);
+    health_monitor_unregister_check("ut_silent");
+}
+
 /* ── Main ───────────────────────────────────────────────────────── */
 
 int main(void) {
@@ -1017,6 +1058,10 @@ int main(void) {
     TEST_SUITE_BEGIN("Logger");
     TEST_SUITE_RUN(test_logger_async_file_write);
     TEST_SUITE_RUN(test_logger_queue_stats);
+
+    TEST_SUITE_BEGIN("Health Monitor");
+    TEST_SUITE_RUN(test_health_check_records_message);
+    TEST_SUITE_RUN(test_health_check_default_message);
 
     TEST_REPORT();
 }

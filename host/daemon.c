@@ -78,11 +78,11 @@ static void generate_display_bytes(char *output, size_t output_size);
 static void update_display(void);
 static int is_phone_ready_for_operation(void);
 static int keypad_has_space(void);
-static health_status_t check_serial_connection(void);
+static health_status_t check_serial_connection(char *message, size_t message_len);
 static void daemon_save_state(void);
 static void daemon_broadcast_state(const char *event_type);
-static health_status_t check_sip_connection(void);
-static health_status_t check_daemon_activity(void);
+static health_status_t check_sip_connection(char *message, size_t message_len);
+static health_status_t check_daemon_activity(char *message, size_t message_len);
 static void update_metrics(void);
 
 /* C-compatible functions for web server */
@@ -778,25 +778,40 @@ void signal_handler(int signal) {
 }
 
 /* Health check functions */
-health_status_t check_serial_connection(void) {
-    if (!client) return HEALTH_STATUS_UNKNOWN;
-    return millennium_client_serial_is_healthy(client)
-        ? HEALTH_STATUS_HEALTHY : HEALTH_STATUS_CRITICAL;
+health_status_t check_serial_connection(char *message, size_t message_len) {
+    if (!client) {
+        snprintf(message, message_len, "Serial client not initialized");
+        return HEALTH_STATUS_UNKNOWN;
+    }
+    if (millennium_client_serial_is_healthy(client)) {
+        snprintf(message, message_len, "Serial link healthy");
+        return HEALTH_STATUS_HEALTHY;
+    }
+    snprintf(message, message_len, "Serial link down: no recent data from Arduino");
+    return HEALTH_STATUS_CRITICAL;
 }
 
-health_status_t check_sip_connection(void) {
+health_status_t check_sip_connection(char *message, size_t message_len) {
     int registered = 0;
     millennium_sdk_get_sip_status(&registered, NULL, 0);
-    if (registered == 1) return HEALTH_STATUS_HEALTHY;
-    if (registered == -1) return HEALTH_STATUS_CRITICAL;
+    if (registered == 1) {
+        snprintf(message, message_len, "SIP registered");
+        return HEALTH_STATUS_HEALTHY;
+    }
+    if (registered == -1) {
+        snprintf(message, message_len, "SIP registration failed");
+        return HEALTH_STATUS_CRITICAL;
+    }
+    snprintf(message, message_len, "SIP registration pending");
     return HEALTH_STATUS_UNKNOWN;
 }
 
-health_status_t check_daemon_activity(void) {
+health_status_t check_daemon_activity(char *message, size_t message_len) {
     time_t now;
     time_t last_activity;
     time_t time_since_activity;
     if (!daemon_state) {
+        snprintf(message, message_len, "Daemon state unavailable");
         return HEALTH_STATUS_CRITICAL;
     }
 
@@ -809,9 +824,13 @@ health_status_t check_daemon_activity(void) {
     time_since_activity = now - last_activity;
 
     if (time_since_activity > 3600) { /* No activity for more than 1 hour */
+        snprintf(message, message_len, "No event activity for %ld minutes",
+                 (long)(time_since_activity / 60));
         return HEALTH_STATUS_WARNING;
     }
-    
+
+    snprintf(message, message_len, "Last event %ld s ago",
+             (long)time_since_activity);
     return HEALTH_STATUS_HEALTHY;
 }
 
