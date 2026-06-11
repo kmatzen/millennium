@@ -528,17 +528,84 @@ void* web_server_thread_func(void* arg) {
     return NULL;
 }
 
+/* Case-insensitively scan request text line-by-line for the Content-Length
+ * header and return its value, or -1 if absent/malformed. Scanning per-line
+ * (not a raw substring search) avoids matching the token inside a body. */
+static long web_server_parse_content_length(const char* buf) {
+    const char* p = buf;
+    while (p && *p) {
+        const char* h = p;
+        const char* n = "content-length:";
+        while (*n && *h && (char)tolower((unsigned char)*h) == *n) {
+            h++;
+            n++;
+        }
+        if (*n == '\0') {
+            while (*h == ' ' || *h == '\t') h++;
+            return strtol(h, NULL, 10);
+        }
+        p = strchr(p, '\n');
+        if (p) p++;
+    }
+    return -1;
+}
+
 void web_server_handle_client(struct web_server* server, int client_fd) {
-    char buffer[4096] = {0};
+    char buffer[4096];
     ssize_t bytes_read;
+    size_t total = 0;
+    char* header_end = NULL;
+    long content_length = -1;
+    struct timeval tv;
     if (!server) {
         close(client_fd);
         return;
     }
 
-    bytes_read = read(client_fd, buffer, sizeof(buffer) - 1);
+    /* A request's headers and body can arrive in separate TCP segments, so a
+     * single read() often returns only the headers with the body still in
+     * flight. That left POST bodies empty — the cause of /api/control
+     * intermittently reporting "Unknown action: unknown". Read until the whole
+     * body (per Content-Length) has arrived. A receive timeout keeps a slow or
+     * stalled client from hanging the single-threaded accept loop. */
+    tv.tv_sec = 2;
+    tv.tv_usec = 0;
+    setsockopt(client_fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 
-    if (bytes_read > 0) {
+    memset(buffer, 0, sizeof(buffer));
+    while (total < sizeof(buffer) - 1) {
+        bytes_read = read(client_fd, buffer + total, sizeof(buffer) - 1 - total);
+        if (bytes_read <= 0) {
+            break;   /* EOF, error, or receive timeout */
+        }
+        total += (size_t)bytes_read;
+        buffer[total] = '\0';
+
+        if (!header_end) {
+            header_end = strstr(buffer, "\r\n\r\n");
+            if (header_end) {
+                header_end += 4;
+            } else {
+                char* alt = strstr(buffer, "\n\n");
+                if (alt) header_end = alt + 2;
+            }
+            if (header_end) {
+                content_length = web_server_parse_content_length(buffer);
+            }
+        }
+        if (header_end) {
+            /* No body expected (e.g. GET): headers alone are enough. */
+            if (content_length < 0) {
+                break;
+            }
+            /* Stop once the declared body length has been received. */
+            if ((size_t)(buffer + total - header_end) >= (size_t)content_length) {
+                break;
+            }
+        }
+    }
+
+    if (total > 0) {
         struct http_request parsed_request = web_server_parse_request(buffer);
         struct http_response response;
 
