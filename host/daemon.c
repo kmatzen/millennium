@@ -938,9 +938,13 @@ int main(int argc, char *argv[]) {
         logger_infof_with_category("Config", "Config loaded from %s", config_file);
     }
     
-    if (!config_validate(config)) {
-        logger_error_with_category("Config", "Configuration validation failed");
-        return 1;
+    {
+        char validate_err[256];
+        if (!config_validate_ex(config, validate_err, sizeof(validate_err))) {
+            logger_errorf_with_category("Config",
+                "Configuration validation failed: %s", validate_err);
+            return 1;
+        }
     }
     
     /* Setup logging */

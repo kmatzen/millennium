@@ -168,17 +168,124 @@ int config_get_bool(const config_data_t* config, const char* key, int default_va
     return 0;
 }
 
-int config_validate(const config_data_t* config) {
-    /* Validate numeric values */
+/* Case-insensitive string compare for small config tokens. */
+static int config_str_eq_ci(const char* a, const char* b) {
+    if (a == NULL || b == NULL) {
+        return 0;
+    }
+    while (*a != '\0' && *b != '\0') {
+        if (tolower((unsigned char)*a) != tolower((unsigned char)*b)) {
+            return 0;
+        }
+        a++;
+        b++;
+    }
+    return *a == '\0' && *b == '\0';
+}
+
+static int config_is_valid_log_level(const char* level) {
+    return config_str_eq_ci(level, "VERBOSE") ||
+           config_str_eq_ci(level, "DEBUG") ||
+           config_str_eq_ci(level, "INFO") ||
+           config_str_eq_ci(level, "WARN") ||
+           config_str_eq_ci(level, "ERROR");
+}
+
+/* Record a failure reason into the caller's buffer (if any) and return 0. */
+#define CONFIG_FAIL(...)                                  \
+    do {                                                  \
+        if (err != NULL && err_size > 0) {                \
+            snprintf(err, err_size, __VA_ARGS__);         \
+        }                                                 \
+        return 0;                                         \
+    } while (0)
+
+int config_validate_ex(const config_data_t* config, char* err, size_t err_size) {
+    int web_enabled, metrics_enabled, web_port, metrics_port;
+    const char* transport;
+
+    if (err != NULL && err_size > 0) {
+        err[0] = '\0';
+    }
+
+    /* Call economics */
     if (config_get_call_cost_cents(config) <= 0) {
-        return 0;
+        CONFIG_FAIL("call.cost_cents must be > 0 (got %d)",
+                    config_get_call_cost_cents(config));
     }
-    
+    if (config_get_call_timeout_seconds(config) <= 0) {
+        CONFIG_FAIL("call.timeout_seconds must be > 0 (got %d)",
+                    config_get_call_timeout_seconds(config));
+    }
+    if (config_get_idle_timeout_seconds(config) <= 0) {
+        CONFIG_FAIL("call.idle_timeout_seconds must be > 0 (got %d)",
+                    config_get_idle_timeout_seconds(config));
+    }
+
+    /* Hardware */
+    if (config_get_baud_rate(config) <= 0) {
+        CONFIG_FAIL("hardware.baud_rate must be > 0 (got %d)",
+                    config_get_baud_rate(config));
+    }
+
+    /* System loop */
     if (config_get_update_interval_ms(config) <= 0) {
-        return 0;
+        CONFIG_FAIL("system.update_interval_ms must be > 0 (got %d)",
+                    config_get_update_interval_ms(config));
     }
-    
+    if (config_get_max_retries(config) < 0) {
+        CONFIG_FAIL("system.max_retries must be >= 0 (got %d)",
+                    config_get_max_retries(config));
+    }
+
+    /* Logging */
+    if (!config_is_valid_log_level(config_get_log_level(config))) {
+        CONFIG_FAIL("logging.level '%s' is not one of "
+                    "VERBOSE/DEBUG/INFO/WARN/ERROR",
+                    config_get_log_level(config));
+    }
+    if (config_get_log_max_size_bytes(config) <= 0) {
+        CONFIG_FAIL("logging.max_size_bytes must be > 0 (got %d)",
+                    config_get_log_max_size_bytes(config));
+    }
+    if (config_get_log_max_files(config) < 1) {
+        CONFIG_FAIL("logging.max_files must be >= 1 (got %d)",
+                    config_get_log_max_files(config));
+    }
+
+    /* Network ports */
+    web_port = config_get_web_server_port(config);
+    metrics_port = config_get_metrics_server_port(config);
+    if (web_port < 1 || web_port > 65535) {
+        CONFIG_FAIL("web_server.port %d out of range 1..65535", web_port);
+    }
+    if (metrics_port < 1 || metrics_port > 65535) {
+        CONFIG_FAIL("metrics_server.port %d out of range 1..65535",
+                    metrics_port);
+    }
+    web_enabled = config_get_web_server_enabled(config);
+    metrics_enabled = config_get_metrics_server_enabled(config);
+    if (web_enabled && metrics_enabled && web_port == metrics_port) {
+        CONFIG_FAIL("web_server.port and metrics_server.port both set to %d "
+                    "while both servers are enabled", web_port);
+    }
+
+    /* SIP transport (only when explicitly configured) */
+    transport = config_get_string(config, "sip.transport", "");
+    if (transport[0] != '\0' &&
+        !config_str_eq_ci(transport, "udp") &&
+        !config_str_eq_ci(transport, "tcp") &&
+        !config_str_eq_ci(transport, "tls")) {
+        CONFIG_FAIL("sip.transport '%s' is not one of udp/tcp/tls", transport);
+    }
+
     return 1;
+}
+
+#undef CONFIG_FAIL
+
+int config_validate(const config_data_t* config) {
+    return config_validate_ex(config, NULL, 0);
 }
 
 void config_set_default_values(config_data_t* config) {
