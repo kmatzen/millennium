@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
-Audit phonev5 KiCad schematic: components, values, footprints, labels, BOM consistency.
-Parses phonev5.kicad_sch (s-expression format) and phonev5.csv (BOM).
+Audit phonev6 KiCad schematic: components, values, footprints, labels, BOM consistency.
+Parses phonev6.kicad_sch (s-expression format) and phonev6.csv (BOM).
 """
 import re
 import csv
 from pathlib import Path
 
-SCHEM = Path(__file__).parent / "phonev5.kicad_sch"
-BOM_CSV = Path(__file__).parent / "phonev5.csv"
+SCHEM = Path(__file__).parent / "phonev6.kicad_sch"
+BOM_CSV = Path(__file__).parent / "phonev6.csv"
 README = Path(__file__).parent.parent / "pcb" / "README.md"
 README = Path(__file__).parent / "README.md"
 
@@ -127,11 +127,11 @@ def extract_global_labels(schem_path: Path) -> set[str]:
 
 
 def main():
-    print("# Schematic Audit Report: phonev5\n")
-    schem = Path(__file__).parent / "phonev5.kicad_sch"
-    bom_csv = Path(__file__).parent / "phonev5.csv"
+    print("# Schematic Audit Report: phonev6\n")
+    schem = Path(__file__).parent / "phonev6.kicad_sch"
+    bom_csv = Path(__file__).parent / "phonev6.csv"
     if not schem.exists():
-        print("Error: phonev5.kicad_sch not found")
+        print("Error: phonev6.kicad_sch not found")
         return 1
     # Extract components - use simpler line-by-line approach
     content = schem.read_text()
@@ -165,7 +165,7 @@ def main():
     power_labels = {l for l in labels if "v" in l.lower() or "gnd" in l.lower() or "5" in l or "12" in l}
     print("Power-related:", sorted(power_labels))
     print("\nAll labels count:", len(labels))
-    print("\n## 3. BOM Comparison (schematic vs phonev5.csv)\n")
+    print("\n## 3. BOM Comparison (schematic vs phonev6.csv)\n")
     bom = load_bom(bom_csv)
     bom_refs = set()
     for row in bom:

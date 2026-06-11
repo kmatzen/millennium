@@ -455,7 +455,7 @@
     "pinned_symbol_libs": []
   },
   "meta": {
-    "filename": "phonev5.kicad_pro",
+    "filename": "phonev6.kicad_pro",
     "version": 3
   },
   "net_settings": {
@@ -493,7 +493,7 @@
       "netlist": "",
       "plot": "",
       "pos_files": "",
-      "specctra_dsn": "phonev5.dsn",
+      "specctra_dsn": "phonev6.dsn",
       "step": "",
       "svg": "",
       "vrml": ""

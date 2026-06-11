@@ -13,7 +13,7 @@ and notes from the current build.
 | USB audio card               | C-Media CM109 (Unitek Y-247A) | USB class-compliant, stereo out + mono mic in |
 | USB hub                      | Huasheng USB2.0 HUB      | 2 hubs daisy-chained for 3 ports. Supports per-port software power via uhubctl (-l 1-1 -a cycle -p 2 for display Arduino). |
 | Boost converter              | XL6009 module            | Boosts 5V → 12V for coin validator only |
-| Custom PCB                   | phonev5                  | Connects all peripherals        |
+| Custom PCB                   | phonev6                  | Connects all peripherals        |
 | VFD display                  | Noritake CU20026SCPB-T23A | 20×2 character VFD             |
 | Coin validator               | Original Millennium part | 600 baud serial protocol        |
 | Magstripe reader             | Original Millennium part | Clock + data signals            |

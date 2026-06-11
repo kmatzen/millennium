@@ -165,4 +165,4 @@ Config file: `/etc/millennium/daemon.conf` (key=value). See `host/daemon.conf.ex
 
 ## PCB Design (`pcb/`)
 
-KiCad project (`phonev5`). Current branch adds TVS diode protection on speaker output lines. See `pcb/README.md` for BOM and connector pinouts, `pcb/JLCPCB_WORKFLOW.md` for fabrication steps.
+KiCad project (`phonev6`) — the fabricated and installed revision (SMD migration of phonev5, gated by a `make verify` guardrail suite). Older revisions (v2/v4/v5) are removed; see `pcb/README.md` for the design history, BOM, and connector pinouts, and `pcb/JLCPCB_WORKFLOW.md` for fabrication steps.
