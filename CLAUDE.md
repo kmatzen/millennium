@@ -134,7 +134,7 @@ State is protected by `daemon_state_mutex`; the `running_mutex` guards the main 
 
 ### Plugin System
 
-Plugins register a `plugin_t` struct with function pointers for: `handle_coin`, `handle_keypad`, `handle_hook`, `handle_call_state`, `handle_card`, `handle_activation`, `handle_tick`. The active plugin can be switched at runtime via `POST /api/control` (`activate_plugin:<name>`) and persists across restarts. The active plugin receives **every** keypress (digits, `*`, `#`, and matrix letters A–D) in all states, so plugins can use the full keypad.
+Plugins register a `plugin_t` struct with function pointers for: `handle_coin`, `handle_keypad`, `handle_hook`, `handle_call_state`, `handle_card`, `handle_activation`, `handle_tick`. The active plugin can be switched at runtime via `POST /api/control` with `{"action":"activate_plugin","plugin":"<name>"}` (internally dispatched as the command string `activate_plugin:<name>`) and persists across restarts. The active plugin receives **every** keypress (digits, `*`, `#`, and matrix letters A–D) in all states, so plugins can use the full keypad.
 
 The web dashboard and `GET /api/plugins` enumerate the registry **dynamically** (`plugins_to_json`), so a newly registered plugin appears automatically — no hard-coded list to update.
 
@@ -155,7 +155,7 @@ Pure ALSA (`libasound`), no PipeWire. Left channel → ringer (TDA2822M ch A), r
 
 ## Coding Conventions
 
-- **C89** across the whole codebase, compiled with `-std=gnu89` (the C89 language plus the GNU extensions the ALSA/PJSIP system headers require, e.g. `inline`; strict `-std=c89` can't parse those headers). `-Wall -Wextra -Wdeclaration-after-statement` on all targets keeps the source free of C99-style mixed declarations; no separate linter configured
+- **C89** across the whole codebase, compiled with `-std=gnu89` (the C89 language plus the GNU extensions the ALSA/PJSIP system headers require, e.g. `inline`; strict `-std=c89` can't parse those headers). `-Wall -Wextra -Wdeclaration-after-statement -Werror` on all targets — warnings are errors, and `-Wdeclaration-after-statement` keeps the source free of C99-style mixed declarations; no separate linter configured
 - No external dependencies beyond ALSA, pthread, PJSIP (libpjproject), and libc
 - No C++ in the active daemon targets (`.cpp` files in `host/` are legacy/unused)
 

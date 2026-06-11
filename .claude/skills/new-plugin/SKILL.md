@@ -15,7 +15,7 @@ on the Pi, in the scenario simulator, and in unit tests. Canonical example:
 The registry is enumerated **dynamically** — once registered, a plugin appears
 in `GET /api/plugins` and the dashboard automatically (no list to hand-edit
 there). Activate at runtime: `POST /api/control` with
-`{"action":"activate_plugin:<Name>"}`.
+`{"action":"activate_plugin","plugin":"<Name>"}`.
 
 ## Steps (working in `host/`)
 
@@ -23,8 +23,9 @@ there). Activate at runtime: `POST /api/control` with
    Replace the game logic; build the `plugin_t` and call
    `plugins_register("<Display Name>", "<description>", &handlers)` inside
    `register_<name>_plugin(void)`. Use `plugin_sdk` calls for display/audio/
-   calls/balance/RNG — don't touch hardware directly. C89 unless you need C99
-   (then add to the C99 set like `jukebox`).
+   calls/balance/RNG — don't touch hardware directly. Write C89 (the whole tree
+   builds `-std=gnu89 -Wdeclaration-after-statement -Werror`, so no C99-style
+   mixed declarations and no warnings — declare locals at the top of a block).
 
 2. **Declare the registrar** in `plugins.h` (alongside lines ~71–77):
    ```c

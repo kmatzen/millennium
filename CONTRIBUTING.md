@@ -11,9 +11,8 @@ Thanks for your interest in the Millennium Project. Here's how to contribute.
 
 ## Code style
 
-- **C89** (`-std=c89`) for most host files — no mixed declarations and code
-- **C99** (`-std=c99`) only where block-scoped declarations are necessary (simulator, jukebox)
-- Compile with `-Wall -Wextra` and fix all warnings
+- **C89** across the host code, compiled with `-std=gnu89` (the C89 language plus the GNU extensions the ALSA/PJSIP headers need) — no mixed declarations and code
+- Compile with `-Wall -Wextra -Wdeclaration-after-statement -Werror` — warnings are errors, so the tree must build clean
 - Avoid unnecessary comments — code should be self-documenting
 - Use `snake_case` for functions and variables, `UPPER_CASE` for macros and constants
 
