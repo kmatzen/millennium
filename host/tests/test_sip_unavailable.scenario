@@ -15,6 +15,9 @@ assert_display SIP unavailable
 assert_display Check connection
 assert_state IDLE_UP
 
+# The refusal is recorded so operators can see SIP-down call attempts.
+assert_metric calls_refused_sip_unavailable == 1
+
 # Coins and number remain in plugin state; display shows error until next update
 
 hook_down

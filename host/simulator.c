@@ -91,6 +91,7 @@ static int sim_call_pending  = 0;
 static int sim_call_active   = 0;
 static int sim_hangup_called = 0;
 static int sim_sip_registered = 1;  /* 1=registered (default), 0=unavailable */
+static int sim_fail_next_call = 0;  /* 1=next placed call fails instead of connecting */
 
 /* ── Millennium SDK stubs ──────────────────────────────────────────── */
 
@@ -424,14 +425,23 @@ static void sim_drain_events(void) {
     }
 }
 
-/* If a call was placed by the plugin, auto-generate CALL_ACTIVE event */
+/* If a call was placed by the plugin, auto-generate the resulting event:
+ * CALL_ACTIVE when it connects, or CALL_INVALID when fail_next_call armed it
+ * to fail (e.g. unreachable number / SIP error during dialing). */
 static void sim_check_pending_call(void) {
     call_state_event_t *ev;
     if (!sim_call_pending) return;
     sim_call_pending = 0;
-    sim_call_active  = 1;
 
-    ev = call_state_event_create("CALL_ESTABLISHED", NULL, EVENT_CALL_STATE_ACTIVE);
+    if (sim_fail_next_call) {
+        sim_fail_next_call = 0;
+        sim_call_active    = 0;
+        ev = call_state_event_create("CALL_CLOSED", NULL, EVENT_CALL_STATE_INVALID);
+    } else {
+        sim_call_active = 1;
+        ev = call_state_event_create("CALL_ESTABLISHED", NULL, EVENT_CALL_STATE_ACTIVE);
+    }
+
     if (ev) {
         sim_process_event((event_t *)ev);
         event_destroy((event_t *)ev);
@@ -455,6 +465,40 @@ static int display_contains(const char *text) {
     return 0;
 }
 
+/*
+ * Resolve a metric reference to a numeric value for assert_metric.
+ *   <name>                  counter or gauge (gauge wins if both exist)
+ *   <name>.count|.sum|.min|.max|.mean|.median|.p95|.p99   histogram stat
+ * Returns 0 on success (value in *out), -1 if the metric is unknown.
+ */
+static int sim_read_metric(const char *ref, double *out) {
+    const char *dot = strrchr(ref, '.');
+    if (dot) {
+        char base[128];
+        size_t blen = (size_t)(dot - ref);
+        metrics_histogram_stats_t st;
+        const char *field = dot + 1;
+        if (blen >= sizeof(base)) return -1;
+        memcpy(base, ref, blen);
+        base[blen] = '\0';
+        if (metrics_get_histogram_stats(base, &st) != 0) return -1;
+        if      (strcmp(field, "count")  == 0) *out = (double)st.count;
+        else if (strcmp(field, "sum")    == 0) *out = st.sum;
+        else if (strcmp(field, "min")    == 0) *out = st.min;
+        else if (strcmp(field, "max")    == 0) *out = st.max;
+        else if (strcmp(field, "mean")   == 0) *out = st.mean;
+        else if (strcmp(field, "median") == 0) *out = st.median;
+        else if (strcmp(field, "p95")    == 0) *out = st.p95;
+        else if (strcmp(field, "p99")    == 0) *out = st.p99;
+        else return -1;
+        return 0;
+    }
+    /* No dot: gauge takes precedence over counter (gauges can read 0). */
+    if (metrics_get_gauge(ref) != 0.0) { *out = metrics_get_gauge(ref); return 0; }
+    *out = (double)metrics_get_counter(ref);
+    return 0;
+}
+
 /* ── Scenario runner ───────────────────────────────────────────────── */
 
 static int run_scenario(const char *path) {
@@ -472,6 +516,8 @@ static int run_scenario(const char *path) {
     }
 
     sim_sip_registered = 1;  /* default: SIP registered for each scenario */
+    sim_fail_next_call = 0;  /* default: placed calls connect */
+    metrics_reset_all();     /* isolate metric assertions from prior scenarios */
 
     while (fgets(line, sizeof(line), f)) {
         line_num++;
@@ -630,6 +676,38 @@ static int run_scenario(const char *path) {
             }
         }
 
+        /* ── assert_metric <name> <op> <value> ───────────────────── */
+        /* op is one of == != >= <= > < ; <name> may be a counter, gauge,
+         * or a histogram stat via the <name>.count|sum|min|max|mean|... form */
+        else if (strncmp(cmd, "assert_metric ", 14) == 0) {
+            char name[128], op[4];
+            double expected, actual = 0.0;
+            arg = trim(cmd + 14);
+            if (sscanf(arg, "%127s %3s %lf", name, op, &expected) != 3) {
+                fprintf(stderr, "  ERROR: usage: assert_metric <name> <op> <value>\n");
+                failures++;
+            } else if (sim_read_metric(name, &actual) != 0) {
+                fprintf(stderr, "  FAIL: unknown metric \"%s\"\n", name);
+                failures++;
+            } else {
+                int ok;
+                if      (strcmp(op, "==") == 0) ok = (actual == expected);
+                else if (strcmp(op, "!=") == 0) ok = (actual != expected);
+                else if (strcmp(op, ">=") == 0) ok = (actual >= expected);
+                else if (strcmp(op, "<=") == 0) ok = (actual <= expected);
+                else if (strcmp(op, ">")  == 0) ok = (actual >  expected);
+                else if (strcmp(op, "<")  == 0) ok = (actual <  expected);
+                else { ok = 0; fprintf(stderr, "  ERROR: bad operator \"%s\"\n", op); }
+                if (ok) {
+                    fprintf(stderr, "  PASS: %s (%.2f) %s %.2f\n", name, actual, op, expected);
+                } else {
+                    fprintf(stderr, "  FAIL: %s is %.2f, expected %s %.2f\n",
+                            name, actual, op, expected);
+                    failures++;
+                }
+            }
+        }
+
         /* ── print (debug) ───────────────────────────────────────── */
         else if (strcmp(cmd, "print") == 0) {
             fprintf(stderr, "  state=%s  coins=%d  display=\"%s\" | \"%s\"\n",
@@ -701,6 +779,12 @@ static int run_scenario(const char *path) {
             while (*p == ' ') p++;
             sim_sip_registered = (*p == '1') ? 1 : 0;
             fprintf(stderr, "  sip_registered = %d\n", sim_sip_registered);
+        }
+
+        /* ── fail_next_call — next placed call fails instead of connecting */
+        else if (strcmp(cmd, "fail_next_call") == 0) {
+            sim_fail_next_call = 1;
+            fprintf(stderr, "  fail_next_call armed\n");
         }
 
         /* ── config <key> <value> ──────────────────────────────── */

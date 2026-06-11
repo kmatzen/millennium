@@ -152,6 +152,7 @@ static int classic_phone_handle_call_state(int call_state) {
             classic_phone_data.is_dialing = 0;
             display_manager_set_text("Call failed", "Coins refunded");
             logger_info_with_category("ClassicPhone", "Call failed - coins refunded");
+            metrics_increment_counter("calls_failed", 1);
         } else if (classic_phone_data.is_in_call) {
             /* #90: Remote hung up - reset call state */
             logger_info_with_category("ClassicPhone", "Call ended by remote party - resetting");
@@ -338,6 +339,7 @@ static void classic_phone_start_call(void) {
         if (sip_registered != 1) {
             display_manager_set_text("SIP unavailable", "Check connection");
             logger_warn_with_category("ClassicPhone", "Call refused - SIP not registered");
+            metrics_increment_counter("calls_refused_sip_unavailable", 1);
             return;
         }
     }

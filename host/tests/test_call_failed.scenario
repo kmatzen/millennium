@@ -1,0 +1,25 @@
+# Test: Call-failed metric (#91 dial-failure path)
+# When a paid call is placed but the SIP leg never connects (unreachable
+# number, mid-dial SIP error), the plugin refunds the coins, shows "Call
+# failed", and the calls_failed counter is incremented. `fail_next_call`
+# arms the simulator so the next placed call resolves to CALL_INVALID while
+# the plugin is still dialing, instead of auto-connecting.
+
+hook_up
+assert_state IDLE_UP
+coin 25
+coin 25
+assert_display Have: 50c
+
+# Arm the failure, then dial a complete number to place the call.
+fail_next_call
+keys 5551234567
+
+# The dial failed: coins refunded, failure shown, still on-hook-up (no call).
+assert_display Call failed
+assert_display Coins refunded
+assert_state IDLE_UP
+assert_metric calls_failed == 1
+
+hook_down
+assert_state IDLE_DOWN
