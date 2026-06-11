@@ -6,9 +6,16 @@
 #include <time.h>
 #include <pthread.h>
 
+#include "conn_queue.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/* Worker threads that service accepted connections in parallel, and the depth
+ * of the backlog the accept loop will buffer before shedding load (#125). */
+#define WEB_SERVER_WORKER_COUNT 4
+#define WEB_SERVER_QUEUE_DEPTH 32
 
 /* Forward declarations */
 struct web_server;
@@ -76,7 +83,16 @@ struct web_server {
     int paused;
     int server_fd;
     pthread_t server_thread;
-    
+
+    /* Worker pool: the accept thread enqueues client fds; workers handle them
+     * concurrently so one slow request can't stall the dashboard (#125). */
+    struct conn_queue conn_queue;
+    pthread_t worker_threads[WEB_SERVER_WORKER_COUNT];
+    int worker_count;
+    /* Guards the rate-limit table and the websocket connection list, both of
+     * which are now mutated from multiple worker threads and the broadcaster. */
+    pthread_mutex_t state_mutex;
+
     /* Route storage - using arrays instead of maps */
     char route_methods[32][16];
     char route_paths[32][256];
