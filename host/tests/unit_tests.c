@@ -936,6 +936,78 @@ static void test_logger_queue_stats(void) {
     remove(path);
 }
 
+/* ── Metrics export ─────────────────────────────────────────────── */
+
+static void test_metrics_export_prometheus_basic(void) {
+    char *out;
+    TEST_ASSERT_EQ_INT(metrics_init(), 0);
+    metrics_increment_counter("calls_total", 3);
+    metrics_set_gauge("balance_cents", 50.0);
+    metrics_observe_histogram("call_duration", 12.5);
+    out = metrics_export_prometheus();
+    TEST_ASSERT_NOT_NULL(out);
+    TEST_ASSERT(strstr(out, "calls_total 3") != NULL);
+    TEST_ASSERT(strstr(out, "call_duration_count 1") != NULL);
+    free(out);
+    metrics_cleanup();
+}
+
+static void test_metrics_export_json_basic(void) {
+    char *out;
+    TEST_ASSERT_EQ_INT(metrics_init(), 0);
+    metrics_increment_counter("coins", 7);
+    out = metrics_export_json();
+    TEST_ASSERT_NOT_NULL(out);
+    TEST_ASSERT(out[0] == '{');
+    TEST_ASSERT(strstr(out, "\"coins\": 7") != NULL);
+    free(out);
+    metrics_cleanup();
+}
+
+/* Regression for the export buffer-overflow fix (buf_appendf). The JSON
+ * exporter sized its buffer from an *average* budget (100 bytes per counter),
+ * so a registry of many long-named counters whose lines each exceed that
+ * budget overran the total allocation: `pos` ran past `len`, `len - pos`
+ * underflowed the size_t, and the next snprintf wrote off the end of the heap
+ * block. A registry full of 160-char names blows past the estimate decisively.
+ * Under ASan this aborts on the old code; the fixed exporters grow on demand,
+ * so it passes and the output stays well-formed and NUL-terminated. */
+static void test_metrics_export_no_overflow(void) {
+    char name[200];
+    char prefix[200];
+    char *p, *j;
+    int i;
+
+    TEST_ASSERT_EQ_INT(metrics_init(), 0);
+
+    /* A 160-char name template; each emitted line is far larger than the old
+     * 100-bytes-per-counter JSON budget. */
+    memset(prefix, 'a', 160);
+    prefix[160] = '\0';
+
+    for (i = 0; i < 200; i++) {
+        snprintf(name, sizeof(name), "%s%d", prefix, i);
+        metrics_increment_counter(name, (uint64_t)i);
+    }
+    for (i = 0; i < 50; i++) {
+        snprintf(name, sizeof(name), "%shist%d", prefix, i);
+        metrics_observe_histogram(name, (double)i);
+    }
+
+    p = metrics_export_prometheus();
+    TEST_ASSERT_NOT_NULL(p);
+    TEST_ASSERT(p[strlen(p)] == '\0');
+    free(p);
+
+    j = metrics_export_json();
+    TEST_ASSERT_NOT_NULL(j);
+    TEST_ASSERT(j[0] == '{');
+    TEST_ASSERT(j[strlen(j)] == '\0');
+    free(j);
+
+    metrics_cleanup();
+}
+
 /* ── Main ───────────────────────────────────────────────────────── */
 
 int main(void) {
@@ -1017,6 +1089,11 @@ int main(void) {
     TEST_SUITE_BEGIN("Logger");
     TEST_SUITE_RUN(test_logger_async_file_write);
     TEST_SUITE_RUN(test_logger_queue_stats);
+
+    TEST_SUITE_BEGIN("Metrics Export");
+    TEST_SUITE_RUN(test_metrics_export_prometheus_basic);
+    TEST_SUITE_RUN(test_metrics_export_json_basic);
+    TEST_SUITE_RUN(test_metrics_export_no_overflow);
 
     TEST_REPORT();
 }
