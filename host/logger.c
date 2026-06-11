@@ -46,6 +46,8 @@ static struct {
     int head;                  /* index of the next line to write */
     int count;                 /* lines queued but not yet on disk */
     unsigned long dropped;     /* lines discarded on overflow since last notice */
+    unsigned long long dropped_total; /* cumulative drops since start (for metrics) */
+    unsigned long high_water;  /* max depth observed since start (for metrics) */
     int started;               /* writer thread is running */
     int shutting_down;         /* drain-and-exit requested */
     pthread_t thread;
@@ -53,7 +55,7 @@ static struct {
     pthread_cond_t not_empty;  /* a line was queued, or shutdown requested */
     pthread_cond_t drained;    /* queue emptied (count reached 0) */
 } log_queue = {
-    {{0}}, 0, 0, 0, 0, 0, 0,
+    {{0}}, 0, 0, 0, 0, 0, 0, 0, 0,
     PTHREAD_MUTEX_INITIALIZER, PTHREAD_COND_INITIALIZER, PTHREAD_COND_INITIALIZER
 };
 
@@ -157,6 +159,7 @@ static void logger_enqueue(const char* line) {
     }
     if (log_queue.count >= LOG_QUEUE_CAP) {
         log_queue.dropped++;           /* bounded memory: drop the newest line */
+        log_queue.dropped_total++;     /* lifetime total for metrics/alerting */
         pthread_mutex_unlock(&log_queue.lock);
         return;
     }
@@ -168,6 +171,9 @@ static void logger_enqueue(const char* line) {
     memcpy(log_queue.lines[tail], line, n);
     log_queue.lines[tail][n] = '\0';
     log_queue.count++;
+    if ((unsigned long)log_queue.count > log_queue.high_water) {
+        log_queue.high_water = (unsigned long)log_queue.count;
+    }
     pthread_cond_signal(&log_queue.not_empty);
     pthread_mutex_unlock(&log_queue.lock);
 }
@@ -179,6 +185,23 @@ void logger_flush(void) {
     while (log_queue.started && log_queue.count > 0) {
         pthread_cond_wait(&log_queue.drained, &log_queue.lock);
     }
+    pthread_mutex_unlock(&log_queue.lock);
+}
+
+/* Snapshot the async writer queue's health under its own lock. Cheap and
+ * non-blocking (never touches the file mutex), so the metrics refresh can poll
+ * it every tick. depth/started reflect the current instant; high_water and
+ * dropped_total are lifetime totals so a metrics counter can rate() over them. */
+void logger_get_queue_stats(logger_queue_stats_t* out) {
+    if (out == NULL) {
+        return;
+    }
+    pthread_mutex_lock(&log_queue.lock);
+    out->started = log_queue.started;
+    out->depth = (unsigned long)log_queue.count;
+    out->high_water = log_queue.high_water;
+    out->capacity = LOG_QUEUE_CAP;
+    out->dropped_total = log_queue.dropped_total;
     pthread_mutex_unlock(&log_queue.lock);
 }
 

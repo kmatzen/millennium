@@ -52,6 +52,21 @@ void logger_set_rotation(long max_file_size, int max_rotated_files);
 void logger_flush(void);
 void logger_shutdown(void);
 
+/* Read-only snapshot of the async writer queue's health. When the writer can't
+ * keep up the queue fills and the newest lines are dropped — but the only
+ * in-band signal is a notice written to the log file, which is unreachable
+ * exactly when a slow/full disk is the cause. Exposing these counters lets the
+ * daemon publish them as metrics so log loss is observable out-of-band. */
+typedef struct {
+    int started;                       /* writer thread running (file logging on) */
+    unsigned long depth;               /* lines queued but not yet on disk */
+    unsigned long high_water;          /* max depth observed since start */
+    unsigned long capacity;            /* queue size; drops begin at this depth */
+    unsigned long long dropped_total;  /* cumulative lines dropped since start */
+} logger_queue_stats_t;
+
+void logger_get_queue_stats(logger_queue_stats_t* out);
+
 /* Logging methods */
 void logger_log(log_level_t level, const char* message);
 void logger_log_with_category(log_level_t level, const char* category, const char* message);
