@@ -17,6 +17,7 @@
 #define AMPLITUDE     12000   /* ~37 % of int16 range — comfortable volume */
 #define DTMF_DURATION_MS   150
 #define COIN_DURATION_MS   200
+#define COIN_AMPLITUDE     7500   /* ~4 dB below default; coin chime sits softer */
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -29,6 +30,8 @@ typedef struct {
     int    on_ms;          /* on period (ms), 0 = continuous      */
     int    off_ms;         /* off period (ms), 0 = no cadence     */
     int    total_ms;       /* total duration (ms), 0 = until stop */
+    int    amplitude;      /* peak amplitude (int16); 0 = default AMPLITUDE */
+    const char *device;    /* ALSA PCM name; NULL = "default" (both channels) */
 } tone_spec_t;
 
 static pthread_t      tone_thread;
@@ -75,7 +78,8 @@ static void *tone_thread_func(void *arg) {
     int elapsed_ms = 0;
     int cadence_pos = 0; /* ms into current on/off cycle */
 
-    err = snd_pcm_open(&pcm, "default", SND_PCM_STREAM_PLAYBACK, 0);
+    err = snd_pcm_open(&pcm, spec.device ? spec.device : "default",
+                       SND_PCM_STREAM_PLAYBACK, 0);
     if (err < 0) {
         logger_warnf_with_category("AudioTones", "Cannot open PCM: %s", snd_strerror(err));
         pthread_mutex_lock(&tone_mutex);
@@ -114,7 +118,7 @@ static void *tone_thread_func(void *arg) {
                 double val = 0;
                 if (spec.freq1 > 0) val += sin(2.0 * M_PI * spec.freq1 * t);
                 if (spec.freq2 > 0) val += sin(2.0 * M_PI * spec.freq2 * t);
-                buf[i] = (int16_t)(val * AMPLITUDE / 2.0);
+                buf[i] = (int16_t)(val * (spec.amplitude > 0 ? spec.amplitude : AMPLITUDE) / 2.0);
             }
             sample_idx++;
         }
@@ -182,8 +186,12 @@ void audio_tones_cleanup(void) {
     logger_info_with_category("AudioTones", "Audio tone subsystem cleaned up");
 }
 
+/* Feedback tones heard in the handset ride the earpiece (right) channel, which
+ * is tuned for call audio; only the incoming-call ring uses the loudspeaker. */
+#define EARPIECE_PCM   "out_right_solo"
+
 void audio_tones_play_dial_tone(void) {
-    tone_spec_t s = { 350.0, 440.0, 0, 0, 0 };
+    tone_spec_t s = { 350.0, 440.0, 0, 0, 0, 0, EARPIECE_PCM };
     logger_debug_with_category("AudioTones", "Playing dial tone");
     start_tone(&s);
 }
@@ -193,30 +201,32 @@ void audio_tones_play_dtmf(char key) {
     memset(&s, 0, sizeof(s));
     if (dtmf_freqs(key, &s.freq1, &s.freq2) != 0) return;
     s.total_ms = DTMF_DURATION_MS;
+    s.device = EARPIECE_PCM;
     logger_debugf_with_category("AudioTones", "Playing DTMF for key %c", key);
     start_tone(&s);
 }
 
 void audio_tones_play_ringback(void) {
-    tone_spec_t s = { 440.0, 480.0, 2000, 4000, 0 };
+    tone_spec_t s = { 440.0, 480.0, 2000, 4000, 0, 0, EARPIECE_PCM };
     logger_debug_with_category("AudioTones", "Playing ringback");
     start_tone(&s);
 }
 
 void audio_tones_play_ring(void) {
-    tone_spec_t s = { 440.0, 480.0, 2000, 4000, 0 };
+    /* Incoming-call ring stays on the loudspeaker (both channels). */
+    tone_spec_t s = { 440.0, 480.0, 2000, 4000, 0, 0, NULL };
     logger_debug_with_category("AudioTones", "Playing ring (incoming)");
     start_tone(&s);
 }
 
 void audio_tones_play_busy_tone(void) {
-    tone_spec_t s = { 480.0, 620.0, 500, 500, 0 };
+    tone_spec_t s = { 480.0, 620.0, 500, 500, 0, 0, EARPIECE_PCM };
     logger_debug_with_category("AudioTones", "Playing busy tone");
     start_tone(&s);
 }
 
 void audio_tones_play_coin_tone(void) {
-    tone_spec_t s = { 1700.0, 2200.0, 0, 0, COIN_DURATION_MS };
+    tone_spec_t s = { 1700.0, 2200.0, 0, 0, COIN_DURATION_MS, COIN_AMPLITUDE, EARPIECE_PCM };
     logger_debug_with_category("AudioTones", "Playing coin tone");
     start_tone(&s);
 }
