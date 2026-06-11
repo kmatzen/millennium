@@ -8,6 +8,7 @@
 #include "plugins.h"
 #include "logger.h"
 #include "millennium_sdk.h"
+#include "metrics.h"
 
 /* Maximum number of plugins. Generous headroom so experimenters can add
  * their own alongside the built-ins (7 ship by default). */
@@ -92,27 +93,49 @@ int plugins_register(const char *name, const char *description,
     return 0;
 }
 
+/* Bump the activation counters for a plugin that was just made active.
+ *
+ * Exposes which of the built-in experiences actually get used on a phone in
+ * the field: a per-plugin counter (plugin_activations_<name>) plus an
+ * aggregate (plugin_activations_total). Both are plain Prometheus counters, so
+ * they ride out through the existing dynamic metrics export with no endpoint
+ * changes. "Activation" here means "made the active plugin" — that includes the
+ * boot-time default and a restore from persistence, not only deliberate user
+ * switches, which is the honest count for a counter named this way.
+ *
+ * Called *after* releasing plugins_mutex: metrics_increment_counter takes its
+ * own lock, and keeping the two mutexes strictly un-nested avoids any lock
+ * ordering concern. Safe before metrics_init() too — the increment is a no-op
+ * until the metrics subsystem is up. */
+static void plugins_record_activation(const char *name) {
+    char counter[128];
+    metrics_increment_counter("plugin_activations_total", 1);
+    snprintf(counter, sizeof(counter), "plugin_activations_%s", name);
+    metrics_increment_counter(counter, 1);
+}
+
 int plugins_activate(const char *plugin_name) {
     int i;
     if (!plugin_name) {
         logger_error_with_category("Plugins", "Plugin name required for activation");
         return -1;
     }
-    
+
     pthread_mutex_lock(&plugins_mutex);
-    
+
     /* Find the plugin */
     for (i = 0; i < plugin_count; i++) {
         if (strcmp(plugins[i].name, plugin_name) == 0) {
             active_plugin_index = i;
-            
+
             /* Call the plugin's activation handler if it exists */
             if (plugins[i].handle_activation) {
                 plugins[i].handle_activation();
             }
-            
+
             logger_infof_with_category("Plugins", "Plugin %s activated", plugin_name);
             pthread_mutex_unlock(&plugins_mutex);
+            plugins_record_activation(plugin_name);
             return 0;
         }
     }
