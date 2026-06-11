@@ -8,6 +8,7 @@
 extern daemon_state_data_t *daemon_state;
 #include "logger.h"
 #include "metrics.h"
+#include "call_metrics.h"
 #include "event_processor.h"
 #include "plugins.h"
 #include "state_persistence.h"
@@ -318,6 +319,7 @@ static void sim_handle_hook(hook_state_change_event_t *ev) {
     if (hook_up) {
         if (daemon_state->current_state == DAEMON_STATE_CALL_INCOMING) {
             daemon_state->current_state = DAEMON_STATE_CALL_ACTIVE;
+            call_metrics_started();  /* mirror daemon.c: incoming call answered */
         } else if (daemon_state->current_state == DAEMON_STATE_IDLE_DOWN) {
             daemon_state->current_state = DAEMON_STATE_IDLE_UP;
             daemon_state->inserted_cents = 0;
@@ -325,6 +327,9 @@ static void sim_handle_hook(hook_state_change_event_t *ev) {
         }
         daemon_state_update_activity(daemon_state);
     } else if (hook_down) {
+        if (daemon_state->current_state == DAEMON_STATE_CALL_ACTIVE) {
+            call_metrics_ended();  /* mirror daemon.c: local hangup ends the call */
+        }
         daemon_state_clear_keypad(daemon_state);
         daemon_state->inserted_cents = 0;
         daemon_state->current_state = DAEMON_STATE_IDLE_DOWN;
@@ -370,10 +375,15 @@ static void sim_handle_call_state(call_state_event_t *ev) {
     } else if (st == EVENT_CALL_STATE_ACTIVE) {
         daemon_state->current_state = DAEMON_STATE_CALL_ACTIVE;
         daemon_state_update_activity(daemon_state);
+        call_metrics_started();  /* mirror daemon.c: call established */
     } else if (st == EVENT_CALL_STATE_INVALID) {
         /* #90: Remote hung up */
         if (daemon_state->current_state == DAEMON_STATE_CALL_ACTIVE ||
             daemon_state->current_state == DAEMON_STATE_CALL_INCOMING) {
+            /* Only a connected (CALL_ACTIVE) call has a duration to record. */
+            if (daemon_state->current_state == DAEMON_STATE_CALL_ACTIVE) {
+                call_metrics_ended();
+            }
             daemon_state_clear_keypad(daemon_state);
             daemon_state->inserted_cents = 0;
             daemon_state->current_state = DAEMON_STATE_IDLE_UP;
@@ -586,6 +596,13 @@ static int run_scenario(const char *path) {
                 sim_drain_events();
                 if (sim_hangup_called) {
                     sim_hangup_called = 0;
+                    /* A plugin hanging up a connected call (e.g. paid time ran
+                     * out) ends it just like a remote/local hangup. On the Pi
+                     * that returns as a CALL INVALID event through
+                     * handle_call_state; mirror its duration recording here. */
+                    if (daemon_state->current_state == DAEMON_STATE_CALL_ACTIVE) {
+                        call_metrics_ended();
+                    }
                     daemon_state->current_state = DAEMON_STATE_IDLE_DOWN;
                 }
             }
@@ -626,6 +643,41 @@ static int run_scenario(const char *path) {
             } else {
                 fprintf(stderr, "  FAIL: expected state containing \"%s\", got \"%s\"\n",
                         arg, actual);
+                failures++;
+            }
+        }
+
+        /* ── assert_histogram <name> <count> <sum> ───────────────── */
+        else if (strncmp(cmd, "assert_histogram ", 17) == 0) {
+            char name[128];
+            unsigned long long want_count;
+            double want_sum;
+            if (sscanf(cmd + 17, "%127s %llu %lf",
+                       name, &want_count, &want_sum) == 3) {
+                metrics_histogram_stats_t stats;
+                if (metrics_get_histogram_stats(name, &stats) != 0) {
+                    fprintf(stderr, "  FAIL: histogram %s not found\n", name);
+                    failures++;
+                } else if (stats.count != want_count) {
+                    fprintf(stderr,
+                            "  FAIL: histogram %s count expected %llu, got %llu\n",
+                            name, want_count,
+                            (unsigned long long)stats.count);
+                    failures++;
+                } else if (stats.sum < want_sum - 0.5 ||
+                           stats.sum > want_sum + 0.5) {
+                    fprintf(stderr,
+                            "  FAIL: histogram %s sum expected %.1f, got %.1f\n",
+                            name, want_sum, stats.sum);
+                    failures++;
+                } else {
+                    fprintf(stderr,
+                            "  PASS: histogram %s count=%llu sum=%.1f\n",
+                            name, want_count, stats.sum);
+                }
+            } else {
+                fprintf(stderr,
+                        "  ERROR: assert_histogram needs <name> <count> <sum>\n");
                 failures++;
             }
         }
@@ -805,6 +857,8 @@ int main(int argc, char *argv[]) {
         sim_call_pending     = 0;
         sim_call_active      = 0;
         sim_hangup_called    = 0;
+        call_metrics_reset();  /* drop any dangling call timer from prior scenario */
+        metrics_reset_all();   /* keep per-scenario metric assertions independent */
         sim_time_init();
         plugins_activate("Classic Phone");
 

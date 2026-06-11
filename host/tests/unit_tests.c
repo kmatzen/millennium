@@ -5,6 +5,7 @@
 #include "../plugins.h"
 #include "../logger.h"
 #include "../metrics.h"
+#include "../call_metrics.h"
 #include "../millennium_sdk.h"
 #include "../updater.h"
 #include "../plugin_sdk.h"
@@ -936,6 +937,69 @@ static void test_logger_queue_stats(void) {
     remove(path);
 }
 
+/* ── Call-duration metric tests ────────────────────────────────── */
+
+/* call_metrics times a connected call between started()/ended() using the
+ * clock seam and records the elapsed seconds into the call_duration_seconds
+ * histogram. Drive it with the fake clock so "elapsed time" is exact and
+ * instant, then verify the histogram count/sum and the order-tolerance and
+ * backwards-clock guards. */
+static void test_call_duration_histogram(void) {
+    metrics_histogram_stats_t stats;
+
+    TEST_ASSERT_EQ_INT(metrics_init(), 0);
+    mclock_set_source(fake_clock_source);
+    call_metrics_reset();
+
+    /* A 42-second call. */
+    g_fake_clock = 5000;
+    call_metrics_started();
+    g_fake_clock = 5042;
+    call_metrics_ended();
+
+    TEST_ASSERT_EQ_INT(metrics_get_histogram_stats("call_duration_seconds", &stats), 0);
+    TEST_ASSERT_EQ_INT((int)stats.count, 1);
+    TEST_ASSERT(stats.sum == 42.0);
+    TEST_ASSERT(stats.max == 42.0);
+
+    /* A second, 60-second call accumulates into the same histogram. */
+    g_fake_clock = 5042;
+    call_metrics_started();
+    g_fake_clock = 5102;
+    call_metrics_ended();
+
+    TEST_ASSERT_EQ_INT(metrics_get_histogram_stats("call_duration_seconds", &stats), 0);
+    TEST_ASSERT_EQ_INT((int)stats.count, 2);
+    TEST_ASSERT(stats.sum == 102.0);
+    TEST_ASSERT(stats.max == 60.0);
+
+    /* ended() without a matching started() records nothing. */
+    call_metrics_ended();
+    TEST_ASSERT_EQ_INT(metrics_get_histogram_stats("call_duration_seconds", &stats), 0);
+    TEST_ASSERT_EQ_INT((int)stats.count, 2);
+
+    /* reset() discards an in-progress call so it is never recorded. */
+    g_fake_clock = 6000;
+    call_metrics_started();
+    call_metrics_reset();
+    g_fake_clock = 6100;
+    call_metrics_ended();
+    TEST_ASSERT_EQ_INT(metrics_get_histogram_stats("call_duration_seconds", &stats), 0);
+    TEST_ASSERT_EQ_INT((int)stats.count, 2);
+
+    /* A clock that steps backwards clamps the duration to 0, never negative. */
+    g_fake_clock = 7000;
+    call_metrics_started();
+    g_fake_clock = 6950;
+    call_metrics_ended();
+    TEST_ASSERT_EQ_INT(metrics_get_histogram_stats("call_duration_seconds", &stats), 0);
+    TEST_ASSERT_EQ_INT((int)stats.count, 3);
+    TEST_ASSERT(stats.sum == 102.0);   /* the clamped 0 added nothing */
+
+    mclock_set_source(NULL);
+    metrics_cleanup();
+}
+
 /* ── Main ───────────────────────────────────────────────────────── */
 
 int main(void) {
@@ -1017,6 +1081,9 @@ int main(void) {
     TEST_SUITE_BEGIN("Logger");
     TEST_SUITE_RUN(test_logger_async_file_write);
     TEST_SUITE_RUN(test_logger_queue_stats);
+
+    TEST_SUITE_BEGIN("Call Metrics");
+    TEST_SUITE_RUN(test_call_duration_histogram);
 
     TEST_REPORT();
 }
