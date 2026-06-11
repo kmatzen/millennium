@@ -15,6 +15,8 @@ static int dm_scroll1_pos;
 static int dm_scroll2_pos;
 static int dm_line1_scrolling;
 static int dm_line2_scrolling;
+static int dm_line1_hold;  /* ticks remaining to pause at start of line 1 scroll */
+static int dm_line2_hold;  /* ticks remaining to pause at start of line 2 scroll */
 
 static void dm_send_display(void) {
     char display_bytes[100];
@@ -84,6 +86,8 @@ void display_manager_init(millennium_client_t *client) {
     dm_scroll2_pos = 0;
     dm_line1_scrolling = 0;
     dm_line2_scrolling = 0;
+    dm_line1_hold = 0;
+    dm_line2_hold = 0;
 }
 
 void display_manager_set_text(const char *line1, const char *line2) {
@@ -97,6 +101,7 @@ void display_manager_set_text(const char *line1, const char *line2) {
     }
     dm_scroll1_pos = 0;
     dm_line1_scrolling = (dm_line1_len > DISPLAY_WIDTH);
+    dm_line1_hold = dm_line1_scrolling ? DISPLAY_SCROLL_HOLD_TICKS : 0;
 
     if (line2) {
         strncpy(dm_line2_full, line2, MAX_TEXT_LEN - 1);
@@ -108,6 +113,7 @@ void display_manager_set_text(const char *line1, const char *line2) {
     }
     dm_scroll2_pos = 0;
     dm_line2_scrolling = (dm_line2_len > DISPLAY_WIDTH);
+    dm_line2_hold = dm_line2_scrolling ? DISPLAY_SCROLL_HOLD_TICKS : 0;
 
     dm_send_display();
 }
@@ -116,12 +122,28 @@ void display_manager_tick(void) {
     int changed = 0;
 
     if (dm_line1_scrolling) {
-        dm_scroll1_pos = (dm_scroll1_pos + 1) % (dm_line1_len + DISPLAY_SCROLL_GAP);
-        changed = 1;
+        if (dm_line1_hold > 0) {
+            /* Holding the start of the message in view; don't advance yet. */
+            dm_line1_hold--;
+        } else {
+            dm_scroll1_pos = (dm_scroll1_pos + 1) % (dm_line1_len + DISPLAY_SCROLL_GAP);
+            changed = 1;
+            if (dm_scroll1_pos == 0) {
+                /* Wrapped back to the start — pause again so it stays readable. */
+                dm_line1_hold = DISPLAY_SCROLL_HOLD_TICKS;
+            }
+        }
     }
     if (dm_line2_scrolling) {
-        dm_scroll2_pos = (dm_scroll2_pos + 1) % (dm_line2_len + DISPLAY_SCROLL_GAP);
-        changed = 1;
+        if (dm_line2_hold > 0) {
+            dm_line2_hold--;
+        } else {
+            dm_scroll2_pos = (dm_scroll2_pos + 1) % (dm_line2_len + DISPLAY_SCROLL_GAP);
+            changed = 1;
+            if (dm_scroll2_pos == 0) {
+                dm_line2_hold = DISPLAY_SCROLL_HOLD_TICKS;
+            }
+        }
     }
 
     if (changed) {
