@@ -897,7 +897,7 @@ int main(int argc, char *argv[]) {
         sim_call_active      = 0;
         sim_hangup_called    = 0;
         call_metrics_reset();  /* drop any dangling call timer from prior scenario */
-        metrics_reset_all();   /* keep per-scenario metric assertions independent */
+        metrics_reset_all();   /* zero counters/gauges so metric asserts are per-scenario */
         sim_time_init();
         plugins_activate("Classic Phone");
 
