@@ -19,6 +19,7 @@ typedef struct {
     int call_cost_cents;
     char keypad_buffer[11];
     int keypad_length;
+    int send_requested;   /* '#' pressed: dial the buffered number even if < 10 digits */
     int is_dialing;
     int is_in_call;
     time_t last_activity;
@@ -47,6 +48,7 @@ static void classic_phone_add_key(char key);
 static void classic_phone_remove_last_key(void);
 static int classic_phone_has_enough_money(void);
 static int classic_phone_has_complete_number(void);
+static int classic_phone_is_free_number(void);
 static void classic_phone_check_and_call(void);
 static void classic_phone_start_call(void);
 static void classic_phone_end_call(void);
@@ -90,6 +92,29 @@ static int classic_phone_handle_keypad(char key) {
         classic_phone_update_display();
         classic_phone_check_and_call();
     }
+    /* '#' is the "send" key: commit a number shorter than 10 digits instead of
+     * waiting for the 10-digit auto-dial. Matches the classic payphone "send"
+     * convention. Ignored while in/placing a call (handset DTMF is handled
+     * above) or with an empty buffer. */
+    else if (key == '#' && daemon_state &&
+             daemon_state->current_state == DAEMON_STATE_IDLE_UP &&
+             !classic_phone_data.is_dialing && !classic_phone_data.is_in_call &&
+             classic_phone_data.keypad_length > 0) {
+        audio_tones_play_dtmf(key);
+        classic_phone_data.send_requested = 1;
+        classic_phone_data.last_activity = sdk_now();
+        classic_phone_check_and_call();
+        /* If the call could not start (not a free number, no card, not enough
+         * money) the '#' request stays armed; tell the user what's missing. */
+        if (!classic_phone_data.is_dialing && !classic_phone_data.is_in_call &&
+            !classic_phone_is_free_number() && !classic_phone_data.is_card_call &&
+            classic_phone_data.inserted_cents < classic_phone_data.call_cost_cents) {
+            char line2[21];
+            snprintf(line2, sizeof(line2), "Insert %dc",
+                     classic_phone_data.call_cost_cents - classic_phone_data.inserted_cents);
+            display_manager_set_text("Need more coins", line2);
+        }
+    }
     return 0;
 }
 
@@ -104,6 +129,7 @@ static int classic_phone_handle_hook(int hook_up, int hook_down) {
             /* Start new call session — play dial tone */
             classic_phone_data.inserted_cents = 0;
             classic_phone_data.keypad_length = 0;
+            classic_phone_data.send_requested = 0;
             classic_phone_data.last_activity = sdk_now();
             audio_tones_play_dial_tone();
             classic_phone_update_display();
@@ -111,6 +137,7 @@ static int classic_phone_handle_hook(int hook_up, int hook_down) {
     } else if (hook_down) {
         audio_tones_stop();
         classic_phone_data.keypad_length = 0;
+        classic_phone_data.send_requested = 0;
         classic_phone_data.inserted_cents = 0;
         classic_phone_data.is_card_call = 0;
         classic_phone_data.card_number[0] = '\0';
@@ -206,6 +233,7 @@ static void classic_phone_on_activation(void) {
     /* Restore coins from daemon_state (may have been loaded from persisted state) */
     classic_phone_data.inserted_cents = daemon_state ? daemon_state->inserted_cents : 0;
     classic_phone_data.keypad_length = 0;
+    classic_phone_data.send_requested = 0;
     classic_phone_data.is_dialing = 0;
     classic_phone_data.is_in_call = 0;
     classic_phone_data.last_activity = sdk_now();
@@ -269,6 +297,7 @@ static void classic_phone_update_display(void) {
 #pragma GCC diagnostic ignored "-Wunused-function"
 static void classic_phone_clear_keypad(void) {
     classic_phone_data.keypad_length = 0;
+    classic_phone_data.send_requested = 0;
     memset(classic_phone_data.keypad_buffer, 0, sizeof(classic_phone_data.keypad_buffer));
 }
 #pragma GCC diagnostic pop
@@ -297,7 +326,12 @@ static int classic_phone_has_enough_money(void) {
 }
 
 static int classic_phone_has_complete_number(void) {
-    return classic_phone_data.keypad_length >= 10;
+    /* A number is "ready to dial" once it reaches the full 10 digits, or as
+     * soon as the caller presses '#' to send a shorter number (e.g. a 7-digit
+     * local number). The '#' request is sticky, so a subsequent coin can
+     * complete the call without re-pressing '#'. */
+    if (classic_phone_data.keypad_length == 0) return 0;
+    return classic_phone_data.send_requested || classic_phone_data.keypad_length >= 10;
 }
 
 static int classic_phone_is_free_number(void) {
@@ -368,8 +402,9 @@ static void classic_phone_end_call(void) {
     classic_phone_data.is_card_call = 0;
     classic_phone_data.card_number[0] = '\0';
     classic_phone_data.keypad_length = 0;
+    classic_phone_data.send_requested = 0;
     classic_phone_data.inserted_cents = 0;
-    
+
     millennium_client_hangup(client);
     classic_phone_update_display();
     
@@ -414,6 +449,7 @@ static void classic_phone_tick(void) {
             logger_info_with_category("ClassicPhone", "Idle timeout — resetting");
             audio_tones_stop();
             classic_phone_data.keypad_length = 0;
+            classic_phone_data.send_requested = 0;
             classic_phone_data.inserted_cents = 0;
             classic_phone_data.last_activity = sdk_now();
             classic_phone_update_display();
@@ -463,6 +499,7 @@ void register_classic_phone_plugin(void) {
     classic_phone_data.inserted_cents = 0;
     classic_phone_data.call_cost_cents = config_get_call_cost_cents(config_get_instance()); /* Use configurable cost like original daemon */
     classic_phone_data.keypad_length = 0;
+    classic_phone_data.send_requested = 0;
     classic_phone_data.is_dialing = 0;
     classic_phone_data.is_in_call = 0;
     classic_phone_data.call_timeout_seconds = config_get_call_timeout_seconds(config_get_instance());

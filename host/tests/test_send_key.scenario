@@ -1,0 +1,52 @@
+# Test: '#' send key dials a short (non-10-digit) number
+# Verifies that pressing '#' commits a buffered number shorter than the
+# usual 10-digit auto-dial, and that the '#' request is "sticky" so a coin
+# inserted afterwards completes the call without re-pressing '#'.
+
+# Phone starts with receiver down
+assert_state IDLE_DOWN
+
+# Pick up handset
+hook_up
+assert_state IDLE_UP
+assert_display Insert 50c
+
+# Pay first
+coin 25
+coin 25
+assert_display Have: 50c
+
+# Dial a 7-digit local number — not enough digits to auto-dial
+keys 5551234
+assert_state IDLE_UP
+assert_no_display Call active
+
+# Press '#' to send now — call should start with only 7 digits
+key #
+assert_display Call active
+assert_state CALL_ACTIVE
+
+# Hang up
+hook_down
+assert_state IDLE_DOWN
+assert_display Lift receiver
+
+# --- Sticky '#' before paying ---------------------------------------------
+hook_up
+assert_state IDLE_UP
+
+# Dial a short number with no money yet
+keys 4567890
+key #
+# Can't place the call: should prompt for the rest of the fare, not dial
+assert_state IDLE_UP
+assert_display Need more coins
+
+# Now insert the fare — the armed '#' send completes the call automatically
+coin 25
+coin 25
+assert_display Call active
+assert_state CALL_ACTIVE
+
+hook_down
+assert_state IDLE_DOWN
