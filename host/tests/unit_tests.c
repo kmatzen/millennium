@@ -856,6 +856,48 @@ static void test_card_empty_list(void) {
     TEST_ASSERT_EQ_INT(0, config_is_admin_card(&cfg, "1234567890123456"));
 }
 
+/* ── Logger (async file writer, issue #123) ─────────────────────── */
+
+/* File logging is drained to disk by a background writer thread so a slow disk
+ * can't block a producer. Verify the contract callers depend on: after
+ * logger_flush(), every enqueued line is actually on disk (nothing lost in the
+ * queue), and logger_shutdown() stops the writer cleanly. */
+static void test_logger_async_file_write(void) {
+    const char *path = "/tmp/millennium_logger_async_test.log";
+    char buf[16384];
+    FILE *f;
+    size_t got;
+    int i;
+
+    remove(path);
+    logger_set_log_to_console(0);          /* keep the 200 lines off the console */
+    logger_set_level(LOG_LEVEL_VERBOSE);   /* let INFO lines pass the level gate */
+    logger_set_log_file(path);
+    logger_set_log_to_file(1);
+
+    for (i = 0; i < 200; i++) {
+        logger_infof_with_category("AsyncTest", "line %d", i);
+    }
+
+    logger_flush();   /* block until the writer has drained the queue to disk */
+
+    f = fopen(path, "r");
+    TEST_ASSERT_NOT_NULL(f);
+    got = fread(buf, 1, sizeof(buf) - 1, f);
+    buf[got] = '\0';
+    fclose(f);
+
+    /* First and last lines must both be present once flush() returns. */
+    TEST_ASSERT_NOT_NULL(strstr(buf, "[AsyncTest] line 0"));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "[AsyncTest] line 199"));
+
+    logger_shutdown();                 /* stop the writer, close the file */
+    logger_set_log_to_file(0);
+    logger_set_log_to_console(1);      /* restore defaults for later suites */
+    logger_set_level(LOG_LEVEL_ERROR);
+    remove(path);
+}
+
 /* ── Main ───────────────────────────────────────────────────────── */
 
 int main(void) {
@@ -933,6 +975,9 @@ int main(void) {
     TEST_SUITE_RUN(test_version_no_update_initially);
     TEST_SUITE_RUN(test_updater_apply_null_dir);
     TEST_SUITE_RUN(test_updater_apply_bad_dir);
+
+    TEST_SUITE_BEGIN("Logger");
+    TEST_SUITE_RUN(test_logger_async_file_write);
 
     TEST_REPORT();
 }

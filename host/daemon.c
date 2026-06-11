@@ -1134,6 +1134,10 @@ int main(int argc, char *argv[]) {
     }
     
     logger_info_with_category("Daemon", "Daemon shutdown complete");
-    
+
+    /* Drain the async log queue and stop the writer thread so the final
+     * lines reach disk before we exit (issue #123). */
+    logger_shutdown();
+
     return 0;
 }

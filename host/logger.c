@@ -10,7 +10,203 @@
 
 /* Global logger instance */
 logger_data_t* g_logger = NULL;
+
+/* logger_mutex guards the in-memory ring buffer + console output (fast, never
+ * blocks on disk). logger_file_mutex guards the actual file stream and the
+ * rotation bookkeeping, and is only ever held by the async writer thread (and
+ * by the set_* config calls at startup) — so disk latency never blocks a
+ * producer. See the async writer block below. */
 static pthread_mutex_t logger_mutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t logger_file_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+/* Forward declarations for the async writer machinery (defined below). */
+static void logger_check_rotation(logger_data_t* logger);
+static void logger_emit_to_file(const char* line);
+static void logger_writer_start(void);
+static void logger_enqueue(const char* line);
+
+/* ── Asynchronous file writer (issue #123) ───────────────────────────────
+ * Previously logger_write_log held logger_mutex across fprintf() + fflush(),
+ * so a slow log target (NFS, full disk, busy spindle) stalled EVERY thread
+ * that logged: main loop, web server, health monitor, PJSIP callbacks. One
+ * slow write cascaded into event-processing delay and serial backlog.
+ *
+ * Now a producer only formats its line, appends it to the in-memory ring +
+ * console under logger_mutex, then drops the line into this bounded queue and
+ * returns. A dedicated writer thread drains the queue to disk under
+ * logger_file_mutex. Disk latency is absorbed by the queue, never by a
+ * producer. If the writer can't keep up the queue fills, the newest lines are
+ * dropped and counted, and the writer emits a single notice line — memory is
+ * bounded and the system never stalls. */
+#define LOG_QUEUE_CAP 1024
+#define LOG_LINE_MAX  512
+
+static struct {
+    char lines[LOG_QUEUE_CAP][LOG_LINE_MAX];
+    int head;                  /* index of the next line to write */
+    int count;                 /* lines queued but not yet on disk */
+    unsigned long dropped;     /* lines discarded on overflow since last notice */
+    int started;               /* writer thread is running */
+    int shutting_down;         /* drain-and-exit requested */
+    pthread_t thread;
+    pthread_mutex_t lock;
+    pthread_cond_t not_empty;  /* a line was queued, or shutdown requested */
+    pthread_cond_t drained;    /* queue emptied (count reached 0) */
+} log_queue = {
+    {{0}}, 0, 0, 0, 0, 0, 0,
+    PTHREAD_MUTEX_INITIALIZER, PTHREAD_COND_INITIALIZER, PTHREAD_COND_INITIALIZER
+};
+
+/* Write one already-formatted line to the log file. Holds logger_file_mutex
+ * (so it may block on disk I/O) but NOT logger_mutex — producers run free. */
+static void logger_emit_to_file(const char* line) {
+    logger_data_t* logger = g_logger;
+    int written;
+
+    if (logger == NULL || line == NULL) {
+        return;
+    }
+
+    pthread_mutex_lock(&logger_file_mutex);
+    if (logger->log_to_file && logger->file_stream != NULL) {
+        written = fprintf(logger->file_stream, "%s\n", line);
+        fflush(logger->file_stream);
+        if (written > 0) {
+            logger->current_file_size += written;
+        }
+        logger_check_rotation(logger);
+    }
+    pthread_mutex_unlock(&logger_file_mutex);
+}
+
+/* The writer thread: pop a line, write it to disk, repeat. The line is not
+ * committed (head/count advanced) until AFTER the write completes, so
+ * logger_flush() only observes count==0 once everything is actually on disk. */
+static void* logger_writer_main(void* arg) {
+    char line[LOG_LINE_MAX];
+    unsigned long dropped;
+
+    (void)arg;
+
+    for (;;) {
+        pthread_mutex_lock(&log_queue.lock);
+        while (log_queue.count == 0 && !log_queue.shutting_down) {
+            pthread_cond_broadcast(&log_queue.drained);
+            pthread_cond_wait(&log_queue.not_empty, &log_queue.lock);
+        }
+        if (log_queue.count == 0 && log_queue.shutting_down) {
+            pthread_cond_broadcast(&log_queue.drained);
+            pthread_mutex_unlock(&log_queue.lock);
+            break;
+        }
+        /* Peek the head; commit it only after the write succeeds. */
+        memcpy(line, log_queue.lines[log_queue.head], LOG_LINE_MAX);
+        dropped = log_queue.dropped;
+        log_queue.dropped = 0;
+        pthread_mutex_unlock(&log_queue.lock);
+
+        if (dropped > 0) {
+            char notice[LOG_LINE_MAX];
+            snprintf(notice, sizeof(notice),
+                "[logger] dropped %lu log line(s): writer fell behind", dropped);
+            logger_emit_to_file(notice);
+        }
+        logger_emit_to_file(line);
+
+        pthread_mutex_lock(&log_queue.lock);
+        log_queue.head = (log_queue.head + 1) % LOG_QUEUE_CAP;
+        log_queue.count--;
+        if (log_queue.count == 0) {
+            pthread_cond_broadcast(&log_queue.drained);
+        }
+        pthread_mutex_unlock(&log_queue.lock);
+    }
+
+    return NULL;
+}
+
+/* Lazily create the writer thread the first time file logging is enabled.
+ * Called from logger_set_log_to_file() while it holds logger_file_mutex. */
+static void logger_writer_start(void) {
+    pthread_mutex_lock(&log_queue.lock);
+    if (log_queue.started) {
+        pthread_mutex_unlock(&log_queue.lock);
+        return;
+    }
+    /* Reset the queue so a restart after logger_shutdown() is clean. */
+    log_queue.shutting_down = 0;
+    log_queue.head = 0;
+    log_queue.count = 0;
+    log_queue.dropped = 0;
+    if (pthread_create(&log_queue.thread, NULL, logger_writer_main, NULL) == 0) {
+        log_queue.started = 1;
+    }
+    pthread_mutex_unlock(&log_queue.lock);
+}
+
+/* Append a formatted line to the queue and wake the writer. Never blocks on
+ * disk; drops (and counts) the line if the queue is full. */
+static void logger_enqueue(const char* line) {
+    int tail;
+    size_t n;
+
+    pthread_mutex_lock(&log_queue.lock);
+    if (!log_queue.started || log_queue.shutting_down) {
+        pthread_mutex_unlock(&log_queue.lock);
+        return;
+    }
+    if (log_queue.count >= LOG_QUEUE_CAP) {
+        log_queue.dropped++;           /* bounded memory: drop the newest line */
+        pthread_mutex_unlock(&log_queue.lock);
+        return;
+    }
+    tail = (log_queue.head + log_queue.count) % LOG_QUEUE_CAP;
+    n = strlen(line);
+    if (n >= LOG_LINE_MAX) {
+        n = LOG_LINE_MAX - 1;
+    }
+    memcpy(log_queue.lines[tail], line, n);
+    log_queue.lines[tail][n] = '\0';
+    log_queue.count++;
+    pthread_cond_signal(&log_queue.not_empty);
+    pthread_mutex_unlock(&log_queue.lock);
+}
+
+/* Block until every queued line has been written to disk. Used at shutdown
+ * checkpoints and by the unit test. No-op if the writer isn't running. */
+void logger_flush(void) {
+    pthread_mutex_lock(&log_queue.lock);
+    while (log_queue.started && log_queue.count > 0) {
+        pthread_cond_wait(&log_queue.drained, &log_queue.lock);
+    }
+    pthread_mutex_unlock(&log_queue.lock);
+}
+
+/* Drain the queue, stop the writer thread, and close the log file. Idempotent.
+ * Call once during daemon shutdown after the final log line is emitted. */
+void logger_shutdown(void) {
+    int started;
+
+    pthread_mutex_lock(&log_queue.lock);
+    started = log_queue.started;
+    log_queue.shutting_down = 1;
+    pthread_cond_broadcast(&log_queue.not_empty);
+    pthread_mutex_unlock(&log_queue.lock);
+
+    if (started) {
+        pthread_join(log_queue.thread, NULL);
+        pthread_mutex_lock(&log_queue.lock);
+        log_queue.started = 0;
+        pthread_mutex_unlock(&log_queue.lock);
+    }
+
+    pthread_mutex_lock(&logger_file_mutex);
+    if (g_logger != NULL && g_logger->file_stream != NULL) {
+        fclose(g_logger->file_stream);
+        g_logger->file_stream = NULL;
+    }
+    pthread_mutex_unlock(&logger_file_mutex);
+}
 
 
 logger_data_t* logger_get_instance(void) {
@@ -45,9 +241,10 @@ void logger_set_log_file(const char* filename) {
         return;
     }
     
+    pthread_mutex_lock(&logger_file_mutex);
     strncpy(logger->log_file, filename, sizeof(logger->log_file) - 1);
     logger->log_file[sizeof(logger->log_file) - 1] = '\0';
-    
+
     if (logger->log_to_file) {
         if (logger->file_stream != NULL) {
             fclose(logger->file_stream);
@@ -61,6 +258,7 @@ void logger_set_log_file(const char* filename) {
             logger->current_file_size = ftell(logger->file_stream);
         }
     }
+    pthread_mutex_unlock(&logger_file_mutex);
 }
 
 void logger_set_log_to_console(int enable) {
@@ -76,6 +274,7 @@ void logger_set_log_to_file(int enable) {
         return;
     }
     
+    pthread_mutex_lock(&logger_file_mutex);
     logger->log_to_file = enable;
     if (enable && strlen(logger->log_file) > 0) {
         if (logger->file_stream != NULL) {
@@ -88,6 +287,7 @@ void logger_set_log_to_file(int enable) {
         } else {
             fseek(logger->file_stream, 0, SEEK_END);
             logger->current_file_size = ftell(logger->file_stream);
+            logger_writer_start();   /* spin up the async writer thread */
         }
     } else {
         if (logger->file_stream != NULL) {
@@ -95,6 +295,7 @@ void logger_set_log_to_file(int enable) {
             logger->file_stream = NULL;
         }
     }
+    pthread_mutex_unlock(&logger_file_mutex);
 }
 
 void logger_set_rotation(long max_file_size, int max_rotated_files) {
@@ -102,8 +303,10 @@ void logger_set_rotation(long max_file_size, int max_rotated_files) {
     if (logger == NULL) {
         return;
     }
+    pthread_mutex_lock(&logger_file_mutex);
     logger->max_file_size = max_file_size;
     logger->max_rotated_files = (max_rotated_files > 0) ? max_rotated_files : 0;
+    pthread_mutex_unlock(&logger_file_mutex);
 }
 
 static void logger_rotate_files(logger_data_t* logger) {
@@ -202,26 +405,27 @@ void logger_write_log(log_level_t level, const char* category, const char* messa
     char timestamp[64];  /* Increased buffer size for timestamp */
     char formatted_message[512];
     const char* level_str;
-    
+    int to_file;
+
     if (logger == NULL || message == NULL) {
         return;
     }
-    
+
     pthread_mutex_lock(&logger_mutex);
-    
+
     logger_format_timestamp(timestamp, sizeof(timestamp));
     level_str = logger_format_level(level);
-    
+
     /* Format the log message */
     if (category != NULL && strlen(category) > 0) {
         snprintf(formatted_message, sizeof(formatted_message), "[%s] [%s] [%s] %s", timestamp, level_str, category, message);
     } else {
         snprintf(formatted_message, sizeof(formatted_message), "[%s] [%s] %s", timestamp, level_str, message);
     }
-    
+
     /* Store in memory */
     logger_add_to_memory(formatted_message);
-    
+
     /* Output to console */
     if (logger->log_to_console) {
         if (level >= LOG_LEVEL_WARN) {
@@ -230,18 +434,17 @@ void logger_write_log(log_level_t level, const char* category, const char* messa
             printf("%s\n", formatted_message);
         }
     }
-    
-    /* Output to file */
-    if (logger->log_to_file && logger->file_stream != NULL) {
-        int written = fprintf(logger->file_stream, "%s\n", formatted_message);
-        fflush(logger->file_stream);
-        if (written > 0) {
-            logger->current_file_size += written;
-        }
-        logger_check_rotation(logger);
-    }
-    
+
+    to_file = logger->log_to_file;
+
     pthread_mutex_unlock(&logger_mutex);
+
+    /* File output is handed off to the async writer thread (issue #123) so a
+     * slow disk never blocks this producer. The writer drains the queue under
+     * logger_file_mutex and performs the actual fprintf/fflush/rotation. */
+    if (to_file) {
+        logger_enqueue(formatted_message);
+    }
 }
 
 void logger_format_timestamp(char* buffer, size_t buffer_size) {
