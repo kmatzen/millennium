@@ -199,24 +199,26 @@ static void jukebox_show_playing(void) {
 }
 
 static void jukebox_play_song(int song_number) {
+    const song_info_t *song;
+    char log_msg[256];
+    const char* wav_file;
     if (song_number < 0 || song_number >= (int)NUM_SONGS) {
         return;
     }
-    
+
     jukebox_data.selected_song = song_number;
     jukebox_data.is_playing = 1;
     jukebox_data.play_start_time = time(NULL);
     jukebox_data.play_duration_seconds = songs[song_number].duration_seconds;
-    
+
     jukebox_show_playing();
-    
-    const song_info_t *song = &songs[song_number];
-    char log_msg[256];
+
+    song = &songs[song_number];
     snprintf(log_msg, sizeof(log_msg), "Playing song: %s by %s", song->title, song->artist);
     logger_info_with_category("Jukebox", log_msg);
-    
+
     /* Play the WAV file using ALSA */
-    const char* wav_file = songs[song_number].audio_file;
+    wav_file = songs[song_number].audio_file;
     if (jukebox_play_wav_file(wav_file) == 0) {
         char log_msg[256];
         snprintf(log_msg, sizeof(log_msg), "Started playing WAV file: %s", wav_file);
@@ -265,7 +267,9 @@ static void jukebox_check_playback(void) {
 #if HAVE_ALSA
 static int jukebox_init_alsa(void) {
     int err;
-    
+    snd_pcm_hw_params_t *hw_params;
+    unsigned int rate;
+
     /* Open PCM device for playback */
     err = snd_pcm_open(&jukebox_data.pcm_handle, "default", SND_PCM_STREAM_PLAYBACK, 0);
     if (err < 0) {
@@ -276,7 +280,6 @@ static int jukebox_init_alsa(void) {
     }
     
     /* Set hardware parameters */
-    snd_pcm_hw_params_t *hw_params;
     hw_params = malloc(snd_pcm_hw_params_sizeof());
     if (!hw_params) {
         logger_error_with_category("Jukebox", "Cannot allocate hardware parameters");
@@ -311,7 +314,7 @@ static int jukebox_init_alsa(void) {
     }
     
     /* Set sample rate */
-    unsigned int rate = 44100;
+    rate = 44100;
     err = snd_pcm_hw_params_set_rate_near(jukebox_data.pcm_handle, hw_params, &rate, 0);
     if (err < 0) {
         logger_error_with_category("Jukebox", "Cannot set sample rate");
@@ -359,6 +362,7 @@ static void jukebox_cleanup_alsa(void) {
 #endif
 
 static int jukebox_play_wav_file(const char* wav_file) {
+    int err;
 #if HAVE_ALSA
     /* Initialize ALSA if not already done */
     if (!jukebox_data.pcm_handle) {
@@ -372,7 +376,7 @@ static int jukebox_play_wav_file(const char* wav_file) {
     jukebox_data.stop_audio = 0;
     
     /* Create audio thread */
-    int err = pthread_create(&jukebox_data.audio_thread, NULL, jukebox_audio_thread, (void*)wav_file);
+    err = pthread_create(&jukebox_data.audio_thread, NULL, jukebox_audio_thread, (void*)wav_file);
     if (err != 0) {
         logger_error_with_category("Jukebox", "Failed to create audio thread");
         return -1;

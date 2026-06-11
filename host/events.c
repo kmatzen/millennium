@@ -7,9 +7,11 @@
 
 /* Helper function to create a string copy */
 static char *strdup_safe(const char *src) {
+    size_t len;
+    char *dst;
     if (!src) return NULL;
-    size_t len = strlen(src);
-    char *dst = malloc(len + 1);
+    len = strlen(src);
+    dst = malloc(len + 1);
     if (dst) {
         memcpy(dst, src, len);
         dst[len] = '\0';

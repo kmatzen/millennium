@@ -3,9 +3,12 @@ CXXFLAGS=-g -O3 -std=c++17 -Wall -Wextra
 # .pc Libs.private, so we need --static to pull them into the link.
 LDFLAGS=-lpthread -latomic -lasound `pkg-config --libs --static libpjproject`
 
-# C flags for C files
-CFLAGS=-g -O3 -Wall -Wextra -std=c89
-C99_CFLAGS=-g -O3 -Wall -Wextra -std=c99
+# C flags for C files. The codebase targets C89. We use -std=gnu89 (the C89
+# language plus the GNU extensions that the ALSA and PJSIP system headers rely
+# on, e.g. `inline`) because strict -std=c89 fails to parse those headers.
+# -Wdeclaration-after-statement keeps OUR OWN code free of C99-style mixed
+# declarations, so the source stays C89-conformant.
+CFLAGS=-g -O3 -Wall -Wextra -std=gnu89 -Wdeclaration-after-statement -Werror
 
 # Build version info
 GIT_HASH := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
@@ -24,13 +27,13 @@ logger.o: logger.c logger.h
 	gcc logger.c -o logger.o -c $(CFLAGS)
 
 health_monitor.o: health_monitor.c health_monitor.h logger.h
-	gcc health_monitor.c -o health_monitor.o -c $(CFLAGS) -lpthread
+	gcc health_monitor.c -o health_monitor.o -c $(CFLAGS)
 
 metrics.o: metrics.c metrics.h
 	gcc metrics.c -o metrics.o -c $(CFLAGS)
 
 metrics_server.o: metrics_server.c metrics_server.h metrics.h logger.h
-	gcc metrics_server.c -o metrics_server.o -c $(CFLAGS) -lpthread
+	gcc metrics_server.c -o metrics_server.o -c $(CFLAGS)
 
 websocket.o: websocket.c websocket.h
 	gcc websocket.c -o websocket.o -c $(CFLAGS)
@@ -39,7 +42,7 @@ web_server.o: web_server.c web_server.h websocket.h config.h logger.h metrics.h 
 	gcc web_server.c -o web_server.o -c $(CFLAGS)
 
 pjsip_interface.o: pjsip_interface.c pjsip_interface.h logger.h
-	gcc pjsip_interface.c -o pjsip_interface.o -c $(C99_CFLAGS) `pkg-config --cflags libpjproject`
+	gcc pjsip_interface.c -o pjsip_interface.o -c $(CFLAGS) `pkg-config --cflags libpjproject`
 
 events.o: events.c events.h
 	gcc events.c -o events.o -c $(CFLAGS)
@@ -63,7 +66,7 @@ version.o: version.c version.h
 	gcc version.c -o version.o -c $(CFLAGS) $(VERSION_CFLAGS)
 
 audio_tones.o: audio_tones.c audio_tones.h logger.h
-	gcc audio_tones.c -o audio_tones.o -c $(C99_CFLAGS) -lm
+	gcc audio_tones.c -o audio_tones.o -c $(CFLAGS)
 
 updater.o: updater.c updater.h version.h logger.h
 	gcc updater.c -o updater.o -c $(CFLAGS)
@@ -82,7 +85,7 @@ plugins/fortune_teller.o: plugins/fortune_teller.c plugins.h
 	gcc plugins/fortune_teller.c -o plugins/fortune_teller.o -c $(CFLAGS)
 
 plugins/jukebox.o: plugins/jukebox.c plugins.h
-	gcc plugins/jukebox.c -o plugins/jukebox.o -c $(C99_CFLAGS) -lpthread
+	gcc plugins/jukebox.c -o plugins/jukebox.o -c $(CFLAGS)
 
 plugins/number_guess.o: plugins/number_guess.c plugins.h plugin_sdk.h config.h
 	gcc plugins/number_guess.c -o plugins/number_guess.o -c $(CFLAGS)
@@ -99,9 +102,9 @@ plugins/trivia.o: plugins/trivia.c plugins.h plugin_sdk.h config.h
 daemon: daemon.o daemon_state.o millennium_sdk.o pjsip_interface.o events.o event_processor.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o websocket.o plugins.o plugin_sdk.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o plugins/number_guess.o plugins/simon.o plugins/dial_a_joke.o plugins/trivia.o state_persistence.o display_manager.o version.o audio_tones.o updater.o
 	gcc daemon.o daemon_state.o millennium_sdk.o pjsip_interface.o events.o event_processor.o config.o logger.o health_monitor.o metrics.o metrics_server.o web_server.o websocket.o plugins.o plugin_sdk.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o plugins/number_guess.o plugins/simon.o plugins/dial_a_joke.o plugins/trivia.o state_persistence.o display_manager.o version.o audio_tones.o updater.o -o daemon $(LDFLAGS) -lm
 
-# Simulator object file (uses C99 for mixed declarations)
+# Simulator object file
 simulator.o: simulator.c millennium_sdk.h events.h config.h daemon_state.h logger.h metrics.h plugins.h
-	gcc simulator.c -o simulator.o -c $(C99_CFLAGS)
+	gcc simulator.c -o simulator.o -c $(CFLAGS)
 
 # Simulator objects — no baresip, no web server, no daemon.o
 SIM_OBJS = simulator.o daemon_state.o events.o event_processor.o config.o logger.o metrics.o plugins.o plugin_sdk.o plugins/classic_phone.o plugins/fortune_teller.o plugins/number_guess.o plugins/simon.o plugins/dial_a_joke.o plugins/trivia.o state_persistence.o display_manager.o version.o
@@ -121,7 +124,7 @@ all: daemon
 UNIT_TEST_OBJS = tests/unit_tests.o daemon_state.o events.o event_processor.o config.o logger.o metrics.o plugins.o plugin_sdk.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o plugins/number_guess.o plugins/simon.o plugins/dial_a_joke.o plugins/trivia.o state_persistence.o display_manager.o version.o updater.o
 
 tests/unit_tests.o: tests/unit_tests.c tests/test_framework.h config.h daemon_state.h plugins.h logger.h metrics.h millennium_sdk.h updater.h
-	gcc tests/unit_tests.c -o tests/unit_tests.o -c $(C99_CFLAGS) -I.
+	gcc tests/unit_tests.c -o tests/unit_tests.o -c $(CFLAGS) -I.
 
 # Unit tests don't use time wrapping; link ALSA on Linux for jukebox
 UNIT_LDFLAGS = -lpthread
@@ -138,7 +141,7 @@ unit_tests: $(UNIT_TEST_OBJS)
 # compiles and runs. Not part of `make test` (which must run anywhere).
 pjsip-smoke: tests/pjsip_smoke.c pjsip_interface.c pjsip_interface.h logger.o
 	gcc tests/pjsip_smoke.c pjsip_interface.c logger.o -o pjsip_smoke \
-		$(C99_CFLAGS) `pkg-config --cflags libpjproject` \
+		$(CFLAGS) `pkg-config --cflags libpjproject` \
 		`pkg-config --libs --static libpjproject` -lpthread -lm
 
 # Run all scenario tests via the simulator

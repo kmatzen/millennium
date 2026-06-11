@@ -56,6 +56,7 @@ int plugins_register(const char *name, const char *description,
                     card_handler_t card_handler,
                     activation_handler_t activation_handler,
                     tick_handler_t tick_handler) {
+    int i;
     if (plugin_count >= MAX_PLUGINS) {
         logger_error_with_category("Plugins", "Maximum number of plugins reached");
         return -1;
@@ -67,7 +68,6 @@ int plugins_register(const char *name, const char *description,
     }
     
     /* Check if plugin already exists */
-    int i;
     for (i = 0; i < plugin_count; i++) {
         if (strcmp(plugins[i].name, name) == 0) {
             logger_warnf_with_category("Plugins", "Plugin %s already registered", name);
@@ -93,6 +93,7 @@ int plugins_register(const char *name, const char *description,
 }
 
 int plugins_activate(const char *plugin_name) {
+    int i;
     if (!plugin_name) {
         logger_error_with_category("Plugins", "Plugin name required for activation");
         return -1;
@@ -101,7 +102,6 @@ int plugins_activate(const char *plugin_name) {
     pthread_mutex_lock(&plugins_mutex);
     
     /* Find the plugin */
-    int i;
     for (i = 0; i < plugin_count; i++) {
         if (strcmp(plugins[i].name, plugin_name) == 0) {
             active_plugin_index = i;
@@ -123,8 +123,8 @@ int plugins_activate(const char *plugin_name) {
 }
 
 const char* plugins_get_active_name(void) {
-    pthread_mutex_lock(&plugins_mutex);
     const char *name = NULL;
+    pthread_mutex_lock(&plugins_mutex);
     if (active_plugin_index >= 0 && active_plugin_index < plugin_count) {
         name = plugins[active_plugin_index].name;
     }
@@ -133,23 +133,24 @@ const char* plugins_get_active_name(void) {
 }
 
 int plugins_list(char *buffer, size_t buffer_size) {
+    int pos = 0;
+    int i;
     if (!buffer || buffer_size == 0) {
         return -1;
     }
-    
+
     pthread_mutex_lock(&plugins_mutex);
-    
+
     buffer[0] = '\0';
-    int pos = 0;
-    
-    int i;
+
     for (i = 0; i < plugin_count && pos < (int)buffer_size - 1; i++) {
         char temp[256];
+        int len;
         snprintf(temp, sizeof(temp), "%s: %s%s\n",
                 plugins[i].name, plugins[i].description,
                 (i == active_plugin_index) ? " (ACTIVE)" : "");
-        
-        int len = strlen(temp);
+
+        len = strlen(temp);
         if (pos + len < (int)buffer_size - 1) {
             strncpy(buffer + pos, temp, buffer_size - pos - 1);
             buffer[buffer_size - 1] = '\0';

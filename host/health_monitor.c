@@ -35,15 +35,17 @@ int health_monitor_register_check(const char* name,
                                  health_check_func_t check_function,
                                  time_t interval_seconds) {
     health_monitor_t* monitor = health_monitor_get_instance();
-    
+    int existing_index;
+    int index;
+
     if (!name || !check_function) {
         return 0; /* Invalid parameters */
     }
-    
+
     pthread_mutex_lock(&g_monitor_mutex);
-    
+
     /* Check if already exists */
-    int existing_index = find_check_index(name);
+    existing_index = find_check_index(name);
     if (existing_index >= 0) {
         pthread_mutex_unlock(&g_monitor_mutex);
         return 0; /* Already exists */
@@ -56,7 +58,7 @@ int health_monitor_register_check(const char* name,
     }
     
     /* Add new check */
-    int index = monitor->checks_count;
+    index = monitor->checks_count;
     strncpy(monitor->checks[index].name, name, sizeof(monitor->checks[index].name) - 1);
     monitor->checks[index].name[sizeof(monitor->checks[index].name) - 1] = '\0';
     monitor->checks[index].check_function = check_function;
@@ -75,14 +77,15 @@ int health_monitor_register_check(const char* name,
 
 void health_monitor_unregister_check(const char* name) {
     health_monitor_t* monitor = health_monitor_get_instance();
-    
+    int index;
+
     if (!name) {
         return;
     }
-    
+
     pthread_mutex_lock(&g_monitor_mutex);
-    
-    int index = find_check_index(name);
+
+    index = find_check_index(name);
     if (index >= 0) {
         /* Shift remaining checks down */
         int i;

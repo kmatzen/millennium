@@ -55,13 +55,15 @@ static void event_queue_push(struct millennium_client *client, void *event) {
 }
 
 static void *event_queue_pop(struct millennium_client *client) {
+    struct event_queue_node *node;
+    void *event;
     if (!client->event_queue_head) {
         return NULL;
     }
-    
-    struct event_queue_node *node = client->event_queue_head;
-    void *event = node->event;
-    
+
+    node = client->event_queue_head;
+    event = node->event;
+
     client->event_queue_head = node->next;
     if (!client->event_queue_head) {
         client->event_queue_tail = NULL;
@@ -86,9 +88,11 @@ static void event_queue_clear(struct millennium_client *client) {
 
 /* String utilities */
 static char *string_duplicate(const char *src) {
+    size_t len;
+    char *dst;
     if (!src) return NULL;
-    size_t len = strlen(src) + 1;
-    char *dst = malloc(len);
+    len = strlen(src) + 1;
+    dst = malloc(len);
     if (dst) {
         strcpy(dst, src);
     }
@@ -106,13 +110,14 @@ static void string_buffer_ensure_capacity(struct millennium_client *client, size
     }
     if (needed >= client->input_buffer_capacity) {
         size_t new_capacity = client->input_buffer_capacity * 2;
+        char *new_buffer;
         if (new_capacity < needed) {
             new_capacity = needed + 1;
         }
         if (new_capacity > MAX_INPUT_BUFFER_SIZE) {
             new_capacity = MAX_INPUT_BUFFER_SIZE;
         }
-        char *new_buffer = realloc(client->input_buffer, new_capacity);
+        new_buffer = realloc(client->input_buffer, new_capacity);
         if (new_buffer) {
             client->input_buffer = new_buffer;
             client->input_buffer_capacity = new_capacity;
@@ -410,13 +415,14 @@ int millennium_client_serial_is_healthy(struct millennium_client *client) {
 }
 
 void millennium_client_check_serial(struct millennium_client *client) {
-    if (!client || client->display_fd == -1) return;
-
 #if SERIAL_WATCHDOG_ENABLED
     struct timespec now;
     long elapsed;
     int backoff;
+#endif
+    if (!client || client->display_fd == -1) return;
 
+#if SERIAL_WATCHDOG_ENABLED
     clock_gettime(CLOCK_MONOTONIC, &now);
     elapsed = now.tv_sec - client->last_serial_activity.tv_sec;
 
@@ -468,6 +474,8 @@ void millennium_client_check_serial(struct millennium_client *client) {
 void millennium_client_update(struct millennium_client *client) {
     char buffer[1024];
     ssize_t bytes_read;
+    struct timespec current_time;
+    long elapsed_ms;
 
     if (client->display_fd == -1) return;
 
@@ -482,10 +490,9 @@ void millennium_client_update(struct millennium_client *client) {
         logger_errorf_with_category("SDK", "Error reading from display_fd: %s", strerror(errno));
     }
 
-    struct timespec current_time;
     clock_gettime(CLOCK_MONOTONIC, &current_time);
-    
-    long elapsed_ms = (current_time.tv_sec - client->last_update_time.tv_sec) * 1000 +
+
+    elapsed_ms = (current_time.tv_sec - client->last_update_time.tv_sec) * 1000 +
                      (current_time.tv_nsec - client->last_update_time.tv_nsec) / 1000000;
     
     if (client->display_dirty && elapsed_ms > 33) {
@@ -501,10 +508,14 @@ void millennium_client_update(struct millennium_client *client) {
 
 void millennium_client_process_event_buffer(struct millennium_client *client) {
     while (client->input_buffer_size > 0) {
-        logger_debug_with_category("SDK", client->input_buffer);
-        
         size_t event_start = 0;
         size_t i;
+        char event_type;
+        char *payload;
+        size_t payload_len;
+        size_t remove_len;
+        logger_debug_with_category("SDK", client->input_buffer);
+
         for (i = 0; i < client->input_buffer_size; i++) {
             char c = client->input_buffer[i];
             if (c == '@' || c == 'K' || c == 'C' || c == 'V' || c == 'A' || 
@@ -519,8 +530,8 @@ void millennium_client_process_event_buffer(struct millennium_client *client) {
             return; /* No event marker found */
         }
 
-        char event_type = client->input_buffer[event_start];
-        char *payload = millennium_client_extract_payload(client, event_type, event_start);
+        event_type = client->input_buffer[event_start];
+        payload = millennium_client_extract_payload(client, event_type, event_start);
         
         logger_debugf_with_category("SDK", "Event type: %c", event_type);
         
@@ -531,8 +542,8 @@ void millennium_client_process_event_buffer(struct millennium_client *client) {
         millennium_client_create_and_queue_event_char(client, event_type, payload);
         
         /* Remove processed data from buffer */
-        size_t payload_len = payload ? strlen(payload) : 0;
-        size_t remove_len = event_start + payload_len + 1;
+        payload_len = payload ? strlen(payload) : 0;
+        remove_len = event_start + payload_len + 1;
         if (remove_len < client->input_buffer_size) {
             memmove(client->input_buffer, client->input_buffer + remove_len, 
                    client->input_buffer_size - remove_len);
@@ -652,17 +663,19 @@ void millennium_client_set_display(struct millennium_client *client, const char 
 }
 
 void millennium_client_write_to_display(struct millennium_client *client, const char *message) {
+    uint8_t cmd_data;
+    size_t total_bytes_written = 0;
+    size_t message_length;
     if (!message) return;
-    
+
     logger_debugf_with_category("SDK", "Writing message to display: %s", message);
 
     /* Step 1: Write the command */
-    uint8_t cmd_data = (uint8_t)strlen(message);
+    cmd_data = (uint8_t)strlen(message);
     millennium_client_write_command(client, 0x02, &cmd_data, 1);
 
     /* Step 2: Write the message in a loop to ensure all bytes are written */
-    size_t total_bytes_written = 0;
-    size_t message_length = strlen(message);
+    message_length = strlen(message);
 
     while (total_bytes_written < message_length) {
         ssize_t bytes_written = write(client->display_fd, message + total_bytes_written,

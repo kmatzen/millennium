@@ -42,9 +42,9 @@ void* web_server_thread_func(void* arg);
 
 /* String utility functions */
 void web_server_strcpy_safe(char* dest, const char* src, size_t dest_size) {
-    if (!dest || !src || dest_size == 0) return;
-    
     size_t i;
+    if (!dest || !src || dest_size == 0) return;
+
     for (i = 0; i < dest_size - 1 && src[i] != '\0'; i++) {
         dest[i] = src[i];
     }
@@ -52,12 +52,13 @@ void web_server_strcpy_safe(char* dest, const char* src, size_t dest_size) {
 }
 
 void web_server_strcat_safe(char* dest, const char* src, size_t dest_size) {
-    if (!dest || !src || dest_size == 0) return;
-    
-    size_t dest_len = web_server_strlen_safe(dest);
-    if (dest_len >= dest_size - 1) return;
-    
+    size_t dest_len;
     size_t i;
+    if (!dest || !src || dest_size == 0) return;
+
+    dest_len = web_server_strlen_safe(dest);
+    if (dest_len >= dest_size - 1) return;
+
     for (i = 0; i < dest_size - dest_len - 1 && src[i] != '\0'; i++) {
         dest[dest_len + i] = src[i];
     }
@@ -122,9 +123,10 @@ int web_server_strcasecmp(const char* s1, const char* s2) {
 
 /* WebServer creation and destruction */
 struct web_server* web_server_create(int port) {
+    int i;
     struct web_server* server = (struct web_server*)web_server_malloc(sizeof(struct web_server));
     if (!server) return NULL;
-    
+
     memset(server, 0, sizeof(struct web_server));
     server->port = port;
     server->running = 0;
@@ -137,7 +139,6 @@ struct web_server* web_server_create(int port) {
     server->rate_limit_count = 0;
     
     /* Initialize static route flags */
-    int i;
     for (i = 0; i < 16; i++) {
         server->static_is_file[i] = 0;
     }
@@ -230,10 +231,11 @@ int web_server_get_port(const struct web_server* server) {
 
 /* Route management */
 void web_server_add_route(struct web_server* server, const char* method, const char* path, route_handler_t handler) {
+    int idx;
     if (!server || !method || !path || !handler) return;
     if (server->route_count >= 32) return; /* Max routes reached */
-    
-    int idx = server->route_count;
+
+    idx = server->route_count;
     web_server_strcpy_safe(server->route_methods[idx], method, sizeof(server->route_methods[idx]));
     web_server_strcpy_safe(server->route_paths[idx], path, sizeof(server->route_paths[idx]));
     server->route_handlers[idx] = handler;
@@ -241,10 +243,11 @@ void web_server_add_route(struct web_server* server, const char* method, const c
 }
 
 void web_server_add_static_route(struct web_server* server, const char* path, const char* content, const char* content_type) {
+    int idx;
     if (!server || !path || !content || !content_type) return;
     if (server->static_count >= 16) return; /* Max static routes reached */
-    
-    int idx = server->static_count;
+
+    idx = server->static_count;
     web_server_strcpy_safe(server->static_paths[idx], path, sizeof(server->static_paths[idx]));
     web_server_strcpy_safe(server->static_contents[idx], content, sizeof(server->static_contents[idx]));
     web_server_strcpy_safe(server->static_content_types[idx], content_type, sizeof(server->static_content_types[idx]));
@@ -253,10 +256,11 @@ void web_server_add_static_route(struct web_server* server, const char* path, co
 }
 
 void web_server_add_file_route(struct web_server* server, const char* path, const char* file_path, const char* content_type) {
+    int idx;
     if (!server || !path || !file_path || !content_type) return;
     if (server->static_count >= 16) return; /* Max static routes reached */
-    
-    int idx = server->static_count;
+
+    idx = server->static_count;
     web_server_strcpy_safe(server->static_paths[idx], path, sizeof(server->static_paths[idx]));
     web_server_strcpy_safe(server->static_file_paths[idx], file_path, sizeof(server->static_file_paths[idx]));
     web_server_strcpy_safe(server->static_content_types[idx], content_type, sizeof(server->static_content_types[idx]));
@@ -267,79 +271,93 @@ void web_server_add_file_route(struct web_server* server, const char* path, cons
 /* HTTP parsing functions */
 struct http_request web_server_parse_request(const char* raw_request) {
     struct http_request request;
-    memset(&request, 0, sizeof(request));
-    
-    if (!raw_request) return request;
-    
-    /* Parse request line */
-    const char* line_start = raw_request;
-    const char* line_end = strchr(line_start, '\n');
-    if (!line_end) return request;
-    
-    /* Extract method and path */
+    const char* line_start;
+    const char* line_end;
     char request_line[512];
-    size_t line_len = line_end - line_start;
+    size_t line_len;
+    char* cr_pos;
+    char* query_pos;
+    const char* header_start;
+    memset(&request, 0, sizeof(request));
+
+    if (!raw_request) return request;
+
+    /* Parse request line */
+    line_start = raw_request;
+    line_end = strchr(line_start, '\n');
+    if (!line_end) return request;
+
+    /* Extract method and path */
+    line_len = line_end - line_start;
     if (line_len >= sizeof(request_line)) line_len = sizeof(request_line) - 1;
-    
+
     memcpy(request_line, line_start, line_len);
     request_line[line_len] = '\0';
-    
+
     /* Remove \r if present */
-    char* cr_pos = strchr(request_line, '\r');
+    cr_pos = strchr(request_line, '\r');
     if (cr_pos) *cr_pos = '\0';
-    
+
     /* Parse method and path */
     if (sscanf(request_line, "%15s %255s", request.method, request.path) != 2) {
         return request;
     }
-    
+
     /* Remove query parameters from path */
-    char* query_pos = strchr(request.path, '?');
+    query_pos = strchr(request.path, '?');
     if (query_pos) {
         *query_pos = '\0';
         web_server_parse_query_string(query_pos + 1, &request);
     }
-    
+
     /* Parse headers */
-    const char* header_start = line_end + 1;
+    header_start = line_end + 1;
     while (header_start && *header_start != '\0') {
-        const char* header_end = strchr(header_start, '\n');
+        const char* header_end;
+        char header_line[512];
+        size_t header_len;
+        char* cr_pos;
+        char* colon_pos;
+        header_end = strchr(header_start, '\n');
         if (!header_end) break;
-        
+
         /* Check for end of headers (empty line) */
         if (header_end == header_start + 1) {
             break;
         }
-        
-        char header_line[512];
-        size_t header_len = header_end - header_start;
+
+        header_len = header_end - header_start;
         if (header_len >= sizeof(header_line)) header_len = sizeof(header_line) - 1;
-        
+
         memcpy(header_line, header_start, header_len);
         header_line[header_len] = '\0';
-        
+
         /* Remove \r if present */
-        char* cr_pos = strchr(header_line, '\r');
+        cr_pos = strchr(header_line, '\r');
         if (cr_pos) *cr_pos = '\0';
-        
+
         /* Parse header key:value */
-        char* colon_pos = strchr(header_line, ':');
+        colon_pos = strchr(header_line, ':');
         if (colon_pos && request.header_count < 32) {
+            char* key;
+            char* value;
+            char* key_end;
+            char* value_end;
             *colon_pos = '\0';
-            char* key = header_line;
-            char* value = colon_pos + 1;
-            
+            key = header_line;
+            value = colon_pos + 1;
+
             /* Trim whitespace */
             while (*key == ' ' || *key == '\t') key++;
             while (*value == ' ' || *value == '\t') value++;
-            
-            char* key_end = key + strlen(key) - 1;
+
+            key_end = key + strlen(key) - 1;
             while (key_end > key && (*key_end == ' ' || *key_end == '\t' || *key_end == '\r')) {
                 *key_end = '\0';
                 key_end--;
             }
-            
-            char* value_end = value + strlen(value) - 1;
+
+            value_end = value + strlen(value) - 1;
             while (value_end > value && (*value_end == ' ' || *value_end == '\t' || *value_end == '\r')) {
                 *value_end = '\0';
                 value_end--;
@@ -365,29 +383,35 @@ struct http_request web_server_parse_request(const char* raw_request) {
 }
 
 void web_server_parse_query_string(const char* query, struct http_request* request) {
+    const char* start;
     if (!query || !request) return;
-    
-    const char* start = query;
+
+    start = query;
     while (*start && request->query_count < 16) {
-        const char* end = strchr(start, '&');
-        if (!end) end = start + strlen(start);
-        
+        const char* end;
         char pair[256];
-        size_t pair_len = end - start;
+        size_t pair_len;
+        char* eq_pos;
+        end = strchr(start, '&');
+        if (!end) end = start + strlen(start);
+
+        pair_len = end - start;
         if (pair_len >= sizeof(pair)) pair_len = sizeof(pair) - 1;
-        
+
         memcpy(pair, start, pair_len);
         pair[pair_len] = '\0';
-        
-        char* eq_pos = strchr(pair, '=');
+
+        eq_pos = strchr(pair, '=');
         if (eq_pos) {
-            *eq_pos = '\0';
-            char* key = pair;
-            char* value = eq_pos + 1;
-            
-            /* URL decode */
+            char* key;
+            char* value;
             char decoded_key[64];
             char decoded_value[256];
+            *eq_pos = '\0';
+            key = pair;
+            value = eq_pos + 1;
+
+            /* URL decode */
             web_server_url_decode(key, decoded_key, sizeof(decoded_key));
             web_server_url_decode(value, decoded_value, sizeof(decoded_value));
             
@@ -402,9 +426,10 @@ void web_server_parse_query_string(const char* query, struct http_request* reque
 }
 
 char* web_server_url_decode(const char* str, char* result, size_t result_size) {
+    size_t i, j;
     if (!str || !result || result_size == 0) return NULL;
-    
-    size_t i, j = 0;
+
+    j = 0;
     for (i = 0; str[i] != '\0' && j < result_size - 1; i++) {
         if (str[i] == '%' && i + 2 < strlen(str)) {
             char hex[3] = {str[i+1], str[i+2], '\0'};
@@ -427,19 +452,22 @@ char* web_server_url_decode(const char* str, char* result, size_t result_size) {
 
 /* Socket initialization */
 void web_server_init_socket(struct web_server* server) {
+    int opt;
+    struct sockaddr_in address;
+    int flags;
+    char start_msg[256];
     if (!server) return;
-    
+
     server->server_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (server->server_fd < 0) {
         logger_error_with_category("WebServer", "Failed to create socket");
         return;
     }
-    
+
     /* Set socket options for reuse */
-    int opt = 1;
+    opt = 1;
     setsockopt(server->server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
-    
-    struct sockaddr_in address;
+
     address.sin_family = AF_INET;
     address.sin_addr.s_addr = INADDR_ANY;
     address.sin_port = htons(server->port);
@@ -461,10 +489,9 @@ void web_server_init_socket(struct web_server* server) {
     }
     
     /* Set socket to non-blocking */
-    int flags = fcntl(server->server_fd, F_GETFL, 0);
+    flags = fcntl(server->server_fd, F_GETFL, 0);
     fcntl(server->server_fd, F_SETFL, flags | O_NONBLOCK);
-    
-    char start_msg[256];
+
     snprintf(start_msg, sizeof(start_msg), "Web server started on port %d", server->port);
     logger_info_with_category("WebServer", start_msg);
 }
@@ -478,7 +505,7 @@ void* web_server_thread_func(void* arg) {
     while (!server->should_stop) {
         struct sockaddr_in client_addr;
         socklen_t client_len = sizeof(client_addr);
-        
+        struct timeval tv;
         int client_fd = accept(server->server_fd, (struct sockaddr*)&client_addr, &client_len);
         
         if (client_fd >= 0) {
@@ -493,7 +520,6 @@ void* web_server_thread_func(void* arg) {
         
         /* Small sleep to prevent busy waiting */
         /* Use select() for C89-compatible microsecond sleep */
-        struct timeval tv;
         tv.tv_sec = 0;
         tv.tv_usec = 1000; /* 1ms */
         select(0, NULL, NULL, NULL, &tv);
@@ -503,17 +529,19 @@ void* web_server_thread_func(void* arg) {
 }
 
 void web_server_handle_client(struct web_server* server, int client_fd) {
+    char buffer[4096] = {0};
+    ssize_t bytes_read;
     if (!server) {
         close(client_fd);
         return;
     }
-    
-    char buffer[4096] = {0};
-    ssize_t bytes_read = read(client_fd, buffer, sizeof(buffer) - 1);
-    
+
+    bytes_read = read(client_fd, buffer, sizeof(buffer) - 1);
+
     if (bytes_read > 0) {
         struct http_request parsed_request = web_server_parse_request(buffer);
-        
+        struct http_response response;
+
         /* Get client IP for rate limiting */
         struct sockaddr_in client_addr;
         socklen_t client_len = sizeof(client_addr);
@@ -522,8 +550,8 @@ void web_server_handle_client(struct web_server* server, int client_fd) {
         } else {
             web_server_strcpy_safe(parsed_request.client_ip, "unknown", sizeof(parsed_request.client_ip));
         }
-        
-        struct http_response response = web_server_process_request(server, &parsed_request);
+
+        response = web_server_process_request(server, &parsed_request);
         
         if (response.status_code == 101) {
             /* WebSocket upgrade — send handshake then keep fd open */
@@ -559,6 +587,7 @@ void web_server_handle_client(struct web_server* server, int client_fd) {
 /* Request processing */
 struct http_response web_server_process_request(struct web_server* server, const struct http_request* request) {
     struct http_response response;
+    int i;
     memset(&response, 0, sizeof(response));
     response.status_code = 200;
     
@@ -611,17 +640,17 @@ struct http_response web_server_process_request(struct web_server* server, const
     }
     
     /* Check static routes first */
-    int i;
     for (i = 0; i < server->static_count; i++) {
         if (strcmp(server->static_paths[i], request->path) == 0) {
             if (server->static_is_file[i]) {
                 /* File route - create streaming response */
+                FILE* file;
                 response.is_streaming = 1;
                 web_server_strcpy_safe(response.file_path, server->static_file_paths[i], sizeof(response.file_path));
                 web_server_strcpy_safe(response.content_type, server->static_content_types[i], sizeof(response.content_type));
-                
+
                 /* Get file size for Content-Length header */
-                FILE* file = fopen(response.file_path, "rb");
+                file = fopen(response.file_path, "rb");
                 if (file) {
                     fseek(file, 0, SEEK_END);
                     response.content_length = ftell(file);
@@ -652,11 +681,10 @@ struct http_response web_server_process_request(struct web_server* server, const
 }
 
 int web_server_is_websocket_upgrade(const struct http_request* request) {
-    if (!request) return 0;
-    
     int i;
     int has_upgrade = 0, has_connection = 0;
-    
+    if (!request) return 0;
+
     for (i = 0; i < request->header_count; i++) {
         if (web_server_strcasecmp(request->header_keys[i], "Upgrade") == 0) {
             if (web_server_strcasecmp(request->header_values[i], "websocket") == 0) {
@@ -674,21 +702,28 @@ int web_server_is_websocket_upgrade(const struct http_request* request) {
 
 /* Response serialization */
 char* web_server_serialize_response(const struct http_response* response) {
+    size_t total_size;
+    char* result;
+    char* ptr;
+    size_t remaining;
+    const char* status_text = "OK";
+    int written;
+    int i;
+    size_t body_len;
     if (!response) return NULL;
-    
+
     /* Calculate total size needed */
-    size_t total_size = 1024; /* Base size for status line and headers */
+    total_size = 1024; /* Base size for status line and headers */
     total_size += strlen(response->body);
     total_size += response->header_count * 128; /* Space for headers */
-    
-    char* result = (char*)web_server_malloc(total_size);
+
+    result = (char*)web_server_malloc(total_size);
     if (!result) return NULL;
-    
-    char* ptr = result;
-    size_t remaining = total_size;
-    
+
+    ptr = result;
+    remaining = total_size;
+
     /* Status line */
-    const char* status_text = "OK";
     switch (response->status_code) {
         case 200: status_text = "OK"; break;
         case 404: status_text = "Not Found"; break;
@@ -698,14 +733,13 @@ char* web_server_serialize_response(const struct http_response* response) {
         default: status_text = "Unknown"; break;
     }
     
-    int written = snprintf(ptr, remaining, "HTTP/1.1 %d %s\r\n", response->status_code, status_text);
+    written = snprintf(ptr, remaining, "HTTP/1.1 %d %s\r\n", response->status_code, status_text);
     if (written > 0 && (size_t)written < remaining) {
         ptr += written;
         remaining -= written;
     }
-    
+
     /* Headers */
-    int i;
     for (i = 0; i < response->header_count; i++) {
         written = snprintf(ptr, remaining, "%s: %s\r\n", 
                           response->header_keys[i], response->header_values[i]);
@@ -739,7 +773,7 @@ char* web_server_serialize_response(const struct http_response* response) {
     }
     
     /* Body */
-    size_t body_len = strlen(response->body);
+    body_len = strlen(response->body);
     if (body_len < remaining) {
         memcpy(ptr, response->body, body_len);
         ptr += body_len;
@@ -770,13 +804,14 @@ void web_server_setup_api_routes(struct web_server* server) {
 
 /* Default handlers */
 struct http_response web_server_handle_not_found(const struct http_request* request) {
-    (void)request; /* Suppress unused parameter warning */
     struct http_response response;
+    const char* html;
+    (void)request; /* Suppress unused parameter warning */
     memset(&response, 0, sizeof(response));
     response.status_code = 404;
     web_server_strcpy_safe(response.content_type, "text/html", sizeof(response.content_type));
-    
-    const char* html = 
+
+    html =
         "<!DOCTYPE html>\n"
         "<html>\n"
         "<head>\n"
@@ -798,18 +833,21 @@ struct http_response web_server_handle_not_found(const struct http_request* requ
 }
 
 struct http_response web_server_handle_api_status(const struct http_request* request) {
-    (void)request; /* Suppress unused parameter warning */
     struct http_response response;
+    time_t now;
+    time_t start_time;
+    time_t uptime_seconds;
+    char json[512];
+    (void)request; /* Suppress unused parameter warning */
     memset(&response, 0, sizeof(response));
     response.status_code = 200;
     web_server_strcpy_safe(response.content_type, "application/json", sizeof(response.content_type));
-    
+
     /* Calculate actual uptime */
-    time_t now = time(NULL);
-    time_t start_time = get_daemon_start_time();
-    time_t uptime_seconds = now - start_time;
-    
-    char json[512];
+    now = time(NULL);
+    start_time = get_daemon_start_time();
+    uptime_seconds = now - start_time;
+
     snprintf(json, sizeof(json),
         "{"
         "\"status\":\"running\","
@@ -823,14 +861,15 @@ struct http_response web_server_handle_api_status(const struct http_request* req
 }
 
 struct http_response web_server_handle_api_metrics(const struct http_request* request) {
-    (void)request; /* Suppress unused parameter warning */
     struct http_response response;
+    char *json_data;
+    (void)request; /* Suppress unused parameter warning */
     memset(&response, 0, sizeof(response));
     response.status_code = 200;
     web_server_strcpy_safe(response.content_type, "application/json", sizeof(response.content_type));
-    
+
     /* Use C89 metrics API - simplified version */
-    char *json_data = metrics_export_json();
+    json_data = metrics_export_json();
     if (json_data) {
         web_server_strcpy_safe(response.body, json_data, sizeof(response.body));
         free(json_data);
@@ -841,32 +880,37 @@ struct http_response web_server_handle_api_metrics(const struct http_request* re
 }
 
 struct http_response web_server_handle_api_health(const struct http_request* request) {
-    (void)request; /* Suppress unused parameter warning */
     struct http_response response;
+    health_status_t overall_status;
+    health_check_t checks[32];
+    int checks_count;
+    char escaped_overall[32];
+    char json[2048];
+    char* ptr;
+    size_t remaining;
+    int written;
+    int i;
+    int first = 1;
+    (void)request; /* Suppress unused parameter warning */
     memset(&response, 0, sizeof(response));
     response.status_code = 200;
     web_server_strcpy_safe(response.content_type, "application/json", sizeof(response.content_type));
-    
-    health_status_t overall_status = health_monitor_get_overall_status();
-    health_check_t checks[32];
-    int checks_count = health_monitor_get_all_checks(checks, 32);
-    
-    char escaped_overall[32];
+
+    overall_status = health_monitor_get_overall_status();
+    checks_count = health_monitor_get_all_checks(checks, 32);
+
     web_server_json_escape(health_monitor_status_to_string(overall_status),
                           escaped_overall, sizeof(escaped_overall));
-    char json[2048];
-    char* ptr = json;
-    size_t remaining = sizeof(json);
-    
-    int written = snprintf(ptr, remaining, "{\"overall_status\":\"%s\",\"checks\":{", 
+    ptr = json;
+    remaining = sizeof(json);
+
+    written = snprintf(ptr, remaining, "{\"overall_status\":\"%s\",\"checks\":{",
                           escaped_overall);
     if (written > 0 && (size_t)written < remaining) {
         ptr += written;
         remaining -= written;
     }
-    
-    int i;
-    int first = 1;
+
     for (i = 0; i < checks_count && remaining > 200; i++) {
         char escaped_name[64];
         char escaped_status[32];
@@ -903,25 +947,26 @@ struct http_response web_server_handle_api_health(const struct http_request* req
 }
 
 struct http_response web_server_handle_api_config(const struct http_request* request) {
-    (void)request; /* Suppress unused parameter warning */
     struct http_response response;
+    config_data_t* config;
+    char escaped_device[128];
+    char escaped_level[32];
+    char escaped_file[256];
+    char json[2048];
+    (void)request; /* Suppress unused parameter warning */
     memset(&response, 0, sizeof(response));
     response.status_code = 200;
     web_server_strcpy_safe(response.content_type, "application/json", sizeof(response.content_type));
-    
-    config_data_t* config = config_get_instance();
+
+    config = config_get_instance();
     if (!config) {
         web_server_strcpy_safe(response.body, "{\"error\":\"Config not available\"}", sizeof(response.body));
         return response;
     }
-    
-    char escaped_device[128];
-    char escaped_level[32];
-    char escaped_file[256];
+
     web_server_json_escape(config_get_display_device(config), escaped_device, sizeof(escaped_device));
     web_server_json_escape(config_get_log_level(config), escaped_level, sizeof(escaped_level));
     web_server_json_escape(config_get_log_file(config), escaped_file, sizeof(escaped_file));
-    char json[2048];
     snprintf(json, sizeof(json),
         "{"
         "\"hardware\":{"
@@ -969,20 +1014,21 @@ struct http_response web_server_handle_api_config(const struct http_request* req
 }
 
 struct http_response web_server_handle_api_state(const struct http_request* request) {
-    (void)request; /* Suppress unused parameter warning */
     struct http_response response;
+    char json[1024];
+    struct daemon_state_info state_info;
+    char line1[64], line2[64];
+    char escaped_line1[128], escaped_line2[128];
+    char escaped_keypad[128];
+    char escaped_error[256];
+    (void)request; /* Suppress unused parameter warning */
     memset(&response, 0, sizeof(response));
     response.status_code = 200;
     web_server_strcpy_safe(response.content_type, "application/json", sizeof(response.content_type));
-    
-    char json[1024];
-    struct daemon_state_info state_info = get_daemon_state_info();
-    char line1[64], line2[64];
-    char escaped_line1[128], escaped_line2[128];
+
+    state_info = get_daemon_state_info();
 
     /* Escape strings for JSON (prevent injection from keypad_buffer, sip_last_error) */
-    char escaped_keypad[128];
-    char escaped_error[256];
     web_server_json_escape(state_info.keypad_buffer, escaped_keypad, sizeof(escaped_keypad));
     web_server_json_escape(state_info.sip_last_error, escaped_error, sizeof(escaped_error));
 
@@ -1016,18 +1062,24 @@ struct http_response web_server_handle_api_state(const struct http_request* requ
 
 struct http_response web_server_handle_api_control(const struct http_request* request) {
     struct http_response response;
-    memset(&response, 0, sizeof(response));
-    response.status_code = 200;
-    web_server_strcpy_safe(response.content_type, "application/json", sizeof(response.content_type));
-    
     char json[1024];
     char action[64] = "unknown";
     char key[16] = "";
     char plugin[64] = "";
     int cents = 0;
-    
+    char* action_pos;
+    char* key_pos;
+    char* plugin_pos;
+    int success = 0;
+    char message[256] = "Unknown action";
+    char escaped_action[128];
+    char escaped_message[512];
+    memset(&response, 0, sizeof(response));
+    response.status_code = 200;
+    web_server_strcpy_safe(response.content_type, "application/json", sizeof(response.content_type));
+
     /* Parse action from JSON body */
-    char* action_pos = strstr(request->body, "\"action\":\"");
+    action_pos = strstr(request->body, "\"action\":\"");
     if (action_pos) {
         char* start = action_pos + 10; /* Length of "action":" */
         char* end = strchr(start, '"');
@@ -1041,7 +1093,7 @@ struct http_response web_server_handle_api_control(const struct http_request* re
     }
     
     /* Parse key for keypad actions (supports "key" or "arg") */
-    char* key_pos = strstr(request->body, "\"key\":\"");
+    key_pos = strstr(request->body, "\"key\":\"");
     if (key_pos) {
         char* start = key_pos + 7; /* Length of "key":" */
         char* end = strchr(start, '"');
@@ -1092,7 +1144,7 @@ struct http_response web_server_handle_api_control(const struct http_request* re
     }
     
     /* Parse plugin for plugin actions */
-    char* plugin_pos = strstr(request->body, "\"plugin\":\"");
+    plugin_pos = strstr(request->body, "\"plugin\":\"");
     if (plugin_pos) {
         char* start = plugin_pos + 10; /* Length of "plugin":" */
         char* end = strchr(start, '"');
@@ -1106,9 +1158,6 @@ struct http_response web_server_handle_api_control(const struct http_request* re
     }
     
     /* Handle different actions */
-    int success = 0;
-    char message[256] = "Unknown action";
-    
     if (strcmp(action, "start_call") == 0) {
         success = send_control_command("start_call");
         snprintf(message, sizeof(message), "%s", success ? "Call initiation requested" : "Failed to initiate call");
@@ -1161,8 +1210,6 @@ struct http_response web_server_handle_api_control(const struct http_request* re
     }
     
     /* Escape for JSON to prevent injection when action/message contain " or \ */
-    char escaped_action[128];
-    char escaped_message[512];
     web_server_json_escape(action, escaped_action, sizeof(escaped_action));
     web_server_json_escape(message, escaped_message, sizeof(escaped_message));
     
@@ -1182,22 +1229,31 @@ struct http_response web_server_handle_api_control(const struct http_request* re
 
 struct http_response web_server_handle_api_logs(const struct http_request* request) {
     struct http_response response;
+    char level[16] = "INFO";
+    int i;
+    int max_entries = 20;
+    char json[8192];
+    char* ptr = json;
+    size_t remaining = sizeof(json);
+    int written;
+    log_level_t min_level = LOG_LEVEL_INFO;
+    char log_buffer[50][512];
+    int log_count;
+    int first = 1;
+    int total_count = 0;
     memset(&response, 0, sizeof(response));
     response.status_code = 200;
     web_server_strcpy_safe(response.content_type, "application/json", sizeof(response.content_type));
-    
+
     /* Get log level parameter */
-    char level[16] = "INFO";
-    int i;
     for (i = 0; i < request->query_count; i++) {
         if (strcmp(request->query_keys[i], "level") == 0) {
             web_server_strcpy_safe(level, request->query_values[i], sizeof(level));
             break;
         }
     }
-    
+
     /* Get max entries parameter (default to 20, max 50) */
-    int max_entries = 20;
     for (i = 0; i < request->query_count; i++) {
         if (strcmp(request->query_keys[i], "max_entries") == 0) {
             max_entries = atoi(request->query_values[i]);
@@ -1206,25 +1262,32 @@ struct http_response web_server_handle_api_logs(const struct http_request* reque
             break;
         }
     }
-    
-    char json[8192];
-    char* ptr = json;
-    size_t remaining = sizeof(json);
-    
-    int written = snprintf(ptr, remaining, "{\"logs\":[");
+
+    written = snprintf(ptr, remaining, "{\"logs\":[");
     if (written > 0 && (size_t)written < remaining) {
         ptr += written;
         remaining -= written;
     }
-    
-    /* Get logs from memory */
-    char log_buffer[50][512];
-    int log_count = logger_get_recent_logs(log_buffer, max_entries);
-    
-    int first = 1;
-    int total_count = 0;
+
+    /* Map requested level name -> minimum severity. This is a THRESHOLD, not an
+     * exact match, so an INFO view still surfaces WARN/ERROR. */
+    if (strcmp(level, "ALL") == 0 || strcmp(level, "VERBOSE") == 0) min_level = LOG_LEVEL_VERBOSE;
+    else if (strcmp(level, "DEBUG") == 0) min_level = LOG_LEVEL_DEBUG;
+    else if (strcmp(level, "INFO") == 0) min_level = LOG_LEVEL_INFO;
+    else if (strcmp(level, "WARN") == 0 || strcmp(level, "WARNING") == 0) min_level = LOG_LEVEL_WARN;
+    else if (strcmp(level, "ERROR") == 0) min_level = LOG_LEVEL_ERROR;
+
+    /* Get logs from memory, level-filtered across the whole ring buffer so
+     * INFO+ events appear even when DEBUG output dominates the recent window. */
+    log_count = logger_get_recent_logs_min_level(log_buffer, max_entries, min_level);
+
     /* Process logs in reverse order (newest first) */
     for (i = log_count - 1; i >= 0 && remaining > 200; i--) {
+        char escaped_message[512];
+        time_t log_timestamp;
+        char log_level[16] = "INFO"; /* Default level */
+        char* timestamp_start;
+        char escaped_level[32];
         if (!first) {
             written = snprintf(ptr, remaining, ",");
             if (written > 0 && (size_t)written < remaining) {
@@ -1234,11 +1297,14 @@ struct http_response web_server_handle_api_logs(const struct http_request* reque
         }
         
         /* JSON-escape log message: ", \, and control chars (#112) */
-        char escaped_message[512];
         {
             char *src = log_buffer[i];
             char *dst = escaped_message;
             size_t dst_remaining = sizeof(escaped_message) - 1;
+            /* Skip the "[timestamp] [LEVEL] " prefix so the message field holds
+             * just "[category] text" (the client renders its own time + level). */
+            { char *b1 = strchr(src, ']');
+              if (b1) { char *b2 = strchr(b1 + 1, ']'); if (b2 && b2[1] == ' ') src = b2 + 2; } }
             while (*src && dst_remaining > 2) {
                 if (*src == '"' || *src == '\\') {
                     *dst++ = '\\';
@@ -1263,17 +1329,17 @@ struct http_response web_server_handle_api_logs(const struct http_request* reque
         }
         
         /* Extract timestamp and level from the log message */
-        time_t log_timestamp = time(NULL); /* Default to current time */
-        char log_level[16] = "INFO"; /* Default level */
-        
+        log_timestamp = time(NULL); /* Default to current time */
+
         /* Try to parse timestamp from log message format: [YYYY-MM-DD HH:MM:SS.mmm] [LEVEL] [CATEGORY] message */
-        char* timestamp_start = strstr(log_buffer[i], "[");
+        timestamp_start = strstr(log_buffer[i], "[");
         if (timestamp_start) {
             char* timestamp_end = strstr(timestamp_start + 1, "]");
             if (timestamp_end) {
                 /* Parse the timestamp - format: YYYY-MM-DD HH:MM:SS.mmm */
                 int year, month, day, hour, min, sec, msec;
-                if (sscanf(timestamp_start + 1, "%d-%d-%d %d:%d:%d.%d", 
+                char* level_start;
+                if (sscanf(timestamp_start + 1, "%d-%d-%d %d:%d:%d.%d",
                           &year, &month, &day, &hour, &min, &sec, &msec) == 7) {
                     /* Convert to time_t (approximate) */
                     struct tm tm_time = {0};
@@ -1287,7 +1353,7 @@ struct http_response web_server_handle_api_logs(const struct http_request* reque
                 }
                 
                 /* Try to parse log level from the next [LEVEL] section */
-                char* level_start = strstr(timestamp_end + 1, "[");
+                level_start = strstr(timestamp_end + 1, "[");
                 if (level_start) {
                     char* level_end = strstr(level_start + 1, "]");
                     if (level_end) {
@@ -1301,33 +1367,9 @@ struct http_response web_server_handle_api_logs(const struct http_request* reque
             }
         }
         
-        /* Filter by level if specified */
-        if (strcmp(level, "ALL") != 0) {
-            /* Convert both to uppercase for comparison */
-            char upper_level[16];
-            char upper_log_level[16];
-            int j;
-            
-            /* Convert requested level to uppercase */
-            for (j = 0; level[j] != '\0' && j < (int)(sizeof(upper_level) - 1); j++) {
-                upper_level[j] = toupper(level[j]);
-            }
-            upper_level[j] = '\0';
-            
-            /* Convert log level to uppercase */
-            for (j = 0; log_level[j] != '\0' && j < (int)(sizeof(upper_log_level) - 1); j++) {
-                upper_log_level[j] = toupper(log_level[j]);
-            }
-            upper_log_level[j] = '\0';
-            
-            /* Skip if level doesn't match */
-            if (strcmp(upper_level, upper_log_level) != 0) {
-                continue;
-            }
-        }
-        
+        /* Level filtering already applied by logger_get_recent_logs_min_level. */
+
         /* Escape log_level for JSON (parsed from log, could have special chars) */
-        char escaped_level[32];
         web_server_json_escape(log_level, escaped_level, sizeof(escaped_level));
         written = snprintf(ptr, remaining,
             "{\"timestamp\":%ld,\"level\":\"%s\",\"message\":\"%s\"}",
@@ -1352,13 +1394,12 @@ struct http_response web_server_handle_api_logs(const struct http_request* reque
 }
 
 struct http_response web_server_handle_api_plugins(const struct http_request* request) {
-    (void)request; /* Suppress unused parameter warning */
     struct http_response response;
+    char json[2048];
+    (void)request; /* Suppress unused parameter warning */
     memset(&response, 0, sizeof(response));
     response.status_code = 200;
     web_server_strcpy_safe(response.content_type, "application/json", sizeof(response.content_type));
-    
-    char json[2048];
 
     /* Enumerate the registry dynamically so newly added plugins appear in the
      * dashboard automatically (no hard-coded list to keep in sync). */
@@ -1372,9 +1413,9 @@ struct http_response web_server_handle_api_plugins(const struct http_request* re
 }
 
 struct http_response web_server_handle_api_version(const struct http_request* request) {
-    (void)request;
     struct http_response response;
     char json[512];
+    (void)request;
     memset(&response, 0, sizeof(response));
     web_server_strcpy_safe(response.content_type, "application/json", sizeof(response.content_type));
     response.status_code = 200;
@@ -1386,10 +1427,10 @@ struct http_response web_server_handle_api_version(const struct http_request* re
 }
 
 struct http_response web_server_handle_api_check_update(const struct http_request* request) {
-    (void)request;
     struct http_response response;
     char json[512];
     const char *latest;
+    (void)request;
     memset(&response, 0, sizeof(response));
     web_server_strcpy_safe(response.content_type, "application/json", sizeof(response.content_type));
     response.status_code = 200;
@@ -1411,11 +1452,11 @@ struct http_response web_server_handle_api_check_update(const struct http_reques
 }
 
 struct http_response web_server_handle_api_update(const struct http_request* request) {
-    (void)request;
     struct http_response response;
     char json[512];
     const char *source_dir;
     int rc;
+    (void)request;
     memset(&response, 0, sizeof(response));
     web_server_strcpy_safe(response.content_type, "application/json", sizeof(response.content_type));
 
@@ -1439,8 +1480,8 @@ struct http_response web_server_handle_api_update(const struct http_request* req
 }
 
 struct http_response web_server_handle_dashboard(const struct http_request* request) {
-    (void)request;
     struct http_response response;
+    (void)request;
     memset(&response, 0, sizeof(response));
     response.status_code = 200;
     web_server_strcpy_safe(response.content_type, "text/html", sizeof(response.content_type));
@@ -1618,14 +1659,16 @@ int web_server_is_audio_active(void) {
 }
 
 int web_server_check_rate_limit(struct web_server* server, const char* client_ip, const char* endpoint) {
-    if (!server || !client_ip || !endpoint) return 1;
-    
-    time_t now = time(NULL);
+    time_t now;
     char key[128];
-    snprintf(key, sizeof(key), "%s:%s", client_ip, endpoint);
-    
-    /* Clean up old entries (older than 60 seconds) */
     int i;
+    int found_idx = -1;
+    if (!server || !client_ip || !endpoint) return 1;
+
+    now = time(NULL);
+    snprintf(key, sizeof(key), "%s:%s", client_ip, endpoint);
+
+    /* Clean up old entries (older than 60 seconds) */
     for (i = 0; i < server->rate_limit_count; i++) {
         if (now - server->rate_limit_infos[i].last_request > 60) {
             /* Remove this entry by shifting remaining entries */
@@ -1641,7 +1684,6 @@ int web_server_check_rate_limit(struct web_server* server, const char* client_ip
     }
     
     /* Find existing entry or create new one */
-    int found_idx = -1;
     for (i = 0; i < server->rate_limit_count; i++) {
         if (strcmp(server->rate_limit_keys[i], key) == 0) {
             found_idx = i;
@@ -1653,8 +1695,8 @@ int web_server_check_rate_limit(struct web_server* server, const char* client_ip
         /* Create new entry */
         if (server->rate_limit_count < 64) {
             found_idx = server->rate_limit_count;
-            strncpy(server->rate_limit_keys[found_idx], key, sizeof(server->rate_limit_keys[found_idx]) - 1);
-            server->rate_limit_keys[found_idx][sizeof(server->rate_limit_keys[found_idx]) - 1] = '\0';
+            web_server_strcpy_safe(server->rate_limit_keys[found_idx], key,
+                                   sizeof(server->rate_limit_keys[found_idx]));
             server->rate_limit_infos[found_idx].request_count = 0;
             server->rate_limit_count++;
         } else {
@@ -1671,6 +1713,7 @@ int web_server_check_rate_limit(struct web_server* server, const char* client_ip
 
 struct http_response web_server_create_rate_limit_response(void) {
     struct http_response response;
+    const char* json;
     memset(&response, 0, sizeof(response));
     response.status_code = 429; /* Too Many Requests */
     
@@ -1680,7 +1723,7 @@ struct http_response web_server_create_rate_limit_response(void) {
     
     web_server_strcpy_safe(response.content_type, "application/json", sizeof(response.content_type));
     
-    const char* json = 
+    json =
         "{"
         "\"error\": \"Rate limit exceeded\","
         "\"message\": \"Too many requests. Please slow down, especially during calls.\","
@@ -1720,15 +1763,21 @@ void web_server_broadcast_to_websockets(struct web_server* server, const char* m
 
 /* Streaming response implementation */
 int web_server_send_streaming_response(int client_fd, const struct http_response* response) {
-    if (!response || !response->is_streaming) return -1;
-    
-    /* Send HTTP headers first */
     char headers[1024];
     char* ptr = headers;
     size_t remaining = sizeof(headers);
-    
+    int written;
+    int i;
+    FILE* file;
+    char buffer[8192];  /* 8KB buffer for efficient reading */
+    size_t bytes_read;
+    int total_sent = 0;
+    if (!response || !response->is_streaming) return -1;
+
+    /* Send HTTP headers first */
+
     /* Status line */
-    int written = snprintf(ptr, remaining, "HTTP/1.1 %d OK\r\n", response->status_code);
+    written = snprintf(ptr, remaining, "HTTP/1.1 %d OK\r\n", response->status_code);
     if (written > 0 && (size_t)written < remaining) {
         ptr += written;
         remaining -= written;
@@ -1749,7 +1798,6 @@ int web_server_send_streaming_response(int client_fd, const struct http_response
     }
     
     /* Additional headers */
-    int i;
     for (i = 0; i < response->header_count; i++) {
         written = snprintf(ptr, remaining, "%s: %s\r\n", 
                           response->header_keys[i], response->header_values[i]);
@@ -1772,15 +1820,11 @@ int web_server_send_streaming_response(int client_fd, const struct http_response
     }
     
     /* Open and send file content */
-    FILE* file = fopen(response->file_path, "rb");
+    file = fopen(response->file_path, "rb");
     if (!file) {
         return -1;
     }
-    
-    char buffer[8192];  /* 8KB buffer for efficient reading */
-    size_t bytes_read;
-    int total_sent = 0;
-    
+
     while ((bytes_read = fread(buffer, 1, sizeof(buffer), file)) > 0) {
         ssize_t sent = send(client_fd, buffer, bytes_read, 0);
         if (sent < 0) {
