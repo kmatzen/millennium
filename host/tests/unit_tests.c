@@ -330,6 +330,41 @@ static void test_plugins_register_and_activate(void) {
     plugins_cleanup();
 }
 
+static void test_plugins_activation_metrics(void) {
+    daemon_state_data_t ds;
+    daemon_state_init(&ds);
+    daemon_state = &ds;
+    client = millennium_client_create();
+
+    /* Start from a clean metrics slate so counts are deterministic even if an
+     * earlier test already created the metrics instance. */
+    metrics_init();
+    metrics_reset_all();
+
+    /* plugins_init activates the default "Classic Phone" once. */
+    plugins_init();
+    TEST_ASSERT_EQ_INT((int)metrics_get_counter("plugin_activations_total"), 1);
+    TEST_ASSERT_EQ_INT(
+        (int)metrics_get_counter("plugin_activations_Classic Phone"), 1);
+
+    /* Each activation bumps the aggregate and the per-plugin counter. */
+    TEST_ASSERT_EQ_INT(plugins_activate("Fortune Teller"), 0);
+    TEST_ASSERT_EQ_INT(plugins_activate("Fortune Teller"), 0);
+    TEST_ASSERT_EQ_INT((int)metrics_get_counter("plugin_activations_total"), 3);
+    TEST_ASSERT_EQ_INT(
+        (int)metrics_get_counter("plugin_activations_Fortune Teller"), 2);
+
+    /* A failed activation must not move any counter. */
+    TEST_ASSERT_EQ_INT(plugins_activate("Nonexistent"), -1);
+    TEST_ASSERT_EQ_INT((int)metrics_get_counter("plugin_activations_total"), 3);
+
+    millennium_client_destroy(client);
+    client = NULL;
+    daemon_state = NULL;
+    plugins_cleanup();
+    metrics_cleanup();
+}
+
 static void test_plugins_activate_nonexistent(void) {
     daemon_state_data_t ds;
     daemon_state_init(&ds);
@@ -1182,6 +1217,7 @@ int main(void) {
 
     TEST_SUITE_BEGIN("Plugins");
     TEST_SUITE_RUN(test_plugins_register_and_activate);
+    TEST_SUITE_RUN(test_plugins_activation_metrics);
     TEST_SUITE_RUN(test_plugins_activate_nonexistent);
     TEST_SUITE_RUN(test_plugins_register_custom);
     TEST_SUITE_RUN(test_plugins_list);
