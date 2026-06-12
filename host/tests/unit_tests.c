@@ -1,6 +1,7 @@
 #define _POSIX_C_SOURCE 200112L
 #include "test_framework.h"
 #include "../config.h"
+#include "../cli.h"
 #include "../daemon_state.h"
 #include "../plugins.h"
 #include "../logger.h"
@@ -1613,6 +1614,94 @@ static void test_conn_queue_stats_null_safety(void) {
     TEST_ASSERT_EQ_INT((int)st.rejected_total, 0);
 }
 
+/* ── CLI argument parsing ───────────────────────────────────────── */
+
+static void test_cli_no_args_runs(void) {
+    cli_options_t opts;
+    char* argv[] = { "millennium-daemon" };
+    cli_parse_args(1, argv, &opts);
+    TEST_ASSERT_EQ_INT(opts.mode, CLI_MODE_RUN);
+    TEST_ASSERT_NULL((void*)opts.config_file);
+}
+
+static void test_cli_config_long(void) {
+    cli_options_t opts;
+    char* argv[] = { "millennium-daemon", "--config", "/etc/millennium/daemon.conf" };
+    cli_parse_args(3, argv, &opts);
+    TEST_ASSERT_EQ_INT(opts.mode, CLI_MODE_RUN);
+    TEST_ASSERT_EQ_STR(opts.config_file, "/etc/millennium/daemon.conf");
+}
+
+static void test_cli_config_short(void) {
+    cli_options_t opts;
+    char* argv[] = { "millennium-daemon", "-c", "/tmp/x.conf" };
+    cli_parse_args(3, argv, &opts);
+    TEST_ASSERT_EQ_INT(opts.mode, CLI_MODE_RUN);
+    TEST_ASSERT_EQ_STR(opts.config_file, "/tmp/x.conf");
+}
+
+static void test_cli_config_equals(void) {
+    cli_options_t opts;
+    char* argv[] = { "millennium-daemon", "--config=/tmp/y.conf" };
+    cli_parse_args(2, argv, &opts);
+    TEST_ASSERT_EQ_INT(opts.mode, CLI_MODE_RUN);
+    TEST_ASSERT_EQ_STR(opts.config_file, "/tmp/y.conf");
+}
+
+static void test_cli_config_missing_value(void) {
+    cli_options_t opts;
+    char* argv[] = { "millennium-daemon", "--config" };
+    cli_parse_args(2, argv, &opts);
+    TEST_ASSERT_EQ_INT(opts.mode, CLI_MODE_ERROR);
+    TEST_ASSERT(opts.error[0] != '\0');
+}
+
+static void test_cli_config_empty_equals(void) {
+    cli_options_t opts;
+    char* argv[] = { "millennium-daemon", "--config=" };
+    cli_parse_args(2, argv, &opts);
+    TEST_ASSERT_EQ_INT(opts.mode, CLI_MODE_ERROR);
+}
+
+static void test_cli_help(void) {
+    cli_options_t opts;
+    char* argv[] = { "millennium-daemon", "--help" };
+    cli_parse_args(2, argv, &opts);
+    TEST_ASSERT_EQ_INT(opts.mode, CLI_MODE_HELP);
+}
+
+static void test_cli_version(void) {
+    cli_options_t opts;
+    char* argv[] = { "millennium-daemon", "-v" };
+    cli_parse_args(2, argv, &opts);
+    TEST_ASSERT_EQ_INT(opts.mode, CLI_MODE_VERSION);
+}
+
+static void test_cli_unknown_arg(void) {
+    cli_options_t opts;
+    char* argv[] = { "millennium-daemon", "--bogus" };
+    cli_parse_args(2, argv, &opts);
+    TEST_ASSERT_EQ_INT(opts.mode, CLI_MODE_ERROR);
+    TEST_ASSERT(opts.error[0] != '\0');
+}
+
+/* --config no longer has to be the first argument (the old parser only looked
+   at argv[1]); a flag before it must still be honored. */
+static void test_cli_config_not_first(void) {
+    cli_options_t opts;
+    char* argv[] = { "millennium-daemon", "-c", "/a.conf", "--bogus" };
+    cli_parse_args(4, argv, &opts);
+    TEST_ASSERT_EQ_INT(opts.mode, CLI_MODE_ERROR);  /* the trailing bad flag wins */
+}
+
+/* --version/--help short-circuit even when other (valid) args follow. */
+static void test_cli_version_short_circuits(void) {
+    cli_options_t opts;
+    char* argv[] = { "millennium-daemon", "--version", "--config", "/x.conf" };
+    cli_parse_args(4, argv, &opts);
+    TEST_ASSERT_EQ_INT(opts.mode, CLI_MODE_VERSION);
+}
+
 /* ── Main ───────────────────────────────────────────────────────── */
 
 int main(void) {
@@ -1732,6 +1821,19 @@ int main(void) {
     TEST_SUITE_RUN(test_conn_queue_blocking_pop_wakes);
     TEST_SUITE_RUN(test_conn_queue_stats);
     TEST_SUITE_RUN(test_conn_queue_stats_null_safety);
+
+    TEST_SUITE_BEGIN("CLI");
+    TEST_SUITE_RUN(test_cli_no_args_runs);
+    TEST_SUITE_RUN(test_cli_config_long);
+    TEST_SUITE_RUN(test_cli_config_short);
+    TEST_SUITE_RUN(test_cli_config_equals);
+    TEST_SUITE_RUN(test_cli_config_missing_value);
+    TEST_SUITE_RUN(test_cli_config_empty_equals);
+    TEST_SUITE_RUN(test_cli_help);
+    TEST_SUITE_RUN(test_cli_version);
+    TEST_SUITE_RUN(test_cli_unknown_arg);
+    TEST_SUITE_RUN(test_cli_config_not_first);
+    TEST_SUITE_RUN(test_cli_version_short_circuits);
 
     TEST_REPORT();
 }

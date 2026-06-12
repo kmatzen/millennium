@@ -65,6 +65,33 @@ make clean         # Remove all build artifacts
 sudo make install  # Install daemon binary, ALSA config, and systemd service
 ```
 
+## Command-line options
+
+The daemon accepts a few flags (anything else is rejected with a usage message
+and exit code 2):
+
+```
+Usage: millennium-daemon [options]
+
+Options:
+  -c, --config <path>   Read configuration from <path>
+                        (default: /etc/millennium/daemon.conf)
+  -v, --version         Print version and build info, then exit
+  -h, --help            Print this help, then exit
+```
+
+`--version` prints the build's semantic version, git hash, and build time —
+useful for confirming which build is actually installed after a deploy:
+
+```bash
+millennium-daemon --version
+# millennium-daemon 0.3.0 (git 1f831a8, built 2026-06-11T12:00:00Z)
+```
+
+`--config` may appear anywhere on the command line and also accepts the
+`--config=<path>` form. The systemd unit passes
+`--config /etc/millennium/daemon.conf`.
+
 ## Systemd Setup
 
 ```bash
