@@ -131,9 +131,9 @@ simulator: $(SIM_OBJS)
 all: daemon
 
 # Unit test binary
-UNIT_TEST_OBJS = tests/unit_tests.o daemon_state.o clock_source.o events.o event_processor.o config.o cli.o logger.o metrics.o call_metrics.o plugins.o plugin_sdk.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o plugins/number_guess.o plugins/simon.o plugins/dial_a_joke.o plugins/trivia.o state_persistence.o display_manager.o version.o updater.o conn_queue.o
+UNIT_TEST_OBJS = tests/unit_tests.o daemon_state.o clock_source.o events.o event_processor.o config.o cli.o logger.o metrics.o call_metrics.o health_monitor.o plugins.o plugin_sdk.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o plugins/number_guess.o plugins/simon.o plugins/dial_a_joke.o plugins/trivia.o state_persistence.o display_manager.o version.o updater.o conn_queue.o
 
-tests/unit_tests.o: tests/unit_tests.c tests/test_framework.h config.h cli.h daemon_state.h plugins.h logger.h metrics.h call_metrics.h millennium_sdk.h updater.h state_persistence.h conn_queue.h
+tests/unit_tests.o: tests/unit_tests.c tests/test_framework.h config.h cli.h daemon_state.h plugins.h logger.h metrics.h call_metrics.h millennium_sdk.h updater.h state_persistence.h conn_queue.h health_monitor.h
 	gcc tests/unit_tests.c -o tests/unit_tests.o -c $(CFLAGS) -I.
 
 # Unit tests don't use time wrapping; link ALSA on Linux for jukebox

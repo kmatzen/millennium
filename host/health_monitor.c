@@ -17,6 +17,7 @@ static pthread_t g_monitoring_thread;
 static void* monitoring_loop(void* arg);
 static void update_statistics(health_status_t status);
 static int find_check_index(const char* name);
+static health_status_t execute_check(health_check_t* check);
 
 health_monitor_t* health_monitor_get_instance(void) {
     if (!g_initialized) {
@@ -180,31 +181,23 @@ void health_monitor_run_check(const char* name) {
     health_monitor_t* monitor = health_monitor_get_instance();
     int index;
     health_status_t status;
-    time_t now;
-    
+
     if (!name) {
         return;
     }
-    
+
     pthread_mutex_lock(&g_monitor_mutex);
-    
+
     index = find_check_index(name);
     if (index < 0) {
         pthread_mutex_unlock(&g_monitor_mutex);
         logger_warn_with_category("HealthMonitor", "Health check not found");
         return;
     }
-    
+
     /* Run the check */
-    status = monitor->checks[index].check_function();
-    now = time(NULL);
-    
-    monitor->checks[index].last_status = status;
-    monitor->checks[index].last_check_time = now;
-    strcpy(monitor->checks[index].last_message, "Check completed successfully");
-    
-    update_statistics(status);
-    
+    status = execute_check(&monitor->checks[index]);
+
     pthread_mutex_unlock(&g_monitor_mutex);
     
     if (status != HEALTH_STATUS_HEALTHY) {
@@ -215,21 +208,13 @@ void health_monitor_run_check(const char* name) {
 void health_monitor_run_all_checks(void) {
     health_monitor_t* monitor = health_monitor_get_instance();
     int i;
-    health_status_t status;
-    time_t now;
-    
+
     pthread_mutex_lock(&g_monitor_mutex);
-    
-    now = time(NULL);
+
     for (i = 0; i < monitor->checks_count; i++) {
-        status = monitor->checks[i].check_function();
-        monitor->checks[i].last_status = status;
-        monitor->checks[i].last_check_time = now;
-        strcpy(monitor->checks[i].last_message, "Check completed successfully");
-        
-        update_statistics(status);
+        execute_check(&monitor->checks[i]);
     }
-    
+
     pthread_mutex_unlock(&g_monitor_mutex);
 }
 
@@ -341,12 +326,7 @@ static void* monitoring_loop(void* arg) {
         
         for (i = 0; i < monitor->checks_count; i++) {
             if (now - monitor->checks[i].last_check_time >= monitor->checks[i].interval_seconds) {
-                health_status_t status = monitor->checks[i].check_function();
-                monitor->checks[i].last_status = status;
-                monitor->checks[i].last_check_time = now;
-                strcpy(monitor->checks[i].last_message, "Check completed successfully");
-                
-                update_statistics(status);
+                execute_check(&monitor->checks[i]);
             }
         }
         
@@ -356,6 +336,32 @@ static void* monitoring_loop(void* arg) {
     }
     
     return NULL;
+}
+
+/* Run one check, recording status, timestamp, and message. The check may fill
+ * `message` with a diagnostic; if it leaves the buffer empty we synthesize a
+ * status-derived default so the /api/health "message" field always reflects the
+ * actual finding (it was previously hard-coded to "Check completed successfully"
+ * even when a check returned CRITICAL). Caller must hold g_monitor_mutex. */
+static health_status_t execute_check(health_check_t* check) {
+    char message[256];
+    health_status_t status;
+
+    message[0] = '\0';
+    status = check->check_function(message, sizeof(message));
+
+    check->last_status = status;
+    check->last_check_time = time(NULL);
+    if (message[0] != '\0') {
+        strncpy(check->last_message, message, sizeof(check->last_message) - 1);
+        check->last_message[sizeof(check->last_message) - 1] = '\0';
+    } else {
+        snprintf(check->last_message, sizeof(check->last_message),
+                 "Status: %s", health_monitor_status_to_string(status));
+    }
+
+    update_statistics(status);
+    return status;
 }
 
 static void update_statistics(health_status_t status) {
@@ -383,20 +389,23 @@ static int find_check_index(const char* name) {
     return -1;
 }
 
-/* System health check implementations */
-health_status_t system_health_check_serial_connection(void) {
-    /* This would check if the serial connection to the Arduino is working */
-    /* For now, we'll simulate a check */
+/* System health check implementations.
+ *
+ * These are generic, registerable checks kept alongside the monitor. The daemon
+ * registers its own hardware-aware serial/SIP checks (see daemon.c); the two
+ * here are simple stand-ins for builds without that wiring. Each writes a short
+ * diagnostic into `message` for /api/health. */
+health_status_t system_health_check_serial_connection(char *message, size_t message_len) {
+    snprintf(message, message_len, "Serial connection assumed up (generic check)");
     return HEALTH_STATUS_HEALTHY;
 }
 
-health_status_t system_health_check_sip_connection(void) {
-    /* This would check if the SIP connection is active */
-    /* For now, we'll simulate a check */
+health_status_t system_health_check_sip_connection(char *message, size_t message_len) {
+    snprintf(message, message_len, "SIP connection assumed up (generic check)");
     return HEALTH_STATUS_HEALTHY;
 }
 
-health_status_t system_health_check_memory_usage(void) {
+health_status_t system_health_check_memory_usage(char *message, size_t message_len) {
     FILE* status_file;
     char line[256];
     char key[32];
@@ -404,60 +413,73 @@ health_status_t system_health_check_memory_usage(void) {
     char unit[32];
     long memory_kb;
     long memory_mb;
-    
+
     status_file = fopen("/proc/self/status", "r");
     if (!status_file) {
+        snprintf(message, message_len, "Could not read /proc/self/status");
         return HEALTH_STATUS_UNKNOWN;
     }
-    
+
     while (fgets(line, sizeof(line), status_file)) {
         if (strncmp(line, "VmRSS:", 6) == 0) {
             if (sscanf(line, "%31s %31s %31s", key, value, unit) == 3) {
                 memory_kb = atol(value);
                 memory_mb = memory_kb / 1024;
-                
+
                 fclose(status_file);
-                
+
                 if (memory_mb > 1000) { /* More than 1GB */
+                    snprintf(message, message_len,
+                             "Resident memory %ld MB exceeds 1000 MB", memory_mb);
                     return HEALTH_STATUS_CRITICAL;
                 } else if (memory_mb > 500) { /* More than 500MB */
+                    snprintf(message, message_len,
+                             "Resident memory %ld MB exceeds 500 MB", memory_mb);
                     return HEALTH_STATUS_WARNING;
                 }
-                
+
+                snprintf(message, message_len, "Resident memory %ld MB", memory_mb);
                 return HEALTH_STATUS_HEALTHY;
             }
         }
     }
-    
+
     fclose(status_file);
+    snprintf(message, message_len, "VmRSS not found in /proc/self/status");
     return HEALTH_STATUS_UNKNOWN;
 }
 
-health_status_t system_health_check_disk_space(void) {
+health_status_t system_health_check_disk_space(char *message, size_t message_len) {
     struct statvfs stat;
     unsigned long free_space;
     unsigned long total_space;
     double free_percentage;
-    
+
     if (statvfs("/", &stat) != 0) {
+        snprintf(message, message_len, "statvfs(\"/\") failed");
         return HEALTH_STATUS_UNKNOWN;
     }
-    
+
     free_space = stat.f_bavail * stat.f_frsize;
     total_space = stat.f_blocks * stat.f_frsize;
-    
+
     free_percentage = (double)free_space / total_space * 100.0;
-    
+
     if (free_percentage < 5.0) {
+        snprintf(message, message_len,
+                 "Root filesystem %.1f%% free (below 5%%)", free_percentage);
         return HEALTH_STATUS_CRITICAL;
     } else if (free_percentage < 10.0) {
+        snprintf(message, message_len,
+                 "Root filesystem %.1f%% free (below 10%%)", free_percentage);
         return HEALTH_STATUS_WARNING;
     }
-    
+
+    snprintf(message, message_len, "Root filesystem %.1f%% free", free_percentage);
     return HEALTH_STATUS_HEALTHY;
 }
 
-health_status_t system_health_check_system_load(void) {
+health_status_t system_health_check_system_load(char *message, size_t message_len) {
     FILE* loadavg_file;
     char line[256];
     double load1, load5, load15;
@@ -465,12 +487,13 @@ health_status_t system_health_check_system_load(void) {
     char cpu_line[256];
     int cpu_count = 0;
     double load_percentage;
-    
+
     loadavg_file = fopen("/proc/loadavg", "r");
     if (!loadavg_file) {
+        snprintf(message, message_len, "Could not read /proc/loadavg");
         return HEALTH_STATUS_UNKNOWN;
     }
-    
+
     if (fgets(line, sizeof(line), loadavg_file)) {
         if (sscanf(line, "%lf %lf %lf", &load1, &load5, &load15) == 3) {
             /* Get number of CPU cores */
@@ -483,25 +506,35 @@ health_status_t system_health_check_system_load(void) {
                 }
                 fclose(cpuinfo);
             }
-            
+
             if (cpu_count == 0) {
                 cpu_count = 1; /* Fallback */
             }
-            
+
             load_percentage = (load1 / cpu_count) * 100.0;
-            
+
             fclose(loadavg_file);
-            
+
             if (load_percentage > 90.0) {
+                snprintf(message, message_len,
+                         "Load %.2f = %.0f%% of %d core(s)",
+                         load1, load_percentage, cpu_count);
                 return HEALTH_STATUS_CRITICAL;
             } else if (load_percentage > 70.0) {
+                snprintf(message, message_len,
+                         "Load %.2f = %.0f%% of %d core(s)",
+                         load1, load_percentage, cpu_count);
                 return HEALTH_STATUS_WARNING;
             }
-            
+
+            snprintf(message, message_len,
+                     "Load %.2f = %.0f%% of %d core(s)",
+                     load1, load_percentage, cpu_count);
             return HEALTH_STATUS_HEALTHY;
         }
     }
-    
+
     fclose(loadavg_file);
+    snprintf(message, message_len, "Could not parse /proc/loadavg");
     return HEALTH_STATUS_UNKNOWN;
 }
