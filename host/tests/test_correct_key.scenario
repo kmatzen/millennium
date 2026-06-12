@@ -1,0 +1,46 @@
+# Test: '*' correct key erases the last dialed digit
+# Verifies that pressing '*' deletes the most recently dialed digit so a
+# misdial can be fixed without hanging up, that it bottoms out cleanly on an
+# empty buffer, and that a corrected number still places a call normally.
+
+# Phone starts with receiver down
+assert_state IDLE_DOWN
+
+# Pick up handset
+hook_up
+assert_state IDLE_UP
+assert_display Insert 50c
+
+# Dial a 4-digit prefix, then notice the last digit is wrong
+keys 5551
+assert_display (555) 1__-____
+
+# Press '*' to erase the last digit
+key *
+assert_display (555) ___-____
+assert_no_display (555) 1__-____
+
+# Erase the remaining digits one at a time
+key *
+assert_display (55_) ___-____
+key *
+assert_display (5__) ___-____
+key *
+assert_display (___) ___-____
+
+# '*' on an empty buffer is a clean no-op
+key *
+assert_display (___) ___-____
+
+# Correction left coins untouched: pay, then dial the right number and connect
+coin 25
+coin 25
+assert_display Have: 50c
+keys 5551234567
+assert_display Call active
+assert_state CALL_ACTIVE
+
+# Hang up
+hook_down
+assert_state IDLE_DOWN
+assert_display Lift receiver
