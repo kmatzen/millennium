@@ -292,6 +292,18 @@ const char* health_monitor_status_to_string(health_status_t status) {
     }
 }
 
+int health_monitor_status_is_serving(health_status_t status) {
+    switch (status) {
+        case HEALTH_STATUS_HEALTHY:
+        case HEALTH_STATUS_WARNING:
+            return 1;
+        case HEALTH_STATUS_CRITICAL:
+        case HEALTH_STATUS_UNKNOWN:
+        default:
+            return 0;
+    }
+}
+
 health_status_t health_monitor_string_to_status(const char* status_str) {
     if (!status_str) {
         return HEALTH_STATUS_UNKNOWN;

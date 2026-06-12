@@ -910,6 +910,7 @@ char* web_server_serialize_response(const struct http_response* response) {
         case 500: status_text = "Internal Server Error"; break;
         case 101: status_text = "Switching Protocols"; break;
         case 429: status_text = "Too Many Requests"; break;
+        case 503: status_text = "Service Unavailable"; break;
         default: status_text = "Unknown"; break;
     }
     
@@ -1078,6 +1079,10 @@ struct http_response web_server_handle_api_health(const struct http_request* req
 
     overall_status = health_monitor_get_overall_status();
     checks_count = health_monitor_get_all_checks(checks, 32);
+
+    /* Reflect health in the HTTP status so liveness/readiness probes and load
+     * balancers can detect an unhealthy daemon without parsing the body. */
+    response.status_code = health_monitor_status_is_serving(overall_status) ? 200 : 503;
 
     web_server_json_escape(health_monitor_status_to_string(overall_status),
                           escaped_overall, sizeof(escaped_overall));

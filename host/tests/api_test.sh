@@ -39,6 +39,10 @@ echo ""
 run "GET /api/state returns JSON" "curl -s $BASE/api/state" "current_state"
 run "GET /api/state has sip_registered" "curl -s $BASE/api/state" "sip_registered"
 run "GET /api/health returns JSON" "curl -s $BASE/api/health" "overall_status"
+# A healthy daemon must answer probes with HTTP 200 (it returns 503 when the
+# overall status is CRITICAL/UNKNOWN, so probes can react to the code alone).
+run "GET /api/health returns HTTP 200 when healthy" \
+    "curl -s -o /dev/null -w '%{http_code}' $BASE/api/health" "200"
 
 # Control: handset_up
 run "POST handset_up" \
