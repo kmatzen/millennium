@@ -140,6 +140,18 @@ static void tq_handle_tick(void) {
     }
 }
 
+/* Test/introspection hook (see test_plugin_display_lines_fit): expose every
+ * static claim so the unit-test guardrail can verify none exceeds the display
+ * line budget. Returns the total count; fills up to `max` into out[]. */
+int trivia_display_strings(const char **out, int max) {
+    int n = 0, i;
+    for (i = 0; i < NUM_Q; i++) {
+        if (out && n < max) out[n] = questions[i].claim;
+        n++;
+    }
+    return n;
+}
+
 void register_trivia_plugin(void) {
     memset(&tq, 0, sizeof(tq));
     tq.phase = TQ_IDLE;

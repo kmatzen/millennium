@@ -868,6 +868,53 @@ static void test_number_guess_compare(void) {
     TEST_ASSERT(number_guess_compare(99, 1) < 0);
 }
 
+/* ── Display line budget guardrail ──────────────────────────────────── */
+
+/* Each content-heavy built-in exposes its static display strings (mirroring
+ * the number_guess_compare export). The VFD scrolls long lines, but the
+ * pipeline silently truncates anything >= DISPLAY_MAX_TEXT_LEN, so every
+ * authored line must round-trip through the display without loss. */
+int dial_a_joke_display_strings(const char **out, int max);
+int trivia_display_strings(const char **out, int max);
+int jukebox_display_strings(const char **out, int max);
+int fortune_teller_display_strings(const char **out, int max);
+
+static void check_display_strings(const char *plugin,
+                                  int (*collect)(const char **, int)) {
+    const char *strings[128];
+    char back[DISPLAY_MAX_TEXT_LEN];
+    int count, i;
+
+    count = collect(strings, 128);
+    TEST_ASSERT(count > 0);
+    TEST_ASSERT(count <= 128);          /* buffer holds the whole table */
+
+    for (i = 0; i < count; i++) {
+        /* Push the real string through the real display pipeline and read it
+         * back: a line over the budget comes back truncated, which fails. */
+        display_manager_set_text(strings[i], NULL);
+        display_manager_get_text(back, sizeof(back), NULL, 0);
+        if (strcmp(back, strings[i]) != 0) {
+            fprintf(stderr, "  %s display line truncated: \"%s\" -> \"%s\"\n",
+                    plugin, strings[i], back);
+        }
+        TEST_ASSERT_EQ_STR(back, strings[i]);
+    }
+}
+
+static void test_plugin_display_lines_fit(void) {
+    client = millennium_client_create();
+    display_manager_init(client);
+
+    check_display_strings("Dial-A-Joke", dial_a_joke_display_strings);
+    check_display_strings("Trivia", trivia_display_strings);
+    check_display_strings("Jukebox", jukebox_display_strings);
+    check_display_strings("Fortune Teller", fortune_teller_display_strings);
+
+    millennium_client_destroy(client);
+    client = NULL;
+}
+
 /* ── Plugin SDK ─────────────────────────────────────────────────────── */
 
 static void test_sdk_rand_bounds(void) {
@@ -1967,6 +2014,7 @@ int main(void) {
     TEST_SUITE_RUN(test_plugins_to_json);
     TEST_SUITE_RUN(test_plugins_to_json_escapes);
     TEST_SUITE_RUN(test_number_guess_compare);
+    TEST_SUITE_RUN(test_plugin_display_lines_fit);
 
     TEST_SUITE_BEGIN("Plugin SDK");
     TEST_SUITE_RUN(test_sdk_rand_bounds);

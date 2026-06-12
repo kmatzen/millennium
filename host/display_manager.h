@@ -15,6 +15,16 @@
 #define DISPLAY_SCROLL_HOLD_TICKS 4
 
 /*
+ * Per-line storage/scroll budget. The VFD shows DISPLAY_WIDTH (20) chars at a
+ * time: a line up to that length is static, a longer line auto-scrolls. The
+ * pipeline can scroll a line up to DISPLAY_MAX_TEXT_LEN-1 chars; anything
+ * longer is silently truncated, so plugin display content must stay under this
+ * budget. The unit-test guardrail (test_plugin_display_lines_fit) enforces it
+ * for every built-in plugin.
+ */
+#define DISPLAY_MAX_TEXT_LEN 256
+
+/*
  * Initialize the display manager with the SDK client handle.
  * Must be called before any other display_manager functions.
  */

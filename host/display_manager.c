@@ -3,7 +3,7 @@
 #include <string.h>
 #include <stdio.h>
 
-#define MAX_TEXT_LEN 256
+#define MAX_TEXT_LEN DISPLAY_MAX_TEXT_LEN
 
 static millennium_client_t *dm_client = NULL;
 

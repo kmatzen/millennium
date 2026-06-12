@@ -105,7 +105,16 @@ void register_hello_plugin(void) {
   `config_get_int/string/bool(config_get_instance(), "your.key", default)`.
   Exposing a "forced" value (e.g. `guess.secret`) makes scenario tests
   deterministic.
-- **Display width.** The VFD is two 20-char lines; longer lines auto-scroll.
+- **Display width.** The VFD is two 20-char lines (`DISPLAY_WIDTH`). A line at
+  or under 20 chars is shown statically; a longer line auto-scrolls. The
+  pipeline scrolls up to `DISPLAY_MAX_TEXT_LEN`-1 (255) chars per line; a line
+  longer than that is silently truncated, so keep every display string within
+  that budget — and ideally within `2 × DISPLAY_WIDTH` (40) so a two-line
+  message fits without scrolling. The unit-test guardrail
+  `test_plugin_display_lines_fit` enforces the no-truncation budget across the
+  built-in plugins by round-tripping their static strings through the display;
+  if you add a content table, expose it the way `trivia_display_strings` does
+  and add it to that test.
 
 ## Testing
 
