@@ -42,7 +42,8 @@ assert_display Text
 # A plugin that repaints its current state every tick should keep scrolling
 # instead of snapping the line back to its start on each repaint.
 set_display Header|This is a very long fortune message that scrolls
-tick_display 6
+# 4 hold ticks (DISPLAY_SCROLL_HOLD_TICKS) + 6 scroll steps = scroll position 6.
+tick_display 10
 assert_display s a very long fortun
 # Repaint byte-for-byte identical content...
 set_display Header|This is a very long fortune message that scrolls
