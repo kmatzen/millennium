@@ -14,6 +14,7 @@
 #include "../state_persistence.h"
 #include "../conn_queue.h"
 #include "../health_monitor.h"
+#include "../display_manager.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <pthread.h>
@@ -1018,6 +1019,52 @@ static void test_card_empty_list(void) {
     TEST_ASSERT_EQ_INT(0, config_is_admin_card(&cfg, "1234567890123456"));
 }
 
+/* ── Display manager ────────────────────────────────────────────── */
+
+/* Control bytes in plugin-supplied text would otherwise reach the VFD as
+ * commands or stray line breaks. They must be replaced with spaces while
+ * ordinary printable text passes through unchanged. */
+static void test_display_sanitizes_control_chars(void) {
+    char line1[64];
+    char line2[64];
+
+    display_manager_init(NULL);
+
+    /* Embedded newline, tab, carriage return, escape, and DEL all become
+     * spaces; the surrounding printable characters are preserved. */
+    display_manager_set_text("AB\nCD\tEF", "G\rH\x1bI\x7fJ");
+    display_manager_get_text(line1, sizeof(line1), line2, sizeof(line2));
+    TEST_ASSERT_EQ_STR(line1, "AB CD EF");
+    TEST_ASSERT_EQ_STR(line2, "G H I J");
+}
+
+static void test_display_preserves_printable(void) {
+    char line1[64];
+    char line2[64];
+
+    display_manager_init(NULL);
+
+    /* Plain text (including spaces and punctuation) is untouched. */
+    display_manager_set_text("Hello, World!", "Coins: $0.50");
+    display_manager_get_text(line1, sizeof(line1), line2, sizeof(line2));
+    TEST_ASSERT_EQ_STR(line1, "Hello, World!");
+    TEST_ASSERT_EQ_STR(line2, "Coins: $0.50");
+}
+
+static void test_display_high_bit_bytes_untouched(void) {
+    char line1[64];
+    char line2[64];
+
+    display_manager_init(NULL);
+
+    /* Bytes >= 0x80 may map to the VFD's extended glyph set, so they are left
+     * alone — only the C0 control range and DEL are scrubbed. */
+    display_manager_set_text("X\xa9Y", NULL);
+    display_manager_get_text(line1, sizeof(line1), line2, sizeof(line2));
+    TEST_ASSERT_EQ_STR(line1, "X\xa9Y");
+    TEST_ASSERT_EQ_STR(line2, "");
+}
+
 /* ── Logger (async file writer, issue #123) ─────────────────────── */
 
 /* File logging is drained to disk by a background writer thread so a slow disk
@@ -1878,6 +1925,11 @@ int main(void) {
     TEST_SUITE_RUN(test_version_no_update_initially);
     TEST_SUITE_RUN(test_updater_apply_null_dir);
     TEST_SUITE_RUN(test_updater_apply_bad_dir);
+
+    TEST_SUITE_BEGIN("Display Manager");
+    TEST_SUITE_RUN(test_display_sanitizes_control_chars);
+    TEST_SUITE_RUN(test_display_preserves_printable);
+    TEST_SUITE_RUN(test_display_high_bit_bytes_untouched);
 
     TEST_SUITE_BEGIN("Logger");
     TEST_SUITE_RUN(test_logger_async_file_write);
