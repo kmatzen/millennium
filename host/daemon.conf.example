@@ -6,6 +6,10 @@ hardware.display_device=/dev/serial/by-id/usb-Arduino_LLC_Millennium_Beta-if00
 hardware.baud_rate=9600
 
 # Call Configuration
+# A paid call dials automatically once 10 digits are entered (with enough
+# coins). To place a shorter number (e.g. a 7-digit local number), press '#'
+# to send immediately — the '#' request stays armed, so a coin inserted after
+# pressing it still completes the call.
 call.cost_cents=50
 call.timeout_seconds=300
 # Comma-separated numbers that can be dialed without coins (emergency/free calls)
