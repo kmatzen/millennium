@@ -26,6 +26,10 @@ void display_manager_init(millennium_client_t *client);
  * line in view at the beginning of every loop so it stays readable. Short
  * lines are displayed statically. Passing NULL for a line clears that line.
  *
+ * Re-setting a line to text identical to what it already shows preserves the
+ * in-progress scroll position, so a plugin may safely repaint its current
+ * state every tick without freezing a scrolling line at its start.
+ *
  * Control characters (bytes below 0x20, plus DEL 0x7F) in the supplied text
  * are replaced with spaces before storage: the VFD treats those bytes as
  * commands or line breaks, so they would otherwise corrupt the display. Plugin
