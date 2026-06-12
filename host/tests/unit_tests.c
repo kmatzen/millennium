@@ -10,7 +10,9 @@
 #include "../updater.h"
 #include "../plugin_sdk.h"
 #include "../clock_source.h"
+#include "../state_persistence.h"
 #include <stdlib.h>
+#include <stdio.h>
 
 /* ── Stubs for linker (plugins.c references these) ──────────────── */
 
@@ -1306,6 +1308,136 @@ static void test_call_ring_and_failure_metrics(void) {
     metrics_cleanup();
 }
 
+/* ── State persistence (load validation) ────────────────────────── */
+
+/* Write contents to a temp file so the loader has something to parse. */
+static void sp_write_file(const char *path, const char *contents) {
+    FILE *f = fopen(path, "w");
+    if (f) {
+        fputs(contents, f);
+        fclose(f);
+    }
+}
+
+static void test_state_load_round_trip(void) {
+    const char *path = "/tmp/millennium_state_good.test";
+    persisted_state_t saved;
+    persisted_state_t loaded;
+
+    saved.inserted_cents = 75;
+    saved.last_state = (int)DAEMON_STATE_IDLE_UP;
+    strcpy(saved.active_plugin, "Classic Phone");
+
+    TEST_ASSERT_EQ_INT(state_persistence_save(&saved, path), 0);
+    TEST_ASSERT_EQ_INT(state_persistence_load(&loaded, path), 0);
+    TEST_ASSERT_EQ_INT(loaded.inserted_cents, 75);
+    TEST_ASSERT_EQ_INT(loaded.last_state, (int)DAEMON_STATE_IDLE_UP);
+    TEST_ASSERT_EQ_STR(loaded.active_plugin, "Classic Phone");
+    remove(path);
+}
+
+static void test_state_load_absent_file_is_silent(void) {
+    const char *path = "/tmp/millennium_state_absent.test";
+    persisted_state_t ps;
+    char err[128];
+
+    remove(path);
+    /* Missing file fails the load but is NOT flagged as corruption. */
+    TEST_ASSERT_EQ_INT(state_persistence_load_ex(&ps, path, err, sizeof(err)), -1);
+    TEST_ASSERT_EQ_STR(err, "");
+    TEST_ASSERT_EQ_INT(ps.inserted_cents, 0);
+}
+
+static void test_state_load_rejects_negative_cents(void) {
+    const char *path = "/tmp/millennium_state_neg.test";
+    persisted_state_t ps;
+    char err[128];
+
+    sp_write_file(path, "inserted_cents=-50\nactive_plugin=Classic Phone\n");
+    TEST_ASSERT_EQ_INT(state_persistence_load_ex(&ps, path, err, sizeof(err)), -1);
+    TEST_ASSERT(err[0] != '\0');                 /* corruption is reported */
+    TEST_ASSERT_EQ_INT(ps.inserted_cents, 0);    /* and the state is zeroed */
+    TEST_ASSERT_EQ_STR(ps.active_plugin, "");
+    remove(path);
+}
+
+static void test_state_load_rejects_huge_cents(void) {
+    const char *path = "/tmp/millennium_state_huge.test";
+    persisted_state_t ps;
+    char err[128];
+
+    sp_write_file(path, "inserted_cents=999999999\n");
+    TEST_ASSERT_EQ_INT(state_persistence_load_ex(&ps, path, err, sizeof(err)), -1);
+    TEST_ASSERT(err[0] != '\0');
+    TEST_ASSERT_EQ_INT(ps.inserted_cents, 0);
+    remove(path);
+}
+
+static void test_state_load_rejects_nonnumeric_cents(void) {
+    const char *path = "/tmp/millennium_state_junk.test";
+    persisted_state_t ps;
+    char err[128];
+
+    /* atoi() would silently turn this into 0; strict parsing must reject it. */
+    sp_write_file(path, "inserted_cents=12abc\n");
+    TEST_ASSERT_EQ_INT(state_persistence_load_ex(&ps, path, err, sizeof(err)), -1);
+    TEST_ASSERT(err[0] != '\0');
+    remove(path);
+}
+
+static void test_state_load_accepts_boundary_cents(void) {
+    const char *path = "/tmp/millennium_state_max.test";
+    persisted_state_t ps;
+    char buf[64];
+
+    snprintf(buf, sizeof(buf), "inserted_cents=%d\n", STATE_MAX_INSERTED_CENTS);
+    sp_write_file(path, buf);
+    TEST_ASSERT_EQ_INT(state_persistence_load(&ps, path), 0);
+    TEST_ASSERT_EQ_INT(ps.inserted_cents, STATE_MAX_INSERTED_CENTS);
+    remove(path);
+}
+
+static void test_state_load_rejects_bad_last_state(void) {
+    const char *path = "/tmp/millennium_state_badstate.test";
+    persisted_state_t ps;
+    char err[128];
+
+    sp_write_file(path, "last_state=99\n");
+    TEST_ASSERT_EQ_INT(state_persistence_load_ex(&ps, path, err, sizeof(err)), -1);
+    TEST_ASSERT(err[0] != '\0');
+    remove(path);
+}
+
+static void test_state_load_rejects_control_chars_in_plugin(void) {
+    const char *path = "/tmp/millennium_state_ctrl.test";
+    persisted_state_t ps;
+    char err[128];
+
+    /* A bell/control byte in the name signals a torn write or tampering. */
+    sp_write_file(path, "active_plugin=Class\x07ic\n");
+    TEST_ASSERT_EQ_INT(state_persistence_load_ex(&ps, path, err, sizeof(err)), -1);
+    TEST_ASSERT(err[0] != '\0');
+    remove(path);
+}
+
+static void test_state_load_ignores_unknown_keys(void) {
+    const char *path = "/tmp/millennium_state_unknown.test";
+    persisted_state_t ps;
+
+    /* Forward compatibility: an unrecognized key must not fail the load. */
+    sp_write_file(path, "inserted_cents=25\nfuture_field=whatever\n");
+    TEST_ASSERT_EQ_INT(state_persistence_load(&ps, path), 0);
+    TEST_ASSERT_EQ_INT(ps.inserted_cents, 25);
+    remove(path);
+}
+
+static void test_state_load_null_safety(void) {
+    persisted_state_t ps;
+    /* NULL arguments must fail cleanly rather than crash. */
+    TEST_ASSERT_EQ_INT(state_persistence_load(NULL, "/tmp/x"), -1);
+    TEST_ASSERT_EQ_INT(state_persistence_load(&ps, NULL), -1);
+}
+
 /* ── Main ───────────────────────────────────────────────────────── */
 
 int main(void) {
@@ -1403,6 +1535,18 @@ int main(void) {
     TEST_SUITE_BEGIN("Call Metrics");
     TEST_SUITE_RUN(test_call_duration_histogram);
     TEST_SUITE_RUN(test_call_ring_and_failure_metrics);
+
+    TEST_SUITE_BEGIN("State Persistence");
+    TEST_SUITE_RUN(test_state_load_round_trip);
+    TEST_SUITE_RUN(test_state_load_absent_file_is_silent);
+    TEST_SUITE_RUN(test_state_load_rejects_negative_cents);
+    TEST_SUITE_RUN(test_state_load_rejects_huge_cents);
+    TEST_SUITE_RUN(test_state_load_rejects_nonnumeric_cents);
+    TEST_SUITE_RUN(test_state_load_accepts_boundary_cents);
+    TEST_SUITE_RUN(test_state_load_rejects_bad_last_state);
+    TEST_SUITE_RUN(test_state_load_rejects_control_chars_in_plugin);
+    TEST_SUITE_RUN(test_state_load_ignores_unknown_keys);
+    TEST_SUITE_RUN(test_state_load_null_safety);
 
     TEST_REPORT();
 }
