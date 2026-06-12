@@ -39,6 +39,7 @@ int send_control_command(const char* action);
 
 /* Thread function for web server */
 void* web_server_thread_func(void* arg);
+static void* web_server_worker_func(void* arg);
 
 /* String utility functions */
 void web_server_strcpy_safe(char* dest, const char* src, size_t dest_size) {
@@ -137,12 +138,25 @@ struct web_server* web_server_create(int port) {
     server->static_count = 0;
     server->websocket_count = 0;
     server->rate_limit_count = 0;
-    
+    server->worker_count = 0;
+
+    if (conn_queue_init(&server->conn_queue, WEB_SERVER_QUEUE_DEPTH) != 0) {
+        logger_error_with_category("WebServer", "Failed to init connection queue");
+        web_server_free(server);
+        return NULL;
+    }
+    if (pthread_mutex_init(&server->state_mutex, NULL) != 0) {
+        logger_error_with_category("WebServer", "Failed to init state mutex");
+        conn_queue_destroy(&server->conn_queue);
+        web_server_free(server);
+        return NULL;
+    }
+
     /* Initialize static route flags */
     for (i = 0; i < 16; i++) {
         server->static_is_file[i] = 0;
     }
-    
+
     return server;
 }
 
@@ -150,6 +164,8 @@ void web_server_destroy(struct web_server* server) {
     if (!server) return;
     
     web_server_stop(server);
+    conn_queue_destroy(&server->conn_queue);
+    pthread_mutex_destroy(&server->state_mutex);
     web_server_free(server);
 }
 
@@ -166,9 +182,42 @@ void web_server_start(struct web_server* server) {
     /* Initialize server socket */
     web_server_init_socket(server);
     
-    /* Start server thread */
+    /* Start worker pool before the accept thread so a connection is never
+     * enqueued with no one to service it. */
+    server->worker_count = 0;
+    {
+        int w;
+        for (w = 0; w < WEB_SERVER_WORKER_COUNT; w++) {
+            if (pthread_create(&server->worker_threads[w], NULL,
+                               web_server_worker_func, server) != 0) {
+                logger_error_with_category("WebServer", "Failed to create worker thread");
+                break;
+            }
+            server->worker_count++;
+        }
+    }
+    if (server->worker_count == 0) {
+        logger_error_with_category("WebServer", "No worker threads started; aborting web server");
+        server->running = 0;
+        if (server->server_fd >= 0) {
+            close(server->server_fd);
+            server->server_fd = -1;
+        }
+        return;
+    }
+
+    /* Start the accept thread */
     if (pthread_create(&server->server_thread, NULL, web_server_thread_func, server) != 0) {
         logger_error_with_category("WebServer", "Failed to create server thread");
+        /* Unwind the workers we just started. */
+        conn_queue_close(&server->conn_queue);
+        {
+            int w;
+            for (w = 0; w < server->worker_count; w++) {
+                pthread_join(server->worker_threads[w], NULL);
+            }
+        }
+        server->worker_count = 0;
         server->running = 0;
         if (server->server_fd >= 0) {
             close(server->server_fd);
@@ -181,17 +230,28 @@ void web_server_stop(struct web_server* server) {
     if (!server || !server->running) return;
     
     server->should_stop = 1;
-    
-    /* Wait for thread to finish */
+
+    /* Stop accepting first: the accept thread sees should_stop and returns. */
     pthread_join(server->server_thread, NULL);
-    
+
+    /* Then drain the worker pool: close the queue so blocked workers wake and
+     * exit once any remaining queued connections are serviced. */
+    conn_queue_close(&server->conn_queue);
+    {
+        int w;
+        for (w = 0; w < server->worker_count; w++) {
+            pthread_join(server->worker_threads[w], NULL);
+        }
+    }
+    server->worker_count = 0;
+
     server->running = 0;
-    
+
     if (server->server_fd >= 0) {
         close(server->server_fd);
         server->server_fd = -1;
     }
-    
+
     logger_info_with_category("WebServer", "Web server stopped");
 }
 
@@ -213,6 +273,12 @@ int web_server_is_running(const struct web_server* server) {
 
 int web_server_is_paused(const struct web_server* server) {
     return server ? server->paused : 0;
+}
+
+void web_server_get_conn_stats(struct web_server* server, struct conn_queue_stats* out) {
+    if (!out) return;
+    /* conn_queue_get_stats zeroes the output when handed a NULL queue. */
+    conn_queue_get_stats(server ? &server->conn_queue : NULL, out);
 }
 
 void web_server_set_port(struct web_server* server, int port) {
@@ -496,35 +562,73 @@ void web_server_init_socket(struct web_server* server) {
     logger_info_with_category("WebServer", start_msg);
 }
 
-/* Thread function for web server */
+/* Short reply sent when the worker queue is saturated, so a flooded server
+ * sheds load with a proper 503 instead of silently dropping the connection. */
+static void web_server_send_busy(int client_fd) {
+    static const char* busy =
+        "HTTP/1.1 503 Service Unavailable\r\n"
+        "Content-Type: application/json\r\n"
+        "Retry-After: 1\r\n"
+        "Connection: close\r\n"
+        "Content-Length: 23\r\n"
+        "\r\n"
+        "{\"error\":\"Server busy\"}";
+    send(client_fd, busy, strlen(busy), 0);
+}
+
+/* Accept thread: accepts connections and hands each off to a worker via the
+ * connection queue. Accepting stays cheap so the listen backlog drains quickly
+ * even while workers are busy with slow requests (#125). */
 void* web_server_thread_func(void* arg) {
     struct web_server* server = (struct web_server*)arg;
     if (!server) return NULL;
-    
-    /* Main server loop - runs in separate thread */
+
     while (!server->should_stop) {
         struct sockaddr_in client_addr;
         socklen_t client_len = sizeof(client_addr);
         struct timeval tv;
         int client_fd = accept(server->server_fd, (struct sockaddr*)&client_addr, &client_len);
-        
+
         if (client_fd >= 0) {
-            /* Handle request in a simple way (no threading to save resources) */
-            web_server_handle_client(server, client_fd);
+            if (conn_queue_try_push(&server->conn_queue, client_fd) != 0) {
+                /* Backlog full: shed load rather than grow unboundedly. */
+                logger_warn_with_category("WebServer",
+                    "Connection queue full; rejecting client with 503");
+                web_server_send_busy(client_fd);
+                close(client_fd);
+            }
         } else if (errno != EAGAIN && errno != EWOULDBLOCK) {
             /* Log error if it's not just a non-blocking accept */
             char error_msg[256];
             snprintf(error_msg, sizeof(error_msg), "Accept failed with error: %d", errno);
             logger_error_with_category("WebServer", error_msg);
         }
-        
+
         /* Small sleep to prevent busy waiting */
         /* Use select() for C89-compatible microsecond sleep */
         tv.tv_sec = 0;
         tv.tv_usec = 1000; /* 1ms */
         select(0, NULL, NULL, NULL, &tv);
     }
-    
+
+    return NULL;
+}
+
+/* Worker thread: services one accepted connection at a time, pulled from the
+ * shared queue. Multiple workers run concurrently, so a slow or expensive
+ * request only occupies its own worker instead of blocking every client. */
+static void* web_server_worker_func(void* arg) {
+    struct web_server* server = (struct web_server*)arg;
+    if (!server) return NULL;
+
+    for (;;) {
+        int client_fd = conn_queue_pop(&server->conn_queue);
+        if (client_fd < 0) {
+            break; /* Queue closed and drained: shut the worker down. */
+        }
+        web_server_handle_client(server, client_fd);
+    }
+
     return NULL;
 }
 
@@ -612,8 +716,12 @@ void web_server_handle_client(struct web_server* server, int client_fd) {
         /* Get client IP for rate limiting */
         struct sockaddr_in client_addr;
         socklen_t client_len = sizeof(client_addr);
-        if (getpeername(client_fd, (struct sockaddr*)&client_addr, &client_len) == 0) {
-            web_server_strcpy_safe(parsed_request.client_ip, inet_ntoa(client_addr.sin_addr), sizeof(parsed_request.client_ip));
+        /* inet_ntop (not inet_ntoa) so concurrent workers don't race on a
+         * shared static buffer. */
+        if (getpeername(client_fd, (struct sockaddr*)&client_addr, &client_len) == 0 &&
+            inet_ntop(AF_INET, &client_addr.sin_addr, parsed_request.client_ip,
+                      sizeof(parsed_request.client_ip)) != NULL) {
+            /* client_ip populated by inet_ntop */
         } else {
             web_server_strcpy_safe(parsed_request.client_ip, "unknown", sizeof(parsed_request.client_ip));
         }
@@ -627,12 +735,17 @@ void web_server_handle_client(struct web_server* server, int client_fd) {
                 send(client_fd, response_str, strlen(response_str), 0);
                 web_server_free(response_str);
             }
+            pthread_mutex_lock(&server->state_mutex);
             if (server->websocket_count < 32) {
+                int total;
                 server->websocket_connections[server->websocket_count++] = client_fd;
+                total = server->websocket_count;
+                pthread_mutex_unlock(&server->state_mutex);
                 logger_infof_with_category("WebServer",
                     "WebSocket client connected (fd=%d, total=%d)",
-                    client_fd, server->websocket_count);
+                    client_fd, total);
             } else {
+                pthread_mutex_unlock(&server->state_mutex);
                 logger_warn_with_category("WebServer", "Max WebSocket connections reached");
                 close(client_fd);
             }
@@ -1735,6 +1848,9 @@ int web_server_check_rate_limit(struct web_server* server, const char* client_ip
     now = time(NULL);
     snprintf(key, sizeof(key), "%s:%s", client_ip, endpoint);
 
+    /* The rate-limit table is shared across worker threads. */
+    pthread_mutex_lock(&server->state_mutex);
+
     /* Clean up old entries (older than 60 seconds) */
     for (i = 0; i < server->rate_limit_count; i++) {
         if (now - server->rate_limit_infos[i].last_request > 60) {
@@ -1767,14 +1883,16 @@ int web_server_check_rate_limit(struct web_server* server, const char* client_ip
             server->rate_limit_infos[found_idx].request_count = 0;
             server->rate_limit_count++;
         } else {
+            pthread_mutex_unlock(&server->state_mutex);
             return 1; /* Rate limit table full, allow request */
         }
     }
-    
+
     /* Update counters */
     server->rate_limit_infos[found_idx].request_count++;
     server->rate_limit_infos[found_idx].last_request = now;
-    
+
+    pthread_mutex_unlock(&server->state_mutex);
     return 1; /* Allowed - simplified rate limiting for C89 */
 }
 
@@ -1808,22 +1926,45 @@ void web_server_add_websocket_route(struct web_server* server, const char* path,
     server->websocket_handler = handler;
 }
 
+/* Remove a websocket fd from the connection list (matched by value) and close
+ * it. Safe against the list shifting under concurrent registration because it
+ * re-scans under the lock rather than trusting a cached index. */
+static void web_server_drop_websocket(struct web_server* server, int fd) {
+    int i;
+    pthread_mutex_lock(&server->state_mutex);
+    for (i = 0; i < server->websocket_count; i++) {
+        if (server->websocket_connections[i] == fd) {
+            int j;
+            for (j = i; j < server->websocket_count - 1; j++) {
+                server->websocket_connections[j] = server->websocket_connections[j + 1];
+            }
+            server->websocket_count--;
+            break;
+        }
+    }
+    pthread_mutex_unlock(&server->state_mutex);
+    close(fd);
+}
+
 void web_server_broadcast_to_websockets(struct web_server* server, const char* message) {
+    int fds[32];
+    int n = 0;
     int i;
     if (!server || !message) return;
 
-    for (i = 0; i < server->websocket_count; i++) {
-        int fd = server->websocket_connections[i];
-        if (ws_send_text(fd, message) != 0) {
-            close(fd);
-            {
-                int j;
-                for (j = i; j < server->websocket_count - 1; j++) {
-                    server->websocket_connections[j] = server->websocket_connections[j + 1];
-                }
-            }
-            server->websocket_count--;
-            i--;
+    /* Snapshot the connection list under the lock, then send outside it: a slow
+     * or stalled websocket client must not block workers registering new ones.
+     * Only this (single) broadcaster sends to or removes ws fds, so an fd can't
+     * be double-closed. */
+    pthread_mutex_lock(&server->state_mutex);
+    for (i = 0; i < server->websocket_count && n < (int)(sizeof(fds) / sizeof(fds[0])); i++) {
+        fds[n++] = server->websocket_connections[i];
+    }
+    pthread_mutex_unlock(&server->state_mutex);
+
+    for (i = 0; i < n; i++) {
+        if (ws_send_text(fds[i], message) != 0) {
+            web_server_drop_websocket(server, fds[i]);
         }
     }
 }

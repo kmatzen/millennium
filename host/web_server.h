@@ -6,9 +6,16 @@
 #include <time.h>
 #include <pthread.h>
 
+#include "conn_queue.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/* Worker threads that service accepted connections in parallel, and the depth
+ * of the backlog the accept loop will buffer before shedding load (#125). */
+#define WEB_SERVER_WORKER_COUNT 4
+#define WEB_SERVER_QUEUE_DEPTH 32
 
 /* Forward declarations */
 struct web_server;
@@ -76,7 +83,16 @@ struct web_server {
     int paused;
     int server_fd;
     pthread_t server_thread;
-    
+
+    /* Worker pool: the accept thread enqueues client fds; workers handle them
+     * concurrently so one slow request can't stall the dashboard (#125). */
+    struct conn_queue conn_queue;
+    pthread_t worker_threads[WEB_SERVER_WORKER_COUNT];
+    int worker_count;
+    /* Guards the rate-limit table and the websocket connection list, both of
+     * which are now mutated from multiple worker threads and the broadcaster. */
+    pthread_mutex_t state_mutex;
+
     /* Route storage - using arrays instead of maps */
     char route_methods[32][16];
     char route_paths[32][256];
@@ -114,6 +130,12 @@ void web_server_pause(struct web_server* server);
 void web_server_resume(struct web_server* server);
 int web_server_is_running(const struct web_server* server);
 int web_server_is_paused(const struct web_server* server);
+
+/* Snapshot the worker pool's connection-queue health (depth, high-water mark,
+ * connections accepted, connections shed under back-pressure). NULL-safe: zeroes
+ * the output if the server isn't running. Lets the daemon publish worker-pool
+ * saturation as metrics, the way #170 did for the async logger queue. */
+void web_server_get_conn_stats(struct web_server* server, struct conn_queue_stats* out);
 
 /* Configuration */
 void web_server_set_port(struct web_server* server, int port);

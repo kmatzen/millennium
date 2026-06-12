@@ -11,8 +11,10 @@
 #include "../plugin_sdk.h"
 #include "../clock_source.h"
 #include "../state_persistence.h"
+#include "../conn_queue.h"
 #include <stdlib.h>
 #include <stdio.h>
+#include <pthread.h>
 
 /* ── Stubs for linker (plugins.c references these) ──────────────── */
 
@@ -1438,6 +1440,179 @@ static void test_state_load_null_safety(void) {
     TEST_ASSERT_EQ_INT(state_persistence_load(&ps, NULL), -1);
 }
 
+/* ── Connection queue (web server worker pool, #125) ────────────── */
+
+static void test_conn_queue_fifo_order(void) {
+    struct conn_queue q;
+    TEST_ASSERT_EQ_INT(conn_queue_init(&q, 4), 0);
+    TEST_ASSERT_EQ_INT(conn_queue_count(&q), 0);
+
+    TEST_ASSERT_EQ_INT(conn_queue_try_push(&q, 10), 0);
+    TEST_ASSERT_EQ_INT(conn_queue_try_push(&q, 20), 0);
+    TEST_ASSERT_EQ_INT(conn_queue_try_push(&q, 30), 0);
+    TEST_ASSERT_EQ_INT(conn_queue_count(&q), 3);
+
+    /* Pops come back in the order they went in. */
+    TEST_ASSERT_EQ_INT(conn_queue_pop(&q), 10);
+    TEST_ASSERT_EQ_INT(conn_queue_pop(&q), 20);
+    TEST_ASSERT_EQ_INT(conn_queue_pop(&q), 30);
+    TEST_ASSERT_EQ_INT(conn_queue_count(&q), 0);
+
+    conn_queue_destroy(&q);
+}
+
+static void test_conn_queue_full_rejects(void) {
+    struct conn_queue q;
+    TEST_ASSERT_EQ_INT(conn_queue_init(&q, 2), 0);
+
+    TEST_ASSERT_EQ_INT(conn_queue_try_push(&q, 1), 0);
+    TEST_ASSERT_EQ_INT(conn_queue_try_push(&q, 2), 0);
+    /* Third push is back-pressure: queue is full. */
+    TEST_ASSERT_EQ_INT(conn_queue_try_push(&q, 3), -1);
+    TEST_ASSERT_EQ_INT(conn_queue_count(&q), 2);
+
+    conn_queue_destroy(&q);
+}
+
+static void test_conn_queue_wraps_around(void) {
+    struct conn_queue q;
+    int i;
+    TEST_ASSERT_EQ_INT(conn_queue_init(&q, 3), 0);
+
+    /* Fill, drain partway, refill — exercises the ring buffer wrap. */
+    for (i = 0; i < 3; i++) TEST_ASSERT_EQ_INT(conn_queue_try_push(&q, i), 0);
+    TEST_ASSERT_EQ_INT(conn_queue_pop(&q), 0);
+    TEST_ASSERT_EQ_INT(conn_queue_pop(&q), 1);
+    TEST_ASSERT_EQ_INT(conn_queue_try_push(&q, 3), 0);  /* wraps to head slot 0 */
+    TEST_ASSERT_EQ_INT(conn_queue_try_push(&q, 4), 0);
+    TEST_ASSERT_EQ_INT(conn_queue_pop(&q), 2);
+    TEST_ASSERT_EQ_INT(conn_queue_pop(&q), 3);
+    TEST_ASSERT_EQ_INT(conn_queue_pop(&q), 4);
+
+    conn_queue_destroy(&q);
+}
+
+static void test_conn_queue_close_drains_then_signals(void) {
+    struct conn_queue q;
+    TEST_ASSERT_EQ_INT(conn_queue_init(&q, 4), 0);
+
+    TEST_ASSERT_EQ_INT(conn_queue_try_push(&q, 7), 0);
+    conn_queue_close(&q);
+
+    /* Push after close is rejected. */
+    TEST_ASSERT_EQ_INT(conn_queue_try_push(&q, 8), -1);
+    /* Already-queued items still drain... */
+    TEST_ASSERT_EQ_INT(conn_queue_pop(&q), 7);
+    /* ...then pop reports closed-and-empty without blocking. */
+    TEST_ASSERT_EQ_INT(conn_queue_pop(&q), -1);
+
+    conn_queue_destroy(&q);
+}
+
+static void test_conn_queue_null_safety(void) {
+    TEST_ASSERT_EQ_INT(conn_queue_init(NULL, 4), -1);
+    TEST_ASSERT_EQ_INT(conn_queue_init((struct conn_queue*)0, 0), -1);
+    TEST_ASSERT_EQ_INT(conn_queue_try_push(NULL, 1), -1);
+    TEST_ASSERT_EQ_INT(conn_queue_pop(NULL), -1);
+    TEST_ASSERT_EQ_INT(conn_queue_count(NULL), 0);
+    conn_queue_close(NULL);    /* must not crash */
+    conn_queue_destroy(NULL);  /* must not crash */
+}
+
+/* A blocked pop must wake and return the fd once a producer pushes. Run the
+ * producer on a second thread so the main thread genuinely blocks in pop. */
+struct cq_producer_arg { struct conn_queue* q; int fd; };
+static void* cq_producer(void* arg) {
+    struct cq_producer_arg* a = (struct cq_producer_arg*)arg;
+    conn_queue_try_push(a->q, a->fd);
+    return NULL;
+}
+static void test_conn_queue_blocking_pop_wakes(void) {
+    struct conn_queue q;
+    struct cq_producer_arg arg;
+    pthread_t producer;
+    TEST_ASSERT_EQ_INT(conn_queue_init(&q, 4), 0);
+
+    arg.q = &q;
+    arg.fd = 42;
+    TEST_ASSERT_EQ_INT(pthread_create(&producer, NULL, cq_producer, &arg), 0);
+    /* Blocks until the producer pushes, then returns its fd. */
+    TEST_ASSERT_EQ_INT(conn_queue_pop(&q), 42);
+    pthread_join(producer, NULL);
+
+    conn_queue_destroy(&q);
+}
+
+/* The health snapshot (#125 follow-up) feeds the worker-pool metrics the daemon
+ * publishes. Verify the contract: capacity is reported, depth tracks the live
+ * count, high_water records the deepest the queue ever got (not the current
+ * depth), pushed_total counts only accepted fds, and rejected_total counts only
+ * connections shed when the queue was full. */
+static void test_conn_queue_stats(void) {
+    struct conn_queue q;
+    struct conn_queue_stats st;
+
+    TEST_ASSERT_EQ_INT(conn_queue_init(&q, 2), 0);
+
+    conn_queue_get_stats(&q, &st);
+    TEST_ASSERT_EQ_INT(st.capacity, 2);
+    TEST_ASSERT_EQ_INT(st.depth, 0);
+    TEST_ASSERT_EQ_INT((int)st.high_water, 0);
+    TEST_ASSERT_EQ_INT((int)st.pushed_total, 0);
+    TEST_ASSERT_EQ_INT((int)st.rejected_total, 0);
+
+    /* Fill to capacity, then overflow twice — both overflows are shed. */
+    TEST_ASSERT_EQ_INT(conn_queue_try_push(&q, 1), 0);
+    TEST_ASSERT_EQ_INT(conn_queue_try_push(&q, 2), 0);
+    TEST_ASSERT_EQ_INT(conn_queue_try_push(&q, 3), -1);
+    TEST_ASSERT_EQ_INT(conn_queue_try_push(&q, 4), -1);
+
+    conn_queue_get_stats(&q, &st);
+    TEST_ASSERT_EQ_INT(st.depth, 2);
+    TEST_ASSERT_EQ_INT((int)st.high_water, 2);
+    TEST_ASSERT_EQ_INT((int)st.pushed_total, 2);
+    TEST_ASSERT_EQ_INT((int)st.rejected_total, 2);
+
+    /* Draining leaves high_water and the lifetime totals intact. */
+    TEST_ASSERT_EQ_INT(conn_queue_pop(&q), 1);
+    TEST_ASSERT_EQ_INT(conn_queue_pop(&q), 2);
+    conn_queue_get_stats(&q, &st);
+    TEST_ASSERT_EQ_INT(st.depth, 0);
+    TEST_ASSERT_EQ_INT((int)st.high_water, 2);
+    TEST_ASSERT_EQ_INT((int)st.pushed_total, 2);
+    TEST_ASSERT_EQ_INT((int)st.rejected_total, 2);
+
+    /* Closing the queue is shutdown, not load shedding: try_push fails but the
+     * rejection counter must not move. */
+    conn_queue_close(&q);
+    TEST_ASSERT_EQ_INT(conn_queue_try_push(&q, 5), -1);
+    conn_queue_get_stats(&q, &st);
+    TEST_ASSERT_EQ_INT((int)st.rejected_total, 2);
+
+    conn_queue_destroy(&q);
+}
+
+/* The snapshot must be NULL-safe both ways: a NULL output is ignored, and a
+ * NULL queue zeroes the output (the daemon polls it when the web server is
+ * disabled). */
+static void test_conn_queue_stats_null_safety(void) {
+    struct conn_queue_stats st;
+
+    conn_queue_get_stats(NULL, NULL);   /* must not crash */
+
+    st.capacity = 7;
+    st.depth = 7;
+    st.high_water = 7;
+    st.pushed_total = 7;
+    st.rejected_total = 7;
+    conn_queue_get_stats(NULL, &st);
+    TEST_ASSERT_EQ_INT(st.capacity, 0);
+    TEST_ASSERT_EQ_INT(st.depth, 0);
+    TEST_ASSERT_EQ_INT((int)st.high_water, 0);
+    TEST_ASSERT_EQ_INT((int)st.pushed_total, 0);
+    TEST_ASSERT_EQ_INT((int)st.rejected_total, 0);
+}
+
 /* ── Main ───────────────────────────────────────────────────────── */
 
 int main(void) {
@@ -1547,6 +1722,16 @@ int main(void) {
     TEST_SUITE_RUN(test_state_load_rejects_control_chars_in_plugin);
     TEST_SUITE_RUN(test_state_load_ignores_unknown_keys);
     TEST_SUITE_RUN(test_state_load_null_safety);
+
+    TEST_SUITE_BEGIN("Connection Queue");
+    TEST_SUITE_RUN(test_conn_queue_fifo_order);
+    TEST_SUITE_RUN(test_conn_queue_full_rejects);
+    TEST_SUITE_RUN(test_conn_queue_wraps_around);
+    TEST_SUITE_RUN(test_conn_queue_close_drains_then_signals);
+    TEST_SUITE_RUN(test_conn_queue_null_safety);
+    TEST_SUITE_RUN(test_conn_queue_blocking_pop_wakes);
+    TEST_SUITE_RUN(test_conn_queue_stats);
+    TEST_SUITE_RUN(test_conn_queue_stats_null_safety);
 
     TEST_REPORT();
 }

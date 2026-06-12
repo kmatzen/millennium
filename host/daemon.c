@@ -898,6 +898,26 @@ static void update_metrics(void) {
             last_dropped = lstats.dropped_total;
         }
     }
+
+    /* Web server worker-pool health (#125 follow-up). The accept thread sheds
+     * load with a 503 when the connection queue saturates; that rejection was
+     * only visible as a warning line in the log. Publish queue depth, the
+     * high-water mark (capacity headroom), and a true counter of shed
+     * connections so an undersized worker pool is alertable out-of-band. Runs
+     * on the single main-loop tick, so the static delta tracker needs no lock. */
+    {
+        struct conn_queue_stats wstats;
+        static unsigned long long last_rejected = 0;
+
+        web_server_get_conn_stats(web_server, &wstats);
+        metrics_set_gauge("web_conn_queue_depth", (double)wstats.depth);
+        metrics_set_gauge("web_conn_queue_high_water", (double)wstats.high_water);
+        if (wstats.rejected_total > last_rejected) {
+            metrics_increment_counter("web_conn_rejected",
+                (uint64_t)(wstats.rejected_total - last_rejected));
+            last_rejected = wstats.rejected_total;
+        }
+    }
 }
 
 int main(int argc, char *argv[]) {
