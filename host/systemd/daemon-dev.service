@@ -1,0 +1,19 @@
+[Unit]
+Description=Millennium Tools Daemon (development)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Development: run from repo build (no make install). %h = your home directory
+ExecStart=%h/millennium/host/daemon --config /etc/millennium/daemon.conf
+ExecStartPre=/bin/bash -c 'until /bin/ping -c1 -W1 8.8.8.8 >/dev/null 2>/dev/null; do sleep 1; done'
+Restart=on-failure
+RestartSec=2
+WorkingDirectory=%h/millennium/host
+StandardInput=null
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target
