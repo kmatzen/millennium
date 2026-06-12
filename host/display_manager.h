@@ -5,6 +5,14 @@
 
 #define DISPLAY_WIDTH 20
 #define DISPLAY_SCROLL_GAP 3  /* spaces between end and start during scroll */
+/*
+ * Ticks to pause with the start of a long line held in view before the line
+ * begins scrolling. The hold is re-armed every time the scroll wraps back to
+ * the beginning, so on each loop the reader gets a readable beat at the start
+ * of the message instead of it sliding away immediately. At the ~300ms tick
+ * cadence, 4 ticks is a ~1.2s pause.
+ */
+#define DISPLAY_SCROLL_HOLD_TICKS 4
 
 /*
  * Initialize the display manager with the SDK client handle.
@@ -13,9 +21,10 @@
 void display_manager_init(millennium_client_t *client);
 
 /*
- * Set display text. Lines longer than 20 characters will scroll
- * automatically on each tick. Short lines are displayed statically.
- * Passing NULL for a line clears that line.
+ * Set display text. Lines longer than 20 characters scroll automatically on
+ * each tick, pausing briefly (DISPLAY_SCROLL_HOLD_TICKS) with the start of the
+ * line in view at the beginning of every loop so it stays readable. Short
+ * lines are displayed statically. Passing NULL for a line clears that line.
  *
  * Control characters (bytes below 0x20, plus DEL 0x7F) in the supplied text
  * are replaced with spaces before storage: the VFD treats those bytes as

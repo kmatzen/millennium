@@ -18,6 +18,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <pthread.h>
+#include <string.h>
 
 /* ── Stubs for linker (plugins.c references these) ──────────────── */
 
@@ -30,7 +31,19 @@ millennium_client_t *millennium_client_create(void) {
 }
 void millennium_client_destroy(millennium_client_t *c) { free(c); }
 void millennium_client_close(millennium_client_t *c) { (void)c; }
-void millennium_client_set_display(millennium_client_t *c, const char *m) { (void)c; (void)m; }
+/* Capture the most recent display payload so display_manager tests can assert
+ * on what would actually be shown on the VFD. */
+static char g_last_display[128];
+void millennium_client_set_display(millennium_client_t *c, const char *m) {
+    (void)c;
+    if (m) {
+        strncpy(g_last_display, m, sizeof(g_last_display) - 1);
+        g_last_display[sizeof(g_last_display) - 1] = '\0';
+    }
+}
+static int display_shows(const char *needle) {
+    return strstr(g_last_display, needle) != NULL;
+}
 void millennium_client_call(millennium_client_t *c, const char *n) { (void)c; (void)n; }
 void millennium_client_answer_call(millennium_client_t *c) { (void)c; }
 void millennium_client_hangup(millennium_client_t *c) { (void)c; }
@@ -325,6 +338,64 @@ static void test_config_load_from_file(void) {
     TEST_ASSERT_EQ_INT(config_get_call_timeout_seconds(&cfg), 120);
 
     remove("/tmp/millennium_test.cfg");
+}
+
+/* ── Display manager tests ──────────────────────────────────────── */
+
+static void test_display_short_line_static(void) {
+    millennium_client_t *c = millennium_client_create();
+    int i;
+    display_manager_init(c);
+
+    /* A line that fits never scrolls, even after many ticks. */
+    display_manager_set_text("Short", "Also short");
+    for (i = 0; i < 20; i++) display_manager_tick();
+    TEST_ASSERT_EQ_INT(display_shows("Short"), 1);
+    TEST_ASSERT_EQ_INT(display_shows("Also short"), 1);
+
+    millennium_client_destroy(c);
+}
+
+static void test_display_scroll_holds_at_start(void) {
+    millennium_client_t *c = millennium_client_create();
+    int i;
+    display_manager_init(c);
+
+    /* A line longer than the 20-char display starts held at the beginning. */
+    display_manager_set_text("Header", "This is a very long fortune message");
+    TEST_ASSERT_EQ_INT(display_shows("This is a very long"), 1);
+
+    /* During the hold window the start stays in view; it does not scroll. */
+    for (i = 0; i < DISPLAY_SCROLL_HOLD_TICKS - 1; i++) display_manager_tick();
+    TEST_ASSERT_EQ_INT(display_shows("This is a very long"), 1);
+
+    /* The tick that spends the last hold doesn't move; the next one scrolls. */
+    display_manager_tick();  /* hold 1 -> 0 */
+    display_manager_tick();  /* first real scroll step */
+    TEST_ASSERT_EQ_INT(display_shows("his is a very long"), 1);
+
+    millennium_client_destroy(c);
+}
+
+static void test_display_scroll_rearms_hold_on_wrap(void) {
+    millennium_client_t *c = millennium_client_create();
+    int i;
+    /* 21-char line: one column too wide, so its scroll period is short. */
+    const char *line = "123456789012345678901";
+    int period = (int)strlen(line) + DISPLAY_SCROLL_GAP;
+    display_manager_init(c);
+
+    display_manager_set_text(line, NULL);
+    /* Spend the initial hold, then a full lap back to column 0, which re-arms
+     * the hold so the start is readable again on the next loop. */
+    for (i = 0; i < DISPLAY_SCROLL_HOLD_TICKS + period; i++) display_manager_tick();
+    TEST_ASSERT_EQ_INT(display_shows("12345678901234567890"), 1);
+
+    /* Re-armed: this tick holds rather than advancing past the start. */
+    display_manager_tick();
+    TEST_ASSERT_EQ_INT(display_shows("12345678901234567890"), 1);
+
+    millennium_client_destroy(c);
 }
 
 /* ── Daemon state tests ─────────────────────────────────────────── */
@@ -1864,6 +1935,11 @@ int main(void) {
     TEST_SUITE_RUN(test_config_null_safety);
     TEST_SUITE_RUN(test_config_overwrite_value);
     TEST_SUITE_RUN(test_config_load_from_file);
+
+    TEST_SUITE_BEGIN("Display Manager");
+    TEST_SUITE_RUN(test_display_short_line_static);
+    TEST_SUITE_RUN(test_display_scroll_holds_at_start);
+    TEST_SUITE_RUN(test_display_scroll_rearms_hold_on_wrap);
 
     TEST_SUITE_BEGIN("Daemon State");
     TEST_SUITE_RUN(test_state_init);

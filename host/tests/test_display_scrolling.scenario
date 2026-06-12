@@ -10,21 +10,27 @@ set_display Header|This is a very long fortune message that scrolls
 assert_display Header
 assert_display This is a very long
 
-# After ticking, line2 should scroll left — "his is a very long f"
-tick_display 1
+# A long line first HOLDS (DISPLAY_SCROLL_HOLD_TICKS=4) so the start of the
+# message stays readable instead of sliding away on the very first tick.
+tick_display 3
+assert_display This is a very long
+
+# Once the hold elapses, the next tick starts scrolling left
+tick_display 2
 assert_display his is a very long f
 
-# Tick 5 more (6 total from start) — text continues scrolling
+# Continue scrolling now that the hold is spent
 tick_display 5
 assert_display s a very long fortun
 
-# Long text on line1 should also scroll
+# Long text on line1 should also hold then scroll
 set_display Extremely Long Title That Exceeds Display|Short
 assert_display Extremely Long Title
 assert_display Short
 
+# Held during the first 4 ticks, scrolls one step on the 5th
 tick_display 5
-assert_display ely Long Title That
+assert_display xtremely Long Title
 
 # Short text should never scroll even after many ticks
 set_display Static|Text
