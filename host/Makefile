@@ -32,7 +32,7 @@ daemon_state.o: daemon_state.c daemon_state.h clock_source.h
 logger.o: logger.c logger.h
 	gcc logger.c -o logger.o -c $(CFLAGS)
 
-health_monitor.o: health_monitor.c health_monitor.h logger.h
+health_monitor.o: health_monitor.c health_monitor.h logger.h metrics.h
 	gcc health_monitor.c -o health_monitor.o -c $(CFLAGS)
 
 metrics.o: metrics.c metrics.h
