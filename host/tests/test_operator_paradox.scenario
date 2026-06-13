@@ -20,6 +20,7 @@ assert_display BENT
 key #
 keys 2005
 assert_display LINE FAULT
+assert_clip paradox.wav
 
 # Return to the source year and choose the opposite branch (1) -> mended
 key #
