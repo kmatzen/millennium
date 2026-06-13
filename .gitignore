@@ -34,3 +34,4 @@ pcb/*-erc.rpt
 host/unit_tests
 host/pjsip_smoke
 host/daemon-override.conf.tmp
+host/audio/out/

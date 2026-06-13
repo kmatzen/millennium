@@ -1,0 +1,31 @@
+# Millennium "The Operator" voice-clip manifest.
+#
+# The recorded clips live only on the Pi's SD card (not in git), so this file is
+# the reproducible source of truth: regen_clips.sh reads it, synthesizes each
+# clip with ElevenLabs text-to-speech, converts to 8 kHz mono 16-bit PCM WAV,
+# and (optionally) deploys to the phone. See AUDIO_CLIPS.md.
+#
+# Voice : Sarah  (ElevenLabs voice_id EXAVITQu4vr4xnSDxMaL)
+# Model : eleven_multilingual_v2
+# Both are overridable via VOICE_ID / MODEL_ID env vars when running the script.
+#
+# Format: one clip per line  ->  <clip_name><whitespace><text...>
+#   - clip_name is a single token; the daemon plays <clip_name>.wav
+#   - everything after the first whitespace run is the spoken text
+#   - blank lines and lines starting with '#' are ignored
+#
+# Keep text plain (the script JSON-escapes it safely); spell out numbers and
+# years so they are read aloud the way you want ("nineteen ninety-nine").
+
+operator   Finally. You picked up. This is the Operator. Dial a year, and I will put you through.
+
+drop       The line is ringing. Almost there. Almost the new year... no. It always drops before midnight. No one ever reaches nineteen ninety-nine.
+paradox    You have bent the timeline. The line is jammed now, two moments crossing at once. Go back to the year you meddled with, and set it right.
+
+era_wires  Connecting. The nineteen hundreds, the age of wires. Hear the copper hum. Every call here is plugged by hand, by an operator like me.
+era_golden Connecting. The golden age of the air. A radio crackles to life, and a big band swings its way down the line.
+era_space  Connecting. The space age. Static drifts in from orbit, and somewhere a countdown is ticking toward the stars.
+era_analog Connecting. The last analog years. Modems screech and handshake, and a young world wide web begins to sing.
+era_frozen Connecting. The frozen minute. Eleven fifty-nine, forever. You are home now, where the clock never turned over.
+era_static Connecting. The static years. Dead air and faint voices, a number station counting out to no one at all.
+era_sealed Connecting. The sealed future. Only a temporal pass opens this line. A calm machine is waiting, and it knows your name.
