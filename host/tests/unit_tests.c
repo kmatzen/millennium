@@ -15,6 +15,7 @@
 #include "../conn_queue.h"
 #include "../health_monitor.h"
 #include "../display_manager.h"
+#include "../wav.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <pthread.h>
@@ -88,6 +89,7 @@ void audio_tones_play_dtmf(char k) { (void)k; }
 void audio_tones_play_ringback(void) {}
 void audio_tones_play_busy_tone(void) {}
 void audio_tones_play_coin_tone(void) {}
+void audio_tones_play_clip(const char *p) { (void)p; }
 void audio_tones_stop(void) {}
 int audio_tones_is_playing(void) { return 0; }
 
@@ -760,6 +762,11 @@ static void test_plugins_dispatch_missing_handler(void) {
 /* Pure comparison exported by plugins/number_guess.c */
 int number_guess_compare(int secret, int guess);
 
+/* Pure helpers exported by plugins/time_operator.c */
+int parse_year(const char *buf);
+int fare_for_year(int year);
+int era_index_for_year(int year);
+
 static void test_plugins_builtins_registered(void) {
     char buf[2048];
     daemon_state_data_t ds;
@@ -769,8 +776,8 @@ static void test_plugins_builtins_registered(void) {
 
     plugins_init();
 
-    /* Seven built-ins ship with the platform. */
-    TEST_ASSERT_EQ_INT(plugins_get_count(), 7);
+    /* Eight built-ins ship with the platform. */
+    TEST_ASSERT_EQ_INT(plugins_get_count(), 8);
 
     TEST_ASSERT_EQ_INT(plugins_list(buf, sizeof(buf)), 0);
     TEST_ASSERT_NOT_NULL(strstr(buf, "Classic Phone"));
@@ -780,6 +787,7 @@ static void test_plugins_builtins_registered(void) {
     TEST_ASSERT_NOT_NULL(strstr(buf, "Simon"));
     TEST_ASSERT_NOT_NULL(strstr(buf, "Dial-A-Joke"));
     TEST_ASSERT_NOT_NULL(strstr(buf, "Trivia"));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "The Operator"));
 
     millennium_client_destroy(client);
     client = NULL;
@@ -868,6 +876,138 @@ static void test_number_guess_compare(void) {
     TEST_ASSERT(number_guess_compare(99, 1) < 0);
 }
 
+/* ── The Operator (time-travel plugin) pure logic ───────────────────── */
+
+static void test_operator_parse_year(void) {
+    TEST_ASSERT_EQ_INT(parse_year("1999"), 1999);
+    TEST_ASSERT_EQ_INT(parse_year("2000"), 2000);
+    TEST_ASSERT_EQ_INT(parse_year("0000"), 0);
+    TEST_ASSERT_EQ_INT(parse_year("123"), -1);   /* too short */
+    TEST_ASSERT_EQ_INT(parse_year("12345"), -1); /* too long */
+    TEST_ASSERT_EQ_INT(parse_year("19x9"), -1);  /* non-digit */
+    TEST_ASSERT_EQ_INT(parse_year(""), -1);
+    TEST_ASSERT_EQ_INT(parse_year(NULL), -1);
+}
+
+static void test_operator_fare_for_year(void) {
+    /* The anchor (2000) is free; the next-cheapest is the base fare. */
+    TEST_ASSERT_EQ_INT(fare_for_year(2000), 0);
+    TEST_ASSERT_EQ_INT(fare_for_year(2005), 25);   /* same decade as anchor */
+    /* Symmetric around the anchor. */
+    TEST_ASSERT_EQ_INT(fare_for_year(1990), fare_for_year(2010));
+    /* Non-decreasing with distance. */
+    TEST_ASSERT(fare_for_year(1980) >= fare_for_year(1990));
+    TEST_ASSERT(fare_for_year(1900) >= fare_for_year(1980));
+    /* Capped. */
+    TEST_ASSERT_EQ_INT(fare_for_year(1900), 275);  /* 25 + 25*10, under cap */
+    TEST_ASSERT(fare_for_year(2100) <= 500);
+}
+
+static void test_operator_era_lookup(void) {
+    /* A year maps to the bracket that contains it. */
+    TEST_ASSERT_EQ_INT(era_index_for_year(1915), 0);
+    TEST_ASSERT_EQ_INT(era_index_for_year(2000), 4);  /* the frozen minute */
+    TEST_ASSERT_EQ_INT(era_index_for_year(2025), 5);
+    TEST_ASSERT_EQ_INT(era_index_for_year(2075), 6);  /* sealed future */
+    /* Out of range and the 1999 dead-end gap map to none. */
+    TEST_ASSERT_EQ_INT(era_index_for_year(1850), -1);
+    TEST_ASSERT_EQ_INT(era_index_for_year(2200), -1);
+    TEST_ASSERT_EQ_INT(era_index_for_year(1999), -1);
+}
+
+/* ── WAV clip parser ────────────────────────────────────────────────── */
+
+static void wav_put_u16(unsigned char *p, unsigned v) {
+    p[0] = (unsigned char)(v & 0xff);
+    p[1] = (unsigned char)((v >> 8) & 0xff);
+}
+static void wav_put_u32(unsigned char *p, unsigned long v) {
+    p[0] = (unsigned char)(v & 0xff);
+    p[1] = (unsigned char)((v >> 8) & 0xff);
+    p[2] = (unsigned char)((v >> 16) & 0xff);
+    p[3] = (unsigned char)((v >> 24) & 0xff);
+}
+
+/* Build a canonical 16-bit PCM WAV (silence) into buf; returns total length. */
+static size_t make_wav(unsigned char *buf, int channels, int rate,
+                       int frames) {
+    int data_bytes = frames * channels * 2;
+    memcpy(buf + 0, "RIFF", 4);
+    wav_put_u32(buf + 4, (unsigned long)(36 + data_bytes));
+    memcpy(buf + 8, "WAVE", 4);
+    memcpy(buf + 12, "fmt ", 4);
+    wav_put_u32(buf + 16, 16);
+    wav_put_u16(buf + 20, 1);                       /* PCM */
+    wav_put_u16(buf + 22, (unsigned)channels);
+    wav_put_u32(buf + 24, (unsigned long)rate);
+    wav_put_u32(buf + 28, (unsigned long)(rate * channels * 2));
+    wav_put_u16(buf + 32, (unsigned)(channels * 2));
+    wav_put_u16(buf + 34, 16);                      /* bits per sample */
+    memcpy(buf + 36, "data", 4);
+    wav_put_u32(buf + 40, (unsigned long)data_bytes);
+    memset(buf + 44, 0, (size_t)data_bytes);
+    return (size_t)(44 + data_bytes);
+}
+
+static void test_wav_parse_valid(void) {
+    unsigned char buf[256];
+    wav_info_t info;
+    size_t len = make_wav(buf, 1, 8000, 10);
+
+    TEST_ASSERT_EQ_INT(wav_parse(buf, len, &info), 0);
+    TEST_ASSERT_EQ_INT(info.format, 1);
+    TEST_ASSERT_EQ_INT(info.channels, 1);
+    TEST_ASSERT_EQ_INT(info.sample_rate, 8000);
+    TEST_ASSERT_EQ_INT(info.bits_per_sample, 16);
+    TEST_ASSERT_EQ_INT((int)info.data_offset, 44);
+    TEST_ASSERT_EQ_INT((int)info.data_len, 20);  /* 10 mono frames * 2 bytes */
+}
+
+static void test_wav_parse_rejects_bad(void) {
+    unsigned char buf[256];
+    wav_info_t info;
+    size_t len = make_wav(buf, 1, 8000, 4);
+
+    TEST_ASSERT_EQ_INT(wav_parse((const unsigned char *)"nope", 4, &info), -1);
+    TEST_ASSERT_EQ_INT(wav_parse(buf, 8, &info), -1);    /* truncated header */
+    TEST_ASSERT_EQ_INT(wav_parse(NULL, 100, &info), -1);
+    TEST_ASSERT_EQ_INT(wav_parse(buf, len, NULL), -1);
+
+    buf[9] = 'X';                                        /* corrupt WAVE tag */
+    TEST_ASSERT_EQ_INT(wav_parse(buf, len, &info), -1);
+}
+
+static void test_wav_parse_skips_unknown_chunk(void) {
+    /* A LIST chunk (odd length -> a pad byte) before data must be skipped and
+     * the data range still located correctly. */
+    unsigned char buf[256];
+    wav_info_t info;
+    size_t n;
+
+    memcpy(buf + 0, "RIFF", 4);
+    memcpy(buf + 8, "WAVE", 4);
+    memcpy(buf + 12, "fmt ", 4);
+    wav_put_u32(buf + 16, 16);
+    wav_put_u16(buf + 20, 1);
+    wav_put_u16(buf + 22, 1);
+    wav_put_u32(buf + 24, 8000);
+    wav_put_u32(buf + 28, 16000);
+    wav_put_u16(buf + 32, 2);
+    wav_put_u16(buf + 34, 16);
+    memcpy(buf + 36, "LIST", 4);
+    wav_put_u32(buf + 40, 3);
+    buf[44] = 'a'; buf[45] = 'b'; buf[46] = 'c'; buf[47] = 0;  /* + pad byte */
+    memcpy(buf + 48, "data", 4);
+    wav_put_u32(buf + 52, 4);
+    buf[56] = 1; buf[57] = 2; buf[58] = 3; buf[59] = 4;
+    n = 60;
+    wav_put_u32(buf + 4, (unsigned long)(n - 8));
+
+    TEST_ASSERT_EQ_INT(wav_parse(buf, n, &info), 0);
+    TEST_ASSERT_EQ_INT((int)info.data_offset, 56);
+    TEST_ASSERT_EQ_INT((int)info.data_len, 4);
+}
+
 /* ── Display line budget guardrail ──────────────────────────────────── */
 
 /* Each content-heavy built-in exposes its static display strings (mirroring
@@ -878,6 +1018,7 @@ int dial_a_joke_display_strings(const char **out, int max);
 int trivia_display_strings(const char **out, int max);
 int jukebox_display_strings(const char **out, int max);
 int fortune_teller_display_strings(const char **out, int max);
+int time_operator_display_strings(const char **out, int max);
 
 static void check_display_strings(const char *plugin,
                                   int (*collect)(const char **, int)) {
@@ -910,6 +1051,7 @@ static void test_plugin_display_lines_fit(void) {
     check_display_strings("Trivia", trivia_display_strings);
     check_display_strings("Jukebox", jukebox_display_strings);
     check_display_strings("Fortune Teller", fortune_teller_display_strings);
+    check_display_strings("The Operator", time_operator_display_strings);
 
     millennium_client_destroy(client);
     client = NULL;
@@ -2056,6 +2198,12 @@ int main(void) {
     TEST_SUITE_RUN(test_plugins_to_json);
     TEST_SUITE_RUN(test_plugins_to_json_escapes);
     TEST_SUITE_RUN(test_number_guess_compare);
+    TEST_SUITE_RUN(test_operator_parse_year);
+    TEST_SUITE_RUN(test_operator_fare_for_year);
+    TEST_SUITE_RUN(test_operator_era_lookup);
+    TEST_SUITE_RUN(test_wav_parse_valid);
+    TEST_SUITE_RUN(test_wav_parse_rejects_bad);
+    TEST_SUITE_RUN(test_wav_parse_skips_unknown_chunk);
     TEST_SUITE_RUN(test_plugin_display_lines_fit);
 
     TEST_SUITE_BEGIN("Plugin SDK");

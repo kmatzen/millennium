@@ -12,6 +12,7 @@
 #include "millennium_sdk.h"
 #include "clock_source.h"
 #include "logger.h"
+#include "config.h"
 
 /* Globals owned by the daemon / simulator / test harness. */
 extern daemon_state_data_t *daemon_state;
@@ -57,6 +58,27 @@ void sdk_ringback(void) { audio_tones_play_ringback(); }
 void sdk_busy_tone(void) { audio_tones_play_busy_tone(); }
 void sdk_stop_audio(void) { audio_tones_stop(); }
 int sdk_audio_is_playing(void) { return audio_tones_is_playing(); }
+
+void sdk_play_clip(const char *name) {
+    char path[512];
+    const char *dir;
+    size_t i;
+
+    if (!name || !name[0]) return;
+    /* Whitelist the name so it can't escape the clip directory. */
+    for (i = 0; name[i] != '\0'; i++) {
+        char ch = name[i];
+        if (!((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
+              (ch >= '0' && ch <= '9') || ch == '_' || ch == '-')) {
+            return;
+        }
+    }
+
+    dir = config_get_string(config_get_instance(), "audio.clip_dir",
+                            "/usr/local/share/millennium/audio");
+    snprintf(path, sizeof(path), "%s/%s.wav", dir, name);
+    audio_tones_play_clip(path);
+}
 
 /* ── Calls ───────────────────────────────────────────────────────────── */
 

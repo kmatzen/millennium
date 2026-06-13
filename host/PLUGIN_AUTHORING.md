@@ -116,6 +116,13 @@ void register_hello_plugin(void) {
   if you add a content table, expose it the way `trivia_display_strings` does
   and add it to that test.
 
+- **Recorded audio.** Beyond the synthesised tones, `sdk_play_clip("name")`
+  plays a recorded WAV clip (`<audio.clip_dir>/name.wav`) on the earpiece. It
+  shares the tone channel (one sound at a time, stopped by `sdk_stop_audio()`),
+  and a missing file is a harmless no-op — so clips are optional and can be
+  layered after a fallback tone. See [`AUDIO_CLIPS.md`](AUDIO_CLIPS.md) for the
+  format and authoring workflow.
+
 ## Testing
 
 **Scenario tests** drive a plugin end-to-end through the simulator. Create
@@ -132,6 +139,7 @@ Useful scenario commands: `activate_plugin <name>`, `hook_up`/`hook_down`,
 `coin <cents>`, `key <0-9*#A-D>`, `keys <digits>`, `card <number>`,
 `wait <seconds>` (advances time and ticks), `tick [n]` (ticks without waiting),
 `config <key> <value>`, `assert_display <text>`, `assert_state <name>`,
+`assert_clip <text>` (the last clip a plugin requested via `sdk_play_clip`),
 `print`. All `tests/*.scenario` files run under `make test`.
 
 **Unit tests** (`tests/unit_tests.c`) cover pure logic. Keep game rules in

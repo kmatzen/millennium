@@ -110,7 +110,7 @@ Single-process C daemon. Key files:
 | `pjsip_interface.c` / `pjsip_interface.h` | PJSIP (PJSUA C API) wrapper: register/call/answer/hangup/DTMF. Header has plain declarations only (so `millennium_sdk.c` compiles on the Mac); the `.c` is built only on the Pi |
 | `daemon_state.c` | Phone state machine (5 states), keypad buffer |
 | `event_processor.c` | Routes queued events to handlers |
-| `plugins.c` + `plugins/` | Plugin registry; built-ins: Classic Phone, Fortune Teller, Jukebox, Number Guess, Simon, Dial-A-Joke, Trivia |
+| `plugins.c` + `plugins/` | Plugin registry; built-ins: Classic Phone, Fortune Teller, Jukebox, Number Guess, Simon, Dial-A-Joke, Trivia, The Operator |
 | `plugin_sdk.c` / `plugin_sdk.h` | Friendly facade for plugin authors (display, audio, calls, state, balance, logging, RNG) — see `host/PLUGIN_AUTHORING.md` |
 | `display_manager.c` | VFD abstraction with auto-scrolling for lines >20 chars |
 | `audio_tones.c` | ALSA tone generator: dial tone, DTMF, ringback, busy, coin chime |
@@ -153,7 +153,7 @@ Base URL: `http://<pi>` (port 80)
 
 ### Audio
 
-Pure ALSA (`libasound`), no PipeWire. Left channel → ringer (TDA2822M ch A), right channel → earpiece (TDA2822M ch B). Audio tone functions compile as no-ops on macOS so tests run locally.
+Pure ALSA (`libasound`), no PipeWire. Left channel → ringer (TDA2822M ch A), right channel → earpiece (TDA2822M ch B). Audio tone functions compile as no-ops on macOS so tests run locally. Plugins can also play recorded WAV clips via `sdk_play_clip()` (16-bit PCM, ideally 8 kHz mono; parsed by the platform-independent `wav.c`, streamed by `audio_tones.c`); clip files live under `audio.clip_dir` and are optional — see `host/AUDIO_CLIPS.md`.
 
 ## Coding Conventions
 

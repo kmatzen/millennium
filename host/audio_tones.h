@@ -34,6 +34,13 @@ void audio_tones_play_busy_tone(void);
 /* Short coin-deposit chime (~200 ms, auto-stops). */
 void audio_tones_play_coin_tone(void);
 
+/* Play a recorded clip from a 16-bit PCM WAV file on the earpiece channel.
+ * Streams on the shared tone thread, so it interrupts any tone/clip currently
+ * playing and stops on audio_tones_stop() like every other sound. A missing or
+ * unsupported file is a no-op that leaves any current sound untouched, so it can
+ * be layered after a fallback tone. No-op entirely when built without ALSA. */
+void audio_tones_play_clip(const char *path);
+
 /* Stop whatever tone is currently playing. */
 void audio_tones_stop(void);
 

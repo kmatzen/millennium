@@ -238,6 +238,15 @@ void audio_tones_play_coin_tone(void) { fprintf(stderr, "[TONE] Coin\n"); }
 void audio_tones_stop(void) { fprintf(stderr, "[TONE] Stop\n"); }
 int audio_tones_is_playing(void) { return 0; }
 
+/* Capture the most recently requested clip path so assert_clip can verify a
+ * plugin asked for the right recording (the daemon would stream it via ALSA). */
+static char sim_last_clip[256];
+void audio_tones_play_clip(const char *path) {
+    strncpy(sim_last_clip, path ? path : "", sizeof(sim_last_clip) - 1);
+    sim_last_clip[sizeof(sim_last_clip) - 1] = '\0';
+    fprintf(stderr, "[CLIP] %s\n", sim_last_clip);
+}
+
 void millennium_client_process_event_buffer(millennium_client_t *c) { (void)c; }
 
 char *millennium_client_extract_payload(millennium_client_t *c, char t, size_t s) {
@@ -667,6 +676,18 @@ static int run_scenario(const char *path) {
             }
         }
 
+        /* ── assert_clip <text> — last clip the plugin requested ──── */
+        else if (strncmp(cmd, "assert_clip ", 12) == 0) {
+            arg = trim(cmd + 12);
+            if (strstr(sim_last_clip, arg)) {
+                fprintf(stderr, "  PASS: last clip contains \"%s\"\n", arg);
+            } else {
+                fprintf(stderr, "  FAIL: last clip (\"%s\") does NOT contain \"%s\"\n",
+                        sim_last_clip, arg);
+                failures++;
+            }
+        }
+
         /* ── assert_state <state_name> ───────────────────────────── */
         else if (strncmp(cmd, "assert_state ", 13) == 0) {
             const char *actual = daemon_state_to_string(daemon_state->current_state);
@@ -930,6 +951,7 @@ int main(int argc, char *argv[]) {
         sim_display_line1[0] = '\0';
         sim_display_line2[0] = '\0';
         sim_display_count    = 0;
+        sim_last_clip[0]     = '\0';
         sim_call_pending     = 0;
         sim_call_active      = 0;
         sim_hangup_called    = 0;

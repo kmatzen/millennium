@@ -1,0 +1,22 @@
+# The Operator: sealed future years are refused until a temporal pass is swiped.
+activate_plugin The Operator
+hook_up
+
+# Dialing a sealed year with no pass is refused
+keys 2080
+assert_display SEALED
+
+# Swipe any card -> it acts as a temporal pass
+card 1234567890123456
+assert_display PASS
+
+# Pay the (longer) fare and dial the gated era -> now allowed
+coin 25
+coin 25
+coin 25
+coin 25
+coin 25
+coin 25
+keys 2050
+wait 6
+assert_display SEALED FUTURE

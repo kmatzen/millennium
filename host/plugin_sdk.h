@@ -77,6 +77,15 @@ void sdk_busy_tone(void);         /* continuous busy cadence */
 void sdk_stop_audio(void);        /* stop any continuous tone */
 int  sdk_audio_is_playing(void);  /* 1 if a tone is currently sounding */
 
+/* Play a recorded clip by logical name (letters/digits/_/- only, no path or
+ * extension). Resolves to <audio.clip_dir>/<name>.wav (config key
+ * "audio.clip_dir", default /usr/local/share/millennium/audio). Clips should be
+ * 16-bit PCM WAV, ideally 8 kHz mono to match the narrowband audio hardware.
+ * Interrupts any sound currently playing; a missing/unsupported file is a
+ * harmless no-op that leaves the current sound untouched, so it can be layered
+ * after a fallback tone. See host/AUDIO_CLIPS.md. */
+void sdk_play_clip(const char *name);
+
 /* ── Calls (VoIP) ────────────────────────────────────────────────────────
  * Place/answer/end calls and send in-call DTMF. No-ops if SIP isn't ready. */
 
