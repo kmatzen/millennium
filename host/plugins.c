@@ -11,7 +11,7 @@
 #include "metrics.h"
 
 /* Maximum number of plugins. Generous headroom so experimenters can add
- * their own alongside the built-ins (7 ship by default). */
+ * their own alongside the built-ins (8 ship by default). */
 #define MAX_PLUGINS 32
 
 /* Plugin registry */
@@ -36,7 +36,8 @@ void plugins_init(void) {
     register_simon_plugin();
     register_dial_a_joke_plugin();
     register_trivia_plugin();
-    
+    register_time_operator_plugin();
+
     /* Activate classic phone by default */
     plugins_activate("Classic Phone");
     

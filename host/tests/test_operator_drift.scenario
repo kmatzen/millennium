@@ -1,0 +1,14 @@
+# The Operator: sitting idle in an era too long causes temporal drift back to
+# the Operator.
+activate_plugin The Operator
+hook_up
+
+# Travel to an era
+coin 25
+keys 2005
+wait 6
+assert_display STATIC YEARS
+
+# Touch nothing past the drift timeout -> snapped back to the Operator
+wait 40
+assert_display TEMPORAL DRIFT

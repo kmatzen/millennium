@@ -1,0 +1,11 @@
+# The Operator: paying the fare up front and dialing a year reaches that era.
+activate_plugin The Operator
+hook_up
+
+# Credit a quarter, then dial 2005 (same decade as the anchor -> 25c fare)
+coin 25
+keys 2005
+
+# Connecting beat, then the era plays on the line
+wait 6
+assert_display STATIC YEARS

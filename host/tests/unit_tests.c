@@ -760,6 +760,11 @@ static void test_plugins_dispatch_missing_handler(void) {
 /* Pure comparison exported by plugins/number_guess.c */
 int number_guess_compare(int secret, int guess);
 
+/* Pure helpers exported by plugins/time_operator.c */
+int parse_year(const char *buf);
+int fare_for_year(int year);
+int era_index_for_year(int year);
+
 static void test_plugins_builtins_registered(void) {
     char buf[2048];
     daemon_state_data_t ds;
@@ -769,8 +774,8 @@ static void test_plugins_builtins_registered(void) {
 
     plugins_init();
 
-    /* Seven built-ins ship with the platform. */
-    TEST_ASSERT_EQ_INT(plugins_get_count(), 7);
+    /* Eight built-ins ship with the platform. */
+    TEST_ASSERT_EQ_INT(plugins_get_count(), 8);
 
     TEST_ASSERT_EQ_INT(plugins_list(buf, sizeof(buf)), 0);
     TEST_ASSERT_NOT_NULL(strstr(buf, "Classic Phone"));
@@ -780,6 +785,7 @@ static void test_plugins_builtins_registered(void) {
     TEST_ASSERT_NOT_NULL(strstr(buf, "Simon"));
     TEST_ASSERT_NOT_NULL(strstr(buf, "Dial-A-Joke"));
     TEST_ASSERT_NOT_NULL(strstr(buf, "Trivia"));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "The Operator"));
 
     millennium_client_destroy(client);
     client = NULL;
@@ -868,6 +874,45 @@ static void test_number_guess_compare(void) {
     TEST_ASSERT(number_guess_compare(99, 1) < 0);
 }
 
+/* ── The Operator (time-travel plugin) pure logic ───────────────────── */
+
+static void test_operator_parse_year(void) {
+    TEST_ASSERT_EQ_INT(parse_year("1999"), 1999);
+    TEST_ASSERT_EQ_INT(parse_year("2000"), 2000);
+    TEST_ASSERT_EQ_INT(parse_year("0000"), 0);
+    TEST_ASSERT_EQ_INT(parse_year("123"), -1);   /* too short */
+    TEST_ASSERT_EQ_INT(parse_year("12345"), -1); /* too long */
+    TEST_ASSERT_EQ_INT(parse_year("19x9"), -1);  /* non-digit */
+    TEST_ASSERT_EQ_INT(parse_year(""), -1);
+    TEST_ASSERT_EQ_INT(parse_year(NULL), -1);
+}
+
+static void test_operator_fare_for_year(void) {
+    /* The anchor (2000) is free; the next-cheapest is the base fare. */
+    TEST_ASSERT_EQ_INT(fare_for_year(2000), 0);
+    TEST_ASSERT_EQ_INT(fare_for_year(2005), 25);   /* same decade as anchor */
+    /* Symmetric around the anchor. */
+    TEST_ASSERT_EQ_INT(fare_for_year(1990), fare_for_year(2010));
+    /* Non-decreasing with distance. */
+    TEST_ASSERT(fare_for_year(1980) >= fare_for_year(1990));
+    TEST_ASSERT(fare_for_year(1900) >= fare_for_year(1980));
+    /* Capped. */
+    TEST_ASSERT_EQ_INT(fare_for_year(1900), 275);  /* 25 + 25*10, under cap */
+    TEST_ASSERT(fare_for_year(2100) <= 500);
+}
+
+static void test_operator_era_lookup(void) {
+    /* A year maps to the bracket that contains it. */
+    TEST_ASSERT_EQ_INT(era_index_for_year(1915), 0);
+    TEST_ASSERT_EQ_INT(era_index_for_year(2000), 4);  /* the frozen minute */
+    TEST_ASSERT_EQ_INT(era_index_for_year(2025), 5);
+    TEST_ASSERT_EQ_INT(era_index_for_year(2075), 6);  /* sealed future */
+    /* Out of range and the 1999 dead-end gap map to none. */
+    TEST_ASSERT_EQ_INT(era_index_for_year(1850), -1);
+    TEST_ASSERT_EQ_INT(era_index_for_year(2200), -1);
+    TEST_ASSERT_EQ_INT(era_index_for_year(1999), -1);
+}
+
 /* ── Display line budget guardrail ──────────────────────────────────── */
 
 /* Each content-heavy built-in exposes its static display strings (mirroring
@@ -878,6 +923,7 @@ int dial_a_joke_display_strings(const char **out, int max);
 int trivia_display_strings(const char **out, int max);
 int jukebox_display_strings(const char **out, int max);
 int fortune_teller_display_strings(const char **out, int max);
+int time_operator_display_strings(const char **out, int max);
 
 static void check_display_strings(const char *plugin,
                                   int (*collect)(const char **, int)) {
@@ -910,6 +956,7 @@ static void test_plugin_display_lines_fit(void) {
     check_display_strings("Trivia", trivia_display_strings);
     check_display_strings("Jukebox", jukebox_display_strings);
     check_display_strings("Fortune Teller", fortune_teller_display_strings);
+    check_display_strings("The Operator", time_operator_display_strings);
 
     millennium_client_destroy(client);
     client = NULL;
@@ -2056,6 +2103,9 @@ int main(void) {
     TEST_SUITE_RUN(test_plugins_to_json);
     TEST_SUITE_RUN(test_plugins_to_json_escapes);
     TEST_SUITE_RUN(test_number_guess_compare);
+    TEST_SUITE_RUN(test_operator_parse_year);
+    TEST_SUITE_RUN(test_operator_fare_for_year);
+    TEST_SUITE_RUN(test_operator_era_lookup);
     TEST_SUITE_RUN(test_plugin_display_lines_fit);
 
     TEST_SUITE_BEGIN("Plugin SDK");

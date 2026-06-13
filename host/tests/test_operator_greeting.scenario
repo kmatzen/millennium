@@ -1,0 +1,10 @@
+# The Operator: lifting the handset reaches the Operator's "dial a year" prompt.
+activate_plugin The Operator
+
+# Receiver down -> dormant invitation
+assert_display Lift
+
+# Lift the handset -> the Operator greeting / dial prompt
+hook_up
+assert_state IDLE_UP
+assert_display DIAL A YEAR

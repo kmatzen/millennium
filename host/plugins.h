@@ -75,5 +75,6 @@ void register_number_guess_plugin(void);
 void register_simon_plugin(void);
 void register_dial_a_joke_plugin(void);
 void register_trivia_plugin(void);
+void register_time_operator_plugin(void);
 
 #endif /* PLUGINS_H */
