@@ -399,8 +399,7 @@ static health_status_t execute_check(health_check_t* check) {
     check->last_status = status;
     check->last_check_time = time(NULL);
     if (message[0] != '\0') {
-        strncpy(check->last_message, message, sizeof(check->last_message) - 1);
-        check->last_message[sizeof(check->last_message) - 1] = '\0';
+        snprintf(check->last_message, sizeof(check->last_message), "%s", message);
     } else {
         snprintf(check->last_message, sizeof(check->last_message),
                  "Status: %s", health_monitor_status_to_string(status));
