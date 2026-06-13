@@ -153,7 +153,7 @@ Base URL: `http://<pi>` (port 80)
 
 ### Audio
 
-Pure ALSA (`libasound`), no PipeWire. Left channel → ringer (TDA2822M ch A), right channel → earpiece (TDA2822M ch B). Audio tone functions compile as no-ops on macOS so tests run locally.
+Pure ALSA (`libasound`), no PipeWire. Left channel → ringer (TDA2822M ch A), right channel → earpiece (TDA2822M ch B). Audio tone functions compile as no-ops on macOS so tests run locally. Plugins can also play recorded WAV clips via `sdk_play_clip()` (16-bit PCM, ideally 8 kHz mono; parsed by the platform-independent `wav.c`, streamed by `audio_tones.c`); clip files live under `audio.clip_dir` and are optional — see `host/AUDIO_CLIPS.md`.
 
 ## Coding Conventions
 

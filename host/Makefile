@@ -71,13 +71,16 @@ state_persistence.o: state_persistence.c state_persistence.h daemon_state.h logg
 display_manager.o: display_manager.c display_manager.h millennium_sdk.h
 	gcc display_manager.c -o display_manager.o -c $(CFLAGS)
 
-plugin_sdk.o: plugin_sdk.c plugin_sdk.h plugins.h display_manager.h audio_tones.h millennium_sdk.h clock_source.h logger.h daemon_state.h
+plugin_sdk.o: plugin_sdk.c plugin_sdk.h plugins.h display_manager.h audio_tones.h millennium_sdk.h clock_source.h logger.h daemon_state.h config.h
 	gcc plugin_sdk.c -o plugin_sdk.o -c $(CFLAGS)
 
 version.o: version.c version.h
 	gcc version.c -o version.o -c $(CFLAGS) $(VERSION_CFLAGS)
 
-audio_tones.o: audio_tones.c audio_tones.h logger.h
+wav.o: wav.c wav.h
+	gcc wav.c -o wav.o -c $(CFLAGS)
+
+audio_tones.o: audio_tones.c audio_tones.h wav.h logger.h
 	gcc audio_tones.c -o audio_tones.o -c $(CFLAGS)
 
 updater.o: updater.c updater.h version.h logger.h
@@ -114,8 +117,8 @@ plugins/trivia.o: plugins/trivia.c plugins.h plugin_sdk.h config.h
 plugins/time_operator.o: plugins/time_operator.c plugins.h plugin_sdk.h
 	gcc plugins/time_operator.c -o plugins/time_operator.o -c $(CFLAGS)
 
-daemon: daemon.o daemon_state.o clock_source.o millennium_sdk.o pjsip_interface.o events.o event_processor.o config.o cli.o logger.o health_monitor.o metrics.o metrics_server.o call_metrics.o web_server.o websocket.o conn_queue.o plugins.o plugin_sdk.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o plugins/number_guess.o plugins/simon.o plugins/dial_a_joke.o plugins/trivia.o plugins/time_operator.o state_persistence.o display_manager.o version.o audio_tones.o updater.o
-	gcc daemon.o daemon_state.o clock_source.o millennium_sdk.o pjsip_interface.o events.o event_processor.o config.o cli.o logger.o health_monitor.o metrics.o metrics_server.o call_metrics.o web_server.o websocket.o conn_queue.o plugins.o plugin_sdk.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o plugins/number_guess.o plugins/simon.o plugins/dial_a_joke.o plugins/trivia.o plugins/time_operator.o state_persistence.o display_manager.o version.o audio_tones.o updater.o -o daemon $(LDFLAGS) -lm
+daemon: daemon.o daemon_state.o clock_source.o millennium_sdk.o pjsip_interface.o events.o event_processor.o config.o cli.o logger.o health_monitor.o metrics.o metrics_server.o call_metrics.o web_server.o websocket.o conn_queue.o plugins.o plugin_sdk.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o plugins/number_guess.o plugins/simon.o plugins/dial_a_joke.o plugins/trivia.o plugins/time_operator.o state_persistence.o display_manager.o version.o audio_tones.o wav.o updater.o
+	gcc daemon.o daemon_state.o clock_source.o millennium_sdk.o pjsip_interface.o events.o event_processor.o config.o cli.o logger.o health_monitor.o metrics.o metrics_server.o call_metrics.o web_server.o websocket.o conn_queue.o plugins.o plugin_sdk.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o plugins/number_guess.o plugins/simon.o plugins/dial_a_joke.o plugins/trivia.o plugins/time_operator.o state_persistence.o display_manager.o version.o audio_tones.o wav.o updater.o -o daemon $(LDFLAGS) -lm
 
 # Simulator object file
 simulator.o: simulator.c millennium_sdk.h events.h config.h daemon_state.h logger.h metrics.h call_metrics.h plugins.h
@@ -134,7 +137,7 @@ simulator: $(SIM_OBJS)
 all: daemon
 
 # Unit test binary
-UNIT_TEST_OBJS = tests/unit_tests.o daemon_state.o clock_source.o events.o event_processor.o config.o cli.o logger.o metrics.o call_metrics.o health_monitor.o plugins.o plugin_sdk.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o plugins/number_guess.o plugins/simon.o plugins/dial_a_joke.o plugins/trivia.o plugins/time_operator.o state_persistence.o display_manager.o version.o updater.o conn_queue.o
+UNIT_TEST_OBJS = tests/unit_tests.o daemon_state.o clock_source.o events.o event_processor.o config.o cli.o logger.o metrics.o call_metrics.o health_monitor.o plugins.o plugin_sdk.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o plugins/number_guess.o plugins/simon.o plugins/dial_a_joke.o plugins/trivia.o plugins/time_operator.o state_persistence.o display_manager.o version.o wav.o updater.o conn_queue.o
 
 tests/unit_tests.o: tests/unit_tests.c tests/test_framework.h config.h cli.h daemon_state.h plugins.h logger.h metrics.h call_metrics.h millennium_sdk.h updater.h state_persistence.h conn_queue.h health_monitor.h
 	gcc tests/unit_tests.c -o tests/unit_tests.o -c $(CFLAGS) -I.
@@ -178,7 +181,7 @@ COMPILE_CHECK_OBJS = daemon.o daemon_state.o clock_source.o millennium_sdk.o eve
 	plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o \
 	plugins/number_guess.o plugins/simon.o plugins/dial_a_joke.o \
 	plugins/trivia.o plugins/time_operator.o state_persistence.o display_manager.o version.o \
-	audio_tones.o updater.o
+	audio_tones.o wav.o updater.o
 
 .PHONY: compile-check
 compile-check: $(COMPILE_CHECK_OBJS)
@@ -201,6 +204,7 @@ install: daemon
 	sudo cp asoundrc.example /etc/asound.conf
 	sudo cp daemon /usr/local/bin/millennium-daemon
 	sudo mkdir -p /usr/local/share/millennium
+	sudo mkdir -p /usr/local/share/millennium/audio
 	sudo cp web_portal.html /usr/local/share/millennium/
 	sudo cp systemd/daemon.service /etc/systemd/system/
 	sudo mkdir -p /etc/systemd/system/daemon.service.d

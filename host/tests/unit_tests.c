@@ -15,6 +15,7 @@
 #include "../conn_queue.h"
 #include "../health_monitor.h"
 #include "../display_manager.h"
+#include "../wav.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <pthread.h>
@@ -88,6 +89,7 @@ void audio_tones_play_dtmf(char k) { (void)k; }
 void audio_tones_play_ringback(void) {}
 void audio_tones_play_busy_tone(void) {}
 void audio_tones_play_coin_tone(void) {}
+void audio_tones_play_clip(const char *p) { (void)p; }
 void audio_tones_stop(void) {}
 int audio_tones_is_playing(void) { return 0; }
 
@@ -911,6 +913,99 @@ static void test_operator_era_lookup(void) {
     TEST_ASSERT_EQ_INT(era_index_for_year(1850), -1);
     TEST_ASSERT_EQ_INT(era_index_for_year(2200), -1);
     TEST_ASSERT_EQ_INT(era_index_for_year(1999), -1);
+}
+
+/* ── WAV clip parser ────────────────────────────────────────────────── */
+
+static void wav_put_u16(unsigned char *p, unsigned v) {
+    p[0] = (unsigned char)(v & 0xff);
+    p[1] = (unsigned char)((v >> 8) & 0xff);
+}
+static void wav_put_u32(unsigned char *p, unsigned long v) {
+    p[0] = (unsigned char)(v & 0xff);
+    p[1] = (unsigned char)((v >> 8) & 0xff);
+    p[2] = (unsigned char)((v >> 16) & 0xff);
+    p[3] = (unsigned char)((v >> 24) & 0xff);
+}
+
+/* Build a canonical 16-bit PCM WAV (silence) into buf; returns total length. */
+static size_t make_wav(unsigned char *buf, int channels, int rate,
+                       int frames) {
+    int data_bytes = frames * channels * 2;
+    memcpy(buf + 0, "RIFF", 4);
+    wav_put_u32(buf + 4, (unsigned long)(36 + data_bytes));
+    memcpy(buf + 8, "WAVE", 4);
+    memcpy(buf + 12, "fmt ", 4);
+    wav_put_u32(buf + 16, 16);
+    wav_put_u16(buf + 20, 1);                       /* PCM */
+    wav_put_u16(buf + 22, (unsigned)channels);
+    wav_put_u32(buf + 24, (unsigned long)rate);
+    wav_put_u32(buf + 28, (unsigned long)(rate * channels * 2));
+    wav_put_u16(buf + 32, (unsigned)(channels * 2));
+    wav_put_u16(buf + 34, 16);                      /* bits per sample */
+    memcpy(buf + 36, "data", 4);
+    wav_put_u32(buf + 40, (unsigned long)data_bytes);
+    memset(buf + 44, 0, (size_t)data_bytes);
+    return (size_t)(44 + data_bytes);
+}
+
+static void test_wav_parse_valid(void) {
+    unsigned char buf[256];
+    wav_info_t info;
+    size_t len = make_wav(buf, 1, 8000, 10);
+
+    TEST_ASSERT_EQ_INT(wav_parse(buf, len, &info), 0);
+    TEST_ASSERT_EQ_INT(info.format, 1);
+    TEST_ASSERT_EQ_INT(info.channels, 1);
+    TEST_ASSERT_EQ_INT(info.sample_rate, 8000);
+    TEST_ASSERT_EQ_INT(info.bits_per_sample, 16);
+    TEST_ASSERT_EQ_INT((int)info.data_offset, 44);
+    TEST_ASSERT_EQ_INT((int)info.data_len, 20);  /* 10 mono frames * 2 bytes */
+}
+
+static void test_wav_parse_rejects_bad(void) {
+    unsigned char buf[256];
+    wav_info_t info;
+    size_t len = make_wav(buf, 1, 8000, 4);
+
+    TEST_ASSERT_EQ_INT(wav_parse((const unsigned char *)"nope", 4, &info), -1);
+    TEST_ASSERT_EQ_INT(wav_parse(buf, 8, &info), -1);    /* truncated header */
+    TEST_ASSERT_EQ_INT(wav_parse(NULL, 100, &info), -1);
+    TEST_ASSERT_EQ_INT(wav_parse(buf, len, NULL), -1);
+
+    buf[9] = 'X';                                        /* corrupt WAVE tag */
+    TEST_ASSERT_EQ_INT(wav_parse(buf, len, &info), -1);
+}
+
+static void test_wav_parse_skips_unknown_chunk(void) {
+    /* A LIST chunk (odd length -> a pad byte) before data must be skipped and
+     * the data range still located correctly. */
+    unsigned char buf[256];
+    wav_info_t info;
+    size_t n;
+
+    memcpy(buf + 0, "RIFF", 4);
+    memcpy(buf + 8, "WAVE", 4);
+    memcpy(buf + 12, "fmt ", 4);
+    wav_put_u32(buf + 16, 16);
+    wav_put_u16(buf + 20, 1);
+    wav_put_u16(buf + 22, 1);
+    wav_put_u32(buf + 24, 8000);
+    wav_put_u32(buf + 28, 16000);
+    wav_put_u16(buf + 32, 2);
+    wav_put_u16(buf + 34, 16);
+    memcpy(buf + 36, "LIST", 4);
+    wav_put_u32(buf + 40, 3);
+    buf[44] = 'a'; buf[45] = 'b'; buf[46] = 'c'; buf[47] = 0;  /* + pad byte */
+    memcpy(buf + 48, "data", 4);
+    wav_put_u32(buf + 52, 4);
+    buf[56] = 1; buf[57] = 2; buf[58] = 3; buf[59] = 4;
+    n = 60;
+    wav_put_u32(buf + 4, (unsigned long)(n - 8));
+
+    TEST_ASSERT_EQ_INT(wav_parse(buf, n, &info), 0);
+    TEST_ASSERT_EQ_INT((int)info.data_offset, 56);
+    TEST_ASSERT_EQ_INT((int)info.data_len, 4);
 }
 
 /* ── Display line budget guardrail ──────────────────────────────────── */
@@ -2106,6 +2201,9 @@ int main(void) {
     TEST_SUITE_RUN(test_operator_parse_year);
     TEST_SUITE_RUN(test_operator_fare_for_year);
     TEST_SUITE_RUN(test_operator_era_lookup);
+    TEST_SUITE_RUN(test_wav_parse_valid);
+    TEST_SUITE_RUN(test_wav_parse_rejects_bad);
+    TEST_SUITE_RUN(test_wav_parse_skips_unknown_chunk);
     TEST_SUITE_RUN(test_plugin_display_lines_fit);
 
     TEST_SUITE_BEGIN("Plugin SDK");

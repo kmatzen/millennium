@@ -65,6 +65,7 @@ typedef struct {
     int            frame_count;
     const char    *observe;      /* '1' branch flavor */
     const char    *interfere;    /* '2' branch flavor (arms a paradox) */
+    const char    *ambient;      /* clip name played on arrival (optional) */
 } era_t;
 
 static const frame_t era0_frames[] = {
@@ -100,13 +101,13 @@ static const frame_t era6_frames[] = {
  * 1999 is the signature dead-end (never reaches midnight) and 2000 is "home".
  * The 2050+ era is gated behind a temporal pass. */
 static const era_t eras[] = {
-    {1900, 1929, "THE WIRES",     era0_frames, 2, "a faint voice: hi",  "you change a word"},
-    {1930, 1959, "GOLDEN AIR",    era1_frames, 2, "swing fills the line","you mute the band"},
-    {1960, 1989, "SPACE LINE",    era2_frames, 2, "...three two one...", "you halt the count"},
-    {1990, 1998, "LAST ANALOG",   era3_frames, 2, "the young web sings", "you cut the modem"},
-    {2000, 2000, "FROZEN MINUTE", era4_frames, 2, "home. stay a while",  "the clock twitches"},
-    {2001, 2049, "STATIC YEARS",  era5_frames, 2, "...seven... nine...", "you read a number"},
-    {2050, 2100, "SEALED FUTURE", era6_frames, 2, "it knows your name",  "you ask it to stop"}
+    {1900, 1929, "THE WIRES",     era0_frames, 2, "a faint voice: hi",  "you change a word", "era_wires"},
+    {1930, 1959, "GOLDEN AIR",    era1_frames, 2, "swing fills the line","you mute the band", "era_golden"},
+    {1960, 1989, "SPACE LINE",    era2_frames, 2, "...three two one...", "you halt the count","era_space"},
+    {1990, 1998, "LAST ANALOG",   era3_frames, 2, "the young web sings", "you cut the modem", "era_analog"},
+    {2000, 2000, "FROZEN MINUTE", era4_frames, 2, "home. stay a while",  "the clock twitches","era_frozen"},
+    {2001, 2049, "STATIC YEARS",  era5_frames, 2, "...seven... nine...", "you read a number", "era_static"},
+    {2050, 2100, "SEALED FUTURE", era6_frames, 2, "it knows your name",  "you ask it to stop","era_sealed"}
 };
 
 #define NUM_ERAS ((int)(sizeof(eras) / sizeof(eras[0])))
@@ -224,6 +225,7 @@ static void ts_enter_era(int idx) {
     ts.visited_mask |= (1 << idx);
     sdk_logf(TS_CAT, "Arrived in era %d (%s)", idx, eras[idx].label);
     ts_render_era();
+    sdk_play_clip(eras[idx].ambient);   /* era ambience; silent if no file */
 }
 
 static void ts_enter_drop(void) {
@@ -232,6 +234,7 @@ static void ts_enter_drop(void) {
     ts.state = TS_DROP;
     ts.frame_at = sdk_now();
     sdk_display("ALMOST 2000...", "NEVER MIDNIGHT");
+    sdk_play_clip("drop");   /* Operator's line; falls back to the busy tone */
 }
 
 static void ts_enter_paradox(void) {
@@ -240,6 +243,7 @@ static void ts_enter_paradox(void) {
     ts.state = TS_PARADOX;
     sdk_logf(TS_CAT, "Paradox jammed the line (source %d)", ts.source_year);
     sdk_display("LINE FAULT 19##", "#=OPERATOR");
+    sdk_play_clip("paradox");   /* glitch sting; falls back to the busy tone */
 }
 
 static void ts_begin_connection(int year) {
@@ -385,6 +389,7 @@ static int ts_handle_keypad(char key) {
 static int ts_handle_hook(int hook_up, int hook_down) {
     if (hook_up) {
         ts_enter_operator(NULL);
+        sdk_play_clip("operator");   /* greeting voice on lift; silent if none */
     } else if (hook_down) {
         sdk_stop_audio();
         ts.state = TS_DORMANT;

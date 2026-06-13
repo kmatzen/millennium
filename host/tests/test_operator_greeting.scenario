@@ -8,3 +8,6 @@ assert_display Lift
 hook_up
 assert_state IDLE_UP
 assert_display DIAL A YEAR
+
+# Lifting also requests the Operator greeting clip
+assert_clip operator.wav

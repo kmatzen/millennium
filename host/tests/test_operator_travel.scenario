@@ -9,3 +9,6 @@ keys 2005
 # Connecting beat, then the era plays on the line
 wait 6
 assert_display STATIC YEARS
+
+# The plugin also requests that era's ambience clip on arrival
+assert_clip era_static.wav

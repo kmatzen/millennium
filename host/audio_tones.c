@@ -1,7 +1,9 @@
 #define _POSIX_C_SOURCE 200112L
 #include "audio_tones.h"
+#include "wav.h"
 #include "logger.h"
 #include <math.h>
+#include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <pthread.h>
@@ -18,6 +20,7 @@
 #define DTMF_DURATION_MS   150
 #define COIN_DURATION_MS   200
 #define COIN_AMPLITUDE     7500   /* ~4 dB below default; coin chime sits softer */
+#define MAX_CLIP_BYTES     (8 * 1024 * 1024)  /* refuse to slurp huge files */
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -231,6 +234,135 @@ void audio_tones_play_coin_tone(void) {
     logger_debug_with_category("AudioTones", "Playing coin tone");
     start_tone(&s);
 }
+
+/* ── Recorded-clip playback (WAV → ALSA) ──────────────────────────── */
+
+#if HAVE_ALSA
+
+typedef struct {
+    unsigned char *data;   /* whole file, owned by the thread */
+    wav_info_t     info;
+} clip_arg_t;
+
+static void *clip_thread_func(void *arg) {
+    clip_arg_t *c = (clip_arg_t *)arg;
+    snd_pcm_t *pcm = NULL;
+    const unsigned char *p = c->data + c->info.data_offset;
+    size_t remaining = c->info.data_len;
+    int frame_bytes = c->info.channels * (c->info.bits_per_sample / 8);
+    int err;
+
+    err = snd_pcm_open(&pcm, EARPIECE_PCM, SND_PCM_STREAM_PLAYBACK, 0);
+    if (err < 0) {
+        logger_warnf_with_category("AudioTones", "Cannot open PCM for clip: %s",
+                                   snd_strerror(err));
+        pcm = NULL;
+    } else {
+        err = snd_pcm_set_params(pcm, SND_PCM_FORMAT_S16_LE,
+                                 SND_PCM_ACCESS_RW_INTERLEAVED,
+                                 (unsigned)c->info.channels,
+                                 (unsigned)c->info.sample_rate, 1, 200000);
+        if (err < 0) {
+            logger_warnf_with_category("AudioTones", "Cannot set clip params: %s",
+                                       snd_strerror(err));
+            snd_pcm_close(pcm);
+            pcm = NULL;
+        }
+    }
+
+    while (pcm && !tone_stop_flag && frame_bytes > 0 &&
+           remaining >= (size_t)frame_bytes) {
+        snd_pcm_uframes_t want = 1024;
+        size_t avail = remaining / (size_t)frame_bytes;
+        snd_pcm_sframes_t frames;
+        if ((size_t)want > avail) want = (snd_pcm_uframes_t)avail;
+        frames = snd_pcm_writei(pcm, p, want);
+        if (frames < 0) {
+            frames = snd_pcm_recover(pcm, (int)frames, 0);
+            if (frames < 0) break;
+            continue;
+        }
+        p += (size_t)frames * (size_t)frame_bytes;
+        remaining -= (size_t)frames * (size_t)frame_bytes;
+    }
+
+    if (pcm) {
+        snd_pcm_drain(pcm);
+        snd_pcm_close(pcm);
+    }
+
+    free(c->data);
+    free(c);
+
+    pthread_mutex_lock(&tone_mutex);
+    tone_thread_running = 0;
+    pthread_mutex_unlock(&tone_mutex);
+    return NULL;
+}
+
+void audio_tones_play_clip(const char *path) {
+    FILE *f;
+    long sz;
+    size_t rd;
+    unsigned char *buf;
+    clip_arg_t *arg;
+    wav_info_t info;
+
+    if (!path) return;
+
+    f = fopen(path, "rb");
+    if (!f) {
+        logger_debugf_with_category("AudioTones", "Clip not found: %s", path);
+        return;  /* leave any current sound playing as a fallback */
+    }
+    if (fseek(f, 0, SEEK_END) != 0) { fclose(f); return; }
+    sz = ftell(f);
+    if (sz <= 0 || sz > MAX_CLIP_BYTES) { fclose(f); return; }
+    rewind(f);
+
+    buf = (unsigned char *)malloc((size_t)sz);
+    if (!buf) { fclose(f); return; }
+    rd = fread(buf, 1, (size_t)sz, f);
+    fclose(f);
+    if (rd != (size_t)sz) { free(buf); return; }
+
+    if (wav_parse(buf, (size_t)sz, &info) != 0 || info.format != 1 ||
+        info.bits_per_sample != 16 || info.channels < 1 || info.channels > 2 ||
+        info.sample_rate <= 0 || info.data_len == 0) {
+        logger_warnf_with_category("AudioTones",
+                                   "Unsupported clip (need 16-bit PCM WAV): %s",
+                                   path);
+        free(buf);
+        return;
+    }
+
+    audio_tones_stop();   /* one sound at a time */
+
+    arg = (clip_arg_t *)malloc(sizeof(clip_arg_t));
+    if (!arg) { free(buf); return; }
+    arg->data = buf;
+    arg->info = info;
+
+    pthread_mutex_lock(&tone_mutex);
+    tone_stop_flag = 0;
+    tone_thread_running = 1;
+    pthread_mutex_unlock(&tone_mutex);
+
+    if (pthread_create(&tone_thread, NULL, clip_thread_func, arg) != 0) {
+        free(buf);
+        free(arg);
+        pthread_mutex_lock(&tone_mutex);
+        tone_thread_running = 0;
+        pthread_mutex_unlock(&tone_mutex);
+        logger_warn_with_category("AudioTones", "Failed to create clip thread");
+    }
+}
+
+#else /* !HAVE_ALSA */
+
+void audio_tones_play_clip(const char *path) { (void)path; }
+
+#endif /* HAVE_ALSA */
 
 void audio_tones_stop(void) {
     pthread_mutex_lock(&tone_mutex);

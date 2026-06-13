@@ -41,6 +41,12 @@ sip.local_port=0
 sip.snd_capture=plughw:CARD=Device,DEV=0
 sip.snd_playback=out_right_solo
 
+# Directory of recorded audio clips played by plugins via sdk_play_clip().
+# Files are 16-bit PCM WAV named <clip>.wav (ideally 8 kHz mono to match the
+# narrowband audio hardware). See host/AUDIO_CLIPS.md. Missing files are a
+# harmless no-op, so clips are optional.
+audio.clip_dir=/usr/local/share/millennium/audio
+
 # Card Configuration (magstripe reader)
 card.enabled=true
 # Comma-separated 16-digit card numbers that grant free calling
