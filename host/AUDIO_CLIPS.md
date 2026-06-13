@@ -35,6 +35,29 @@ ffmpeg -i voice.mp3 -ac 1 -ar 8000 -sample_fmt s16 operator.wav
 scp operator.wav matzen@raspberrypi.local:/usr/local/share/millennium/audio/
 ```
 
+## Reproducible clips (manifest + regen script)
+
+The clips are **not in git** (binary, and easy to regenerate), so the source of
+truth is [`audio/clips.manifest`](audio/clips.manifest): one line per clip,
+`<clip_name> <text>`, plus the voice/model in its header. The current set is
+"The Operator" narration in ElevenLabs' *Sarah* voice.
+
+[`audio/regen_clips.sh`](audio/regen_clips.sh) rebuilds every clip from the
+manifest — synthesize via ElevenLabs TTS, convert to the format above, write to
+`audio/out/`, and optionally deploy to the Pi. Use this to restore the clips
+after an SD reflash or to re-voice them (edit the manifest, or set `VOICE_ID`).
+
+```sh
+export ELEVENLABS_API_KEY=sk_...        # a TTS-capable key; never commit it
+make regen-clips                        # build into host/audio/out/
+make regen-clips DEPLOY=1               # build + scp/install onto the Pi
+# voice/host overrides: VOICE_ID=... PI_HOST=user@ip ./audio/regen_clips.sh --deploy
+```
+
+To re-voice, change the `Voice:` line + `VOICE_ID`. Free ElevenLabs accounts
+can't use "library" voices via the API (HTTP 402); current default voices like
+Sarah/Brian/George work.
+
 ## Using clips from a plugin
 
 ```c
@@ -56,8 +79,10 @@ sdk_play_clip("operator");   /* plays <clip_dir>/operator.wav */
 "The Operator" uses this for an Operator greeting on lift (`operator`), per-era
 ambience on arrival (`era_wires`, `era_golden`, `era_space`, `era_analog`,
 `era_frozen`, `era_static`, `era_sealed`), the 1999 line-drop (`drop`), and the
-paradox sting (`paradox`). None ship in the repo — add your own to bring the
-phone to life, or leave them out and the experience runs on tones + text.
+paradox sting (`paradox`). The recordings themselves aren't committed, but their
+text is — all 10 are defined in `audio/clips.manifest` and rebuilt by
+`make regen-clips` (see above). Leave them out and the experience still runs on
+tones + text.
 
 ## Testing
 

@@ -250,4 +250,10 @@ operator-smoke:
 	@chmod +x tests/operator_smoke.sh
 	@RUN_DRIFT=$(RUN_DRIFT) ./tests/operator_smoke.sh $(OP_HOST)
 
-.PHONY: all clean install uninstall test unit_tests api-test device-test break-test operator-smoke pjsip-smoke
+# Regenerate The Operator's voice clips from audio/clips.manifest via ElevenLabs
+# TTS. Needs ELEVENLABS_API_KEY in the environment and ffmpeg. Add DEPLOY=1 to
+# also push the rebuilt WAVs to the Pi. See host/AUDIO_CLIPS.md.
+regen-clips:
+	@cd audio && ./regen_clips.sh $(if $(DEPLOY),--deploy,)
+
+.PHONY: all clean install uninstall test unit_tests api-test device-test break-test operator-smoke regen-clips pjsip-smoke
