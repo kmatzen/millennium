@@ -240,4 +240,14 @@ break-test:
 	@chmod +x tests/break_test.sh
 	@HOST=$(HOST) ./tests/break_test.sh $(HOST)
 
-.PHONY: all clean install uninstall test unit_tests api-test device-test break-test pjsip-smoke
+# "The Operator" plugin smoke test against a live daemon over the web API. Drives
+# the state machine end-to-end (greeting, eras, fares, 1999 drop, sealed refusal,
+# paradox+repair). Does NOT cover audio/coins/card/hook — those need the physical
+# phone; see host/OPERATOR_PLAYTEST.md. Usage: make operator-smoke [OP_HOST=<ip>]
+# [RUN_DRIFT=1] (default host = the Pi).
+OP_HOST ?= 192.168.86.152
+operator-smoke:
+	@chmod +x tests/operator_smoke.sh
+	@RUN_DRIFT=$(RUN_DRIFT) ./tests/operator_smoke.sh $(OP_HOST)
+
+.PHONY: all clean install uninstall test unit_tests api-test device-test break-test operator-smoke pjsip-smoke

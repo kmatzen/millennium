@@ -1,0 +1,36 @@
+# The Operator: an armed paradox is a session-long consequence -- it survives
+# hanging up and lifting the handset again (state only resets when the plugin is
+# re-activated). Meddle in one era, hang up, come back, open a DIFFERENT era,
+# and the line is still jammed.
+activate_plugin The Operator
+
+# Lift, travel to 1995, and meddle (branch 2) -> arms the paradox
+hook_up
+coin 25
+keys 1995
+wait 6
+assert_display LAST ANALOG
+key 2
+assert_display BENT
+
+# Hang up completely, then lift again -- a fresh call, but the timeline is
+# still bent (coins are cleared on hook-up, so pay the fare again).
+hook_down
+assert_state IDLE_DOWN
+hook_up
+assert_display DIAL A YEAR
+coin 25
+
+# Opening a different era still jams the line: the paradox persisted.
+keys 2005
+assert_display LINE FAULT
+assert_clip paradox.wav
+
+# Re-activating the plugin is what clears session state -- now a different era
+# connects normally instead of jamming.
+activate_plugin The Operator
+hook_up
+coin 25
+keys 2005
+wait 6
+assert_display STATIC YEARS
