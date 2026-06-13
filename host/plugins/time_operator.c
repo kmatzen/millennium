@@ -183,7 +183,7 @@ static void ts_render_operator(void) {
 }
 
 static void ts_render_need(void) {
-    char l1[21], l2[21];
+    char l1[32], l2[32];   /* room for a worst-case int from snprintf */
     snprintf(l1, sizeof(l1), "NEED $%d.%02d", ts.fare_cents / 100,
              ts.fare_cents % 100);
     snprintf(l2, sizeof(l2), "HAVE $%d.%02d", sdk_balance() / 100,
@@ -299,7 +299,7 @@ static void ts_eval_year(void) {
 /* ── Plugin callbacks ────────────────────────────────────────────────── */
 
 static int ts_handle_coin(int coin_value, const char *coin_code) {
-    char l2[21];
+    char l2[32];   /* room for a worst-case int from snprintf */
     (void)coin_value;
     (void)coin_code;
     sdk_coin_chime();
@@ -461,6 +461,12 @@ static void ts_handle_tick(void) {
     }
 }
 
+/* Append one string at index n (when there's room) and return n+1. */
+static int ts_collect(const char **out, int max, int n, const char *s) {
+    if (out && n < max) out[n] = s;
+    return n + 1;
+}
+
 /* Test/introspection hook (see test_plugin_display_lines_fit): expose every
  * authored display string so the guardrail can confirm none exceeds the line
  * budget. Returns the total count; fills up to `max` into out[]. */
@@ -474,16 +480,15 @@ int time_operator_display_strings(const char **out, int max) {
     };
     int n = 0, i, f;
     for (i = 0; i < (int)(sizeof(ui) / sizeof(ui[0])); i++) {
-        if (out && n < max) out[n] = ui[i];
-        n++;
+        n = ts_collect(out, max, n, ui[i]);
     }
     for (i = 0; i < NUM_ERAS; i++) {
-        if (out && n < max) out[n] = eras[i].label;       n++;
-        if (out && n < max) out[n] = eras[i].observe;     n++;
-        if (out && n < max) out[n] = eras[i].interfere;   n++;
+        n = ts_collect(out, max, n, eras[i].label);
+        n = ts_collect(out, max, n, eras[i].observe);
+        n = ts_collect(out, max, n, eras[i].interfere);
         for (f = 0; f < eras[i].frame_count; f++) {
-            if (out && n < max) out[n] = eras[i].frames[f].l1; n++;
-            if (out && n < max) out[n] = eras[i].frames[f].l2; n++;
+            n = ts_collect(out, max, n, eras[i].frames[f].l1);
+            n = ts_collect(out, max, n, eras[i].frames[f].l2);
         }
     }
     return n;
