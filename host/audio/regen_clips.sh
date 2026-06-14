@@ -15,6 +15,8 @@
 #
 # Env knobs (all optional):
 #   ELEVENLABS_API_KEY  required  — API key (never hard-code it / commit it)
+#   MANIFEST            default clips.manifest — point at a subset file to
+#                                  regenerate only some clips (saves TTS spend)
 #   VOICE_ID            default Sarah (EXAVITQu4vr4xnSDxMaL)
 #   MODEL_ID            default eleven_multilingual_v2
 #   OUTDIR              default <script dir>/out
@@ -25,7 +27,7 @@
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
-MANIFEST="$HERE/clips.manifest"
+MANIFEST="${MANIFEST:-$HERE/clips.manifest}"   # override to regen a subset
 OUTDIR="${OUTDIR:-$HERE/out}"
 VOICE_ID="${VOICE_ID:-EXAVITQu4vr4xnSDxMaL}"   # Sarah
 MODEL_ID="${MODEL_ID:-eleven_multilingual_v2}"
