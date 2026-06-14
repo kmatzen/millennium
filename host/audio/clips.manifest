@@ -36,6 +36,11 @@ era3_sealed  This line is sealed, a trunk line. Swipe a pass, or feed the coinbo
 era3_arrive  Connecting. December, nineteen ninety-eight. A Christmas card, Ruth's new number folded inside. The last of it. Listen.
 era3_listen  Five, five. That is the end of it. The whole number, at last.
 
+# -- Per-era story beats (a forced moment between LISTEN and the piece) --
+era1_scene   The song ends, and the older girl leans close. Call me, she says, and gives the little one the number to keep. She writes it on her palm in blue ink, so she will never forget.
+era2_scene   She stands in the hallway a long while, the receiver humming against her ear. Pride, or fear, it is hard to say. In the end she sets it down, and the number stays unfinished, sitting in her chest like a stone.
+era3_scene   She copies Ruth's new number onto the back of her hand, meaning to call once the holidays are over. The holidays become the new year. For her, the new year never quite arrives.
+
 # -- Flavor eras + the homing nudges (too early / too late / warm) --
 flv_early   Too early. Come back, and I will point you nearer.
 flv_late    Too late. That is past her moment. Come back, and I will point you nearer.

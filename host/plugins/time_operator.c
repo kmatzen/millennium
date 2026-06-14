@@ -41,6 +41,7 @@
  * lands instead of being cut off mid-line -- this is what paces a first-time
  * session toward ~5 minutes. */
 #define TRAVEL_SECS        2
+#define SCENE_SECS         14  /* forced story beat after LISTEN; era*_scene ~11-13 s */
 #define REVEAL_SECS        6   /* hold a found piece; era*_listen runs ~4-5 s    */
 #define FLAVOR_SECS        5   /* a nudge/flavor beat; flv_* run ~3-5 s          */
 #define DRIFT_SECS         30
@@ -78,6 +79,7 @@ enum {
     TS_TRAVEL,     /* connecting beat (ringback)                    */
     TS_FLAVOR,     /* a non-key era; brief scene then back          */
     TS_KEY,        /* a key era; LISTEN/SPEAK (maybe locked/tangled)*/
+    TS_SCENE,      /* forced story beat after LISTEN, before the piece */
     TS_REVEAL,     /* a piece was just found                        */
     TS_READY,      /* all 3 pieces; dialing the final number        */
     TS_FINAL,      /* the call connects; scripted beats             */
@@ -317,6 +319,22 @@ static void op_enter_key(int idx, int locked) {
     }
 }
 
+/* A forced story beat after the caller chooses LISTEN, before the piece is
+ * revealed: it deepens each era and -- being unskippable -- puts a firm floor
+ * under the session length (a hurried player can't blow past the story). */
+static void op_enter_scene(void) {
+    const char *l1 = (op.cur_key == 0) ? "A SUMMER KITCHEN" :
+                     (op.cur_key == 1) ? "A HALLWAY PHONE" : "DECEMBER 1998";
+    const char *l2 = (op.cur_key == 0) ? "call me, she says" :
+                     (op.cur_key == 1) ? "the nerve fails" : "Ruth's last card";
+    sdk_stop_audio();
+    op.state = TS_SCENE;
+    op.timer_at = sdk_now();
+    sdk_display(l1, l2);
+    sdk_play_clip(op.cur_key == 0 ? "era1_scene" :
+                  op.cur_key == 1 ? "era2_scene" : "era3_scene");
+}
+
 static void op_enter_reveal(void) {
     char l1[24], l2[24];
     const char *piece = (op.cur_key == 0) ? PIECE_A :
@@ -493,7 +511,7 @@ static int op_handle_keypad(char key) {
             if (key == '#') op_enter_hub(NULL);
             else sdk_beep(key);
         } else if (key == '1') {
-            op_enter_reveal();
+            op_enter_scene();
         } else if (key == '2') {
             op.tangled = 1;
             op.spoke_once = 1;   /* learned the lesson; stop advertising SPEAK */
@@ -579,6 +597,9 @@ static void op_handle_tick(void) {
     case TS_FLAVOR:
         if (sdk_elapsed(op.timer_at) >= FLAVOR_SECS) op_enter_hub(NULL);
         break;
+    case TS_SCENE:
+        if (sdk_elapsed(op.timer_at) >= SCENE_SECS) op_enter_reveal();
+        break;
     case TS_REVEAL:
         if (sdk_elapsed(op.timer_at) >= REVEAL_SECS) op_enter_hub(NULL);
         break;
@@ -628,6 +649,8 @@ int time_operator_display_strings(const char **out, int max) {
         "BACK TO OPERATOR", "TOO EARLY", "TOO LATE", "WARMER",
         "A LITTLE LATER", "A LITTLE EARLIER", "ALREADY HEARD",
         "FROZEN MINUTE", "FUTURE SEALED",
+        "A SUMMER KITCHEN", "call me, she says", "A HALLWAY PHONE",
+        "the nerve fails", "DECEMBER 1998", "Ruth's last card",
         "1955 TWO SISTERS", "1978 SHE PAUSES", "1998 A CARD", "1998: SEALED",
         "SWIPE PASS / COIN", "1=LISTEN 2=SPEAK", "LINE TANGLED", "press 1=LISTEN",
         "TEMPORAL PASS", "PASS ACCEPTED", "NO SUCH YEAR", "try 1900-2100",

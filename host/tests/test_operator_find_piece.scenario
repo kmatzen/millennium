@@ -9,8 +9,11 @@ wait 3
 assert_display 1=LISTEN
 assert_clip era1_arrive.wav
 
-# Listen (don't speak) -> first piece
+# Listen (don't speak) -> a forced story beat -> the first piece
 key 1
+assert_display A SUMMER KITCHEN
+assert_clip era1_scene.wav
+wait 14
 assert_display PIECE A
 assert_display 1/3
 assert_clip era1_listen.wav
