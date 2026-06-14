@@ -267,4 +267,13 @@ tsan-queue:
 	@$(TSAN_CC) -fsanitize=thread -g -O1 -DNO_LOCK tests/tsan_event_queue.c -o /tmp/tsan_queue_nolock
 	@echo "[no-lock] (expect: ThreadSanitizer data race warnings)"; /tmp/tsan_queue_nolock || true
 
-.PHONY: all clean install uninstall test unit_tests api-test device-test break-test operator-smoke regen-clips tsan-queue pjsip-smoke
+# CBMC memory-safety proof of the serial event-buffer parser (mirrors
+# millennium_sdk.c). Proves no OOB/overflow/leak for any serial input up to the
+# modeled length. Needs cbmc installed; takes ~2 min. Not part of `make test`.
+CBMC ?= cbmc
+cbmc-parser:
+	$(CBMC) tests/cbmc_serial_parser.c --function verify_parser \
+	  --bounds-check --pointer-check --pointer-overflow-check --conversion-check \
+	  --memory-leak-check --unwind 37 --unwinding-assertions
+
+.PHONY: all clean install uninstall test unit_tests api-test device-test break-test operator-smoke regen-clips tsan-queue cbmc-parser pjsip-smoke
