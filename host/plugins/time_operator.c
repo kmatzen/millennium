@@ -44,6 +44,7 @@
 #define GRACE_SECS         30   /* re-lift within this window resumes a session */
 #define FINAL_CONNECT_SECS 3
 #define FINAL_CLOCK_SECS   4
+#define ENTRY_TIMEOUT_SECS 6   /* clear a half-typed year/number after this idle */
 
 /* Ruth's number, in three positional pieces A-B-C (tunable). */
 #define PIECE_A "36"
@@ -390,6 +391,7 @@ static int op_handle_coin(int coin_value, const char *coin_code) {
 static int op_handle_keypad(char key) {
     switch (op.state) {
     case TS_HUB:
+        op.last_input_at = sdk_now();   /* for the stale-entry auto-clear */
         if (key >= '0' && key <= '9') {
             if (op.len < 4) {
                 op.buf[op.len++] = key;
@@ -409,6 +411,7 @@ static int op_handle_keypad(char key) {
         break;
 
     case TS_READY:
+        op.last_input_at = sdk_now();   /* for the stale-entry auto-clear */
         if (key >= '0' && key <= '9') {
             if (op.len < 6) {
                 op.buf[op.len++] = key;
@@ -497,6 +500,20 @@ static void op_handle_activation(void) {
 
 static void op_handle_tick(void) {
     switch (op.state) {
+    case TS_HUB:
+        /* A half-typed year left by a hesitant or fumbling caller clears itself
+         * so stray digits can't derail the next dial. */
+        if (op.len > 0 && sdk_elapsed(op.last_input_at) >= ENTRY_TIMEOUT_SECS) {
+            op.buf[0] = '\0'; op.len = 0;
+            op_render_hub();
+        }
+        break;
+    case TS_READY:
+        if (op.len > 0 && sdk_elapsed(op.last_input_at) >= ENTRY_TIMEOUT_SECS) {
+            op.buf[0] = '\0'; op.len = 0;
+            op_render_ready();
+        }
+        break;
     case TS_TRAVEL:
         if (sdk_elapsed(op.timer_at) >= TRAVEL_SECS) op_resolve_travel();
         break;
