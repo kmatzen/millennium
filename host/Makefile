@@ -256,4 +256,15 @@ operator-smoke:
 regen-clips:
 	@cd audio && ./regen_clips.sh $(if $(DEPLOY),--deploy,)
 
-.PHONY: all clean install uninstall test unit_tests api-test device-test break-test operator-smoke regen-clips pjsip-smoke
+# ThreadSanitizer check for the serial event queue's lock (mirrors
+# millennium_sdk.c). Needs a TSan-capable toolchain (clang/gcc on x86-64 or
+# arm64; NOT the 32-bit Pi). The locked build must be race-free; the -DNO_LOCK
+# build demonstrates the pre-fix race. Not part of `make test`.
+TSAN_CC ?= clang
+tsan-queue:
+	@$(TSAN_CC) -fsanitize=thread -g -O1 tests/tsan_event_queue.c -o /tmp/tsan_queue_lock
+	@echo "[locked] (expect: no races, prints done)"; /tmp/tsan_queue_lock
+	@$(TSAN_CC) -fsanitize=thread -g -O1 -DNO_LOCK tests/tsan_event_queue.c -o /tmp/tsan_queue_nolock
+	@echo "[no-lock] (expect: ThreadSanitizer data race warnings)"; /tmp/tsan_queue_nolock || true
+
+.PHONY: all clean install uninstall test unit_tests api-test device-test break-test operator-smoke regen-clips tsan-queue pjsip-smoke
