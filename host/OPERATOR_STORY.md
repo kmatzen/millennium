@@ -77,11 +77,13 @@ decade roles (A/B/C/early/home/future/other) for reference; **arrival** is decid
 by `op_in_window` (the narrow windows above), not by that classifier.
 
 ## States (`plugins/time_operator.c`)
-`DORMANT → HUB → TRAVEL → {FLAVOR | KEY} → REVEAL → … → READY → FINAL → WIN`
+`DORMANT → HUB → TRAVEL → {FLAVOR | KEY} → SCENE → REVEAL → … → READY → FINAL → WIN`
+(`SCENE` is a forced, unskippable per-era story beat between LISTEN and the piece)
 plus `KEY` sub-flags `locked` (sealed) and `tangled` (spoke), and session flag
 `spoke_once` (retires the SPEAK prompt). Timers are sized to let each beat's voice
 clip finish (so the story isn't cut off mid-line, which paces a first session
-toward ~5 min): `TRAVEL_SECS 2`, `REVEAL_SECS 6`, `FLAVOR_SECS 5`, `DRIFT_SECS 30`,
+toward ~5 min): `TRAVEL_SECS 2`, `SCENE_SECS 14` (forced per-era story beat),
+`REVEAL_SECS 6`, `FLAVOR_SECS 5`, `DRIFT_SECS 30`,
 `EXTEND_SECS 30`, `GRACE_SECS 30`, final beats `8` then `6`, then `WIN_HOLD_SECS 8`
 before the quiet coda. Tuning knob: `WARM_BAND 6`.
 
@@ -92,8 +94,8 @@ DORMANT ──lift──▶ [won OR idle>grace?] ─ yes ▶ reset + op_intro �
 HUB (cryptic clue for lowest unfound piece; n/3)
   ├─ dial year off-target ─▶ FLAVOR nudge (TOO EARLY/LATE/WARMER) ─(timeout/#)─▶ HUB
   ├─ dial year in a piece window (unfound) ─▶ TRAVEL ─▶ KEY
-  │        ├─ 1 LISTEN ─▶ REVEAL (piece++) ─(timeout/#)─▶ HUB
-  │        └─ 2 SPEAK  ─▶ tangled (SPEAK retired) ──1 LISTEN──▶ REVEAL
+  │        ├─ 1 LISTEN ─▶ SCENE (forced story beat) ─▶ REVEAL (piece++) ─▶ HUB
+  │        └─ 2 SPEAK  ─▶ tangled (SPEAK retired) ──1 LISTEN──▶ SCENE ─▶ REVEAL
   ├─ dial a window already found ─▶ FLAVOR "already heard" ─▶ HUB
   ├─ dial 1998-window (sealed, unfound) ─▶ KEY locked ──card|coin──▶ KEY ─▶ …
   ├─ coin ─▶ sharper hint (decade)   │   # ─▶ repeat hint
@@ -106,7 +108,7 @@ ANY ── hang up ──▶ DORMANT (30 s grace; a WIN forces a fresh next sess
 ## Clips
 All voice lines (IDs + exact text + voice) are the manifest:
 `audio/clips.manifest`, rebuilt by `make regen-clips` (see `AUDIO_CLIPS.md`).
-Groups: `op_*` (hub), `era{1,2,3}_{arrive,listen}` + `era3_sealed`, `flv_*`,
+Groups: `op_*` (hub), `era{1,2,3}_{arrive,scene,listen}` + `era3_sealed`, `flv_*`,
 `px_tangle` / `drift_back` / `coin_hold`, `final_connect` / `final_clock` /
 `win_free`. Missing clips are silent no-ops; the experience still reads on the VFD.
 

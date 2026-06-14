@@ -3,11 +3,11 @@
 activate_plugin The Operator
 hook_up
 
-# Earn piece A
+# Earn piece A (LISTEN -> story beat -> reveal)
 keys 1955
 wait 3
 key 1
-wait 3
+wait 14
 assert_display 1/3
 
 # Hang up, lift back quickly -> resume with progress intact

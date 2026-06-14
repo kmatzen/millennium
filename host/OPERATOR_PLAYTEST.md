@@ -33,8 +33,10 @@ Clips live in `/usr/local/share/millennium/audio/`; a missing one is a silent no
       ·  H: lifting really transitions to IDLE_UP (no API nudge).
 - [ ] **Homing feedback.** Dial `1 9 5 0`. V: `WARMER` / `A LITTLE LATER`. Dial `1 9 5 8`:
       `WARMER` / `A LITTLE EARLIER`. Dial `1 9 2 5`: `TOO EARLY`. (Deduce, then land it.)
-- [ ] **Piece A.** Dial `1 9 5 5`. V: connecting → `1955 TWO SISTERS` / `1=LISTEN 2=SPEAK`.
-      Press `1`. V: `PIECE A: 36` / `PIECES 1/3` · A: `era1_arrive`, then `era1_listen`.
+- [ ] **Piece A (+ forced story beat).** Dial `1 9 5 5`. V: connecting → `1955 TWO SISTERS` /
+      `1=LISTEN 2=SPEAK`. Press `1`. V: a forced ~14 s scene (`A SUMMER KITCHEN` / `call me, she says`,
+      A: `era1_scene`) that you **cannot skip**, then V: `PIECE A: 36` / `PIECES 1/3` · A: `era1_listen`.
+      (This beat plays in every era; it's what puts a floor under the session length.)
 - [ ] **Listen, don't speak (+ retire).** In a key era press `2`. V: `LINE TANGLED` · A: `px_tangle`.
       Press `1` to recover the piece. Thereafter the prompt reads `press 1=LISTEN` (SPEAK retired).
 - [ ] **Piece B — the exact year.** Dial `1 9 7 7` → `WARMER`/`A LITTLE LATER`; only

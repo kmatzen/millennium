@@ -12,8 +12,9 @@ key 2
 assert_display LINE TANGLED
 assert_clip px_tangle.wav
 
-# Listen -> recovered, piece found
+# Listen -> recovered, then the story beat -> piece found
 key 1
+wait 14
 assert_display PIECE A
 assert_display 1/3
 

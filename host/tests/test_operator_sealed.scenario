@@ -14,5 +14,6 @@ assert_display 1998 A CARD
 assert_clip era3_arrive.wav
 
 key 1
+wait 14
 assert_display PIECE C
 assert_display 1/3

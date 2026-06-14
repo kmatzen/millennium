@@ -32,6 +32,7 @@ keys 1955
 wait 3
 assert_display 1=LISTEN
 key 1
+wait 14
 assert_display PIECE A
 wait 6
 

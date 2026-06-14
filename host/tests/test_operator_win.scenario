@@ -7,13 +7,13 @@ hook_up
 keys 1955
 wait 3
 key 1
-wait 6
+wait 20
 
 # Piece B (1970s)
 keys 1978
 wait 3
 key 1
-wait 6
+wait 20
 
 # Piece C (1998, sealed -> swipe a pass)
 keys 1998
@@ -21,7 +21,7 @@ wait 3
 assert_display SEALED
 card 1234567890123456
 key 1
-wait 6
+wait 20
 
 # All three pieces -> ready to place the call (the number is NOT shown; you must
 # assemble the three pieces you collected from memory)
