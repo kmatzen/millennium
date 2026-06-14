@@ -311,4 +311,11 @@ game-check:
 	 ( cd $$tmp && $(SPIN) -run -ltl can_win -f -m1000000 g.pml ) | grep -iE "acceptance|errors:"; \
 	 rm -rf $$tmp
 
-.PHONY: all clean install uninstall test unit_tests api-test device-test break-test operator-smoke regen-clips tsan-queue cbmc-parser cbmc-parsers model-check game-check pjsip-smoke
+# CBMC of the daemon phone state machine (tests/cbmc_state_machine.c): proves the
+# state+balance invariants AND that simulator.c and daemon.c implement the same
+# transitions (catches sim/daemon drift). Needs cbmc.
+state-check:
+	$(CBMC) tests/cbmc_state_machine.c --function verify_invariants
+	$(CBMC) tests/cbmc_state_machine.c --function verify_equiv
+
+.PHONY: all clean install uninstall test unit_tests api-test device-test break-test operator-smoke regen-clips tsan-queue cbmc-parser cbmc-parsers model-check game-check state-check pjsip-smoke
