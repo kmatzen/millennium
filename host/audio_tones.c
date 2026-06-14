@@ -4,6 +4,7 @@
 #include "logger.h"
 #include <math.h>
 #include <stdio.h>
+#include <stdarg.h>
 #include <string.h>
 #include <stdlib.h>
 #include <pthread.h>
@@ -181,7 +182,43 @@ static void start_tone(const tone_spec_t *spec) {
 
 /* ── Public API ────────────────────────────────────────────────── */
 
+#if HAVE_ALSA
+/*
+ * PJMEDIA's ALSA backend installs a process-wide snd_lib_error_set_handler()
+ * during PJSUA init that funnels every libasound error message through
+ * pj_log(). pj_log() calls pj_thread_this(), which asserts() -- and so abort()s
+ * the whole process -- when invoked from a thread not registered with PJLIB.
+ * Our tone/clip playback threads are plain pthreads, never registered with
+ * PJLIB, so any ALSA diagnostic they provoke (a buffer underrun/overrun under
+ * load is enough) would crash the daemon through PJMEDIA's handler. This was the
+ * intermittent SIGABRT seen under audio load: backtrace was
+ * libasound -> alsa_error_handler -> pj_log_4 -> pj_thread_this -> assert.
+ *
+ * audio_tones_init() runs after PJSUA has started, so re-installing our own
+ * handler here wins. It never touches PJLIB, so it is safe from any thread, and
+ * it keeps ALSA diagnostics flowing to our (thread-safe, pj-free) logger.
+ */
+static void millennium_alsa_error_handler(const char *file, int line,
+                                          const char *function, int err,
+                                          const char *fmt, ...) {
+    char msg[256];
+    va_list ap;
+    int n;
+    (void)file; (void)line; (void)err;
+    va_start(ap, fmt);
+    n = vsnprintf(msg, sizeof(msg), fmt, ap);
+    va_end(ap);
+    if (n < 0) msg[0] = '\0';
+    logger_debugf_with_category("AudioTones", "ALSA: %s: %s",
+                                function ? function : "?", msg);
+}
+#endif /* HAVE_ALSA */
+
 void audio_tones_init(void) {
+#if HAVE_ALSA
+    /* Take over the global ALSA error handler from PJMEDIA (see note above). */
+    snd_lib_error_set_handler(millennium_alsa_error_handler);
+#endif
     logger_info_with_category("AudioTones", "Audio tone subsystem initialized");
 }
 
