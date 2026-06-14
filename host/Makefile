@@ -297,4 +297,18 @@ model-check:
 	 ( cd $$tmp && $(SPIN) -run -ltl progress -m200000 live.pml ) | grep -iE "acceptance|never claim|errors:"; \
 	 rm -rf $$tmp
 
-.PHONY: all clean install uninstall test unit_tests api-test device-test break-test operator-smoke regen-clips tsan-queue cbmc-parser cbmc-parsers model-check pjsip-smoke
+# SPIN model-check of The Operator game (tests/operator_game.pml, mirrors
+# plugins/time_operator.c). Proves no dead-ends, bounded pieces, and no soft-lock
+# (WIN reachable from every state, AG EF win). Needs spin; not in `make test`.
+game-check:
+	@tmp=$$(mktemp -d); \
+	 grep -v '^ltl ' tests/operator_game.pml > $$tmp/safety.pml; cp tests/operator_game.pml $$tmp/g.pml; \
+	 echo "== no dead-ends =="; \
+	 ( cd $$tmp && $(SPIN) -run -safety -m300000 safety.pml ) | grep -iE "invalid end|errors:"; \
+	 echo "== bounded pieces ([] pieces<=3) =="; \
+	 ( cd $$tmp && $(SPIN) -run -ltl pieces_ok -m300000 g.pml ) | grep -iE "errors:"; \
+	 echo "== no soft-lock (AG EF win) =="; \
+	 ( cd $$tmp && $(SPIN) -run -ltl can_win -f -m1000000 g.pml ) | grep -iE "acceptance|errors:"; \
+	 rm -rf $$tmp
+
+.PHONY: all clean install uninstall test unit_tests api-test device-test break-test operator-smoke regen-clips tsan-queue cbmc-parser cbmc-parsers model-check game-check pjsip-smoke
