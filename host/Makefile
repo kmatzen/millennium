@@ -276,4 +276,17 @@ cbmc-parser:
 	  --bounds-check --pointer-check --pointer-overflow-check --conversion-check \
 	  --memory-leak-check --unwind 37 --unwinding-assertions
 
-.PHONY: all clean install uninstall test unit_tests api-test device-test break-test operator-smoke regen-clips tsan-queue cbmc-parser pjsip-smoke
+# SPIN model-check of the Pi<->Arduino display-command wire protocol
+# (tests/protocol.pml, mirrors display.ino's framing). Proves overrun-freedom,
+# deadlock-freedom, and full-consumption (self-resync). Needs spin; not in `make test`.
+SPIN ?= spin
+model-check:
+	@tmp=$$(mktemp -d); \
+	 grep -v '^ltl ' tests/protocol.pml > $$tmp/safety.pml; cp tests/protocol.pml $$tmp/live.pml; \
+	 echo "== safety: overrun-freedom + deadlock-freedom =="; \
+	 ( cd $$tmp && $(SPIN) -run -safety -m200000 safety.pml ) | grep -iE "assertion viol|invalid end|errors:"; \
+	 echo "== liveness: full-consumption []<> at_idle =="; \
+	 ( cd $$tmp && $(SPIN) -run -ltl progress -m200000 live.pml ) | grep -iE "acceptance|never claim|errors:"; \
+	 rm -rf $$tmp
+
+.PHONY: all clean install uninstall test unit_tests api-test device-test break-test operator-smoke regen-clips tsan-queue cbmc-parser model-check pjsip-smoke
