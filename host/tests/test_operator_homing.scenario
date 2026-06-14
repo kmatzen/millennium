@@ -2,6 +2,8 @@
 # but valid year answers with direction (TOO EARLY/LATE) and, once close, warmth
 # (WARMER + a little earlier/later). The middle moment demands the EXACT year --
 # the one real inference.
+# (waits: ~3 s catches the beat after the travel hop; ~5 s lets a flavor/nudge
+#  clear back to the hub; ~6 s lets a reveal clear -- see the *_SECS timers.)
 activate_plugin The Operator
 hook_up
 
@@ -10,20 +12,20 @@ keys 1925
 wait 3
 assert_display TOO EARLY
 assert_clip flv_early.wav
-wait 3
+wait 5
 
 # Close, but a touch early -> warmer, nudged later
 keys 1950
 wait 3
 assert_display WARMER
 assert_display A LITTLE LATER
-wait 3
+wait 5
 
 # Close, but a touch late -> warmer, nudged earlier
 keys 1958
 wait 3
 assert_display A LITTLE EARLIER
-wait 3
+wait 5
 
 # On the moment -> the era opens, first piece earned
 keys 1955
@@ -31,18 +33,18 @@ wait 3
 assert_display 1=LISTEN
 key 1
 assert_display PIECE A
-wait 3
+wait 6
 
 # Now hunting the middle piece: it needs the EXACT year, not just the decade
 keys 1977
 wait 3
 assert_display WARMER
 assert_display A LITTLE LATER
-wait 3
+wait 5
 keys 1980
 wait 3
 assert_display A LITTLE EARLIER
-wait 3
+wait 5
 keys 1978
 wait 3
 assert_display 1=LISTEN

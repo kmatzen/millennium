@@ -36,17 +36,21 @@
 #define YEAR_MIN           1900
 #define YEAR_MAX           2100
 #define FUTURE_SEALED_YEAR 2050
+/* Transient-state durations. The reveal/flavor/final beats are sized to let
+ * their voice clip finish (see audio/clips.manifest durations) so the story
+ * lands instead of being cut off mid-line -- this is what paces a first-time
+ * session toward ~5 minutes. */
 #define TRAVEL_SECS        2
-#define REVEAL_SECS        3
-#define FLAVOR_SECS        3
+#define REVEAL_SECS        6   /* hold a found piece; era*_listen runs ~4-5 s    */
+#define FLAVOR_SECS        5   /* a nudge/flavor beat; flv_* run ~3-5 s          */
 #define DRIFT_SECS         30
 #define EXTEND_SECS        30   /* a coin buys this much extra line time */
 #define GRACE_SECS         30   /* re-lift within this window resumes a session */
-#define FINAL_CONNECT_SECS 3
-#define FINAL_CLOCK_SECS   4
+#define FINAL_CONNECT_SECS 8   /* "...RINGING..."; final_connect runs ~7.4 s    */
+#define FINAL_CLOCK_SECS   6   /* "11:59 ... 12:00"; final_clock runs ~5.4 s    */
 #define ENTRY_TIMEOUT_SECS 6   /* clear a half-typed year/number after this idle */
 #define WARM_BAND          6   /* within this many years of a target reads "warmer" */
-#define WIN_HOLD_SECS      6   /* hold the win before settling to the quiet coda    */
+#define WIN_HOLD_SECS      8   /* hold the win (win_free runs ~6.8 s) before coda    */
 
 /* Ruth's number, in three positional pieces A-B-C (tunable). */
 #define PIECE_A "36"

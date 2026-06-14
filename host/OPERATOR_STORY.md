@@ -79,10 +79,11 @@ by `op_in_window` (the narrow windows above), not by that classifier.
 ## States (`plugins/time_operator.c`)
 `DORMANT → HUB → TRAVEL → {FLAVOR | KEY} → REVEAL → … → READY → FINAL → WIN`
 plus `KEY` sub-flags `locked` (sealed) and `tangled` (spoke), and session flag
-`spoke_once` (retires the SPEAK prompt). Timers: `TRAVEL_SECS 2`, `REVEAL_SECS 3`,
-`FLAVOR_SECS 3`, `DRIFT_SECS 30`, `EXTEND_SECS 30`, `GRACE_SECS 30`, final beats
-`3` then `4`, then `WIN_HOLD_SECS 6` before the quiet coda. Tuning knob:
-`WARM_BAND 6`.
+`spoke_once` (retires the SPEAK prompt). Timers are sized to let each beat's voice
+clip finish (so the story isn't cut off mid-line, which paces a first session
+toward ~5 min): `TRAVEL_SECS 2`, `REVEAL_SECS 6`, `FLAVOR_SECS 5`, `DRIFT_SECS 30`,
+`EXTEND_SECS 30`, `GRACE_SECS 30`, final beats `8` then `6`, then `WIN_HOLD_SECS 8`
+before the quiet coda. Tuning knob: `WARM_BAND 6`.
 
 ## Decision tree
 ```
