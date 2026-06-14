@@ -3,7 +3,7 @@
 activate_plugin The Operator
 hook_up
 
-# Dial the 1950s -> connecting beat -> the era
+# Dial 1955 (her childhood) -> connecting beat -> the era
 keys 1955
 wait 3
 assert_display 1=LISTEN
@@ -18,4 +18,4 @@ assert_clip era1_listen.wav
 # After the reveal, back to the Operator pointing at piece B
 wait 3
 assert_display DIAL A YEAR
-assert_display FIND THE 1970s
+assert_display NIGHT SHE FALTERED

@@ -23,10 +23,15 @@ card 1234567890123456
 key 1
 wait 3
 
-# All three pieces -> ready to place the call; the number is shown
+# All three pieces -> ready to place the call (the number is NOT shown; you must
+# assemble the three pieces you collected from memory)
 assert_display DIAL HER NUMBER
-assert_display 36 41 55
+assert_display 6 DIGITS
 assert_clip op_ready.wav
+
+# A coin reveals the assembled number for a stuck caller
+coin 25
+assert_display 36 41 55
 
 # Dial Ruth's number -> the call connects
 keys 364155
@@ -39,3 +44,7 @@ assert_display the clock turns
 wait 5
 assert_display SHE IS FREE
 assert_clip win_free.wav
+
+# The win settles to a quiet coda inviting hang-up (no longer frozen)
+wait 7
+assert_display THE LINE IS QUIET

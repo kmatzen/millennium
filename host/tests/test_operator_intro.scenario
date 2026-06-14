@@ -7,5 +7,5 @@ hook_up
 assert_state IDLE_UP
 assert_display DIAL A YEAR
 assert_display 0/3
-assert_display FIND THE 1950s
+assert_display TWO GIRLS, A RADIO
 assert_clip op_intro.wav
