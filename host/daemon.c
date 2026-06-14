@@ -56,6 +56,12 @@ static const char *state_file_path = NULL;
 /* Thread synchronization */
 pthread_mutex_t running_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t daemon_state_mutex = PTHREAD_MUTEX_INITIALIZER;
+/* Serializes one whole engine step (serial read + event dispatch + plugin ticks
+ * + display writes) in the main loop against web-thread control commands, which
+ * run the same paths via send_control_command. Held only around the work, never
+ * across the idle sleep. Lock order: engine_mutex -> daemon_state_mutex /
+ * plugins_mutex / the SDK queue mutex (never the reverse). */
+static pthread_mutex_t engine_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 /* Simple validation macro */
 #define VALIDATE_BASICS() do { \
@@ -575,7 +581,20 @@ void handle_card_event(card_event_t *card_event) {
 }
 
 /* Implementation of sendControlCommand */
+static int dispatch_control_command(const char* action);
+
+/* Public entry for web-thread control commands. Runs the dispatch under
+ * engine_mutex so it can't touch the serial fd / event queue / plugin state /
+ * display concurrently with the main loop's engine step. */
 int send_control_command(const char* action) {
+    int result;
+    pthread_mutex_lock(&engine_mutex);
+    result = dispatch_control_command(action);
+    pthread_mutex_unlock(&engine_mutex);
+    return result;
+}
+
+static int dispatch_control_command(const char* action) {
     char command[MAX_STRING_LEN];
     char arg[MAX_STRING_LEN];
     const char *colon_pos;
@@ -1149,6 +1168,7 @@ int main(int argc, char *argv[]) {
     /* Main event loop */
     while (1) {
         event_t *event;
+        int had_event;
         pthread_mutex_lock(&running_mutex);
         if (!running) {
             pthread_mutex_unlock(&running_mutex);
@@ -1156,22 +1176,15 @@ int main(int argc, char *argv[]) {
         }
         pthread_mutex_unlock(&running_mutex);
 
+        pthread_mutex_lock(&engine_mutex);
+
         millennium_client_update(client);
 
         event = (event_t *)millennium_client_next_event(client);
+        had_event = (event != NULL);
         if (event) {
             event_processor_process_event(event_processor, event);
             event_destroy(event);
-        } else {
-            /* No event: yield ~10ms to keep idle CPU low (the OS buffers serial,
-             * so input latency stays imperceptible) — frees the single core for
-             * call audio (#115). */
-            {
-                struct timeval tv;
-                tv.tv_sec = 0;
-                tv.tv_usec = 10000;
-                select(0, NULL, NULL, NULL, &tv);
-            }
         }
         
         /* Periodic work on a wall-clock schedule. The loop now idles at ~10ms
@@ -1220,8 +1233,20 @@ int main(int argc, char *argv[]) {
                 }
             }
         }
+
+        pthread_mutex_unlock(&engine_mutex);
+
+        if (!had_event) {
+            /* No event: yield ~10ms OUTSIDE the engine lock to keep idle CPU low
+             * without blocking web-thread control commands. The OS buffers
+             * serial, so input latency stays imperceptible (#115). */
+            struct timeval tv;
+            tv.tv_sec = 0;
+            tv.tv_usec = 10000;
+            select(0, NULL, NULL, NULL, &tv);
+        }
     }
-    
+
     /* Cleanup */
     logger_info_with_category("Daemon", "Shutting down daemon");
     

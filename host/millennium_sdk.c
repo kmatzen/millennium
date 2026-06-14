@@ -35,6 +35,13 @@ static int g_sip_registered = 0;
 static char g_sip_last_error[256] = {0};
 static pthread_mutex_t g_sip_mutex = PTHREAD_MUTEX_INITIALIZER;
 
+/* The event queue is produced by both the main loop (serial events) and PJSUA
+ * worker threads (SIP call-state events, via the SIP callback) and consumed by
+ * the main loop, so its linked-list/malloc operations must be serialized or the
+ * heap corrupts. This guards push/pop/empty; clear() runs only at shutdown and
+ * reuses those locked primitives, so it stays lock-free itself. */
+static pthread_mutex_t g_queue_mutex = PTHREAD_MUTEX_INITIALIZER;
+
 /* Event queue implementation */
 static void event_queue_push(struct millennium_client *client, void *event) {
     struct event_queue_node *node = malloc(sizeof(struct event_queue_node));
@@ -42,22 +49,27 @@ static void event_queue_push(struct millennium_client *client, void *event) {
         logger_error_with_category("SDK", "Failed to allocate memory for event queue node");
         return;
     }
-    
+
     node->event = event;
     node->next = NULL;
-    
+
+    pthread_mutex_lock(&g_queue_mutex);
     if (client->event_queue_tail) {
         client->event_queue_tail->next = node;
     } else {
         client->event_queue_head = node;
     }
     client->event_queue_tail = node;
+    pthread_mutex_unlock(&g_queue_mutex);
 }
 
 static void *event_queue_pop(struct millennium_client *client) {
     struct event_queue_node *node;
     void *event;
+
+    pthread_mutex_lock(&g_queue_mutex);
     if (!client->event_queue_head) {
+        pthread_mutex_unlock(&g_queue_mutex);
         return NULL;
     }
 
@@ -68,13 +80,18 @@ static void *event_queue_pop(struct millennium_client *client) {
     if (!client->event_queue_head) {
         client->event_queue_tail = NULL;
     }
-    
+    pthread_mutex_unlock(&g_queue_mutex);
+
     free(node);
     return event;
 }
 
 static int event_queue_empty(struct millennium_client *client) {
-    return client->event_queue_head == NULL;
+    int empty;
+    pthread_mutex_lock(&g_queue_mutex);
+    empty = (client->event_queue_head == NULL);
+    pthread_mutex_unlock(&g_queue_mutex);
+    return empty;
 }
 
 static void event_queue_clear(struct millennium_client *client) {
