@@ -110,6 +110,10 @@ const char *sdk_keypad(void) {
     return daemon_state ? daemon_state->keypad_buffer : "";
 }
 
+void sdk_clear_keypad(void) {
+    if (daemon_state) daemon_state_clear_keypad(daemon_state);
+}
+
 /* ── Coin balance ────────────────────────────────────────────────────── */
 
 int sdk_balance(void) {

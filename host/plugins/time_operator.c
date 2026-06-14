@@ -45,6 +45,8 @@
 #define FINAL_CONNECT_SECS 3
 #define FINAL_CLOCK_SECS   4
 #define ENTRY_TIMEOUT_SECS 6   /* clear a half-typed year/number after this idle */
+#define WARM_BAND          6   /* within this many years of a target reads "warmer" */
+#define WIN_HOLD_SECS      6   /* hold the win before settling to the quiet coda    */
 
 /* Ruth's number, in three positional pieces A-B-C (tunable). */
 #define PIECE_A "36"
@@ -89,6 +91,7 @@ typedef struct {
     int    cur_key;       /* key index while TS_KEY (0/1/2), else -1 */
     int    locked;        /* current key era sealed, awaiting access */
     int    tangled;       /* current key era tangled (spoke)         */
+    int    spoke_once;    /* tried SPEAK once; stop advertising it    */
     int    final_step;
     time_t timer_at;      /* transient-state timer                   */
     time_t last_input_at; /* drift timer base in TS_KEY              */
@@ -142,7 +145,20 @@ int operator_target_piece(int pieces) {
     return 3;
 }
 
+/* The canonical year for each piece, and how close a dial must land to "arrive".
+ * Piece B (the middle scene) demands the exact year -- the one real inference;
+ * A and C accept a small window, so the clue plus warmer/colder feedback is
+ * enough to home in. */
+static int op_target_year(int idx) {
+    return (idx == 0) ? 1955 : (idx == 1) ? 1978 : 1998;
+}
+static int op_in_window(int idx, int year) {
+    int ty = op_target_year(idx);
+    if (idx == 1) return year == ty;                 /* exact: the night she faltered */
+    return year >= ty - 2 && year <= ty + 2;
+}
 static int op_have(int idx) { return (op.pieces & (1 << idx)) != 0; }
+
 static int op_count(void) {
     return ((op.pieces & 1) ? 1 : 0) + ((op.pieces & 2) ? 1 : 0) +
            ((op.pieces & 4) ? 1 : 0);
@@ -157,8 +173,8 @@ static void op_render_dormant(void) {
 static void op_render_hub(void) {
     char l2[24];
     int t = operator_target_piece(op.pieces);
-    const char *l1 = (t == 0) ? "FIND THE 1950s" :
-                     (t == 1) ? "FIND THE 1970s" : "FIND 1998 SEALED";
+    const char *l1 = (t == 0) ? "TWO GIRLS, A RADIO" :
+                     (t == 1) ? "NIGHT SHE FALTERED" : "HER LAST ATTEMPT";
     if (op.len > 0) {
         char l2b[24];
         snprintf(l2b, sizeof(l2b), "YEAR: %s_", op.buf);
@@ -176,7 +192,7 @@ static void op_render_ready(void) {
         sdk_display("DIALING...", l2);
         return;
     }
-    sdk_display("DIAL HER NUMBER", PIECE_A " " PIECE_B " " PIECE_C);
+    sdk_display("DIAL HER NUMBER", "6 DIGITS");
 }
 
 /* ── State transitions (each stops any continuous tone first) ────────── */
@@ -227,6 +243,7 @@ static void op_reset_session(void) {
     op.pass = 0;
     op.won = 0;
     op.tangled = 0;
+    op.spoke_once = 0;
     op.locked = 0;
     op.cur_key = -1;
     op.buf[0] = '\0';
@@ -244,12 +261,28 @@ static void op_enter_travel(int year) {
     sdk_display("CONNECTING...", l2);
 }
 
-static void op_enter_flavor(const char *clip, const char *label) {
+static void op_enter_flavor(const char *clip, const char *l1, const char *l2) {
     sdk_stop_audio();
     op.state = TS_FLAVOR;
     op.timer_at = sdk_now();
-    sdk_display(label, "BACK TO OPERATOR");
+    sdk_display(l1, l2);
     sdk_play_clip(clip);
+}
+
+/* A wrong-but-valid year nudges the caller toward the current target's year:
+ * directional far out, "warmer" once within WARM_BAND. This turns finding a year
+ * into a homing search instead of a decade lookup. */
+static void op_nudge(int dialed, int target_year) {
+    int diff = dialed - target_year;
+    int ad = (diff < 0) ? -diff : diff;
+    if (ad <= WARM_BAND) {
+        op_enter_flavor("flv_warm", "WARMER",
+                        (diff < 0) ? "A LITTLE LATER" : "A LITTLE EARLIER");
+    } else if (diff < 0) {
+        op_enter_flavor("flv_early", "TOO EARLY", "BACK TO OPERATOR");
+    } else {
+        op_enter_flavor("flv_late", "TOO LATE", "BACK TO OPERATOR");
+    }
 }
 
 static void op_render_key(void) {
@@ -260,7 +293,7 @@ static void op_render_key(void) {
     } else if (op.tangled) {
         sdk_display("LINE TANGLED", "press 1=LISTEN");
     } else {
-        sdk_display(l1, "1=LISTEN 2=SPEAK");
+        sdk_display(l1, op.spoke_once ? "press 1=LISTEN" : "1=LISTEN 2=SPEAK");
     }
 }
 
@@ -300,6 +333,8 @@ static void op_enter_win(void) {
     sdk_stop_audio();
     op.state = TS_WIN;
     op.won = 1;
+    op.final_step = 0;
+    op.timer_at = sdk_now();
     sdk_display("12:00  2000", "SHE IS FREE");
     sdk_log(TS_CAT, "The last call connected; the Operator is free");
     sdk_play_clip("win_free");
@@ -316,26 +351,36 @@ static void op_enter_final(void) {
 
 /* Resolve a completed TRAVEL beat to the right era. */
 static void op_resolve_travel(void) {
-    int role = year_role(op.travel_year);
-    int idx = (role == ROLE_KEY_A) ? 0 : (role == ROLE_KEY_B) ? 1 : 2;
+    int year = op.travel_year;
+    int t = operator_target_piece(op.pieces);   /* the piece the hub suggests */
+    int hit, i;
 
-    switch (role) {
-    case ROLE_KEY_A:
-    case ROLE_KEY_B:
-    case ROLE_KEY_C:
-        if (op_have(idx)) {
-            op_enter_flavor("flv_heard", "ALREADY HEARD");
-        } else if (role == ROLE_KEY_C && !op.pass) {
-            op_enter_key(idx, 1);   /* sealed */
-        } else {
-            op_enter_key(idx, 0);
-        }
-        break;
-    case ROLE_EARLY:  op_enter_flavor("flv_early",  "TOO EARLY");      break;
-    case ROLE_HOME:   op_enter_flavor("flv_2000",   "FROZEN MINUTE");  break;
-    case ROLE_FUTURE: op_enter_flavor("flv_future", "FUTURE SEALED");  break;
-    default:          op_enter_flavor("flv_other",  "NOTHING HERE");   break;
+    /* Poetic special years, answered regardless of the current target. */
+    if (year == 2000) {
+        op_enter_flavor("flv_2000", "FROZEN MINUTE", "BACK TO OPERATOR");
+        return;
     }
+    if (year >= FUTURE_SEALED_YEAR) {
+        op_enter_flavor("flv_future", "FUTURE SEALED", "BACK TO OPERATOR");
+        return;
+    }
+    /* Does the dialed year land on one of her three moments? You may visit them
+     * in any order; the hub only suggests the next one. */
+    hit = -1;
+    for (i = 0; i < 3; i++) { if (op_in_window(i, year)) { hit = i; break; } }
+    if (hit >= 0) {
+        if (op_have(hit)) {
+            op_enter_flavor("flv_heard", "ALREADY HEARD", "BACK TO OPERATOR");
+        } else if (hit == 2 && !op.pass) {
+            op_enter_key(2, 1);            /* the sealed final year */
+        } else {
+            op_enter_key(hit, 0);
+        }
+        return;
+    }
+    /* A year she never held the number: nudge toward the current target. */
+    if (t <= 2) op_nudge(year, op_target_year(t));
+    else op_enter_hub(NULL);
 }
 
 /* ── Year / number entry ─────────────────────────────────────────────── */
@@ -357,7 +402,7 @@ static void op_eval_number(void) {
     } else {
         op.buf[0] = '\0';
         op.len = 0;
-        sdk_display("WRONG NUMBER", PIECE_A " " PIECE_B " " PIECE_C);
+        sdk_display("WRONG NUMBER", "TRY AGAIN");
     }
 }
 
@@ -368,9 +413,12 @@ static int op_handle_coin(int coin_value, const char *coin_code) {
     (void)coin_code;
     sdk_coin_chime();
     if (op.state == TS_HUB) {
+        /* A coin buys a sharper hint -- it names the decade (the old level of
+         * help), an escape hatch for a public phone. Piece B still needs the
+         * exact year nailed down within that decade. */
         int t = operator_target_piece(op.pieces);
-        const char *l1 = (t == 0) ? "DIAL 1955" :
-                         (t == 1) ? "DIAL 1978" : "DIAL 1998";
+        const char *l1 = (t == 0) ? "TRY THE 1950s" :
+                         (t == 1) ? "TRY THE 1970s" : "TRY THE 1990s";
         char l2[24];
         snprintf(l2, sizeof(l2), "DIAL A YEAR  %d/3", op_count());
         sdk_display(l1, l2);
@@ -383,12 +431,18 @@ static int op_handle_coin(int coin_value, const char *coin_code) {
             sdk_play_clip("coin_hold");
         }
     } else if (op.state == TS_READY) {
-        op_render_ready();
+        /* A coin reveals the assembled number for a stuck caller. */
+        sdk_display("HER NUMBER", PIECE_A " " PIECE_B " " PIECE_C);
+        sdk_play_clip("op_ready");
     }
     return 0;
 }
 
 static int op_handle_keypad(char key) {
+    /* This app keeps its own per-field entry; keep the daemon's shared dial
+     * buffer (Classic Phone's) clean so /api/state isn't a confusing pile of
+     * every digit ever pressed. */
+    sdk_clear_keypad();
     switch (op.state) {
     case TS_HUB:
         op.last_input_at = sdk_now();   /* for the stale-entry auto-clear */
@@ -438,6 +492,7 @@ static int op_handle_keypad(char key) {
             op_enter_reveal();
         } else if (key == '2') {
             op.tangled = 1;
+            op.spoke_once = 1;   /* learned the lesson; stop advertising SPEAK */
             op_render_key();
             sdk_play_clip("px_tangle");
         } else if (key == '#') {
@@ -539,6 +594,14 @@ static void op_handle_tick(void) {
             op_enter_win();
         }
         break;
+    case TS_WIN:
+        /* Hold the win a beat, then settle to a quiet coda inviting hang-up so
+         * the screen doesn't freeze on SHE IS FREE forever. */
+        if (op.final_step == 0 && sdk_elapsed(op.timer_at) >= WIN_HOLD_SECS) {
+            op.final_step = 1;
+            sdk_display("THE LINE IS QUIET", "hang up: she's home");
+        }
+        break;
     default:
         break;
     }
@@ -553,16 +616,20 @@ static int op_collect(const char **out, int max, int n, const char *s) {
 
 int time_operator_display_strings(const char **out, int max) {
     static const char *const ui[] = {
-        "THE OPERATOR", "Lift: the last call", "FIND THE 1950s",
-        "FIND THE 1970s", "FIND 1998 SEALED", "DIAL A YEAR", "DIAL HER NUMBER",
+        "THE OPERATOR", "Lift: the last call",
+        "TWO GIRLS, A RADIO", "NIGHT SHE FALTERED", "HER LAST ATTEMPT",
+        "TRY THE 1950s", "TRY THE 1970s", "TRY THE 1990s",
+        "DIAL A YEAR", "DIAL HER NUMBER", "6 DIGITS", "HER NUMBER",
         PIECE_A " " PIECE_B " " PIECE_C, "DIALING...", "CONNECTING...",
-        "BACK TO OPERATOR", "TOO EARLY", "FROZEN MINUTE", "FUTURE SEALED",
-        "NOTHING HERE", "ALREADY HEARD", "1955 TWO SISTERS", "1978 SHE PAUSES",
-        "1998 A CARD", "1998: SEALED", "SWIPE PASS / COIN", "1=LISTEN 2=SPEAK",
-        "LINE TANGLED", "press 1=LISTEN", "DIAL 1955", "DIAL 1978", "DIAL 1998",
+        "BACK TO OPERATOR", "TOO EARLY", "TOO LATE", "WARMER",
+        "A LITTLE LATER", "A LITTLE EARLIER", "ALREADY HEARD",
+        "FROZEN MINUTE", "FUTURE SEALED",
+        "1955 TWO SISTERS", "1978 SHE PAUSES", "1998 A CARD", "1998: SEALED",
+        "SWIPE PASS / COIN", "1=LISTEN 2=SPEAK", "LINE TANGLED", "press 1=LISTEN",
         "TEMPORAL PASS", "PASS ACCEPTED", "NO SUCH YEAR", "try 1900-2100",
-        "WRONG NUMBER", "...RINGING...", "the last call", "11:59 ... 12:00",
-        "the clock turns", "12:00  2000", "SHE IS FREE"
+        "WRONG NUMBER", "TRY AGAIN", "...RINGING...", "the last call",
+        "11:59 ... 12:00", "the clock turns", "12:00  2000", "SHE IS FREE",
+        "THE LINE IS QUIET", "hang up: she's home"
     };
     int n = 0, i;
     for (i = 0; i < (int)(sizeof(ui) / sizeof(ui[0])); i++) {

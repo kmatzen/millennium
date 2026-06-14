@@ -106,6 +106,10 @@ int sdk_receiver_is_up(void);
 /* The digits the user has typed (daemon-level buffer). Never NULL. */
 const char *sdk_keypad(void);
 
+/* Clear the daemon's shared dial buffer. Apps that keep their own per-field
+ * entry call this so /api/state's keypad buffer doesn't accumulate every key. */
+void sdk_clear_keypad(void);
+
 /* ── Coin balance ────────────────────────────────────────────────────────
  * The daemon tracks a shared inserted-cents balance. These helpers read and
  * adjust it while keeping the daemon's view in sync (so the dashboard, coin

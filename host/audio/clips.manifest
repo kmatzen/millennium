@@ -17,15 +17,15 @@
 # Spell out numbers and years so they are read aloud the way you want.
 
 # -- Operator hub: mission, guidance, hints --
-op_intro   Operator. I have held one last call since the clock stopped, eleven fifty-nine on New Year's Eve, nineteen ninety-nine. A woman calling her sister Ruth to make peace, frozen mid-ring. Help me finish it, and time moves again. Her number is lost across the years she held it. Start where she first dialed it: two girls and a kitchen radio, the chrome-and-radio fifties. Dial a year. A coin buys a hint; press pound to hear me again.
+op_intro   Operator. I have held one last call since the clock stopped, eleven fifty-nine on New Year's Eve, nineteen ninety-nine. A woman calling her sister Ruth to make peace, frozen mid-ring. Help me finish it, and time moves again. Her number is lost across the years she held it. Start where she first dialed it: two girls and a kitchen radio. Listen for when. Dial a year, and I will tell you if you are too early, too late, or warm. A coin buys a sharper hint; press pound to hear me again.
 op_resume  Still on the line. Good. We were finding her number. Keep going.
-op_next_a  Start where she first dialed it, the chrome-and-radio fifties.
-op_next_b  Now the night she lost her nerve, the receiver warm in her hand, the long-wire seventies.
-op_next_c  The last piece is sealed away, the final analog year, ninety-eight. You will need a pass, or force the coinbox.
-op_ready   That is all of it. Three, six, four, one, five, five. The whole number, after all these years. Dial it now, and finish her call.
-op_hint_a  Try nineteen fifty-five.
-op_hint_b  Try nineteen seventy-eight.
-op_hint_c  Try nineteen ninety-eight, and bring a pass.
+op_next_a  Start where she first dialed it. Two girls and a kitchen radio.
+op_next_b  Now the night she lost her nerve, the receiver warm in her hand. Find the exact year.
+op_next_c  The last piece is sealed away, her final attempt. You will need a pass, or force the coinbox.
+op_ready   That is all three pieces. Put them in the order you found them, and dial her number. Finish her call.
+op_hint_a  A sharper hint: the nineteen fifties.
+op_hint_b  A sharper hint: the nineteen seventies. But you must dial the exact year.
+op_hint_c  A sharper hint: the nineteen nineties. And bring a pass.
 
 # -- Key eras: arrival scenes and the number-pieces --
 era1_arrive  Connecting. Nineteen fifty-five. A kitchen radio, two sisters, a number inked on a small palm. Listen, do not speak.
@@ -36,11 +36,12 @@ era3_sealed  This line is sealed, a trunk line. Swipe a pass, or feed the coinbo
 era3_arrive  Connecting. December, nineteen ninety-eight. A Christmas card, Ruth's new number folded inside. The last of it. Listen.
 era3_listen  Five, five. That is the end of it. The whole number, at last.
 
-# -- Flavor eras --
-flv_early   Too early. She was not even born yet. Come back, and I will point you right.
+# -- Flavor eras + the homing nudges (too early / too late / warm) --
+flv_early   Too early. Come back, and I will point you nearer.
+flv_late    Too late. That is past her moment. Come back, and I will point you nearer.
+flv_warm    Warm. You are close now, just a little off. Try once more.
 flv_2000    The year two thousand, the frozen minute. Only silence here, and me, waiting.
 flv_future  The future is sealed. There is nothing there for you yet.
-flv_other   Not here. This is not one of the years she held the number. Come back to me.
 flv_heard   You have already heard everything this line can tell you.
 
 # -- Hazards --

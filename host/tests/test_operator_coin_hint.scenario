@@ -3,9 +3,9 @@
 activate_plugin The Operator
 hook_up
 
-# Coin at the hub -> blunt hint for the current target
+# Coin at the hub -> a sharper hint: it names the decade for the current target
 coin 25
-assert_display DIAL 1955
+assert_display TRY THE 1950s
 assert_clip op_hint_a.wav
 
 # Coin in an era -> the Operator holds the line longer

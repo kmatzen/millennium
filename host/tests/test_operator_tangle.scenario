@@ -16,3 +16,9 @@ assert_clip px_tangle.wav
 key 1
 assert_display PIECE A
 assert_display 1/3
+
+# Having spoken once, the SPEAK prompt is retired: later eras only offer LISTEN
+wait 3
+keys 1978
+wait 3
+assert_display press 1=LISTEN

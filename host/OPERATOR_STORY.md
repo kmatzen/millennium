@@ -16,8 +16,18 @@ climax is literally placing the call.
 
 ## Agreed choices
 - **Core:** goal-driven quest (find 3 number-pieces → place the call → time resumes).
-- **Coins (never gate winning):** at the Operator a coin buys a **sharper hint**;
-  in an era a coin buys **more line time** before drift (and **forces** the sealed era).
+- **Finding a year is a homing search, not a decade lookup.** The hub gives a
+  **cryptic** clue (no decade named). A wrong-but-valid year answers with
+  direction — `TOO EARLY` / `TOO LATE`, and `WARMER` (+ *a little earlier/later*)
+  once within `WARM_BAND` years. You deduce the year from the clue + this feedback.
+- **One real inference:** pieces A and C accept a small window (±2 yrs of 1955 / 1998);
+  the middle piece **B demands the exact year (1978)** — the one genuine deduction.
+- **The finale hides the answer:** `READY` shows `6 DIGITS`, a wrong attempt says
+  `TRY AGAIN`. You assemble the three pieces you collected from memory.
+- **Coins (never gate winning), the escape hatches:** at the hub a coin buys a
+  **sharper hint** (names the decade); in an era a coin buys **more line time**
+  before drift (and **forces** the sealed era); at `READY` a coin **reveals the
+  assembled number**.
 - **Reset:** on hang-up, with a ~30 s **grace** (re-lift resumes; later, or after a
   win, starts fresh). All state is in-memory for the session.
 - **Tone & length:** warm & bittersweet, ~3–5 minutes.
@@ -25,11 +35,14 @@ climax is literally placing the call.
 ## Legibility rules
 - The Operator's **voice** states the goal and the next step; every line is echoed
   as VFD text so it works without audio.
-- The **VFD HUD**: line 1 = current hint, line 2 = `… n/3`. Every line ≤ 20 chars
-  (no scroll), so it's stable and readable.
-- You can't hard-fail; every mistake is recoverable and the next action is clear.
+- The **VFD HUD**: line 1 = current **cryptic** clue, line 2 = `… n/3`. Every line
+  ≤ 20 chars (no scroll), so it's stable and readable.
+- You can't hard-fail; every mistake is recoverable and the next action is clear —
+  the directional/warm feedback always points you nearer.
 - **Listen, don't speak:** in a key era `1=LISTEN` gives the piece; `2=SPEAK`
   tangles the line — recover by pressing `1`. Self-teaching, local, no penalty.
+  After you've spoken once the `2=SPEAK` prompt is **retired** (it reads
+  `press 1=LISTEN`) so it doesn't keep advertising a dead end.
 
 ## Hardware → meaning
 | Input | Role |
@@ -37,7 +50,7 @@ climax is literally placing the call.
 | Lift handset | Connect to the Operator (mission / resume / next hint) |
 | Dial 4-digit **year** | Travel to that era |
 | **1 / 2** in a key era | `1=LISTEN` (get piece) vs `2=SPEAK` (tangle) |
-| **Coin** | Hub: sharper hint · Era: hold the line / force the sealed era |
+| **Coin** | Hub: sharper hint (names decade) · Era: hold the line / force the sealed era · Ready: reveal the number |
 | **Card** swipe | "Trunk-line pass" → opens the sealed era |
 | Idle (**drift**) | Pulled back to the Operator (nothing lost) |
 | **#** | Repeat the hint / back to the Operator |
@@ -45,38 +58,46 @@ climax is literally placing the call.
 
 ## The number & the eras
 Ruth's number is **36‑41‑55** (→ dial `364155`), in fixed positions A‑B‑C; find
-pieces in any order. Year roles (see `operator_year_role`):
+pieces in any order. Each piece has a **target year** and an **arrival window**
+(`op_target_year` / `op_in_window`):
 
-| Years | Role | Holds |
+| Year(s) | Role | Holds |
 |---|---|---|
-| 1950–1959 | **KEY A** | piece **36** — two girls, a kitchen radio |
-| 1970–1989 | **KEY B** | piece **41** — the night she lost her nerve |
-| 1995–1999 | **KEY C** (sealed) | piece **55** — a Christmas card; needs pass/coin |
-| < 1950 | flavor `early` | "too early — she wasn't born" |
-| 2000 | flavor `home` | "the frozen minute; only silence" |
+| 1955 ±2 (1953–1957) | **KEY A** | piece **36** — two girls, a kitchen radio |
+| **1978 exact** | **KEY B** | piece **41** — the night she lost her nerve (the inference) |
+| 1998 ±2 (1996–2000\*) | **KEY C** (sealed) | piece **55** — a Christmas card; needs pass/coin |
+| 2000 | flavor `home` | "the frozen minute; only silence" (\*checked before C) |
 | ≥ 2050 | flavor `future` | "the future is sealed" |
-| other in range | flavor `other` | "not one of the years she held it" |
+| any other 1900–2100 | **nudge** | `TOO EARLY`/`TOO LATE`, or `WARMER` within `WARM_BAND` (6 yrs) of the current target |
 | outside 1900–2100 | `bad` | "no such year" (refused at the hub) |
+| an already-found era | flavor `heard` | "already heard" |
+
+`operator_year_role` (the unit-tested classifier) still reports the historical
+decade roles (A/B/C/early/home/future/other) for reference; **arrival** is decided
+by `op_in_window` (the narrow windows above), not by that classifier.
 
 ## States (`plugins/time_operator.c`)
 `DORMANT → HUB → TRAVEL → {FLAVOR | KEY} → REVEAL → … → READY → FINAL → WIN`
-plus `KEY` sub-flags `locked` (sealed) and `tangled` (spoke). Timers:
-`TRAVEL_SECS 2`, `REVEAL_SECS 3`, `FLAVOR_SECS 3`, `DRIFT_SECS 30`,
-`EXTEND_SECS 30`, `GRACE_SECS 30`, final beats `3` then `4`.
+plus `KEY` sub-flags `locked` (sealed) and `tangled` (spoke), and session flag
+`spoke_once` (retires the SPEAK prompt). Timers: `TRAVEL_SECS 2`, `REVEAL_SECS 3`,
+`FLAVOR_SECS 3`, `DRIFT_SECS 30`, `EXTEND_SECS 30`, `GRACE_SECS 30`, final beats
+`3` then `4`, then `WIN_HOLD_SECS 6` before the quiet coda. Tuning knob:
+`WARM_BAND 6`.
 
 ## Decision tree
 ```
 DORMANT ──lift──▶ [won OR idle>grace?] ─ yes ▶ reset + op_intro ▶ HUB
                                          └ no ▶ op_resume ───────▶ HUB
-HUB (hint for lowest unfound piece; n/3)
-  ├─ dial flavor year ─▶ FLAVOR ─(timeout/#)─▶ HUB
-  ├─ dial key year (unfound) ─▶ TRAVEL ─▶ KEY
+HUB (cryptic clue for lowest unfound piece; n/3)
+  ├─ dial year off-target ─▶ FLAVOR nudge (TOO EARLY/LATE/WARMER) ─(timeout/#)─▶ HUB
+  ├─ dial year in a piece window (unfound) ─▶ TRAVEL ─▶ KEY
   │        ├─ 1 LISTEN ─▶ REVEAL (piece++) ─(timeout/#)─▶ HUB
-  │        └─ 2 SPEAK  ─▶ tangled ──1 LISTEN──▶ REVEAL
-  ├─ dial key year (already found) ─▶ FLAVOR "already heard" ─▶ HUB
-  ├─ dial 1998 (sealed, unfound) ─▶ KEY locked ──card|coin──▶ KEY ─▶ …
-  ├─ coin ─▶ sharper hint     │   # ─▶ repeat hint
-  └─ 3/3 ─▶ READY ──dial 364155──▶ FINAL ─▶ WIN ─▶ (hang up) reset
+  │        └─ 2 SPEAK  ─▶ tangled (SPEAK retired) ──1 LISTEN──▶ REVEAL
+  ├─ dial a window already found ─▶ FLAVOR "already heard" ─▶ HUB
+  ├─ dial 1998-window (sealed, unfound) ─▶ KEY locked ──card|coin──▶ KEY ─▶ …
+  ├─ coin ─▶ sharper hint (decade)   │   # ─▶ repeat hint
+  └─ 3/3 ─▶ READY (6 DIGITS) ──dial 364155──▶ FINAL ─▶ WIN ─(hold)─▶ quiet coda ─▶ (hang up) reset
+                              └─ wrong ─▶ TRY AGAIN   coin ─▶ reveal number
 KEY ── idle ──▶ drift_back ─▶ HUB        ── coin ──▶ hold the line (timer +)
 ANY ── hang up ──▶ DORMANT (30 s grace; a WIN forces a fresh next session)
 ```
@@ -91,6 +112,7 @@ Groups: `op_*` (hub), `era{1,2,3}_{arrive,listen}` + `era3_sealed`, `flv_*`,
 ## Tests
 - Unit (`tests/unit_tests.c`): `parse_year`, `operator_year_role`,
   `operator_target_piece`, plus the display-line-budget guardrail.
-- Scenario (`tests/test_operator_*.scenario`): intro, find-piece, flavor, tangle,
-  sealed, full win, drift, grace, coin-hint.
+- Scenario (`tests/test_operator_*.scenario`): intro, find-piece, flavor, tangle
+  (+ SPEAK retire), homing (directional/warm + exact-year B), sealed, full win
+  (hidden number, coin-reveal, win coda), drift, grace, coin-hint.
 - Live: `make operator-smoke` (web API) + `OPERATOR_PLAYTEST.md` (hands-on).
