@@ -7,13 +7,13 @@ hook_up
 keys 1955
 wait 3
 key 1
-wait 3
+wait 6
 
 # Piece B (1970s)
 keys 1978
 wait 3
 key 1
-wait 3
+wait 6
 
 # Piece C (1998, sealed -> swipe a pass)
 keys 1998
@@ -21,7 +21,7 @@ wait 3
 assert_display SEALED
 card 1234567890123456
 key 1
-wait 3
+wait 6
 
 # All three pieces -> ready to place the call (the number is NOT shown; you must
 # assemble the three pieces you collected from memory)
@@ -39,12 +39,12 @@ assert_display RINGING
 assert_clip final_connect.wav
 
 # The clock turns over, and she is free
-wait 4
+wait 8
 assert_display the clock turns
-wait 5
+wait 6
 assert_display SHE IS FREE
 assert_clip win_free.wav
 
 # The win settles to a quiet coda inviting hang-up (no longer frozen)
-wait 7
+wait 8
 assert_display THE LINE IS QUIET

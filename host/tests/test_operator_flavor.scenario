@@ -7,6 +7,6 @@ wait 3
 assert_display TOO EARLY
 assert_clip flv_early.wav
 
-# Returns to the Operator on its own
-wait 3
+# Returns to the Operator on its own (after FLAVOR_SECS)
+wait 5
 assert_display DIAL A YEAR
