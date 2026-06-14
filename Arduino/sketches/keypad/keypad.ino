@@ -73,9 +73,19 @@ struct MagstripeData {
  */
 struct MagstripeData parseTrack2(char *rawData, int length) {
   MagstripeData result;
+  /* Initialize every field so all return paths yield a fully-defined struct.
+   * The discretionary fields below are only filled in when a long-enough
+   * discretionary section is present; without these defaults the early returns
+   * (and the short-data case) would return uninitialized pointers. */
   result.valid = false;
   result.pan = NULL;
   result.pan_len = 0;
+  result.expirationDate = NULL;
+  result.expiration_date_len = 0;
+  result.serviceCode = NULL;
+  result.service_code_len = 0;
+  result.otherData = NULL;
+  result.other_data_len = 0;
 
   int startSentinelIndex = -1;
   for (int i = 0; i < length; i++) {
