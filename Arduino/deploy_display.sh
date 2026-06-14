@@ -59,40 +59,13 @@ else
   fi
 fi
 
-# Step 3: Flash via GPIO reset
-echo "  Step 3: Flashing display Arduino (Beta) on $REMOTE..."
-ssh "$REMOTE" "bash -l -c '
-  set -e
-  sudo systemctl stop daemon.service 2>/dev/null || true
-
-  # Assert reset: drive GPIO low (open-drain), then release to input so the
-  # Arduino RST pull-up brings the line high and the bootloader starts.
-  raspi-gpio set $RESET_GPIO op dl
-  sleep 0.1
-  raspi-gpio set $RESET_GPIO ip
-
-  BY_ID=/dev/serial/by-id/usb-Arduino_LLC_Millennium_Beta-if00
-
-  # Wait for device to go away (confirms reset triggered)
-  echo \"  Waiting for reset...\"
-  for i in \$(seq 1 50); do
-    if [ ! -e \$BY_ID ]; then break; fi
-    sleep 0.1
-  done
-
-  # Wait for bootloader to enumerate (same custom PID as sketch)
-  echo \"  Waiting for bootloader...\"
-  for i in \$(seq 1 50); do
-    if [ -e \$BY_ID ]; then break; fi
-    sleep 0.1
-  done
-
-  PORT=\$(readlink -f \$BY_ID)
-  echo \"  Bootloader on \$PORT, flashing...\"
-  avrdude -p atmega32u4 -c avr109 -P \"\$PORT\" -b 57600 \
-    -U flash:w:$REPO_DIR/Arduino/build/display/display.ino.hex:i
-
-  sudo systemctl start daemon.service 2>/dev/null || true
-'"
+# Step 3: Flash via the on-Pi orchestrator. pi_flash.sh runs entirely on the Pi,
+# so there's no SSH latency between detecting the Caterina bootloader and
+# launching avrdude (that ~750ms window is easily missed when the steps are split
+# across separate ssh calls). It resets, detects, flashes with retries and a
+# timeout, and always restarts the daemon on exit.
+echo "  Step 3: Flashing display Arduino (Beta) on $REMOTE via pi_flash.sh..."
+scp "$SCRIPT_DIR/pi_flash.sh" "$REMOTE:/tmp/pi_flash.sh"
+ssh "$REMOTE" "bash -l -c 'bash /tmp/pi_flash.sh display $REPO_DIR/Arduino/build/display/display.ino.hex'"
 
 echo "Done."
