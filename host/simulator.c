@@ -401,11 +401,13 @@ static void sim_handle_call_state(call_state_event_t *ev) {
              * either a missed inbound ring or a failed outbound dial. */
             if (daemon_state->current_state == DAEMON_STATE_CALL_ACTIVE) {
                 call_metrics_ended();
+                daemon_state->inserted_cents = 0;   /* connected call clears coins */
             } else {
                 call_metrics_incoming_ended();
+                /* #91: a failed-to-connect incoming keeps coins so the plugin can
+                 * refund -- mirror daemon.c (which does NOT clear here). */
             }
             daemon_state_clear_keypad(daemon_state);
-            daemon_state->inserted_cents = 0;
             daemon_state->current_state = DAEMON_STATE_IDLE_UP;
             daemon_state_update_activity(daemon_state);
             sim_call_active = 0;
