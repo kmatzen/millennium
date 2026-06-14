@@ -276,6 +276,14 @@ cbmc-parser:
 	  --bounds-check --pointer-check --pointer-overflow-check --conversion-check \
 	  --memory-leak-check --unwind 37 --unwinding-assertions
 
+# CBMC memory-safety proofs of the other untrusted-input parsers (wav.c, the
+# websocket frame decoder, config_trim). Run --32 to match the Pi. Needs cbmc.
+CBMC_MS = --32 --bounds-check --pointer-check --pointer-overflow-check --memory-leak-check --unwinding-assertions
+cbmc-parsers:
+	$(CBMC) tests/cbmc_parsers.c wav.c --function verify_wav        $(CBMC_MS) --unwind 12
+	$(CBMC) tests/cbmc_parsers.c        --function verify_ws_frame   $(CBMC_MS) --unwind 12
+	$(CBMC) tests/cbmc_parsers.c        --function verify_config_trim $(CBMC_MS) --unwind 20
+
 # SPIN model-check of the Pi<->Arduino display-command wire protocol
 # (tests/protocol.pml, mirrors display.ino's framing). Proves overrun-freedom,
 # deadlock-freedom, and full-consumption (self-resync). Needs spin; not in `make test`.
@@ -289,4 +297,4 @@ model-check:
 	 ( cd $$tmp && $(SPIN) -run -ltl progress -m200000 live.pml ) | grep -iE "acceptance|never claim|errors:"; \
 	 rm -rf $$tmp
 
-.PHONY: all clean install uninstall test unit_tests api-test device-test break-test operator-smoke regen-clips tsan-queue cbmc-parser model-check pjsip-smoke
+.PHONY: all clean install uninstall test unit_tests api-test device-test break-test operator-smoke regen-clips tsan-queue cbmc-parser cbmc-parsers model-check pjsip-smoke
