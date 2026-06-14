@@ -76,13 +76,13 @@ sdk_play_clip("operator");   /* plays <clip_dir>/operator.wav */
   sdk_play_clip("drop");    /* replaces the busy tone only if drop.wav exists */
   ```
 
-"The Operator" uses this for an Operator greeting on lift (`operator`), per-era
-ambience on arrival (`era_wires`, `era_golden`, `era_space`, `era_analog`,
-`era_frozen`, `era_static`, `era_sealed`), the 1999 line-drop (`drop`), and the
-paradox sting (`paradox`). The recordings themselves aren't committed, but their
-text is — all 10 are defined in `audio/clips.manifest` and rebuilt by
-`make regen-clips` (see above). Leave them out and the experience still runs on
-tones + text.
+"The Operator: The Last Call" uses ~27 clips — the Operator's mission and hints
+(`op_*`), the key-era scenes and number-piece reveals (`era1_*`/`era2_*`/`era3_*`),
+flavor years (`flv_*`), the listen-don't-speak / drift hazards (`px_tangle`,
+`drift_back`, `coin_hold`), and the closing call (`final_*`, `win_free`). The
+recordings aren't committed, but their text is — every clip is defined in
+`audio/clips.manifest` and rebuilt by `make regen-clips` (see above). Leave them
+out and the experience still runs on text + tones.
 
 ## Testing
 

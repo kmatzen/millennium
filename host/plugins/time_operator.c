@@ -1,6 +1,5 @@
 #define _POSIX_C_SOURCE 200112L
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
@@ -8,134 +7,97 @@
 #include "../plugin_sdk.h"
 
 /*
- * The Operator — an interactive time-travel narrative.
+ * The Operator — "The Last Call", an interactive time-travel story.
  *
- * The conceit: at the stroke of the year 2000 the Millennium's clock failed to
- * roll over and the phone came unstuck in time. Lifting the handset no longer
- * reaches a person; it reaches the Operator, a switchboard voice stranded at
- * that frozen minute. Dial a 4-digit YEAR, pay a fare in coins that scales with
- * how far you travel, optionally swipe a magstripe card as a temporal pass to
- * unlock sealed eras, and listen to each era play out on the VFD. Meddling in
- * one era and then opening another jams the line with a paradox you must repair.
+ * Premise: at 11:59 PM on New Year's Eve 1999 a woman lifted a payphone to call
+ * her estranged sister Ruth and make peace, and the clock froze mid-ring. The
+ * Operator has held that unfinished call ever since. The caller helps her finish
+ * it: recover the three pieces of Ruth's number — each overheard at a moment the
+ * woman almost dialed it across her life — then dial the whole number. The call
+ * connects, the clock turns over to 2000, and the Operator is freed.
  *
- * The whole experience runs locally with the tone palette and the two-line
- * display — no real SIP call is placed, so the daemon stays in IDLE_UP
- * throughout and scenario tests assert on the displayed text. All narrative
- * content is original.
+ * Design: see host/OPERATOR_STORY.md for the full script and decision tree.
  *
- * Scope: this is the Phase-1 MVP. The SDK exposes no audio-file playback and no
- * plugin-state persistence hook (only coin balance and the active plugin name
- * survive a restart), so era ambience is tones-only and every narrative
- * consequence — visited eras, the temporal pass, an armed paradox — lives in
- * memory for the current power-on session and resets when the plugin is
- * (re)activated.
+ * Legibility: the Operator's voice states the goal and the next step; the VFD is
+ * a permanent HUD (current hint + PIECES n/3). Coins never gate winning — at the
+ * hub a coin buys a sharper hint, in an era it buys more "line time" before
+ * temporal drift pulls you back. "Listen, don't speak": in a key era 1=LISTEN
+ * yields the piece, 2=SPEAK tangles the line (recover by pressing 1). Sessions
+ * reset on hang-up after a short grace, so each caller gets the whole arc but a
+ * fumbled hang-up doesn't wipe progress. All consequence is in-memory for the
+ * session (the SDK has no persistence hook). No real SIP call is placed.
+ *
+ * Audio clips (operator/era/win lines) are optional no-ops if absent; their text
+ * and a regen script live in host/audio/. All narrative content is original.
  */
 
 #define TS_CAT "Operator"
 
-#define FARE_BASE_CENTS       25
-#define FARE_PER_DECADE_CENTS 25
-#define FARE_MAX_CENTS        500
-#define YEAR_MIN              1900
-#define YEAR_MAX              2100
-#define FUTURE_SEALED_YEAR    2050
-#define FRAME_SECONDS         2
-#define DRIFT_SECONDS         30
-#define DROP_SECONDS          3
-#define CONNECT_FRAMES        2
+#define YEAR_MIN           1900
+#define YEAR_MAX           2100
+#define FUTURE_SEALED_YEAR 2050
+#define TRAVEL_SECS        2
+#define REVEAL_SECS        3
+#define FLAVOR_SECS        3
+#define DRIFT_SECS         30
+#define EXTEND_SECS        30   /* a coin buys this much extra line time */
+#define GRACE_SECS         30   /* re-lift within this window resumes a session */
+#define FINAL_CONNECT_SECS 3
+#define FINAL_CLOCK_SECS   4
 
-/* Internal plugin states (distinct from daemon_state_t). TS_DORMANT must be 0
- * so a memset-zeroed session struct starts dormant. */
+/* Ruth's number, in three positional pieces A-B-C (tunable). */
+#define PIECE_A "36"
+#define PIECE_B "41"
+#define PIECE_C "55"
+#define FINAL_NUMBER PIECE_A PIECE_B PIECE_C   /* "364155" */
+
+/* Year roles (which moment in the caller's life a year holds). */
+enum {
+    ROLE_KEY_A = 0,   /* 1950s — two girls, a kitchen radio          */
+    ROLE_KEY_B,       /* 1970s-80s — the night she lost her nerve    */
+    ROLE_KEY_C,       /* 1995-99 — the sealed final year (needs pass)*/
+    ROLE_EARLY,       /* before she was born                         */
+    ROLE_HOME,        /* 2000 — the frozen minute                    */
+    ROLE_FUTURE,      /* sealed future                               */
+    ROLE_OTHER,       /* a year she never held the number            */
+    ROLE_BAD          /* out of range                                */
+};
+
+/* Plugin states (distinct from daemon_state_t). TS_DORMANT must be 0 so a
+ * memset-zeroed session starts dormant. */
 enum {
     TS_DORMANT = 0,
-    TS_OPERATOR,
-    TS_AWAIT_FARE,
-    TS_CONNECTING,
-    TS_IN_ERA,
-    TS_DROP,
-    TS_PARADOX
+    TS_HUB,        /* with the Operator; dialing a year             */
+    TS_TRAVEL,     /* connecting beat (ringback)                    */
+    TS_FLAVOR,     /* a non-key era; brief scene then back          */
+    TS_KEY,        /* a key era; LISTEN/SPEAK (maybe locked/tangled)*/
+    TS_REVEAL,     /* a piece was just found                        */
+    TS_READY,      /* all 3 pieces; dialing the final number        */
+    TS_FINAL,      /* the call connects; scripted beats             */
+    TS_WIN         /* time resumes; she is free                     */
 };
-
-typedef struct { const char *l1; const char *l2; } frame_t;
 
 typedef struct {
-    int            lo, hi;       /* inclusive year bracket */
-    const char    *label;        /* shown on line 1 throughout the era */
-    const frame_t *frames;
-    int            frame_count;
-    const char    *observe;      /* '1' branch flavor */
-    const char    *interfere;    /* '2' branch flavor (arms a paradox) */
-    const char    *ambient;      /* clip name played on arrival (optional) */
-} era_t;
+    int    state;
+    char   buf[8];        /* year (4) or final number (6) entry      */
+    int    len;
+    int    pieces;        /* bitmask: bit0=A bit1=B bit2=C           */
+    int    pass;          /* a temporal pass (card) was swiped       */
+    int    won;           /* completed; next lift starts fresh       */
+    int    travel_year;
+    int    cur_key;       /* key index while TS_KEY (0/1/2), else -1 */
+    int    locked;        /* current key era sealed, awaiting access */
+    int    tangled;       /* current key era tangled (spoke)         */
+    int    final_step;
+    time_t timer_at;      /* transient-state timer                   */
+    time_t last_input_at; /* drift timer base in TS_KEY              */
+    time_t hangup_at;     /* for the grace-period resume             */
+} op_state_t;
 
-static const frame_t era0_frames[] = {
-    {"THE WIRES", "operator plugs in"},
-    {"THE WIRES", "1=listen 2=meddle"}
-};
-static const frame_t era1_frames[] = {
-    {"GOLDEN AIR", "radio crackles on"},
-    {"GOLDEN AIR", "1=listen 2=meddle"}
-};
-static const frame_t era2_frames[] = {
-    {"SPACE LINE", "a countdown ticks"},
-    {"SPACE LINE", "1=listen 2=meddle"}
-};
-static const frame_t era3_frames[] = {
-    {"LAST ANALOG", "modems screech"},
-    {"LAST ANALOG", "1=listen 2=meddle"}
-};
-static const frame_t era4_frames[] = {
-    {"FROZEN MINUTE", "11:59 forever"},
-    {"FROZEN MINUTE", "#=back home"}
-};
-static const frame_t era5_frames[] = {
-    {"STATIC YEARS", "dead air, faint"},
-    {"STATIC YEARS", "1=listen 2=meddle"}
-};
-static const frame_t era6_frames[] = {
-    {"SEALED FUTURE", "the pass glows"},
-    {"SEALED FUTURE", "1=listen 2=meddle"}
-};
+static op_state_t op;
 
-/* Brackets tile 1900..2100 with two gaps handled specially before lookup:
- * 1999 is the signature dead-end (never reaches midnight) and 2000 is "home".
- * The 2050+ era is gated behind a temporal pass. */
-static const era_t eras[] = {
-    {1900, 1929, "THE WIRES",     era0_frames, 2, "a faint voice: hi",  "you change a word", "era_wires"},
-    {1930, 1959, "GOLDEN AIR",    era1_frames, 2, "swing fills the line","you mute the band", "era_golden"},
-    {1960, 1989, "SPACE LINE",    era2_frames, 2, "...three two one...", "you halt the count","era_space"},
-    {1990, 1998, "LAST ANALOG",   era3_frames, 2, "the young web sings", "you cut the modem", "era_analog"},
-    {2000, 2000, "FROZEN MINUTE", era4_frames, 2, "home. stay a while",  "the clock twitches","era_frozen"},
-    {2001, 2049, "STATIC YEARS",  era5_frames, 2, "...seven... nine...", "you read a number", "era_static"},
-    {2050, 2100, "SEALED FUTURE", era6_frames, 2, "it knows your name",  "you ask it to stop","era_sealed"}
-};
+/* ── Pure helpers (no hardware; unit-tested) ─────────────────────────── */
 
-#define NUM_ERAS ((int)(sizeof(eras) / sizeof(eras[0])))
-
-typedef struct {
-    int         state;
-    char        year_buf[5];     /* up to 4 digits + NUL */
-    int         year_len;
-    int         current_year;    /* year of the active connection */
-    int         pending_year;    /* year awaiting fare */
-    int         fare_cents;      /* fare for pending_year */
-    int         dest;            /* era index of current connection, -1 = drop */
-    int         era;             /* era index while TS_IN_ERA */
-    int         frame_index;
-    time_t      frame_at;        /* paces frame scrolling / connecting */
-    time_t      last_input_at;   /* drives temporal-drift timeout in an era */
-    int         pass_active;     /* a temporal pass was swiped this session */
-    int         armed;           /* a paradox is armed (line will jam) */
-    int         source_year;     /* year where the paradox was armed */
-    int         visited_mask;    /* eras visited this session */
-    const char *banner;          /* operator line-1 banner */
-} time_state_t;
-
-static time_state_t ts;
-
-/* ── Pure helpers (no hardware; unit-tested directly) ────────────────── */
-
-/* Parse a buffer of exactly 4 digits into a year, or -1 otherwise. */
 int parse_year(const char *buf) {
     int i, val = 0;
     if (!buf || strlen(buf) != 4) return -1;
@@ -146,238 +108,348 @@ int parse_year(const char *buf) {
     return val;
 }
 
-/* Fare in cents for a target year; the frozen minute (2000) is free. */
-int fare_for_year(int year) {
-    int decades, fare;
-    if (year == 2000) return 0;
-    decades = abs(year - 2000) / 10;
-    fare = FARE_BASE_CENTS + FARE_PER_DECADE_CENTS * decades;
-    if (fare > FARE_MAX_CENTS) fare = FARE_MAX_CENTS;
-    return fare;
+static int year_role(int year) {
+    if (year < YEAR_MIN || year > YEAR_MAX) return ROLE_BAD;
+    if (year >= 1950 && year <= 1959) return ROLE_KEY_A;
+    if (year >= 1970 && year <= 1989) return ROLE_KEY_B;
+    if (year >= 1995 && year <= 1999) return ROLE_KEY_C;
+    if (year == 2000) return ROLE_HOME;
+    if (year >= FUTURE_SEALED_YEAR) return ROLE_FUTURE;
+    if (year < 1950) return ROLE_EARLY;
+    return ROLE_OTHER;
 }
 
-/* Era index whose bracket contains year, or -1 (e.g. the 1999 gap). */
-int era_index_for_year(int year) {
-    int i;
-    for (i = 0; i < NUM_ERAS; i++) {
-        if (year >= eras[i].lo && year <= eras[i].hi) return i;
-    }
-    return -1;
-}
-
-/* ── Rendering ───────────────────────────────────────────────────────── */
-
-static void ts_render_dormant(void) {
-    sdk_display("THE OPERATOR", "Lift to dial");
-}
-
-static void ts_render_operator(void) {
-    char l2[21];
-    if (ts.year_len == 0) {
-        sdk_display(ts.banner ? ts.banner : "TIME OPERATOR",
-                    "DIAL A YEAR  #=BACK");
-    } else {
-        snprintf(l2, sizeof(l2), "YEAR: %s_", ts.year_buf);
-        sdk_display("TIME OPERATOR", l2);
+/* Stable string tag for the same classification, for unit tests. */
+const char *operator_year_role(int year) {
+    switch (year_role(year)) {
+        case ROLE_KEY_A: return "A";
+        case ROLE_KEY_B: return "B";
+        case ROLE_KEY_C: return "C";
+        case ROLE_EARLY: return "early";
+        case ROLE_HOME:  return "home";
+        case ROLE_FUTURE:return "future";
+        case ROLE_OTHER: return "other";
+        default:         return "bad";
     }
 }
 
-static void ts_render_need(void) {
-    char l1[32], l2[32];   /* room for a worst-case int from snprintf */
-    snprintf(l1, sizeof(l1), "NEED $%d.%02d", ts.fare_cents / 100,
-             ts.fare_cents % 100);
-    snprintf(l2, sizeof(l2), "HAVE $%d.%02d", sdk_balance() / 100,
-             sdk_balance() % 100);
+/* Lowest piece index (0..2) not yet found, or 3 when all three are held. */
+int operator_target_piece(int pieces) {
+    if (!(pieces & 1)) return 0;
+    if (!(pieces & 2)) return 1;
+    if (!(pieces & 4)) return 2;
+    return 3;
+}
+
+static int op_have(int idx) { return (op.pieces & (1 << idx)) != 0; }
+static int op_count(void) {
+    return ((op.pieces & 1) ? 1 : 0) + ((op.pieces & 2) ? 1 : 0) +
+           ((op.pieces & 4) ? 1 : 0);
+}
+
+/* ── Rendering (every VFD line <= 20 chars: no scroll, stable to assert) ─ */
+
+static void op_render_dormant(void) {
+    sdk_display("THE OPERATOR", "Lift: the last call");
+}
+
+static void op_render_hub(void) {
+    char l2[24];
+    int t = operator_target_piece(op.pieces);
+    const char *l1 = (t == 0) ? "FIND THE 1950s" :
+                     (t == 1) ? "FIND THE 1970s" : "FIND 1998 SEALED";
+    if (op.len > 0) {
+        char l2b[24];
+        snprintf(l2b, sizeof(l2b), "YEAR: %s_", op.buf);
+        sdk_display("DIAL A YEAR", l2b);
+        return;
+    }
+    snprintf(l2, sizeof(l2), "DIAL A YEAR  %d/3", op_count());
     sdk_display(l1, l2);
 }
 
-static void ts_render_connecting(void) {
-    char l2[21];
-    snprintf(l2, sizeof(l2), "YEAR %d", ts.current_year);
-    sdk_display(ts.frame_index == 0 ? "CONNECTING..." : "ringing...", l2);
-}
-
-static void ts_render_era(void) {
-    const era_t *e = &eras[ts.era];
-    int i = ts.frame_index;
-    if (i >= e->frame_count) i = e->frame_count - 1;
-    sdk_display(e->frames[i].l1, e->frames[i].l2);
+static void op_render_ready(void) {
+    char l2[24];
+    if (op.len > 0) {
+        snprintf(l2, sizeof(l2), "%s_", op.buf);
+        sdk_display("DIALING...", l2);
+        return;
+    }
+    sdk_display("DIAL HER NUMBER", PIECE_A " " PIECE_B " " PIECE_C);
 }
 
 /* ── State transitions (each stops any continuous tone first) ────────── */
 
-static void ts_enter_operator(const char *banner) {
-    sdk_stop_audio();
-    ts.state = TS_OPERATOR;
-    ts.year_buf[0] = '\0';
-    ts.year_len = 0;
-    ts.banner = banner ? banner : "TIME OPERATOR";
-    ts_render_operator();
+static const char *op_next_clip(void) {
+    switch (operator_target_piece(op.pieces)) {
+        case 0:  return "op_next_a";
+        case 1:  return "op_next_b";
+        case 2:  return "op_next_c";
+        default: return "op_ready";
+    }
 }
 
-static void ts_enter_era(int idx) {
+static void op_enter_ready(const char *clip) {
     sdk_stop_audio();
-    ts.state = TS_IN_ERA;
-    ts.era = idx;
-    ts.frame_index = 0;
-    ts.frame_at = sdk_now();
-    ts.last_input_at = sdk_now();
-    ts.visited_mask |= (1 << idx);
-    sdk_logf(TS_CAT, "Arrived in era %d (%s)", idx, eras[idx].label);
-    ts_render_era();
-    sdk_play_clip(eras[idx].ambient);   /* era ambience; silent if no file */
+    op.state = TS_READY;
+    op.buf[0] = '\0';
+    op.len = 0;
+    op_render_ready();
+    sdk_play_clip(clip ? clip : "op_ready");
 }
 
-static void ts_enter_drop(void) {
+/* Enter the hub. clip==NULL plays the hint for the current target. */
+static void op_enter_hub(const char *clip) {
+    if (operator_target_piece(op.pieces) == 3) {
+        op_enter_ready(clip);
+        return;
+    }
     sdk_stop_audio();
-    sdk_busy_tone();
-    ts.state = TS_DROP;
-    ts.frame_at = sdk_now();
-    sdk_display("ALMOST 2000...", "NEVER MIDNIGHT");
-    sdk_play_clip("drop");   /* Operator's line; falls back to the busy tone */
+    op.state = TS_HUB;
+    op.buf[0] = '\0';
+    op.len = 0;
+    op_render_hub();
+    sdk_play_clip(clip ? clip : op_next_clip());
 }
 
-static void ts_enter_paradox(void) {
+static void op_enter_dormant(void) {
     sdk_stop_audio();
-    sdk_busy_tone();
-    ts.state = TS_PARADOX;
-    sdk_logf(TS_CAT, "Paradox jammed the line (source %d)", ts.source_year);
-    sdk_display("LINE FAULT 19##", "#=OPERATOR");
-    sdk_play_clip("paradox");   /* glitch sting; falls back to the busy tone */
+    op.state = TS_DORMANT;
+    op.hangup_at = sdk_now();
+    op.buf[0] = '\0';
+    op.len = 0;
+    op_render_dormant();
 }
 
-static void ts_begin_connection(int year) {
-    ts.current_year = year;
-    ts.dest = (year == 1999) ? -1 : era_index_for_year(year);
+static void op_reset_session(void) {
+    op.pieces = 0;
+    op.pass = 0;
+    op.won = 0;
+    op.tangled = 0;
+    op.locked = 0;
+    op.cur_key = -1;
+    op.buf[0] = '\0';
+    op.len = 0;
+}
+
+static void op_enter_travel(int year) {
+    char l2[24];
     sdk_stop_audio();
     sdk_ringback();
-    ts.state = TS_CONNECTING;
-    ts.frame_index = 0;
-    ts.frame_at = sdk_now();
-    ts_render_connecting();
+    op.state = TS_TRAVEL;
+    op.travel_year = year;
+    op.timer_at = sdk_now();
+    snprintf(l2, sizeof(l2), "YEAR %d", year);
+    sdk_display("CONNECTING...", l2);
 }
 
-/* Attempt to route to a year already known to be in range and unsealed. */
-static void ts_try_connect(int year) {
-    int fare = fare_for_year(year);
-    int target;
-
-    if (sdk_balance() < fare) {
-        ts.pending_year = year;
-        ts.fare_cents = fare;
-        ts.state = TS_AWAIT_FARE;
-        ts_render_need();
-        return;
-    }
-
-    target = (year == 1999) ? -1 : era_index_for_year(year);
-    if (ts.armed && target >= 0 &&
-        target != era_index_for_year(ts.source_year)) {
-        /* Opening a second era while one is meddled-with jams the line. */
-        sdk_spend_balance(fare);
-        ts_enter_paradox();
-        return;
-    }
-
-    sdk_spend_balance(fare);
-    ts_begin_connection(year);
+static void op_enter_flavor(const char *clip, const char *label) {
+    sdk_stop_audio();
+    op.state = TS_FLAVOR;
+    op.timer_at = sdk_now();
+    sdk_display(label, "BACK TO OPERATOR");
+    sdk_play_clip(clip);
 }
 
-static void ts_eval_year(void) {
-    int year = parse_year(ts.year_buf);
-    if (year < YEAR_MIN || year > YEAR_MAX) {
-        ts_enter_operator("NO SUCH YEAR");
+static void op_render_key(void) {
+    const char *l1 = (op.cur_key == 0) ? "1955 TWO SISTERS" :
+                     (op.cur_key == 1) ? "1978 SHE PAUSES" : "1998 A CARD";
+    if (op.locked) {
+        sdk_display("1998: SEALED", "SWIPE PASS / COIN");
+    } else if (op.tangled) {
+        sdk_display("LINE TANGLED", "press 1=LISTEN");
+    } else {
+        sdk_display(l1, "1=LISTEN 2=SPEAK");
+    }
+}
+
+static void op_enter_key(int idx, int locked) {
+    sdk_stop_audio();
+    op.state = TS_KEY;
+    op.cur_key = idx;
+    op.locked = locked;
+    op.tangled = 0;
+    op.last_input_at = sdk_now();
+    op_render_key();
+    if (locked) {
+        sdk_play_clip("era3_sealed");
+    } else {
+        sdk_play_clip(idx == 0 ? "era1_arrive" :
+                      idx == 1 ? "era2_arrive" : "era3_arrive");
+    }
+}
+
+static void op_enter_reveal(void) {
+    char l1[24], l2[24];
+    const char *piece = (op.cur_key == 0) ? PIECE_A :
+                        (op.cur_key == 1) ? PIECE_B : PIECE_C;
+    char letter = (char)('A' + op.cur_key);
+    op.pieces |= (1 << op.cur_key);
+    op.state = TS_REVEAL;
+    op.timer_at = sdk_now();
+    snprintf(l1, sizeof(l1), "PIECE %c: %s", letter, piece);
+    snprintf(l2, sizeof(l2), "PIECES %d/3", op_count());
+    sdk_display(l1, l2);
+    sdk_logf(TS_CAT, "Found piece %c (%s); %d/3", letter, piece, op_count());
+    sdk_play_clip(op.cur_key == 0 ? "era1_listen" :
+                  op.cur_key == 1 ? "era2_listen" : "era3_listen");
+}
+
+static void op_enter_win(void) {
+    sdk_stop_audio();
+    op.state = TS_WIN;
+    op.won = 1;
+    sdk_display("12:00  2000", "SHE IS FREE");
+    sdk_log(TS_CAT, "The last call connected; the Operator is free");
+    sdk_play_clip("win_free");
+}
+
+static void op_enter_final(void) {
+    sdk_stop_audio();
+    op.state = TS_FINAL;
+    op.final_step = 0;
+    op.timer_at = sdk_now();
+    sdk_display("...RINGING...", "the last call");
+    sdk_play_clip("final_connect");
+}
+
+/* Resolve a completed TRAVEL beat to the right era. */
+static void op_resolve_travel(void) {
+    int role = year_role(op.travel_year);
+    int idx = (role == ROLE_KEY_A) ? 0 : (role == ROLE_KEY_B) ? 1 : 2;
+
+    switch (role) {
+    case ROLE_KEY_A:
+    case ROLE_KEY_B:
+    case ROLE_KEY_C:
+        if (op_have(idx)) {
+            op_enter_flavor("flv_heard", "ALREADY HEARD");
+        } else if (role == ROLE_KEY_C && !op.pass) {
+            op_enter_key(idx, 1);   /* sealed */
+        } else {
+            op_enter_key(idx, 0);
+        }
+        break;
+    case ROLE_EARLY:  op_enter_flavor("flv_early",  "TOO EARLY");      break;
+    case ROLE_HOME:   op_enter_flavor("flv_2000",   "FROZEN MINUTE");  break;
+    case ROLE_FUTURE: op_enter_flavor("flv_future", "FUTURE SEALED");  break;
+    default:          op_enter_flavor("flv_other",  "NOTHING HERE");   break;
+    }
+}
+
+/* ── Year / number entry ─────────────────────────────────────────────── */
+
+static void op_eval_year(void) {
+    int year = parse_year(op.buf);
+    if (year_role(year) == ROLE_BAD) {
+        op.buf[0] = '\0';
+        op.len = 0;
+        sdk_display("NO SUCH YEAR", "try 1900-2100");
         return;
     }
-    if (year >= FUTURE_SEALED_YEAR && !ts.pass_active) {
-        ts_enter_operator("FUTURE SEALED");
-        return;
+    op_enter_travel(year);
+}
+
+static void op_eval_number(void) {
+    if (strcmp(op.buf, FINAL_NUMBER) == 0) {
+        op_enter_final();
+    } else {
+        op.buf[0] = '\0';
+        op.len = 0;
+        sdk_display("WRONG NUMBER", PIECE_A " " PIECE_B " " PIECE_C);
     }
-    ts_try_connect(year);
 }
 
 /* ── Plugin callbacks ────────────────────────────────────────────────── */
 
-static int ts_handle_coin(int coin_value, const char *coin_code) {
-    char l2[32];   /* room for a worst-case int from snprintf */
+static int op_handle_coin(int coin_value, const char *coin_code) {
     (void)coin_value;
     (void)coin_code;
     sdk_coin_chime();
-    if (ts.state == TS_AWAIT_FARE) {
-        if (sdk_balance() >= ts.fare_cents) {
-            ts_try_connect(ts.pending_year);
+    if (op.state == TS_HUB) {
+        int t = operator_target_piece(op.pieces);
+        const char *l1 = (t == 0) ? "DIAL 1955" :
+                         (t == 1) ? "DIAL 1978" : "DIAL 1998";
+        char l2[24];
+        snprintf(l2, sizeof(l2), "DIAL A YEAR  %d/3", op_count());
+        sdk_display(l1, l2);
+        sdk_play_clip(t == 0 ? "op_hint_a" : t == 1 ? "op_hint_b" : "op_hint_c");
+    } else if (op.state == TS_KEY) {
+        if (op.locked) {
+            op_enter_key(op.cur_key, 0);   /* feed the coinbox to force it open */
         } else {
-            ts_render_need();
+            op.last_input_at = sdk_now();   /* a coin buys more line time */
+            sdk_play_clip("coin_hold");
         }
-    } else if (ts.state == TS_OPERATOR) {
-        snprintf(l2, sizeof(l2), "CREDIT $%d.%02d", sdk_balance() / 100,
-                 sdk_balance() % 100);
-        sdk_display("TIME OPERATOR", l2);
+    } else if (op.state == TS_READY) {
+        op_render_ready();
     }
     return 0;
 }
 
-static int ts_handle_keypad(char key) {
-    const era_t *e;
-
-    switch (ts.state) {
-    case TS_OPERATOR:
+static int op_handle_keypad(char key) {
+    switch (op.state) {
+    case TS_HUB:
         if (key >= '0' && key <= '9') {
-            if (ts.year_len < 4) {
-                ts.year_buf[ts.year_len++] = key;
-                ts.year_buf[ts.year_len] = '\0';
+            if (op.len < 4) {
+                op.buf[op.len++] = key;
+                op.buf[op.len] = '\0';
                 sdk_beep(key);
-                ts_render_operator();
-                if (ts.year_len == 4) ts_eval_year();
+                op_render_hub();
+                if (op.len == 4) op_eval_year();
             }
         } else if (key == '*') {
-            if (ts.year_len > 0) ts.year_buf[--ts.year_len] = '\0';
-            ts.banner = "TIME OPERATOR";
-            ts_render_operator();
+            if (op.len > 0) op.buf[--op.len] = '\0';
+            op_render_hub();
         } else if (key == '#') {
-            ts.year_buf[0] = '\0';
-            ts.year_len = 0;
-            ts.banner = "TIME OPERATOR";
-            ts_render_operator();
+            op.buf[0] = '\0'; op.len = 0;
+            op_render_hub();
+            sdk_play_clip(op_next_clip());
         }
         break;
 
-    case TS_AWAIT_FARE:
-        if (key == '*' || key == '#') {
-            ts_enter_operator(NULL);
-        } else {
-            sdk_beep(key);
+    case TS_READY:
+        if (key >= '0' && key <= '9') {
+            if (op.len < 6) {
+                op.buf[op.len++] = key;
+                op.buf[op.len] = '\0';
+                sdk_beep(key);
+                op_render_ready();
+                if (op.len == 6) op_eval_number();
+            }
+        } else if (key == '*') {
+            if (op.len > 0) op.buf[--op.len] = '\0';
+            op_render_ready();
+        } else if (key == '#') {
+            op.buf[0] = '\0'; op.len = 0;
+            op_render_ready();
         }
         break;
 
-    case TS_IN_ERA:
-        e = &eras[ts.era];
-        ts.last_input_at = sdk_now();
-        if (key == '#') {
-            ts_enter_operator(NULL);
+    case TS_KEY:
+        op.last_input_at = sdk_now();
+        if (op.locked) {
+            if (key == '#') op_enter_hub(NULL);
+            else sdk_beep(key);
         } else if (key == '1') {
-            if (ts.armed && ts.current_year == ts.source_year) {
-                ts.armed = 0;
-                sdk_logf(TS_CAT, "Paradox mended at %d", ts.current_year);
-                sdk_display("TIMELINE", "MENDED");
-            } else {
-                sdk_display(e->label, e->observe);
-            }
+            op_enter_reveal();
         } else if (key == '2') {
-            ts.armed = 1;
-            ts.source_year = ts.current_year;
-            sdk_display("TIMELINE BENT", e->interfere);
+            op.tangled = 1;
+            op_render_key();
+            sdk_play_clip("px_tangle");
+        } else if (key == '#') {
+            op_enter_hub(NULL);
         } else {
             sdk_beep(key);
         }
         break;
 
-    case TS_PARADOX:
-        if (key == '#') {
-            ts_enter_operator(NULL);
-        } else {
-            sdk_beep(key);
-        }
+    case TS_FLAVOR:
+        if (key == '#') op_enter_hub(NULL);
+        break;
+
+    case TS_REVEAL:
+        if (key == '#') op_enter_hub(NULL);
         break;
 
     default:
@@ -386,125 +458,114 @@ static int ts_handle_keypad(char key) {
     return 0;
 }
 
-static int ts_handle_hook(int hook_up, int hook_down) {
+static int op_handle_hook(int hook_up, int hook_down) {
     if (hook_up) {
-        ts_enter_operator(NULL);
-        sdk_play_clip("operator");   /* greeting voice on lift; silent if none */
+        if (op.won || sdk_elapsed(op.hangup_at) > GRACE_SECS) {
+            op_reset_session();
+            op_enter_hub("op_intro");
+        } else {
+            op_enter_hub("op_resume");   /* keeps pieces/pass within grace */
+        }
     } else if (hook_down) {
-        sdk_stop_audio();
-        ts.state = TS_DORMANT;
-        ts.year_buf[0] = '\0';
-        ts.year_len = 0;
-        ts_render_dormant();
+        op_enter_dormant();
     }
     return 0;
 }
 
-static int ts_handle_card(const char *card_number) {
+static int op_handle_card(const char *card_number) {
     (void)card_number;
-    ts.pass_active = 1;
-    sdk_log(TS_CAT, "Temporal pass accepted");
-    sdk_display("TEMPORAL PASS", "PASS ACCEPTED");
+    op.pass = 1;
+    if (op.state == TS_KEY && op.locked) {
+        op_enter_key(op.cur_key, 0);     /* unlock and arrive */
+    } else {
+        sdk_display("TEMPORAL PASS", "PASS ACCEPTED");
+        sdk_log(TS_CAT, "Temporal pass accepted");
+    }
     return 0;
 }
 
-static void ts_handle_activation(void) {
-    memset(&ts, 0, sizeof(ts));
+static void op_handle_activation(void) {
+    memset(&op, 0, sizeof(op));
+    op.cur_key = -1;
     if (sdk_receiver_is_up()) {
-        ts_enter_operator(NULL);
+        op_enter_hub("op_intro");
     } else {
-        ts.state = TS_DORMANT;
-        ts_render_dormant();
+        op.state = TS_DORMANT;
+        op_render_dormant();
     }
 }
 
-static void ts_handle_tick(void) {
-    const era_t *e;
-
-    switch (ts.state) {
-    case TS_CONNECTING:
-        if (sdk_elapsed(ts.frame_at) >= FRAME_SECONDS) {
-            ts.frame_index++;
-            ts.frame_at = sdk_now();
-            if (ts.frame_index < CONNECT_FRAMES) {
-                ts_render_connecting();
-            } else if (ts.dest < 0) {
-                ts_enter_drop();
-            } else {
-                ts_enter_era(ts.dest);
-            }
+static void op_handle_tick(void) {
+    switch (op.state) {
+    case TS_TRAVEL:
+        if (sdk_elapsed(op.timer_at) >= TRAVEL_SECS) op_resolve_travel();
+        break;
+    case TS_FLAVOR:
+        if (sdk_elapsed(op.timer_at) >= FLAVOR_SECS) op_enter_hub(NULL);
+        break;
+    case TS_REVEAL:
+        if (sdk_elapsed(op.timer_at) >= REVEAL_SECS) op_enter_hub(NULL);
+        break;
+    case TS_KEY:
+        if (sdk_elapsed(op.last_input_at) >= DRIFT_SECS) {
+            op_enter_hub("drift_back");
         }
         break;
-
-    case TS_IN_ERA:
-        if (sdk_elapsed(ts.last_input_at) >= DRIFT_SECONDS) {
-            ts_enter_operator("TEMPORAL DRIFT");
-            break;
-        }
-        e = &eras[ts.era];
-        if (ts.frame_index < e->frame_count - 1 &&
-            sdk_elapsed(ts.frame_at) >= FRAME_SECONDS) {
-            ts.frame_index++;
-            ts.frame_at = sdk_now();
-            ts_render_era();
+    case TS_FINAL:
+        if (op.final_step == 0 && sdk_elapsed(op.timer_at) >= FINAL_CONNECT_SECS) {
+            op.final_step = 1;
+            op.timer_at = sdk_now();
+            sdk_display("11:59 ... 12:00", "the clock turns");
+            sdk_play_clip("final_clock");
+        } else if (op.final_step == 1 &&
+                   sdk_elapsed(op.timer_at) >= FINAL_CLOCK_SECS) {
+            op_enter_win();
         }
         break;
-
-    case TS_DROP:
-        if (sdk_elapsed(ts.frame_at) >= DROP_SECONDS) {
-            ts_enter_operator("LINE DROPPED");
-        }
-        break;
-
     default:
         break;
     }
 }
 
-/* Append one string at index n (when there's room) and return n+1. */
-static int ts_collect(const char **out, int max, int n, const char *s) {
+/* Test/introspection hook: expose every authored display string so the
+ * test_plugin_display_lines_fit guardrail can confirm none exceeds the budget. */
+static int op_collect(const char **out, int max, int n, const char *s) {
     if (out && n < max) out[n] = s;
     return n + 1;
 }
 
-/* Test/introspection hook (see test_plugin_display_lines_fit): expose every
- * authored display string so the guardrail can confirm none exceeds the line
- * budget. Returns the total count; fills up to `max` into out[]. */
 int time_operator_display_strings(const char **out, int max) {
     static const char *const ui[] = {
-        "THE OPERATOR", "Lift to dial", "TIME OPERATOR", "DIAL A YEAR  #=BACK",
-        "CONNECTING...", "ringing...", "ALMOST 2000...", "NEVER MIDNIGHT",
-        "LINE FAULT 19##", "#=OPERATOR", "TEMPORAL PASS", "PASS ACCEPTED",
-        "TIMELINE", "MENDED", "TIMELINE BENT", "NO SUCH YEAR", "FUTURE SEALED",
-        "TEMPORAL DRIFT", "LINE DROPPED"
+        "THE OPERATOR", "Lift: the last call", "FIND THE 1950s",
+        "FIND THE 1970s", "FIND 1998 SEALED", "DIAL A YEAR", "DIAL HER NUMBER",
+        PIECE_A " " PIECE_B " " PIECE_C, "DIALING...", "CONNECTING...",
+        "BACK TO OPERATOR", "TOO EARLY", "FROZEN MINUTE", "FUTURE SEALED",
+        "NOTHING HERE", "ALREADY HEARD", "1955 TWO SISTERS", "1978 SHE PAUSES",
+        "1998 A CARD", "1998: SEALED", "SWIPE PASS / COIN", "1=LISTEN 2=SPEAK",
+        "LINE TANGLED", "press 1=LISTEN", "DIAL 1955", "DIAL 1978", "DIAL 1998",
+        "TEMPORAL PASS", "PASS ACCEPTED", "NO SUCH YEAR", "try 1900-2100",
+        "WRONG NUMBER", "...RINGING...", "the last call", "11:59 ... 12:00",
+        "the clock turns", "12:00  2000", "SHE IS FREE"
     };
-    int n = 0, i, f;
+    int n = 0, i;
     for (i = 0; i < (int)(sizeof(ui) / sizeof(ui[0])); i++) {
-        n = ts_collect(out, max, n, ui[i]);
-    }
-    for (i = 0; i < NUM_ERAS; i++) {
-        n = ts_collect(out, max, n, eras[i].label);
-        n = ts_collect(out, max, n, eras[i].observe);
-        n = ts_collect(out, max, n, eras[i].interfere);
-        for (f = 0; f < eras[i].frame_count; f++) {
-            n = ts_collect(out, max, n, eras[i].frames[f].l1);
-            n = ts_collect(out, max, n, eras[i].frames[f].l2);
-        }
+        n = op_collect(out, max, n, ui[i]);
     }
     return n;
 }
 
 void register_time_operator_plugin(void) {
-    memset(&ts, 0, sizeof(ts));
-    ts.state = TS_DORMANT;
+    memset(&op, 0, sizeof(op));
+    op.state = TS_DORMANT;
+    op.cur_key = -1;
 
     plugins_register("The Operator",
-                     "Dial a year - a time-travel story line",
-                     ts_handle_coin,
-                     ts_handle_keypad,
-                     ts_handle_hook,
+                     "The Last Call - help finish a call frozen in time",
+                     op_handle_coin,
+                     op_handle_keypad,
+                     op_handle_hook,
                      NULL,
-                     ts_handle_card,
-                     ts_handle_activation,
-                     ts_handle_tick);
+                     op_handle_card,
+                     op_handle_activation,
+                     op_handle_tick);
 }

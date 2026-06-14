@@ -1,0 +1,12 @@
+# The Operator: a year she never held the number gives a scene and a nudge back.
+activate_plugin The Operator
+hook_up
+
+keys 1925
+wait 3
+assert_display TOO EARLY
+assert_clip flv_early.wav
+
+# Returns to the Operator on its own
+wait 3
+assert_display DIAL A YEAR

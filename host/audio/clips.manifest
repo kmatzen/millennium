@@ -1,9 +1,9 @@
-# Millennium "The Operator" voice-clip manifest.
+# Millennium "The Operator: The Last Call" voice-clip manifest.
 #
 # The recorded clips live only on the Pi's SD card (not in git), so this file is
 # the reproducible source of truth: regen_clips.sh reads it, synthesizes each
 # clip with ElevenLabs text-to-speech, converts to 8 kHz mono 16-bit PCM WAV,
-# and (optionally) deploys to the phone. See AUDIO_CLIPS.md.
+# and (optionally) deploys to the phone. See AUDIO_CLIPS.md and OPERATOR_STORY.md.
 #
 # Voice : Sarah  (ElevenLabs voice_id EXAVITQu4vr4xnSDxMaL)
 # Model : eleven_multilingual_v2
@@ -14,18 +14,41 @@
 #   - everything after the first whitespace run is the spoken text
 #   - blank lines and lines starting with '#' are ignored
 #
-# Keep text plain (the script JSON-escapes it safely); spell out numbers and
-# years so they are read aloud the way you want ("nineteen ninety-nine").
+# Spell out numbers and years so they are read aloud the way you want.
 
-operator   Finally. You picked up. This is the Operator. Dial a year, and I will put you through.
+# -- Operator hub: mission, guidance, hints --
+op_intro   Operator. I have held one last call since the clock stopped, eleven fifty-nine on New Year's Eve, nineteen ninety-nine. A woman calling her sister Ruth to make peace, frozen mid-ring. Help me finish it, and time moves again. Her number is lost across the years she held it. Start where she first dialed it: two girls and a kitchen radio, the chrome-and-radio fifties. Dial a year. A coin buys a hint; press pound to hear me again.
+op_resume  Still on the line. Good. We were finding her number. Keep going.
+op_next_a  Start where she first dialed it, the chrome-and-radio fifties.
+op_next_b  Now the night she lost her nerve, the receiver warm in her hand, the long-wire seventies.
+op_next_c  The last piece is sealed away, the final analog year, ninety-eight. You will need a pass, or force the coinbox.
+op_ready   That is all of it. Three, six, four, one, five, five. The whole number, after all these years. Dial it now, and finish her call.
+op_hint_a  Try nineteen fifty-five.
+op_hint_b  Try nineteen seventy-eight.
+op_hint_c  Try nineteen ninety-eight, and bring a pass.
 
-drop       The line is ringing. Almost there. Almost the new year... no. It always drops before midnight. No one ever reaches nineteen ninety-nine.
-paradox    You have bent the timeline. The line is jammed now, two moments crossing at once. Go back to the year you meddled with, and set it right.
+# -- Key eras: arrival scenes and the number-pieces --
+era1_arrive  Connecting. Nineteen fifty-five. A kitchen radio, two sisters, a number inked on a small palm. Listen, do not speak.
+era1_listen  The little one reads it out, proud: three, six. The first piece, thirty-six. Hold on to it.
+era2_arrive  Connecting. Nineteen seventy-eight. She is grown now, the receiver warm in her hand. She dials four, one, and sets it down. Listen.
+era2_listen  Four, one. The middle of it, forty-one. She never finished, but you can.
+era3_sealed  This line is sealed, a trunk line. Swipe a pass, or feed the coinbox to force it open.
+era3_arrive  Connecting. December, nineteen ninety-eight. A Christmas card, Ruth's new number folded inside. The last of it. Listen.
+era3_listen  Five, five. That is the end of it. The whole number, at last.
 
-era_wires  Connecting. The nineteen hundreds, the age of wires. Hear the copper hum. Every call here is plugged by hand, by an operator like me.
-era_golden Connecting. The golden age of the air. A radio crackles to life, and a big band swings its way down the line.
-era_space  Connecting. The space age. Static drifts in from orbit, and somewhere a countdown is ticking toward the stars.
-era_analog Connecting. The last analog years. Modems screech and handshake, and a young world wide web begins to sing.
-era_frozen Connecting. The frozen minute. Eleven fifty-nine, forever. You are home now, where the clock never turned over.
-era_static Connecting. The static years. Dead air and faint voices, a number station counting out to no one at all.
-era_sealed Connecting. The sealed future. Only a temporal pass opens this line. A calm machine is waiting, and it knows your name.
+# -- Flavor eras --
+flv_early   Too early. She was not even born yet. Come back, and I will point you right.
+flv_2000    The year two thousand, the frozen minute. Only silence here, and me, waiting.
+flv_future  The future is sealed. There is nothing there for you yet.
+flv_other   Not here. This is not one of the years she held the number. Come back to me.
+flv_heard   You have already heard everything this line can tell you.
+
+# -- Hazards --
+px_tangle   You spoke to her, and the past hears you. The line tangles. Do not speak. Just listen.
+drift_back  The connection is fading. I am pulling you back. Drop a coin and I will hold the line longer.
+coin_hold   Thank you. I will hold the line a little longer.
+
+# -- The last call and the ending --
+final_connect  It is ringing. After all this time. A click. A held breath. Hello? Ruth? It is me. I made it to the new year.
+final_clock    Eleven fifty-nine, and, twelve. The year two thousand. The clock is moving again.
+win_free       I can hear it ticking. Forty years I held that one minute. Thank you, caller. Now hang up, and go live your years.

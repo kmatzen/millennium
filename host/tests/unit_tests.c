@@ -764,8 +764,8 @@ int number_guess_compare(int secret, int guess);
 
 /* Pure helpers exported by plugins/time_operator.c */
 int parse_year(const char *buf);
-int fare_for_year(int year);
-int era_index_for_year(int year);
+const char *operator_year_role(int year);
+int operator_target_piece(int pieces);
 
 static void test_plugins_builtins_registered(void) {
     char buf[2048];
@@ -889,30 +889,29 @@ static void test_operator_parse_year(void) {
     TEST_ASSERT_EQ_INT(parse_year(NULL), -1);
 }
 
-static void test_operator_fare_for_year(void) {
-    /* The anchor (2000) is free; the next-cheapest is the base fare. */
-    TEST_ASSERT_EQ_INT(fare_for_year(2000), 0);
-    TEST_ASSERT_EQ_INT(fare_for_year(2005), 25);   /* same decade as anchor */
-    /* Symmetric around the anchor. */
-    TEST_ASSERT_EQ_INT(fare_for_year(1990), fare_for_year(2010));
-    /* Non-decreasing with distance. */
-    TEST_ASSERT(fare_for_year(1980) >= fare_for_year(1990));
-    TEST_ASSERT(fare_for_year(1900) >= fare_for_year(1980));
-    /* Capped. */
-    TEST_ASSERT_EQ_INT(fare_for_year(1900), 275);  /* 25 + 25*10, under cap */
-    TEST_ASSERT(fare_for_year(2100) <= 500);
+static void test_operator_year_role(void) {
+    /* The three key eras hold number-pieces. */
+    TEST_ASSERT_EQ_STR(operator_year_role(1955), "A");  /* two sisters     */
+    TEST_ASSERT_EQ_STR(operator_year_role(1978), "B");  /* she lost nerve  */
+    TEST_ASSERT_EQ_STR(operator_year_role(1998), "C");  /* sealed final yr */
+    /* Flavor classifications. */
+    TEST_ASSERT_EQ_STR(operator_year_role(1925), "early");
+    TEST_ASSERT_EQ_STR(operator_year_role(2000), "home");
+    TEST_ASSERT_EQ_STR(operator_year_role(2075), "future");
+    TEST_ASSERT_EQ_STR(operator_year_role(1965), "other");
+    /* Out of range. */
+    TEST_ASSERT_EQ_STR(operator_year_role(1850), "bad");
+    TEST_ASSERT_EQ_STR(operator_year_role(2200), "bad");
 }
 
-static void test_operator_era_lookup(void) {
-    /* A year maps to the bracket that contains it. */
-    TEST_ASSERT_EQ_INT(era_index_for_year(1915), 0);
-    TEST_ASSERT_EQ_INT(era_index_for_year(2000), 4);  /* the frozen minute */
-    TEST_ASSERT_EQ_INT(era_index_for_year(2025), 5);
-    TEST_ASSERT_EQ_INT(era_index_for_year(2075), 6);  /* sealed future */
-    /* Out of range and the 1999 dead-end gap map to none. */
-    TEST_ASSERT_EQ_INT(era_index_for_year(1850), -1);
-    TEST_ASSERT_EQ_INT(era_index_for_year(2200), -1);
-    TEST_ASSERT_EQ_INT(era_index_for_year(1999), -1);
+static void test_operator_target_piece(void) {
+    /* Lowest unfound piece (bit0=A,1=B,2=C); 3 == all collected. */
+    TEST_ASSERT_EQ_INT(operator_target_piece(0x0), 0);
+    TEST_ASSERT_EQ_INT(operator_target_piece(0x1), 1);   /* have A */
+    TEST_ASSERT_EQ_INT(operator_target_piece(0x3), 2);   /* have A,B */
+    TEST_ASSERT_EQ_INT(operator_target_piece(0x7), 3);   /* all */
+    TEST_ASSERT_EQ_INT(operator_target_piece(0x4), 0);   /* have only C */
+    TEST_ASSERT_EQ_INT(operator_target_piece(0x6), 0);   /* B,C but not A */
 }
 
 /* ── WAV clip parser ────────────────────────────────────────────────── */
@@ -2199,8 +2198,8 @@ int main(void) {
     TEST_SUITE_RUN(test_plugins_to_json_escapes);
     TEST_SUITE_RUN(test_number_guess_compare);
     TEST_SUITE_RUN(test_operator_parse_year);
-    TEST_SUITE_RUN(test_operator_fare_for_year);
-    TEST_SUITE_RUN(test_operator_era_lookup);
+    TEST_SUITE_RUN(test_operator_year_role);
+    TEST_SUITE_RUN(test_operator_target_piece);
     TEST_SUITE_RUN(test_wav_parse_valid);
     TEST_SUITE_RUN(test_wav_parse_rejects_bad);
     TEST_SUITE_RUN(test_wav_parse_skips_unknown_chunk);

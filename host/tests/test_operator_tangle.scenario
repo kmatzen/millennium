@@ -1,0 +1,18 @@
+# The Operator: SPEAK tangles the line; pressing LISTEN untangles it and yields
+# the piece. (Listen, don't speak.)
+activate_plugin The Operator
+hook_up
+
+keys 1955
+wait 3
+assert_display 1=LISTEN
+
+# Speak -> tangled
+key 2
+assert_display LINE TANGLED
+assert_clip px_tangle.wav
+
+# Listen -> recovered, piece found
+key 1
+assert_display PIECE A
+assert_display 1/3

@@ -1,0 +1,11 @@
+# The Operator (The Last Call): lifting the handset states the mission and shows
+# the HUD (current goal + pieces 0/3).
+activate_plugin The Operator
+assert_display Lift
+
+hook_up
+assert_state IDLE_UP
+assert_display DIAL A YEAR
+assert_display 0/3
+assert_display FIND THE 1950s
+assert_clip op_intro.wav
