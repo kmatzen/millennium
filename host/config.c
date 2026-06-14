@@ -324,15 +324,24 @@ char* config_trim(const char* str, char* result, size_t result_size) {
         return result;
     }
     
-    /* Find first non-space character */
+    /* Find first non-space character. Cast to unsigned char: passing a negative
+     * char to isspace() is undefined behavior. */
     start = str;
-    while (*start != '\0' && isspace(*start)) {
+    while (*start != '\0' && isspace((unsigned char)*start)) {
         start++;
     }
-    
-    /* Find last non-space character */
+
+    /* Empty or all-whitespace: the trimmed result is empty. This also avoids
+     * forming str + strlen(str) - 1 == str - 1 below for an empty string, which
+     * is out-of-bounds pointer arithmetic (UB, found by CBMC). */
+    if (*start == '\0') {
+        result[0] = '\0';
+        return result;
+    }
+
+    /* Find last non-space character (strlen >= 1 here, so this stays in bounds) */
     end = str + strlen(str) - 1;
-    while (end > start && isspace(*end)) {
+    while (end > start && isspace((unsigned char)*end)) {
         end--;
     }
     

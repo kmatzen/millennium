@@ -38,10 +38,15 @@ int wav_parse(const unsigned char *data, size_t len, wav_info_t *out) {
         }
 
         if (memcmp(ck, "fmt ", 4) == 0) {
+            unsigned long rate;
             if (cksize < 16) return -1;
             out->format          = (int)read_u16(ck + 8);
             out->channels        = (int)read_u16(ck + 10);
-            out->sample_rate     = (int)read_u32(ck + 12);
+            /* sample_rate is a 32-bit field; casting a value >= 2^31 straight to
+             * int is signed overflow (UB). Treat an out-of-range rate as 0
+             * (invalid), which callers already reject. */
+            rate = read_u32(ck + 12);
+            out->sample_rate     = (rate <= 0x7FFFFFFFUL) ? (int)rate : 0;
             out->bits_per_sample = (int)read_u16(ck + 22);
             have_fmt = 1;
         } else if (memcmp(ck, "data", 4) == 0) {
