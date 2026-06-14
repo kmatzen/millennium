@@ -1,80 +1,64 @@
-# The Operator — physical playtest checklist
+# The Operator: "The Last Call" — physical playtest checklist
 
-A hands-on pass for the **The Operator** plugin on the real phone. Everything
-here was verified in software (unit + scenario tests, and the web-API smoke
-test); this checklist covers the parts that need **real hardware and your ears**:
-the handset hook switch, the coin validator, the magstripe reader, and audio on
-the earpiece.
+A hands-on pass on the real phone. The flow is verified in software (unit +
+scenario tests, and `make operator-smoke`); this covers what needs **real
+hardware and your ears**: the hook switch, the coin validator, the magstripe
+reader, and audio on the earpiece. Full script/tree: `OPERATOR_STORY.md`.
+
+## The goal (what the caller is doing)
+Help the Operator finish a phone call frozen at 11:59 PM, 1999. Recover the
+**three pieces of Ruth's number** from three key years, then **dial the whole
+number** — the call connects and the clock turns to 2000. The Operator's voice
+states the goal and the next step; the VFD shows `PIECES n/3` and the current hint.
 
 ## Before you start
-
-1. Make it the active plugin (web dashboard, or):
+1. Activate it (dashboard, or):
    ```bash
    curl -s -X POST -H 'Content-Type: application/json' \
      -d '{"action":"activate_plugin","plugin":"The Operator"}' http://<pi>/api/control
    ```
-2. Software pre-flight (optional but recommended) — confirms the state machine
-   is healthy before you touch the phone:
-   ```bash
-   make operator-smoke OP_HOST=<pi>        # add RUN_DRIFT=1 for the slow drift leg
-   ```
-3. Re-activating the plugin resets session state (clears an armed paradox / the
-   temporal pass). Do it between runs if you want a clean slate.
+2. Software pre-flight: `make operator-smoke OP_HOST=<pi>` (add `RUN_DRIFT=1` for the slow leg).
+3. Number/years (current tuning): pieces **36 / 41 / 55** → dial **364155** to win.
+   Key years: **1955** (A), **1978** (B), **1998** (C, sealed). Re-activating resets the session.
 
-Audio clips live in `/usr/local/share/millennium/audio/` (see `AUDIO_CLIPS.md`).
-A missing clip is a silent no-op, so anything you didn't install just won't speak.
+Clips live in `/usr/local/share/millennium/audio/`; a missing one is a silent no-op.
 
-## Checklist
-
-Tick VFD (V), audio (A), and the hardware path (H) for each.
+## Checklist  (V = VFD, A = audio, H = hardware path)
 
 - [ ] **Greeting / hook switch.** Lift the handset.
-      V: `TIME OPERATOR` / `DIAL A YEAR  #=BACK`  ·  A: `operator.wav` greeting
+      V: `FIND THE 1950s` / `DIAL A YEAR  0/3`  ·  A: `op_intro` (states the mission)
       ·  H: lifting really transitions to IDLE_UP (no API nudge).
-- [ ] **Coin validator + fare.** With the handset up, drop a real coin.
-      V: `CREDIT $0.25` (value matches the coin)  ·  A: coin chime
-      ·  H: the validator credits the balance.
-- [ ] **Travel to an era.** Dial `2 0 0 5` (fare 25¢ — insert a quarter first).
-      V: `CONNECTING... / YEAR 2005`, then `STATIC YEARS`  ·  A: ringback, then
-      `era_static.wav` ("Connecting. The static years…").
-- [ ] **Era branches.** In the era press `1` (listen) then `#` (back).
-      V: branch line ("…seven… nine…"), then back to the Operator.
-- [ ] **Home, free.** Dial `2 0 0 0` (no fare).  V: `FROZEN MINUTE` · A: `era_frozen.wav`.
-- [ ] **Insufficient funds.** Fresh lift, dial `2 0 0 5` with no coins.
-      V: `NEED $0.25 / HAVE $0.00`. Now insert a quarter → it connects.
-- [ ] **The 1999 drop.** Insert a quarter, dial `1 9 9 9`.
-      V: `ALMOST 2000... / NEVER MIDNIGHT`, then `LINE DROPPED` → Operator
-      ·  A: `drop.wav` ("…it always drops before midnight").
-- [ ] **Sealed future refused.** Dial `2 0 8 0` with no pass.  V: `FUTURE SEALED`.
+- [ ] **Piece A.** Dial `1 9 5 5`. V: connecting → `1955 TWO SISTERS` / `1=LISTEN 2=SPEAK`.
+      Press `1`. V: `PIECE A: 36` / `PIECES 1/3` · A: `era1_arrive`, then `era1_listen`.
+- [ ] **Listen, don't speak.** In a key era press `2`. V: `LINE TANGLED` · A: `px_tangle`.
+      Press `1` to recover the piece.
+- [ ] **Wrong year nudge.** Dial `1 9 2 5`. V: `TOO EARLY`, then back to the Operator.
+- [ ] **Piece B.** Dial `1 9 7 8` → `1=LISTEN` → `1` → `PIECE B: 41` / `2/3`.
+- [ ] **Sealed final year.** Dial `1 9 9 8`. V: `1998: SEALED` / `SWIPE PASS / COIN`.
 - [ ] **Temporal pass (magstripe).** Swipe any card.
-      V: `TEMPORAL PASS / PASS ACCEPTED`  ·  H: the reader fires `handle_card`.
-      Then dial `2 0 5 0` with enough coins (fare $1.50) → `SEALED FUTURE`.
-- [ ] **Paradox.** Dial an era (e.g. `1 9 9 5`), in it press `2` (meddle →
-      `TIMELINE BENT`), press `#`, then dial a *different* era (`2 0 0 5`).
-      V: `LINE FAULT 19## / #=OPERATOR`  ·  A: `paradox.wav`.
-- [ ] **Paradox survives a hang-up.** While armed, hang up and lift again, then
-      dial a different era — still `LINE FAULT`. (Consequences persist for the
-      session; re-activating the plugin is what clears it.)
-- [ ] **Paradox repair.** From the fault press `#`, dial back to the source year
-      (`1 9 9 5`), and press `1` (the opposite branch).  V: `TIMELINE / MENDED`.
-- [ ] **Temporal drift.** In any era, touch nothing for ~30 s.
-      V: snaps back with `TEMPORAL DRIFT / DIAL A YEAR`.
-- [ ] **Hang up.** Place the handset down from anywhere.
-      V: `THE OPERATOR / Lift to dial`  ·  A: any clip/tone stops immediately.
+      V: `1998 A CARD` / `1=LISTEN 2=SPEAK`  ·  H: the reader fires `handle_card`.
+      Press `1` → `PIECE C: 55` / `3/3`.  (A real coin also forces it open — try both.)
+- [ ] **Coin validator — hints & time.** At the Operator, drop a coin → blunter hint
+      (`DIAL 1955` …) · A: `op_hint_*`. In an era, a coin → A: `coin_hold` (holds the line).
+      ·  H: the validator registers the coin.
+- [ ] **The last call.** With `3/3`: V: `DIAL HER NUMBER` / `36 41 55`. Dial `3 6 4 1 5 5`.
+      V: `...RINGING...` → `11:59 ... 12:00` → `12:00  2000` / `SHE IS FREE`
+      ·  A: `final_connect` → `final_clock` → `win_free`.
+- [ ] **Temporal drift.** In an era, touch nothing ~30 s. V: pulled back to the Operator
+      (`DIAL A YEAR`) · A: `drift_back`. (A coin in the era buys ~30 s more first.)
+- [ ] **Grace reset.** Hang up, then lift again within ~30 s → resumes with progress
+      (A: `op_resume`). Lift after ~30 s, or after a win → fresh story `0/3` (A: `op_intro`).
+- [ ] **Hang up.** Handset down from anywhere → `THE OPERATOR` / `Lift: the last call`,
+      and any clip/tone stops immediately.
 
-## What to listen for (audio judgement — only doable here)
-
+## What to listen for (only judge-able here)
 - Clip **clarity** through the TDA2822M earpiece amp at 8 kHz narrowband.
-- Clip **volume vs the tones** (dial/ring/busy/DTMF). If a clip is noticeably
-  hotter or quieter than the tones, note it — clip levels can be normalized in
-  the conversion step and redeployed without touching the daemon.
-- No clipping/buzz, and that a clip **stops cleanly** on hang-up / dialing on.
+- Clip **volume vs the tones** (ringback/DTMF/coin chime). If clips are noticeably
+  hotter/quieter, note it — levels can be normalized in `regen_clips.sh` and redeployed.
+- Each clip **stops cleanly** on hang-up / dialing on. Pacing of the win sequence feels right.
 
 ## If something's off
-
-- Wrong/no audio for one step: check the matching file exists and is 16-bit PCM
-  WAV in the clip dir (`ls -la /usr/local/share/millennium/audio/`).
-- Unexpected `LINE FAULT`: a paradox is still armed from a previous run —
-  re-activate the plugin to reset.
-- Coins not crediting / card not read / hook not switching: that's the Arduino
-  serial path, not the plugin — see `phone-status` and `journalctl -u daemon`.
+- Wrong/no audio for a step: confirm the file exists, 16-bit PCM WAV, in the clip dir.
+- Unexpected state: re-activate the plugin to reset the session.
+- Coins/card/hook not registering: that's the Arduino serial path, not the plugin —
+  see `phone-status` and `journalctl -u daemon`.

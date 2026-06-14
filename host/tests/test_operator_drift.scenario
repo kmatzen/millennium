@@ -1,14 +1,13 @@
-# The Operator: sitting idle in an era too long causes temporal drift back to
-# the Operator.
+# The Operator: idling in an era past the drift timeout pulls you back to the
+# Operator (no progress lost).
 activate_plugin The Operator
 hook_up
 
-# Travel to an era
-coin 25
-keys 2005
-wait 6
-assert_display STATIC YEARS
+keys 1955
+wait 3
+assert_display 1=LISTEN
 
-# Touch nothing past the drift timeout -> snapped back to the Operator
-wait 40
-assert_display TEMPORAL DRIFT
+# Touch nothing past the drift window
+wait 31
+assert_display DIAL A YEAR
+assert_clip drift_back.wav

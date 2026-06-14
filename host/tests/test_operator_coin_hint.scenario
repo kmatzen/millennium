@@ -1,0 +1,15 @@
+# The Operator: coins never gate winning -- at the hub a coin buys a sharper
+# hint; in an era a coin buys more line time before drift.
+activate_plugin The Operator
+hook_up
+
+# Coin at the hub -> blunt hint for the current target
+coin 25
+assert_display DIAL 1955
+assert_clip op_hint_a.wav
+
+# Coin in an era -> the Operator holds the line longer
+keys 1955
+wait 3
+coin 25
+assert_clip coin_hold.wav

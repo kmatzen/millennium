@@ -1,0 +1,26 @@
+# The Operator: hanging up and lifting again within the grace window resumes the
+# same session (progress kept); after the window it starts fresh.
+activate_plugin The Operator
+hook_up
+
+# Earn piece A
+keys 1955
+wait 3
+key 1
+wait 3
+assert_display 1/3
+
+# Hang up, lift back quickly -> resume with progress intact
+hook_down
+assert_state IDLE_DOWN
+wait 5
+hook_up
+assert_display 1/3
+assert_clip op_resume.wav
+
+# Hang up, wait past the grace window -> a fresh story (0/3)
+hook_down
+wait 35
+hook_up
+assert_display 0/3
+assert_clip op_intro.wav
