@@ -7,529 +7,302 @@
 #include "../plugin_sdk.h"
 
 /*
- * The Operator — "The Last Call", an interactive time-travel story.
+ * The Operator — "The Last Call", a puzzle game.
  *
- * Premise: at 11:59 PM on New Year's Eve 1999 a woman lifted a payphone to call
- * her estranged sister Ruth and make peace, and the clock froze mid-ring. The
- * Operator has held that unfinished call ever since. The caller helps her finish
- * it: recover the three pieces of Ruth's number — each overheard at a moment the
- * woman almost dialed it across her life — then dial the whole number. The call
- * connects, the clock turns over to 2000, and the Operator is freed.
+ * Premise: a call has rung on this line since 11:59 PM, New Year's Eve 1999 — a
+ * woman calling her estranged sister Ruth to make peace, frozen mid-ring. The
+ * Operator can still connect it, but Ruth's seven-digit number is lost,
+ * "scattered in the things she told me while she waited". The caller works the
+ * number out by solving three puzzles, dials it, and time moves again.
  *
- * Design: see host/OPERATOR_STORY.md for the full script and decision tree.
+ * Design: see host/OPERATOR_STORY.md. The puzzles are meant to be HARD; the
+ * story the Operator narrates IS the puzzle input. There is no guess-and-check
+ * and nothing is gated on the coin validator or a magstripe card — only the
+ * keypad (digits + * hint + # repeat), the display, and the earpiece. A three
+ * step hint ladder (press *) keeps a persistent player from getting stuck.
  *
- * Legibility: the Operator's voice states the goal and the next step; the VFD is
- * a permanent HUD (current hint + PIECES n/3). Coins never gate winning — at the
- * hub a coin buys a sharper hint, in an era it buys more "line time" before
- * temporal drift pulls you back. "Listen, don't speak": in a key era 1=LISTEN
- * yields the piece, 2=SPEAK tangles the line (recover by pressing 1). Sessions
- * reset on hang-up after a short grace, so each caller gets the whole arc but a
- * fumbled hang-up doesn't wipe progress. All consequence is in-memory for the
- * session (the SDK has no persistence hook). No real SIP call is placed.
+ *   Puzzle 1  keypad letters : a word scratched by the phone -> spell it (HUG=484)
+ *   Puzzle 2  logic          : her age in 1999 from narrated facts (=51)
+ *   Puzzle 3  cipher         : "7 0" shifted down by 2 (the two sisters) (=58)
+ *   -> dial 4844858 -> the call connects, the clock turns to 2000.
  *
- * Audio clips (operator/era/win lines) are optional no-ops if absent; their text
- * and a regen script live in host/audio/. All narrative content is original.
+ * Audio clips are optional no-ops if absent; their text + a regen script live in
+ * host/audio/. All narrative content is original.
  */
 
 #define TS_CAT "Operator"
 
-#define YEAR_MIN           1900
-#define YEAR_MAX           2100
-#define FUTURE_SEALED_YEAR 2050
-/* Transient-state durations. The reveal/flavor/final beats are sized to let
- * their voice clip finish (see audio/clips.manifest durations) so the story
- * lands instead of being cut off mid-line -- this is what paces a first-time
- * session toward ~5 minutes. */
-#define TRAVEL_SECS        2
-#define SCENE_SECS         14  /* forced story beat after LISTEN; era*_scene ~11-13 s */
-#define REVEAL_SECS        6   /* hold a found piece; era*_listen runs ~4-5 s    */
-#define FLAVOR_SECS        5   /* a nudge/flavor beat; flv_* run ~3-5 s          */
-#define DRIFT_SECS         30
-#define EXTEND_SECS        30   /* a coin buys this much extra line time */
-#define GRACE_SECS         30   /* re-lift within this window resumes a session */
+#define SOLVED_SECS        3   /* "GOT IT" confirm beat before the next puzzle  */
 #define FINAL_CONNECT_SECS 8   /* "...RINGING..."; final_connect runs ~7.4 s    */
 #define FINAL_CLOCK_SECS   6   /* "11:59 ... 12:00"; final_clock runs ~5.4 s    */
-#define ENTRY_TIMEOUT_SECS 6   /* clear a half-typed year/number after this idle */
-#define WARM_BAND          6   /* within this many years of a target reads "warmer" */
-#define WIN_HOLD_SECS      8   /* hold the win (win_free runs ~6.8 s) before coda    */
+#define WIN_HOLD_SECS      8   /* hold the win (win_free ~6.8 s) before the coda */
+#define ENTRY_TIMEOUT_SECS 8   /* clear a half-typed answer after this idle      */
+#define GRACE_SECS         30  /* re-lift within this window resumes progress     */
 
-/* Ruth's number, in three positional pieces A-B-C (tunable). */
-#define PIECE_A "36"
-#define PIECE_B "41"
-#define PIECE_C "55"
-#define FINAL_NUMBER PIECE_A PIECE_B PIECE_C   /* "364155" */
-
-/* Year roles (which moment in the caller's life a year holds). */
-enum {
-    ROLE_KEY_A = 0,   /* 1950s — two girls, a kitchen radio          */
-    ROLE_KEY_B,       /* 1970s-80s — the night she lost her nerve    */
-    ROLE_KEY_C,       /* 1995-99 — the sealed final year (needs pass)*/
-    ROLE_EARLY,       /* before she was born                         */
-    ROLE_HOME,        /* 2000 — the frozen minute                    */
-    ROLE_FUTURE,      /* sealed future                               */
-    ROLE_OTHER,       /* a year she never held the number            */
-    ROLE_BAD          /* out of range                                */
-};
+/* The three puzzle answers; concatenated, they are Ruth's number. */
+#define ANS1 "484"   /* puzzle 1: HUG on the keypad (4-8-4)        */
+#define ANS2 "51"    /* puzzle 2: her age on the frozen night       */
+#define ANS3 "58"    /* puzzle 3: 7,0 shifted down by the two of us */
+#define FINAL_NUMBER ANS1 ANS2 ANS3   /* "4844858" */
+#define FINAL_LEN 7
 
 /* Plugin states (distinct from daemon_state_t). TS_DORMANT must be 0 so a
  * memset-zeroed session starts dormant. */
 enum {
     TS_DORMANT = 0,
-    TS_HUB,        /* with the Operator; dialing a year             */
-    TS_TRAVEL,     /* connecting beat (ringback)                    */
-    TS_FLAVOR,     /* a non-key era; brief scene then back          */
-    TS_KEY,        /* a key era; LISTEN/SPEAK (maybe locked/tangled)*/
-    TS_SCENE,      /* forced story beat after LISTEN, before the piece */
-    TS_REVEAL,     /* a piece was just found                        */
-    TS_READY,      /* all 3 pieces; dialing the final number        */
-    TS_FINAL,      /* the call connects; scripted beats             */
-    TS_WIN         /* time resumes; she is free                     */
+    TS_PUZZLE,     /* solving puzzle op.pz (0..2)              */
+    TS_SOLVED,     /* brief confirm beat after a correct answer */
+    TS_DIAL,       /* all three solved; dial the whole number   */
+    TS_FINAL,      /* the call connects; scripted beats         */
+    TS_WIN         /* time resumes; she is free                 */
+};
+
+typedef struct {
+    const char *answer;     /* expected digit string                       */
+    const char *clue1;      /* VFD line 1 (terse; the audio carries it all)*/
+    const char *clue2;      /* VFD line 2 (terse prompt)                   */
+    const char *clip;       /* the spoken riddle (replayed on #)           */
+    const char *hint[3][2]; /* three escalating hints, each l1 / l2        */
+} puzzle_t;
+
+/* Every VFD string here is <= 20 chars (no scroll); the guardrail test checks. */
+static const puzzle_t PUZ[3] = {
+    { ANS1, "WORD BY THE PHONE", "SPELL IT  *=HINT", "puz1",
+      { { "LOOK AT THE KEYS",  "letters on dial" },
+        { "3 LETTERS",         "not 'sorry' but..." },
+        { "H  U  G",           "= 4 8 4" } } },
+    { ANS2, "HER AGE IN 1999",  "ENTER 2  *=HINT", "puz2",
+      { { "FIND HER BIRTH YR",  "ignore the rest" },
+        { "RUTH 1940",          "sister +11 = 1951" },
+        { "1999 - 1951",        "= 51" } } },
+    { ANS3, "CROSSED: 7 0",     "ENTER 2  *=HINT", "puz3",
+      { { "THE KEY IS 2",       "'the two of us'" },
+        { "SUBTRACT 2 EACH",    "wrap past zero" },
+        { "7->5   0->8",        "= 58" } } }
 };
 
 typedef struct {
     int    state;
-    char   buf[8];        /* year (4) or final number (6) entry      */
+    int    pz;                 /* current puzzle index 0..2          */
+    char   buf[8];             /* answer entry for the current puzzle */
     int    len;
-    int    pieces;        /* bitmask: bit0=A bit1=B bit2=C           */
-    int    pass;          /* a temporal pass (card) was swiped       */
-    int    won;           /* completed; next lift starts fresh       */
-    int    travel_year;
-    int    cur_key;       /* key index while TS_KEY (0/1/2), else -1 */
-    int    locked;        /* current key era sealed, awaiting access */
-    int    tangled;       /* current key era tangled (spoke)         */
-    int    spoke_once;    /* tried SPEAK once; stop advertising it    */
-    int    final_step;
-    time_t timer_at;      /* transient-state timer                   */
-    time_t last_input_at; /* drift timer base in TS_KEY              */
-    time_t hangup_at;     /* for the grace-period resume             */
+    int    hintlvl;            /* 0..3 hint level for current puzzle  */
+    char   assembled[FINAL_LEN + 1]; /* number built up as puzzles solve */
+    char   dialed[FINAL_LEN + 1];    /* entry during the final dial   */
+    int    dlen;
+    int    won;                /* completed; next lift starts fresh   */
+    int    step;              /* final-sequence sub-step             */
+    time_t timer_at;           /* transient-state / entry-idle timer  */
+    time_t last_input_at;
+    time_t hangup_at;          /* for the grace-period resume         */
 } op_state_t;
 
 static op_state_t op;
 
 /* ── Pure helpers (no hardware; unit-tested) ─────────────────────────── */
 
-int parse_year(const char *buf) {
-    int i, val = 0;
-    if (!buf || strlen(buf) != 4) return -1;
-    for (i = 0; i < 4; i++) {
-        if (buf[i] < '0' || buf[i] > '9') return -1;
-        val = val * 10 + (buf[i] - '0');
-    }
-    return val;
-}
-
-static int year_role(int year) {
-    if (year < YEAR_MIN || year > YEAR_MAX) return ROLE_BAD;
-    if (year >= 1950 && year <= 1959) return ROLE_KEY_A;
-    if (year >= 1970 && year <= 1989) return ROLE_KEY_B;
-    if (year >= 1995 && year <= 1999) return ROLE_KEY_C;
-    if (year == 2000) return ROLE_HOME;
-    if (year >= FUTURE_SEALED_YEAR) return ROLE_FUTURE;
-    if (year < 1950) return ROLE_EARLY;
-    return ROLE_OTHER;
-}
-
-/* Stable string tag for the same classification, for unit tests. */
-const char *operator_year_role(int year) {
-    switch (year_role(year)) {
-        case ROLE_KEY_A: return "A";
-        case ROLE_KEY_B: return "B";
-        case ROLE_KEY_C: return "C";
-        case ROLE_EARLY: return "early";
-        case ROLE_HOME:  return "home";
-        case ROLE_FUTURE:return "future";
-        case ROLE_OTHER: return "other";
-        default:         return "bad";
+/* The phone keypad digit for a letter A-Z (the classic 2=ABC..9=WXYZ map),
+ * or -1 for a non-letter. */
+int operator_keypad_digit(char c) {
+    if (c >= 'a' && c <= 'z') c = (char)(c - 'a' + 'A');
+    switch (c) {
+        case 'A': case 'B': case 'C':           return 2;
+        case 'D': case 'E': case 'F':           return 3;
+        case 'G': case 'H': case 'I':           return 4;
+        case 'J': case 'K': case 'L':           return 5;
+        case 'M': case 'N': case 'O':           return 6;
+        case 'P': case 'Q': case 'R': case 'S': return 7;
+        case 'T': case 'U': case 'V':           return 8;
+        case 'W': case 'X': case 'Y': case 'Z': return 9;
+        default:                                return -1;
     }
 }
 
-/* Lowest piece index (0..2) not yet found, or 3 when all three are held. */
-int operator_target_piece(int pieces) {
-    if (!(pieces & 1)) return 0;
-    if (!(pieces & 2)) return 1;
-    if (!(pieces & 4)) return 2;
-    return 3;
+/* Subtract key from a shifted digit, wrapping mod 10 (the puzzle-3 cipher). */
+int operator_shift_down(int digit, int key) {
+    int r = (digit - key) % 10;
+    if (r < 0) r += 10;
+    return r;
 }
 
-/* The canonical year for each piece, and how close a dial must land to "arrive".
- * Piece B (the middle scene) demands the exact year -- the one real inference;
- * A and C accept a small window, so the clue plus warmer/colder feedback is
- * enough to home in. */
-static int op_target_year(int idx) {
-    return (idx == 0) ? 1955 : (idx == 1) ? 1978 : 1998;
-}
-static int op_in_window(int idx, int year) {
-    int ty = op_target_year(idx);
-    if (idx == 1) return year == ty;                 /* exact: the night she faltered */
-    return year >= ty - 2 && year <= ty + 2;
-}
-static int op_have(int idx) { return (op.pieces & (1 << idx)) != 0; }
-
-static int op_count(void) {
-    return ((op.pieces & 1) ? 1 : 0) + ((op.pieces & 2) ? 1 : 0) +
-           ((op.pieces & 4) ? 1 : 0);
-}
-
-/* ── Rendering (every VFD line <= 20 chars: no scroll, stable to assert) ─ */
+/* ── Rendering ───────────────────────────────────────────────────────── */
 
 static void op_render_dormant(void) {
     sdk_display("THE OPERATOR", "Lift: the last call");
 }
 
-static void op_render_hub(void) {
+static void op_render_puzzle(void) {
+    const puzzle_t *p = &PUZ[op.pz];
     char l2[24];
-    int t = operator_target_piece(op.pieces);
-    const char *l1 = (t == 0) ? "TWO GIRLS, A RADIO" :
-                     (t == 1) ? "NIGHT SHE FALTERED" : "HER LAST ATTEMPT";
-    if (op.len > 0) {
-        char l2b[24];
-        snprintf(l2b, sizeof(l2b), "YEAR: %s_", op.buf);
-        sdk_display("DIAL A YEAR", l2b);
-        return;
+    if (op.len > 0) {                       /* mid-entry: show what's typed */
+        snprintf(l2, sizeof(l2), "> %s_", op.buf);
+        sdk_display(p->clue1, l2);
+    } else if (op.hintlvl > 0) {            /* a hint was requested         */
+        sdk_display(p->hint[op.hintlvl - 1][0], p->hint[op.hintlvl - 1][1]);
+    } else {                                /* the clue prompt              */
+        sdk_display(p->clue1, p->clue2);
     }
-    snprintf(l2, sizeof(l2), "DIAL A YEAR  %d/3", op_count());
-    sdk_display(l1, l2);
 }
 
-static void op_render_ready(void) {
+static void op_render_dial(void) {
     char l2[24];
-    if (op.len > 0) {
-        snprintf(l2, sizeof(l2), "%s_", op.buf);
-        sdk_display("DIALING...", l2);
-        return;
+    if (op.dlen > 0) {
+        snprintf(l2, sizeof(l2), "> %s_", op.dialed);
+    } else {
+        /* show the assembled number grouped: 484 51 58 */
+        snprintf(l2, sizeof(l2), "%.3s %.2s %.2s",
+                 op.assembled, op.assembled + 3, op.assembled + 5);
     }
-    sdk_display("DIAL HER NUMBER", "6 DIGITS");
+    sdk_display("DIAL HER NUMBER", l2);
 }
 
-/* ── State transitions (each stops any continuous tone first) ────────── */
+/* ── State transitions ───────────────────────────────────────────────── */
 
-static const char *op_next_clip(void) {
-    switch (operator_target_piece(op.pieces)) {
-        case 0:  return "op_next_a";
-        case 1:  return "op_next_b";
-        case 2:  return "op_next_c";
-        default: return "op_ready";
-    }
-}
-
-static void op_enter_ready(const char *clip) {
+static void op_enter_puzzle(int i, const char *clip) {
     sdk_stop_audio();
-    op.state = TS_READY;
+    op.state = TS_PUZZLE;
+    op.pz = i;
     op.buf[0] = '\0';
     op.len = 0;
-    op_render_ready();
+    op.hintlvl = 0;
+    op.last_input_at = sdk_now();
+    op_render_puzzle();
+    sdk_play_clip(clip ? clip : PUZ[i].clip);
+}
+
+static void op_enter_dial(const char *clip) {
+    sdk_stop_audio();
+    op.state = TS_DIAL;
+    op.dialed[0] = '\0';
+    op.dlen = 0;
+    op.last_input_at = sdk_now();
+    op_render_dial();
     sdk_play_clip(clip ? clip : "op_ready");
 }
 
-/* Enter the hub. clip==NULL plays the hint for the current target. */
-static void op_enter_hub(const char *clip) {
-    if (operator_target_piece(op.pieces) == 3) {
-        op_enter_ready(clip);
-        return;
-    }
-    sdk_stop_audio();
-    op.state = TS_HUB;
-    op.buf[0] = '\0';
-    op.len = 0;
-    op_render_hub();
-    sdk_play_clip(clip ? clip : op_next_clip());
-}
-
-static void op_enter_dormant(void) {
-    sdk_stop_audio();
-    op.state = TS_DORMANT;
-    op.hangup_at = sdk_now();
-    op.buf[0] = '\0';
-    op.len = 0;
-    op_render_dormant();
-}
-
-static void op_reset_session(void) {
-    op.pieces = 0;
-    op.pass = 0;
-    op.won = 0;
-    op.tangled = 0;
-    op.spoke_once = 0;
-    op.locked = 0;
-    op.cur_key = -1;
-    op.buf[0] = '\0';
-    op.len = 0;
-}
-
-static void op_enter_travel(int year) {
+static void op_enter_solved(void) {
     char l2[24];
     sdk_stop_audio();
-    sdk_ringback();
-    op.state = TS_TRAVEL;
-    op.travel_year = year;
+    op.state = TS_SOLVED;
     op.timer_at = sdk_now();
-    snprintf(l2, sizeof(l2), "YEAR %d", year);
-    sdk_display("CONNECTING...", l2);
+    snprintf(l2, sizeof(l2), "HER #: %s", op.assembled);
+    sdk_display("GOT IT", l2);
+    sdk_logf(TS_CAT, "Puzzle %d solved; number so far %s", op.pz + 1, op.assembled);
+    sdk_play_clip("solved");
 }
 
-static void op_enter_flavor(const char *clip, const char *l1, const char *l2) {
+static void op_enter_final(void) {
     sdk_stop_audio();
-    op.state = TS_FLAVOR;
+    op.state = TS_FINAL;
+    op.step = 0;
     op.timer_at = sdk_now();
-    sdk_display(l1, l2);
-    sdk_play_clip(clip);
-}
-
-/* A wrong-but-valid year nudges the caller toward the current target's year:
- * directional far out, "warmer" once within WARM_BAND. This turns finding a year
- * into a homing search instead of a decade lookup. */
-static void op_nudge(int dialed, int target_year) {
-    int diff = dialed - target_year;
-    int ad = (diff < 0) ? -diff : diff;
-    if (ad <= WARM_BAND) {
-        op_enter_flavor("flv_warm", "WARMER",
-                        (diff < 0) ? "A LITTLE LATER" : "A LITTLE EARLIER");
-    } else if (diff < 0) {
-        op_enter_flavor("flv_early", "TOO EARLY", "BACK TO OPERATOR");
-    } else {
-        op_enter_flavor("flv_late", "TOO LATE", "BACK TO OPERATOR");
-    }
-}
-
-static void op_render_key(void) {
-    const char *l1 = (op.cur_key == 0) ? "1955 TWO SISTERS" :
-                     (op.cur_key == 1) ? "1978 SHE PAUSES" : "1998 A CARD";
-    if (op.locked) {
-        sdk_display("1998: SEALED", "SWIPE PASS / COIN");
-    } else if (op.tangled) {
-        sdk_display("LINE TANGLED", "press 1=LISTEN");
-    } else {
-        sdk_display(l1, op.spoke_once ? "press 1=LISTEN" : "1=LISTEN 2=SPEAK");
-    }
-}
-
-static void op_enter_key(int idx, int locked) {
-    sdk_stop_audio();
-    op.state = TS_KEY;
-    op.cur_key = idx;
-    op.locked = locked;
-    op.tangled = 0;
-    op.last_input_at = sdk_now();
-    op_render_key();
-    if (locked) {
-        sdk_play_clip("era3_sealed");
-    } else {
-        sdk_play_clip(idx == 0 ? "era1_arrive" :
-                      idx == 1 ? "era2_arrive" : "era3_arrive");
-    }
-}
-
-/* A forced story beat after the caller chooses LISTEN, before the piece is
- * revealed: it deepens each era and -- being unskippable -- puts a firm floor
- * under the session length (a hurried player can't blow past the story). */
-static void op_enter_scene(void) {
-    const char *l1 = (op.cur_key == 0) ? "A SUMMER KITCHEN" :
-                     (op.cur_key == 1) ? "A HALLWAY PHONE" : "DECEMBER 1998";
-    const char *l2 = (op.cur_key == 0) ? "call me, she says" :
-                     (op.cur_key == 1) ? "the nerve fails" : "Ruth's last card";
-    sdk_stop_audio();
-    op.state = TS_SCENE;
-    op.timer_at = sdk_now();
-    sdk_display(l1, l2);
-    sdk_play_clip(op.cur_key == 0 ? "era1_scene" :
-                  op.cur_key == 1 ? "era2_scene" : "era3_scene");
-}
-
-static void op_enter_reveal(void) {
-    char l1[24], l2[24];
-    const char *piece = (op.cur_key == 0) ? PIECE_A :
-                        (op.cur_key == 1) ? PIECE_B : PIECE_C;
-    char letter = (char)('A' + op.cur_key);
-    op.pieces |= (1 << op.cur_key);
-    op.state = TS_REVEAL;
-    op.timer_at = sdk_now();
-    snprintf(l1, sizeof(l1), "PIECE %c: %s", letter, piece);
-    snprintf(l2, sizeof(l2), "PIECES %d/3", op_count());
-    sdk_display(l1, l2);
-    sdk_logf(TS_CAT, "Found piece %c (%s); %d/3", letter, piece, op_count());
-    sdk_play_clip(op.cur_key == 0 ? "era1_listen" :
-                  op.cur_key == 1 ? "era2_listen" : "era3_listen");
+    sdk_display("...RINGING...", "the last call");
+    sdk_play_clip("final_connect");
 }
 
 static void op_enter_win(void) {
     sdk_stop_audio();
     op.state = TS_WIN;
     op.won = 1;
-    op.final_step = 0;
+    op.step = 0;
     op.timer_at = sdk_now();
     sdk_display("12:00  2000", "SHE IS FREE");
     sdk_log(TS_CAT, "The last call connected; the Operator is free");
     sdk_play_clip("win_free");
 }
 
-static void op_enter_final(void) {
+static void op_enter_dormant(void) {
     sdk_stop_audio();
-    op.state = TS_FINAL;
-    op.final_step = 0;
-    op.timer_at = sdk_now();
-    sdk_display("...RINGING...", "the last call");
-    sdk_play_clip("final_connect");
+    op.state = TS_DORMANT;
+    op.hangup_at = sdk_now();
+    op_render_dormant();
 }
 
-/* Resolve a completed TRAVEL beat to the right era. */
-static void op_resolve_travel(void) {
-    int year = op.travel_year;
-    int t = operator_target_piece(op.pieces);   /* the piece the hub suggests */
-    int hit, i;
-
-    /* Poetic special years, answered regardless of the current target. */
-    if (year == 2000) {
-        op_enter_flavor("flv_2000", "FROZEN MINUTE", "BACK TO OPERATOR");
-        return;
-    }
-    if (year >= FUTURE_SEALED_YEAR) {
-        op_enter_flavor("flv_future", "FUTURE SEALED", "BACK TO OPERATOR");
-        return;
-    }
-    /* Does the dialed year land on one of her three moments? You may visit them
-     * in any order; the hub only suggests the next one. */
-    hit = -1;
-    for (i = 0; i < 3; i++) { if (op_in_window(i, year)) { hit = i; break; } }
-    if (hit >= 0) {
-        if (op_have(hit)) {
-            op_enter_flavor("flv_heard", "ALREADY HEARD", "BACK TO OPERATOR");
-        } else if (hit == 2 && !op.pass) {
-            op_enter_key(2, 1);            /* the sealed final year */
-        } else {
-            op_enter_key(hit, 0);
-        }
-        return;
-    }
-    /* A year she never held the number: nudge toward the current target. */
-    if (t <= 2) op_nudge(year, op_target_year(t));
-    else op_enter_hub(NULL);
+static void op_reset_session(void) {
+    op.pz = 0;
+    op.buf[0] = '\0';
+    op.len = 0;
+    op.hintlvl = 0;
+    op.assembled[0] = '\0';
+    op.dialed[0] = '\0';
+    op.dlen = 0;
+    op.won = 0;
+    op.step = 0;
 }
 
-/* ── Year / number entry ─────────────────────────────────────────────── */
+/* ── Answer checking ─────────────────────────────────────────────────── */
 
-static void op_eval_year(void) {
-    int year = parse_year(op.buf);
-    if (year_role(year) == ROLE_BAD) {
-        op.buf[0] = '\0';
-        op.len = 0;
-        sdk_display("NO SUCH YEAR", "try 1900-2100");
-        return;
-    }
-    op_enter_travel(year);
-}
-
-static void op_eval_number(void) {
-    if (strcmp(op.buf, FINAL_NUMBER) == 0) {
-        op_enter_final();
+static void op_check_answer(void) {
+    if (strcmp(op.buf, PUZ[op.pz].answer) == 0) {
+        /* lock this chunk onto the number being assembled */
+        size_t a = strlen(op.assembled);
+        snprintf(op.assembled + a, sizeof(op.assembled) - a, "%s", PUZ[op.pz].answer);
+        op_enter_solved();
     } else {
         op.buf[0] = '\0';
         op.len = 0;
+        sdk_display("NOT IT", "* hint  # clue");
+        sdk_play_clip("wrong");
+    }
+}
+
+static void op_check_number(void) {
+    if (strcmp(op.dialed, FINAL_NUMBER) == 0) {
+        op_enter_final();
+    } else {
+        op.dialed[0] = '\0';
+        op.dlen = 0;
         sdk_display("WRONG NUMBER", "TRY AGAIN");
     }
 }
 
 /* ── Plugin callbacks ────────────────────────────────────────────────── */
 
-static int op_handle_coin(int coin_value, const char *coin_code) {
-    (void)coin_value;
-    (void)coin_code;
-    sdk_coin_chime();
-    if (op.state == TS_HUB) {
-        /* A coin buys a sharper hint -- it names the decade (the old level of
-         * help), an escape hatch for a public phone. Piece B still needs the
-         * exact year nailed down within that decade. */
-        int t = operator_target_piece(op.pieces);
-        const char *l1 = (t == 0) ? "TRY THE 1950s" :
-                         (t == 1) ? "TRY THE 1970s" : "TRY THE 1990s";
-        char l2[24];
-        snprintf(l2, sizeof(l2), "DIAL A YEAR  %d/3", op_count());
-        sdk_display(l1, l2);
-        sdk_play_clip(t == 0 ? "op_hint_a" : t == 1 ? "op_hint_b" : "op_hint_c");
-    } else if (op.state == TS_KEY) {
-        if (op.locked) {
-            op_enter_key(op.cur_key, 0);   /* feed the coinbox to force it open */
-        } else {
-            op.last_input_at = sdk_now();   /* a coin buys more line time */
-            sdk_play_clip("coin_hold");
-        }
-    } else if (op.state == TS_READY) {
-        /* A coin reveals the assembled number for a stuck caller. */
-        sdk_display("HER NUMBER", PIECE_A " " PIECE_B " " PIECE_C);
-        sdk_play_clip("op_ready");
-    }
-    return 0;
-}
-
 static int op_handle_keypad(char key) {
     /* This app keeps its own per-field entry; keep the daemon's shared dial
-     * buffer (Classic Phone's) clean so /api/state isn't a confusing pile of
-     * every digit ever pressed. */
+     * buffer clean so /api/state isn't a pile of every digit pressed. */
     sdk_clear_keypad();
+
     switch (op.state) {
-    case TS_HUB:
-        op.last_input_at = sdk_now();   /* for the stale-entry auto-clear */
-        if (key >= '0' && key <= '9') {
-            if (op.len < 4) {
-                op.buf[op.len++] = key;
-                op.buf[op.len] = '\0';
-                sdk_beep(key);
-                op_render_hub();
-                if (op.len == 4) op_eval_year();
-            }
-        } else if (key == '*') {
-            if (op.len > 0) op.buf[--op.len] = '\0';
-            op_render_hub();
-        } else if (key == '#') {
-            op.buf[0] = '\0'; op.len = 0;
-            op_render_hub();
-            sdk_play_clip(op_next_clip());
-        }
-        break;
-
-    case TS_READY:
-        op.last_input_at = sdk_now();   /* for the stale-entry auto-clear */
-        if (key >= '0' && key <= '9') {
-            if (op.len < 6) {
-                op.buf[op.len++] = key;
-                op.buf[op.len] = '\0';
-                sdk_beep(key);
-                op_render_ready();
-                if (op.len == 6) op_eval_number();
-            }
-        } else if (key == '*') {
-            if (op.len > 0) op.buf[--op.len] = '\0';
-            op_render_ready();
-        } else if (key == '#') {
-            op.buf[0] = '\0'; op.len = 0;
-            op_render_ready();
-        }
-        break;
-
-    case TS_KEY:
+    case TS_PUZZLE:
         op.last_input_at = sdk_now();
-        if (op.locked) {
-            if (key == '#') op_enter_hub(NULL);
-            else sdk_beep(key);
-        } else if (key == '1') {
-            op_enter_scene();
-        } else if (key == '2') {
-            op.tangled = 1;
-            op.spoke_once = 1;   /* learned the lesson; stop advertising SPEAK */
-            op_render_key();
-            sdk_play_clip("px_tangle");
+        if (key == '*') {
+            if (op.hintlvl < 3) op.hintlvl++;
+            op.buf[0] = '\0';
+            op.len = 0;
+            op_render_puzzle();
         } else if (key == '#') {
-            op_enter_hub(NULL);
-        } else {
-            sdk_beep(key);
+            op.buf[0] = '\0';
+            op.len = 0;
+            op_render_puzzle();
+            sdk_play_clip(PUZ[op.pz].clip);
+        } else if (key >= '0' && key <= '9') {
+            int need = (int)strlen(PUZ[op.pz].answer);
+            if (op.len < need) {
+                op.buf[op.len++] = key;
+                op.buf[op.len] = '\0';
+                sdk_beep(key);
+                op_render_puzzle();
+                if (op.len == need) op_check_answer();
+            }
         }
         break;
 
-    case TS_FLAVOR:
-        if (key == '#') op_enter_hub(NULL);
-        break;
-
-    case TS_REVEAL:
-        if (key == '#') op_enter_hub(NULL);
+    case TS_DIAL:
+        op.last_input_at = sdk_now();
+        if (key == '#') {
+            op.dialed[0] = '\0';
+            op.dlen = 0;
+            op_render_dial();
+        } else if (key >= '0' && key <= '9') {
+            if (op.dlen < FINAL_LEN) {
+                op.dialed[op.dlen++] = key;
+                op.dialed[op.dlen] = '\0';
+                sdk_beep(key);
+                op_render_dial();
+                if (op.dlen == FINAL_LEN) op_check_number();
+            }
+        }
         break;
 
     default:
@@ -542,9 +315,11 @@ static int op_handle_hook(int hook_up, int hook_down) {
     if (hook_up) {
         if (op.won || sdk_elapsed(op.hangup_at) > GRACE_SECS) {
             op_reset_session();
-            op_enter_hub("op_intro");
+            op_enter_puzzle(0, "op_intro");      /* fresh: mission + riddle 1 */
+        } else if (op.state == TS_DIAL || op.pz >= 3) {
+            op_enter_dial("op_ready");           /* resume at the final dial  */
         } else {
-            op_enter_hub("op_resume");   /* keeps pieces/pass within grace */
+            op_enter_puzzle(op.pz, NULL);        /* resume the current puzzle */
         }
     } else if (hook_down) {
         op_enter_dormant();
@@ -552,23 +327,10 @@ static int op_handle_hook(int hook_up, int hook_down) {
     return 0;
 }
 
-static int op_handle_card(const char *card_number) {
-    (void)card_number;
-    op.pass = 1;
-    if (op.state == TS_KEY && op.locked) {
-        op_enter_key(op.cur_key, 0);     /* unlock and arrive */
-    } else {
-        sdk_display("TEMPORAL PASS", "PASS ACCEPTED");
-        sdk_log(TS_CAT, "Temporal pass accepted");
-    }
-    return 0;
-}
-
 static void op_handle_activation(void) {
     memset(&op, 0, sizeof(op));
-    op.cur_key = -1;
     if (sdk_receiver_is_up()) {
-        op_enter_hub("op_intro");
+        op_enter_puzzle(0, "op_intro");
     } else {
         op.state = TS_DORMANT;
         op_render_dormant();
@@ -577,53 +339,40 @@ static void op_handle_activation(void) {
 
 static void op_handle_tick(void) {
     switch (op.state) {
-    case TS_HUB:
-        /* A half-typed year left by a hesitant or fumbling caller clears itself
-         * so stray digits can't derail the next dial. */
+    case TS_PUZZLE:
+        /* A half-typed answer left idle clears itself. */
         if (op.len > 0 && sdk_elapsed(op.last_input_at) >= ENTRY_TIMEOUT_SECS) {
-            op.buf[0] = '\0'; op.len = 0;
-            op_render_hub();
+            op.buf[0] = '\0';
+            op.len = 0;
+            op_render_puzzle();
         }
         break;
-    case TS_READY:
-        if (op.len > 0 && sdk_elapsed(op.last_input_at) >= ENTRY_TIMEOUT_SECS) {
-            op.buf[0] = '\0'; op.len = 0;
-            op_render_ready();
+    case TS_DIAL:
+        if (op.dlen > 0 && sdk_elapsed(op.last_input_at) >= ENTRY_TIMEOUT_SECS) {
+            op.dialed[0] = '\0';
+            op.dlen = 0;
+            op_render_dial();
         }
         break;
-    case TS_TRAVEL:
-        if (sdk_elapsed(op.timer_at) >= TRAVEL_SECS) op_resolve_travel();
-        break;
-    case TS_FLAVOR:
-        if (sdk_elapsed(op.timer_at) >= FLAVOR_SECS) op_enter_hub(NULL);
-        break;
-    case TS_SCENE:
-        if (sdk_elapsed(op.timer_at) >= SCENE_SECS) op_enter_reveal();
-        break;
-    case TS_REVEAL:
-        if (sdk_elapsed(op.timer_at) >= REVEAL_SECS) op_enter_hub(NULL);
-        break;
-    case TS_KEY:
-        if (sdk_elapsed(op.last_input_at) >= DRIFT_SECS) {
-            op_enter_hub("drift_back");
+    case TS_SOLVED:
+        if (sdk_elapsed(op.timer_at) >= SOLVED_SECS) {
+            if (op.pz < 2) op_enter_puzzle(op.pz + 1, NULL);
+            else { op.pz = 3; op_enter_dial(NULL); }
         }
         break;
     case TS_FINAL:
-        if (op.final_step == 0 && sdk_elapsed(op.timer_at) >= FINAL_CONNECT_SECS) {
-            op.final_step = 1;
+        if (op.step == 0 && sdk_elapsed(op.timer_at) >= FINAL_CONNECT_SECS) {
+            op.step = 1;
             op.timer_at = sdk_now();
             sdk_display("11:59 ... 12:00", "the clock turns");
             sdk_play_clip("final_clock");
-        } else if (op.final_step == 1 &&
-                   sdk_elapsed(op.timer_at) >= FINAL_CLOCK_SECS) {
+        } else if (op.step == 1 && sdk_elapsed(op.timer_at) >= FINAL_CLOCK_SECS) {
             op_enter_win();
         }
         break;
     case TS_WIN:
-        /* Hold the win a beat, then settle to a quiet coda inviting hang-up so
-         * the screen doesn't freeze on SHE IS FREE forever. */
-        if (op.final_step == 0 && sdk_elapsed(op.timer_at) >= WIN_HOLD_SECS) {
-            op.final_step = 1;
+        if (op.step == 0 && sdk_elapsed(op.timer_at) >= WIN_HOLD_SECS) {
+            op.step = 1;
             sdk_display("THE LINE IS QUIET", "hang up: she's home");
         }
         break;
@@ -642,25 +391,22 @@ static int op_collect(const char **out, int max, int n, const char *s) {
 int time_operator_display_strings(const char **out, int max) {
     static const char *const ui[] = {
         "THE OPERATOR", "Lift: the last call",
-        "TWO GIRLS, A RADIO", "NIGHT SHE FALTERED", "HER LAST ATTEMPT",
-        "TRY THE 1950s", "TRY THE 1970s", "TRY THE 1990s",
-        "DIAL A YEAR", "DIAL HER NUMBER", "6 DIGITS", "HER NUMBER",
-        PIECE_A " " PIECE_B " " PIECE_C, "DIALING...", "CONNECTING...",
-        "BACK TO OPERATOR", "TOO EARLY", "TOO LATE", "WARMER",
-        "A LITTLE LATER", "A LITTLE EARLIER", "ALREADY HEARD",
-        "FROZEN MINUTE", "FUTURE SEALED",
-        "A SUMMER KITCHEN", "call me, she says", "A HALLWAY PHONE",
-        "the nerve fails", "DECEMBER 1998", "Ruth's last card",
-        "1955 TWO SISTERS", "1978 SHE PAUSES", "1998 A CARD", "1998: SEALED",
-        "SWIPE PASS / COIN", "1=LISTEN 2=SPEAK", "LINE TANGLED", "press 1=LISTEN",
-        "TEMPORAL PASS", "PASS ACCEPTED", "NO SUCH YEAR", "try 1900-2100",
-        "WRONG NUMBER", "TRY AGAIN", "...RINGING...", "the last call",
-        "11:59 ... 12:00", "the clock turns", "12:00  2000", "SHE IS FREE",
-        "THE LINE IS QUIET", "hang up: she's home"
+        "GOT IT", "HER #: 4845158", "NOT IT", "* hint  # clue",
+        "DIAL HER NUMBER", "484 51 58", "> 4845158_", "WRONG NUMBER", "TRY AGAIN",
+        "...RINGING...", "the last call", "11:59 ... 12:00", "the clock turns",
+        "12:00  2000", "SHE IS FREE", "THE LINE IS QUIET", "hang up: she's home"
     };
-    int n = 0, i;
+    int n = 0, i, h;
     for (i = 0; i < (int)(sizeof(ui) / sizeof(ui[0])); i++) {
         n = op_collect(out, max, n, ui[i]);
+    }
+    for (i = 0; i < 3; i++) {
+        n = op_collect(out, max, n, PUZ[i].clue1);
+        n = op_collect(out, max, n, PUZ[i].clue2);
+        for (h = 0; h < 3; h++) {
+            n = op_collect(out, max, n, PUZ[i].hint[h][0]);
+            n = op_collect(out, max, n, PUZ[i].hint[h][1]);
+        }
     }
     return n;
 }
@@ -668,15 +414,14 @@ int time_operator_display_strings(const char **out, int max) {
 void register_time_operator_plugin(void) {
     memset(&op, 0, sizeof(op));
     op.state = TS_DORMANT;
-    op.cur_key = -1;
 
     plugins_register("The Operator",
-                     "The Last Call - help finish a call frozen in time",
-                     op_handle_coin,
+                     "The Last Call - work out her number and finish the call",
+                     NULL,                 /* coins do not gate anything here   */
                      op_handle_keypad,
                      op_handle_hook,
-                     NULL,
-                     op_handle_card,
+                     NULL,                 /* no real SIP call                  */
+                     NULL,                 /* no card needed                    */
                      op_handle_activation,
                      op_handle_tick);
 }

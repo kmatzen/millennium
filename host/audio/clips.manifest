@@ -14,47 +14,21 @@
 #   - everything after the first whitespace run is the spoken text
 #   - blank lines and lines starting with '#' are ignored
 #
-# Spell out numbers and years so they are read aloud the way you want.
+# Spell out numbers and years so they are read aloud the way you want. The audio
+# carries the full riddle; the VFD only shows a terse prompt.
 
-# -- Operator hub: mission, guidance, hints --
-op_intro   Operator. I have held one last call since the clock stopped, eleven fifty-nine on New Year's Eve, nineteen ninety-nine. A woman calling her sister Ruth to make peace, frozen mid-ring. Help me finish it, and time moves again. Her number is lost across the years she held it. Start where she first dialed it: two girls and a kitchen radio. Listen for when. Dial a year, and I will tell you if you are too early, too late, or warm. A coin buys a sharper hint; press pound to hear me again.
-op_resume  Still on the line. Good. We were finding her number. Keep going.
-op_next_a  Start where she first dialed it. Two girls and a kitchen radio.
-op_next_b  Now the night she lost her nerve, the receiver warm in her hand. Find the exact year.
-op_next_c  The last piece is sealed away, her final attempt. You will need a pass, or force the coinbox.
-op_ready   That is all three pieces. Put them in the order you found them, and dial her number. Finish her call.
-op_hint_a  A sharper hint: the nineteen fifties.
-op_hint_b  A sharper hint: the nineteen seventies. But you must dial the exact year.
-op_hint_c  A sharper hint: the nineteen nineties. And bring a pass.
+# -- Mission + the three riddles --
+op_intro  Operator. One call has rung on this line since the clock stopped, eleven fifty-nine, New Year's Eve, nineteen ninety-nine. A woman calling her sister Ruth, to make peace, frozen mid-ring. I can still connect it, but her number is gone, scattered in the things she told me while she waited. Seven digits. Work them out and dial them, and time moves again. The keys still carry their letters. Press star if you need a hand; press pound to hear a riddle again. The first three: by the phone box where the girls grew up, one word was scratched in the paint, what they did instead of ever saying they were sorry. Spell it.
+puz1  The first three. By the old phone box, one word scratched in the paint, what the two of them did instead of ever saying sorry. Spell it on the keys.
+puz2  The next two: how old she was the night the call froze. Ruth was nineteen when their mother passed, in fifty-nine. Her little sister was born eleven years after Ruth. And the call froze on New Year's Eve, ninety-nine. How old was she then?
+puz3  The last two, she kept secret, shifted, she said, by the two of them, so no one could read them over her shoulder. The crossed line shows them as seven, zero. Bring them back down.
 
-# -- Key eras: arrival scenes and the number-pieces --
-era1_arrive  Connecting. Nineteen fifty-five. A kitchen radio, two sisters, a number inked on a small palm. Listen, do not speak.
-era1_listen  The little one reads it out, proud: three, six. The first piece, thirty-six. Hold on to it.
-era2_arrive  Connecting. Nineteen seventy-eight. She is grown now, the receiver warm in her hand. She dials four, one, and sets it down. Listen.
-era2_listen  Four, one. The middle of it, forty-one. She never finished, but you can.
-era3_sealed  This line is sealed, a trunk line. Swipe a pass, or feed the coinbox to force it open.
-era3_arrive  Connecting. December, nineteen ninety-eight. A Christmas card, Ruth's new number folded inside. The last of it. Listen.
-era3_listen  Five, five. That is the end of it. The whole number, at last.
+# -- Feedback --
+solved  That's one piece of her. Keep going.
+wrong   No. That is not it. Listen again, or press star for a hand.
+op_ready  That is all of it. Her whole number, after all these years. Dial it now, and finish her call.
 
-# -- Per-era story beats (a forced moment between LISTEN and the piece) --
-era1_scene   The song ends, and the older girl leans close. Call me, she says, and gives the little one the number to keep. She writes it on her palm in blue ink, so she will never forget.
-era2_scene   She stands in the hallway a long while, the receiver humming against her ear. Pride, or fear, it is hard to say. In the end she sets it down, and the number stays unfinished, sitting in her chest like a stone.
-era3_scene   She copies Ruth's new number onto the back of her hand, meaning to call once the holidays are over. The holidays become the new year. For her, the new year never quite arrives.
-
-# -- Flavor eras + the homing nudges (too early / too late / warm) --
-flv_early   Too early. Come back, and I will point you nearer.
-flv_late    Too late. That is past her moment. Come back, and I will point you nearer.
-flv_warm    Warm. You are close now, just a little off. Try once more.
-flv_2000    The year two thousand, the frozen minute. Only silence here, and me, waiting.
-flv_future  The future is sealed. There is nothing there for you yet.
-flv_heard   You have already heard everything this line can tell you.
-
-# -- Hazards --
-px_tangle   You spoke to her, and the past hears you. The line tangles. Do not speak. Just listen.
-drift_back  The connection is fading. I am pulling you back. Drop a coin and I will hold the line longer.
-coin_hold   Thank you. I will hold the line a little longer.
-
-# -- The last call and the ending --
+# -- The last call and the ending (unchanged; reused as-is) --
 final_connect  It is ringing. After all this time. A click. A held breath. Hello? Ruth? It is me. I made it to the new year.
 final_clock    Eleven fifty-nine, and, twelve. The year two thousand. The clock is moving again.
 win_free       I can hear it ticking. Forty years I held that one minute. Thank you, caller. Now hang up, and go live your years.

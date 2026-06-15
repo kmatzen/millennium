@@ -1,50 +1,43 @@
-# The Operator: the full arc -- collect all three pieces, dial the number, and
-# the call connects, turning the clock over to 2000.
+# The Operator: solve all three puzzles, assemble her number, dial it, and the
+# call connects -- turning the clock over to 2000.
 activate_plugin The Operator
 hook_up
 
-# Piece A (1950s)
-keys 1955
+# Puzzle 1 -- spell HUG on the keypad: 4-8-4
+assert_display WORD BY THE PHONE
+keys 484
+assert_display GOT IT
+assert_display HER #: 484
+assert_clip solved.wav
 wait 3
-key 1
-wait 20
 
-# Piece B (1970s)
-keys 1978
+# Puzzle 2 -- her age in 1999 from the narrated facts: 51
+assert_display HER AGE IN 1999
+assert_clip puz2.wav
+keys 51
+assert_display HER #: 48451
 wait 3
-key 1
-wait 20
 
-# Piece C (1998, sealed -> swipe a pass)
-keys 1998
+# Puzzle 3 -- decode the crossed line 7 0 by subtracting 2: 58
+assert_display CROSSED: 7 0
+assert_clip puz3.wav
+keys 58
+assert_display HER #: 4845158
 wait 3
-assert_display SEALED
-card 1234567890123456
-key 1
-wait 20
 
-# All three pieces -> ready to place the call (the number is NOT shown; you must
-# assemble the three pieces you collected from memory)
+# All three solved -> dial the whole number
 assert_display DIAL HER NUMBER
-assert_display 6 DIGITS
+assert_display 484 51 58
 assert_clip op_ready.wav
-
-# A coin reveals the assembled number for a stuck caller
-coin 25
-assert_display 36 41 55
-
-# Dial Ruth's number -> the call connects
-keys 364155
+keys 4845158
 assert_display RINGING
 assert_clip final_connect.wav
 
-# The clock turns over, and she is free
+# The clock turns over, and she is free, then a quiet coda
 wait 8
 assert_display the clock turns
 wait 6
 assert_display SHE IS FREE
 assert_clip win_free.wav
-
-# The win settles to a quiet coda inviting hang-up (no longer frozen)
 wait 8
 assert_display THE LINE IS QUIET

@@ -1,15 +1,16 @@
 # The Operator: "The Last Call" — physical playtest checklist
 
 A hands-on pass on the real phone. The flow is verified in software (unit +
-scenario tests, and `make operator-smoke`); this covers what needs **real
-hardware and your ears**: the hook switch, the coin validator, the magstripe
-reader, and audio on the earpiece. Full script/tree: `OPERATOR_STORY.md`.
+scenario tests, `make test`); this covers what needs **real hardware and your
+ears**: the hook switch, the keypad (including its printed letters), and audio on
+the earpiece. Full design: `OPERATOR_STORY.md`.
 
-## The goal (what the caller is doing)
-Help the Operator finish a phone call frozen at 11:59 PM, 1999. Recover the
-**three pieces of Ruth's number** from three key years, then **dial the whole
-number** — the call connects and the clock turns to 2000. The Operator's voice
-states the goal and the next step; the VFD shows `PIECES n/3` and the current hint.
+## The goal
+Help the Operator finish a call frozen at 11:59 PM, 1999. **Work out Ruth's
+seven-digit number** by solving three puzzles, then **dial it** — the call
+connects and the clock turns to 2000. The Operator's voice carries each riddle;
+the VFD shows a terse prompt and what you've typed. Press **`*`** for a hint,
+**`#`** to hear the riddle again. Coins and cards are not used.
 
 ## Before you start
 1. Activate it (dashboard, or):
@@ -17,57 +18,48 @@ states the goal and the next step; the VFD shows `PIECES n/3` and the current hi
    curl -s -X POST -H 'Content-Type: application/json' \
      -d '{"action":"activate_plugin","plugin":"The Operator"}' http://<pi>/api/control
    ```
-2. Software pre-flight: `make operator-smoke OP_HOST=<pi>` (add `RUN_DRIFT=1` for the slow leg).
-3. Number/years (current tuning): pieces **36 / 41 / 55** → dial **364155** to win.
-   Target years: **1955** (A, ±2), **1978** (B, **exact**), **1998** (C ±2, sealed).
-   The hub no longer names the decade — clues are cryptic and a wrong year answers
-   `TOO EARLY`/`TOO LATE`/`WARMER`. The finale **hides** the number (`6 DIGITS`);
-   a coin at `READY` reveals it. Re-activating resets the session.
+2. The answers (for checking): puzzle 1 = **484** (HUG), puzzle 2 = **51**,
+   puzzle 3 = **58** → her number is **4845158**. Re-activating resets the session.
 
 Clips live in `/usr/local/share/millennium/audio/`; a missing one is a silent no-op.
 
 ## Checklist  (V = VFD, A = audio, H = hardware path)
 
-- [ ] **Greeting / hook switch.** Lift the handset.
-      V: `TWO GIRLS, A RADIO` / `DIAL A YEAR  0/3`  ·  A: `op_intro` (states the mission)
-      ·  H: lifting really transitions to IDLE_UP (no API nudge).
-- [ ] **Homing feedback.** Dial `1 9 5 0`. V: `WARMER` / `A LITTLE LATER`. Dial `1 9 5 8`:
-      `WARMER` / `A LITTLE EARLIER`. Dial `1 9 2 5`: `TOO EARLY`. (Deduce, then land it.)
-- [ ] **Piece A (+ forced story beat).** Dial `1 9 5 5`. V: connecting → `1955 TWO SISTERS` /
-      `1=LISTEN 2=SPEAK`. Press `1`. V: a forced ~14 s scene (`A SUMMER KITCHEN` / `call me, she says`,
-      A: `era1_scene`) that you **cannot skip**, then V: `PIECE A: 36` / `PIECES 1/3` · A: `era1_listen`.
-      (This beat plays in every era; it's what puts a floor under the session length.)
-- [ ] **Listen, don't speak (+ retire).** In a key era press `2`. V: `LINE TANGLED` · A: `px_tangle`.
-      Press `1` to recover the piece. Thereafter the prompt reads `press 1=LISTEN` (SPEAK retired).
-- [ ] **Piece B — the exact year.** Dial `1 9 7 7` → `WARMER`/`A LITTLE LATER`; only
-      `1 9 7 8` opens the era → `1=LISTEN` → `1` → `PIECE B: 41` / `2/3`.
-- [ ] **Sealed final year.** Dial `1 9 9 8`. V: `1998: SEALED` / `SWIPE PASS / COIN`.
-- [ ] **Temporal pass (magstripe).** Swipe any card.
-      V: `1998 A CARD` / `1=LISTEN 2=SPEAK`  ·  H: the reader fires `handle_card`.
-      Press `1` → `PIECE C: 55` / `3/3`.  (A real coin also forces it open — try both.)
-- [ ] **Coin validator — hints & time.** At the Operator, drop a coin → sharper hint
-      naming the decade (`TRY THE 1950s` …) · A: `op_hint_*`. In an era, a coin → A:
-      `coin_hold` (holds the line). ·  H: the validator registers the coin.
-- [ ] **The last call.** With `3/3`: V: `DIAL HER NUMBER` / `6 DIGITS` (number hidden —
-      a coin here reveals `36 41 55`). Dial `3 6 4 1 5 5`.
+- [ ] **Greeting / hook switch.** Lift the handset. V: `WORD BY THE PHONE` /
+      `SPELL IT  *=HINT` · A: `op_intro` (states the mission + first riddle) ·
+      H: lifting really transitions to IDLE_UP.
+- [ ] **Puzzle 1 — keypad letters.** The riddle: the word scratched by the phone,
+      what they did instead of saying sorry = **HUG**. Read the **letters printed
+      on the keys** and dial `4 8 4`. V: `> 48_` as you type → `GOT IT` /
+      `HER #: 484`. *(Confirm the keypad actually has letters; if not, note it —
+      the hint spells the mapping.)*
+- [ ] **Hint ladder.** On any puzzle, press `*` three times: the Operator gives a
+      nudge → a method → the answer. V updates each press; A plays the hint.
+- [ ] **Wrong answer.** Enter a wrong code. V: `NOT IT` / `* hint  # clue` ·
+      A: `wrong`. You can retry freely (no hard fail).
+- [ ] **Puzzle 2 — logic.** V: `HER AGE IN 1999`. From the spoken facts (Ruth 19
+      at the mother's death in '59; sister 11 yrs younger; call froze '99) →
+      **51**. Dial `5 1` → `HER #: 48451`.
+- [ ] **Puzzle 3 — cipher.** V: `CROSSED: 7 0`. Subtract 2 ("the two of us"),
+      wrapping: 7→5, 0→8 → **58**. Dial `5 8` → `HER #: 4845158`.
+- [ ] **The last call.** V: `DIAL HER NUMBER` / `484 51 58`. Dial `4 8 4 5 1 5 8`.
       V: `...RINGING...` → `11:59 ... 12:00` → `12:00  2000` / `SHE IS FREE`,
-      then after a beat the coda `THE LINE IS QUIET` / `hang up: she's home`
-      ·  A: `final_connect` → `final_clock` → `win_free`.
-- [ ] **Temporal drift.** In an era, touch nothing ~30 s. V: pulled back to the Operator
-      (`DIAL A YEAR`) · A: `drift_back`. (A coin in the era buys ~30 s more first.)
-- [ ] **Grace reset.** Hang up, then lift again within ~30 s → resumes with progress
-      (A: `op_resume`). Lift after ~30 s, or after a win → fresh story `0/3` (A: `op_intro`).
-- [ ] **Hang up.** Handset down from anywhere → `THE OPERATOR` / `Lift: the last call`,
-      and any clip/tone stops immediately.
+      then the coda `THE LINE IS QUIET` / `hang up: she's home`
+      · A: `final_connect` → `final_clock` → `win_free`.
+- [ ] **`#` repeat.** Mid-puzzle, press `#` — the Operator restates the riddle and
+      your entry clears.
+- [ ] **Grace resume.** Solve one puzzle, hang up, lift again within ~30 s →
+      resumes where you were. After ~30 s, or after a win → fresh from puzzle 1.
+- [ ] **Hang up.** Handset down → `THE OPERATOR` / `Lift: the last call`, and any
+      clip stops immediately.
 
 ## What to listen for (only judge-able here)
-- Clip **clarity** through the TDA2822M earpiece amp at 8 kHz narrowband.
-- Clip **volume vs the tones** (ringback/DTMF/coin chime). If clips are noticeably
-  hotter/quieter, note it — levels can be normalized in `regen_clips.sh` and redeployed.
-- Each clip **stops cleanly** on hang-up / dialing on. Pacing of the win sequence feels right.
+- Clip **clarity** through the earpiece at 8 kHz, and **volume vs the DTMF beeps**.
+- Each clip **stops cleanly** on hang-up / on dialing the next digit.
+- The riddles are **understandable by ear** — the VFD is only a terse reminder.
 
 ## If something's off
-- Wrong/no audio for a step: confirm the file exists, 16-bit PCM WAV, in the clip dir.
+- No audio at all: usually the dmix IPC — see the `ipc_perm` note in
+  `asoundrc.example`; clear stale SysV IPC (`ipcs`/`ipcrm`) or reboot.
+- Wrong/no clip for a step: confirm the file exists (16-bit PCM WAV) in the clip dir.
 - Unexpected state: re-activate the plugin to reset the session.
-- Coins/card/hook not registering: that's the Arduino serial path, not the plugin —
-  see `phone-status` and `journalctl -u daemon`.

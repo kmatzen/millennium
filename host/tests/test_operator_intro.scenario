@@ -1,11 +1,10 @@
-# The Operator (The Last Call): lifting the handset states the mission and shows
-# the HUD (current goal + pieces 0/3).
+# The Operator (The Last Call): lifting the handset states the mission and poses
+# the first puzzle.
 activate_plugin The Operator
 assert_display Lift
 
 hook_up
 assert_state IDLE_UP
-assert_display DIAL A YEAR
-assert_display 0/3
-assert_display TWO GIRLS, A RADIO
+assert_display WORD BY THE PHONE
+assert_display SPELL IT
 assert_clip op_intro.wav

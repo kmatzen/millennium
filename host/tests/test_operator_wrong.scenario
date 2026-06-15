@@ -1,0 +1,25 @@
+# The Operator: wrong answers never hard-fail. A wrong puzzle answer says NOT IT
+# and lets you retry; a wrong final number says WRONG NUMBER and lets you redial.
+activate_plugin The Operator
+hook_up
+
+# Wrong puzzle-1 answer -> NOT IT, then correct it
+keys 123
+assert_display NOT IT
+assert_clip wrong.wav
+keys 484
+assert_display GOT IT
+wait 3
+
+# Breeze through 2 and 3 to reach the dial
+keys 51
+wait 3
+keys 58
+wait 3
+assert_display DIAL HER NUMBER
+
+# Wrong number -> TRY AGAIN (the answer is not revealed), then dial it right
+keys 1234567
+assert_display WRONG NUMBER
+keys 4845158
+assert_display RINGING

@@ -763,9 +763,8 @@ static void test_plugins_dispatch_missing_handler(void) {
 int number_guess_compare(int secret, int guess);
 
 /* Pure helpers exported by plugins/time_operator.c */
-int parse_year(const char *buf);
-const char *operator_year_role(int year);
-int operator_target_piece(int pieces);
+int operator_keypad_digit(char c);
+int operator_shift_down(int digit, int key);
 
 static void test_plugins_builtins_registered(void) {
     char buf[2048];
@@ -878,40 +877,25 @@ static void test_number_guess_compare(void) {
 
 /* ── The Operator (time-travel plugin) pure logic ───────────────────── */
 
-static void test_operator_parse_year(void) {
-    TEST_ASSERT_EQ_INT(parse_year("1999"), 1999);
-    TEST_ASSERT_EQ_INT(parse_year("2000"), 2000);
-    TEST_ASSERT_EQ_INT(parse_year("0000"), 0);
-    TEST_ASSERT_EQ_INT(parse_year("123"), -1);   /* too short */
-    TEST_ASSERT_EQ_INT(parse_year("12345"), -1); /* too long */
-    TEST_ASSERT_EQ_INT(parse_year("19x9"), -1);  /* non-digit */
-    TEST_ASSERT_EQ_INT(parse_year(""), -1);
-    TEST_ASSERT_EQ_INT(parse_year(NULL), -1);
+static void test_operator_keypad_digit(void) {
+    /* Classic phone lettering: 2=ABC .. 9=WXYZ; non-letters -> -1. */
+    TEST_ASSERT_EQ_INT(operator_keypad_digit('A'), 2);
+    TEST_ASSERT_EQ_INT(operator_keypad_digit('Z'), 9);
+    TEST_ASSERT_EQ_INT(operator_keypad_digit('s'), 7);   /* lowercase too */
+    TEST_ASSERT_EQ_INT(operator_keypad_digit('5'), -1);  /* not a letter  */
+    TEST_ASSERT_EQ_INT(operator_keypad_digit(' '), -1);
+    /* Puzzle 1 self-check: HUG spells 4-8-4. */
+    TEST_ASSERT_EQ_INT(operator_keypad_digit('H'), 4);
+    TEST_ASSERT_EQ_INT(operator_keypad_digit('U'), 8);
+    TEST_ASSERT_EQ_INT(operator_keypad_digit('G'), 4);
 }
 
-static void test_operator_year_role(void) {
-    /* The three key eras hold number-pieces. */
-    TEST_ASSERT_EQ_STR(operator_year_role(1955), "A");  /* two sisters     */
-    TEST_ASSERT_EQ_STR(operator_year_role(1978), "B");  /* she lost nerve  */
-    TEST_ASSERT_EQ_STR(operator_year_role(1998), "C");  /* sealed final yr */
-    /* Flavor classifications. */
-    TEST_ASSERT_EQ_STR(operator_year_role(1925), "early");
-    TEST_ASSERT_EQ_STR(operator_year_role(2000), "home");
-    TEST_ASSERT_EQ_STR(operator_year_role(2075), "future");
-    TEST_ASSERT_EQ_STR(operator_year_role(1965), "other");
-    /* Out of range. */
-    TEST_ASSERT_EQ_STR(operator_year_role(1850), "bad");
-    TEST_ASSERT_EQ_STR(operator_year_role(2200), "bad");
-}
-
-static void test_operator_target_piece(void) {
-    /* Lowest unfound piece (bit0=A,1=B,2=C); 3 == all collected. */
-    TEST_ASSERT_EQ_INT(operator_target_piece(0x0), 0);
-    TEST_ASSERT_EQ_INT(operator_target_piece(0x1), 1);   /* have A */
-    TEST_ASSERT_EQ_INT(operator_target_piece(0x3), 2);   /* have A,B */
-    TEST_ASSERT_EQ_INT(operator_target_piece(0x7), 3);   /* all */
-    TEST_ASSERT_EQ_INT(operator_target_piece(0x4), 0);   /* have only C */
-    TEST_ASSERT_EQ_INT(operator_target_piece(0x6), 0);   /* B,C but not A */
+static void test_operator_shift_down(void) {
+    /* Puzzle 3 cipher: subtract the key, wrapping mod 10. */
+    TEST_ASSERT_EQ_INT(operator_shift_down(7, 2), 5);
+    TEST_ASSERT_EQ_INT(operator_shift_down(0, 2), 8);   /* wraps past zero */
+    TEST_ASSERT_EQ_INT(operator_shift_down(1, 2), 9);
+    TEST_ASSERT_EQ_INT(operator_shift_down(9, 0), 9);
 }
 
 /* ── WAV clip parser ────────────────────────────────────────────────── */
@@ -2197,9 +2181,8 @@ int main(void) {
     TEST_SUITE_RUN(test_plugins_to_json);
     TEST_SUITE_RUN(test_plugins_to_json_escapes);
     TEST_SUITE_RUN(test_number_guess_compare);
-    TEST_SUITE_RUN(test_operator_parse_year);
-    TEST_SUITE_RUN(test_operator_year_role);
-    TEST_SUITE_RUN(test_operator_target_piece);
+    TEST_SUITE_RUN(test_operator_keypad_digit);
+    TEST_SUITE_RUN(test_operator_shift_down);
     TEST_SUITE_RUN(test_wav_parse_valid);
     TEST_SUITE_RUN(test_wav_parse_rejects_bad);
     TEST_SUITE_RUN(test_wav_parse_skips_unknown_chunk);
