@@ -1,0 +1,16 @@
+# The Operator: the hint ladder. Pressing * escalates through three hints so a
+# stuck caller is never permanently blocked (the third hint gives the answer).
+activate_plugin The Operator
+hook_up
+assert_display WORD BY THE PHONE
+
+key *
+assert_display LOOK AT THE KEYS
+key *
+assert_display 3 LETTERS
+key *
+assert_display H  U  G
+
+# The final hint reveals the answer; entering it solves the puzzle.
+keys 484
+assert_display GOT IT
