@@ -2,6 +2,11 @@
 pcm.dmix_usb {
     type dmix
     ipc_key 1024
+    # World-accessible IPC (semaphore + shm) so the mixer can be shared no matter
+    # which user opens it first. Without this it defaults to 0600/owner-only, and
+    # if the daemon is ever run as root (e.g. under sudo gdb) the root-owned IPC
+    # locks out the normal `matzen` service afterward -> all audio fails silently.
+    ipc_perm 0666
     slave {
         pcm "hw:1,0"     # adjust if your USB isn't card 1
         rate 48000
