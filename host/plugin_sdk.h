@@ -136,4 +136,24 @@ int sdk_rand_range(int lo, int hi);   /* inclusive [lo, hi] */
 /* Pick a random element from an array of strings (NULL if n<=0). */
 const char *sdk_rand_choice(const char *const *choices, int n);
 
+/* ── Session teardown (daemon-internal) ──────────────────────────────────
+ * Release anything the phone is holding on behalf of the ACTIVE plugin: hang
+ * up a call in progress, stop any continuous tone, clear the keypad, and drop
+ * back to the idle state matching the physical handset.
+ *
+ * Called by plugins_activate when switching between two different plugins
+ * (#223). The plugin API has no handle_deactivation hook, so an outgoing
+ * plugin gets no chance to clean up after itself -- switching mid-call used to
+ * leave the SIP call up, the audio running, and the daemon in CALL_ACTIVE,
+ * while the outgoing plugin forgot it ever had a call. Rather than obliging
+ * every plugin author to implement teardown correctly, the daemon releases the
+ * resources it owns.
+ *
+ * The coin balance is deliberately NOT cleared: an operator switching plugins
+ * should not swallow the customer's money, and the incoming plugin reads the
+ * balance from daemon_state on activation.
+ *
+ * Not part of the plugin-facing API -- plugins should not call this. */
+void sdk_release_session(void);
+
 #endif /* PLUGIN_SDK_H */

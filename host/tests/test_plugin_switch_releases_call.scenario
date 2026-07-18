@@ -1,0 +1,49 @@
+# Test: switching plugins releases the call but keeps the coins (#223)
+#
+# The plugin API has no handle_deactivation hook, so an outgoing plugin never
+# gets a chance to clean up after itself. Switching mid-call used to leave the
+# SIP call up, the audio running, and the daemon parked in CALL_ACTIVE -- while
+# the outgoing plugin's own activation handler later reset is_in_call and
+# forgot the call had ever existed. The daemon now releases what it owns.
+
+assert_state IDLE_DOWN
+
+# ── 1) A switch mid-call releases the call ──────────────────────────────
+hook_up
+assert_state IDLE_UP
+
+coin 25
+coin 25
+keys 5551234567
+assert_state CALL_ACTIVE
+
+activate_plugin Number Guess
+
+# The handset is still up, so we land in IDLE_UP -- not stranded in
+# CALL_ACTIVE, and not dropped to IDLE_DOWN as though the user hung up.
+assert_state IDLE_UP
+
+# ── 2) A switch does NOT swallow the customer's coins ───────────────────
+# Back to Classic Phone and a clean slate first: Number Guess is active after
+# part 1, and it charges to start a game, so coins inserted now would go to it.
+activate_plugin Classic Phone
+hook_down
+assert_state IDLE_DOWN
+hook_up
+
+coin 25
+coin 25
+assert_display Have: 50c
+
+# Switch away and back. Classic Phone re-reads the balance from daemon_state
+# on activation, so if the switch had cleared it this would show "Insert 50c".
+activate_plugin Number Guess
+activate_plugin Classic Phone
+assert_display Have: 50c
+
+# ── 3) Re-activating the plugin that is already active is not a switch ──
+# The dashboard can do this; it must not tear down a call in progress.
+keys 5551234567
+assert_state CALL_ACTIVE
+activate_plugin Classic Phone
+assert_state CALL_ACTIVE
