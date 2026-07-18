@@ -318,4 +318,50 @@ state-check:
 	$(CBMC) tests/cbmc_state_machine.c --function verify_invariants
 	$(CBMC) tests/cbmc_state_machine.c --function verify_equiv
 
-.PHONY: all clean install uninstall test unit_tests api-test device-test break-test operator-smoke regen-clips tsan-queue cbmc-parser cbmc-parsers model-check game-check state-check pjsip-smoke
+# TLC model-check of concurrent event ordering (tests/EventOrdering.tla).
+# Where state-check verifies ONE transition sequentially, this checks every
+# interleaving of the two racing producers -- the serial/Arduino path and the
+# PJSUA worker thread -- through the single-consumer main loop. Formalizes the
+# hand-written case analysis in docs/EVENT_ORDERING.md (#100).
+#
+# Needs tla2tools.jar (https://github.com/tlaplus/tlaplus/releases) and a JRE:
+#   make tla-check TLA_TOOLS=/path/to/tla2tools.jar
+# Not part of `make test`; takes ~25s.
+TLA_TOOLS ?= tla2tools.jar
+TLC = java -XX:+UseParallelGC -cp $(TLA_TOOLS) tlc2.TLC
+
+tla-check:
+	cd tests && $(TLC) -config EventOrdering.cfg EventOrdering.tla
+
+# The two invariants that currently FAIL, both from the unguarded
+# EVENT_CALL_STATE_ACTIVE arm at daemon.c:387. Expected to report a violation
+# until that arm is guarded -- see tests/EventOrderingRace.cfg for the traces.
+tla-check-race:
+	cd tests && $(TLC) -config EventOrderingRace.cfg EventOrdering.tla
+
+# TLC model-check of coin accounting across the three ledgers that hold the
+# same balance: daemon_state->inserted_cents, classic_phone_data.inserted_cents
+# and the persisted file. Only the charge and refund paths sync the first two
+# (#109); every other write is unilateral. See docs/COIN_LEDGER.md.
+coin-check:
+	cd tests && $(TLC) -config CoinLedger.cfg CoinLedger.tla
+
+# The ledger-divergence properties. Expected to report violations: four
+# independent paths let the daemon and plugin ledgers drift. Each counterexample
+# and its code site is listed in tests/CoinLedgerDrift.cfg.
+coin-check-drift:
+	cd tests && $(TLC) -config CoinLedgerDrift.cfg CoinLedger.tla
+
+# TLC model-check of the OTA updater (tests/Updater.tla): the check FSM, the
+# four-step apply pipeline, and what a restart does to a call in progress.
+# See docs/OTA_UPDATE.md.
+ota-check:
+	cd tests && $(TLC) -config Updater.cfg Updater.tla
+
+# The open updater findings. Expected to report violations: the check FSM is a
+# one-way ratchet, "success" is reported without checking the restart, a failed
+# build strands the tree, and the restart ignores call state.
+ota-check-open:
+	cd tests && $(TLC) -config UpdaterOpen.cfg Updater.tla
+
+.PHONY: all clean install uninstall test unit_tests api-test device-test break-test operator-smoke regen-clips tsan-queue cbmc-parser cbmc-parsers model-check game-check state-check tla-check tla-check-race coin-check coin-check-drift ota-check ota-check-open pjsip-smoke

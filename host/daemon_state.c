@@ -11,6 +11,7 @@ void daemon_state_init(daemon_state_data_t* state) {
     memset(state->keypad_buffer, 0, sizeof(state->keypad_buffer));
     state->inserted_cents = 0;
     state->last_activity = mclock_now();
+    state->handset_up = 0;
 }
 
 void daemon_state_reset(daemon_state_data_t* state) {
@@ -20,6 +21,7 @@ void daemon_state_reset(daemon_state_data_t* state) {
     daemon_state_clear_keypad(state);
     state->inserted_cents = 0;
     state->last_activity = mclock_now();
+    state->handset_up = 0;
 }
 
 void daemon_state_update_activity(daemon_state_data_t* state) {

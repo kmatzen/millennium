@@ -329,6 +329,13 @@ static void sim_handle_hook(hook_state_change_event_t *ev) {
     hook_up   = (hook_state_change_event_get_direction(ev) == 'U');
     hook_down = (hook_state_change_event_get_direction(ev) == 'D');
 
+    /* mirror daemon.c: physical handset position is ground truth */
+    if (hook_up) {
+        daemon_state->handset_up = 1;
+    } else if (hook_down) {
+        daemon_state->handset_up = 0;
+    }
+
     if (hook_up) {
         if (daemon_state->current_state == DAEMON_STATE_CALL_INCOMING) {
             daemon_state->current_state = DAEMON_STATE_CALL_ACTIVE;
@@ -388,10 +395,14 @@ static void sim_handle_call_state(call_state_event_t *ev) {
         call_metrics_ringing_started();  /* mirror daemon.c: ring started */
         daemon_state_update_activity(daemon_state);
     } else if (st == EVENT_CALL_STATE_ACTIVE) {
-        daemon_state->current_state = DAEMON_STATE_CALL_ACTIVE;
-        daemon_state_update_activity(daemon_state);
-        call_metrics_ringing_answered();  /* mirror daemon.c: SIP-side answer */
-        call_metrics_started();  /* mirror daemon.c: call established */
+        /* mirror daemon.c: guard on the physical handset, not current_state --
+         * CALL_INCOMING is reachable both on-hook and off-hook (#92) */
+        if (daemon_state->handset_up) {
+            daemon_state->current_state = DAEMON_STATE_CALL_ACTIVE;
+            daemon_state_update_activity(daemon_state);
+            call_metrics_ringing_answered();  /* mirror daemon.c: SIP-side answer */
+            call_metrics_started();  /* mirror daemon.c: call established */
+        }
     } else if (st == EVENT_CALL_STATE_INVALID) {
         /* #90: Remote hung up */
         if (daemon_state->current_state == DAEMON_STATE_CALL_ACTIVE ||
@@ -408,7 +419,9 @@ static void sim_handle_call_state(call_state_event_t *ev) {
                  * refund -- mirror daemon.c (which does NOT clear here). */
             }
             daemon_state_clear_keypad(daemon_state);
-            daemon_state->current_state = DAEMON_STATE_IDLE_UP;
+            /* mirror daemon.c: land in the idle state matching the handset */
+            daemon_state->current_state = daemon_state->handset_up
+                    ? DAEMON_STATE_IDLE_UP : DAEMON_STATE_IDLE_DOWN;
             daemon_state_update_activity(daemon_state);
             sim_call_active = 0;
         }
@@ -808,6 +821,9 @@ static int run_scenario(const char *path) {
             if (state_persistence_load(&ps, arg) == 0) {
                 daemon_state->inserted_cents = ps.inserted_cents;
                 daemon_state->current_state = (daemon_state_t)ps.last_state;
+                /* mirror daemon.c: derive the handset from the restored state */
+                daemon_state->handset_up =
+                        (ps.last_state == (int)DAEMON_STATE_IDLE_UP);
                 if (strlen(ps.active_plugin) > 0) {
                     plugins_activate(ps.active_plugin);
                 }

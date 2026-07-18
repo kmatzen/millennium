@@ -19,7 +19,11 @@ assert_state CALL_INCOMING
 # It rings out for 12 seconds (from the caller's side) and never connects.
 wait 12
 call_ended
-assert_state IDLE_UP
+# The handset was never lifted, so the call ending returns to IDLE_DOWN,
+# not IDLE_UP. (Was IDLE_UP until the handset position became a tracked
+# field -- inferring it from current_state left the daemon believing the
+# handset was up while it sat in the cradle. See docs/EVENT_ORDERING.md.)
+assert_state IDLE_DOWN
 
 # The attempt is counted as a failure, not a miss. (That no ring time is
 # recorded is proven in step 3: only the one genuine inbound ring lands in the
@@ -31,7 +35,7 @@ assert_counter calls_missed 0
 start_call
 assert_state CALL_INCOMING
 call_ended
-assert_state IDLE_UP
+assert_state IDLE_DOWN
 
 assert_counter calls_failed 2
 assert_counter calls_missed 0
@@ -42,7 +46,7 @@ call_incoming
 assert_state CALL_INCOMING
 wait 5
 call_ended
-assert_state IDLE_UP
+assert_state IDLE_DOWN
 
 assert_counter calls_missed 1
 assert_counter calls_failed 2

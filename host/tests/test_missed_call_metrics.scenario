@@ -18,7 +18,11 @@ call_incoming
 assert_state CALL_INCOMING
 wait 20
 call_ended
-assert_state IDLE_UP
+# The handset was never lifted, so the call ending returns to IDLE_DOWN,
+# not IDLE_UP. (Was IDLE_UP until the handset position became a tracked
+# field -- inferring it from current_state left the daemon believing the
+# handset was up while it sat in the cradle. See docs/EVENT_ORDERING.md.)
+assert_state IDLE_DOWN
 
 # One ring recorded (20s); one miss counted.
 assert_histogram call_ring_seconds 1 20
@@ -29,7 +33,7 @@ call_incoming
 assert_state CALL_INCOMING
 wait 10
 call_ended
-assert_state IDLE_UP
+assert_state IDLE_DOWN
 
 # Two rings recorded now (20 + 10 = 30s); two misses.
 assert_histogram call_ring_seconds 2 30

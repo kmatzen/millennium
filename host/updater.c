@@ -96,7 +96,17 @@ static void *check_thread_func(void *arg) {
 void updater_check_async(void) {
     pthread_t th;
     pthread_mutex_lock(&check_mutex);
-    if (check_state == 0) {
+    /* Start a check unless one is already running. The guard used to be
+     * `check_state == 0`, but nothing ever set check_state back to 0, so the
+     * state machine ratcheted 0 -> 1 -> 2 and this endpoint went inert for the
+     * life of the process. That was worst when the FIRST check failed:
+     * check_thread_func clears latest_version, so the phone reported "no update
+     * known" until the daemon was restarted. Found by tests/Updater.tla
+     * (CheckNotStuck); see docs/OTA_UPDATE.md.
+     *
+     * check_state stays 2 after a completed check so updater_get_latest_version
+     * keeps reporting the last known version while a re-check runs. */
+    if (check_state != 1) {
         check_state = 1;
         pthread_mutex_unlock(&check_mutex);
         if (pthread_create(&th, NULL, check_thread_func, NULL) == 0) {
@@ -270,7 +280,18 @@ int updater_apply(const char *source_dir) {
     snprintf(apply_status, sizeof(apply_status), "Restarting daemon...");
     pthread_mutex_unlock(&apply_mutex);
     logger_info_with_category("Updater", "Restarting daemon via systemd");
-    run_command("sudo systemctl restart daemon.service");
+    /* Check this like every other step. On success systemd kills us before the
+     * next line runs, so reaching it at all means the restart did not take --
+     * reporting "applied successfully" there left the dashboard claiming the
+     * new build was live while the old binary kept running. Found by
+     * tests/Updater.tla (StatusHonest); see docs/OTA_UPDATE.md. */
+    if (run_command("sudo systemctl restart daemon.service") != 0) {
+        pthread_mutex_lock(&apply_mutex);
+        snprintf(apply_status, sizeof(apply_status),
+                 "Error: installed, but daemon restart failed");
+        pthread_mutex_unlock(&apply_mutex);
+        return -1;
+    }
 
     pthread_mutex_lock(&apply_mutex);
     snprintf(apply_status, sizeof(apply_status), "Update applied successfully");

@@ -385,18 +385,34 @@ void handle_call_state_event(call_state_event_t *call_state_event) {
         daemon_state_update_activity(daemon_state);
         
     } else if (call_state_event_get_state(call_state_event) == EVENT_CALL_STATE_ACTIVE) {
-        /* Handle call established (when the SIP stack reports CALL_ESTABLISHED) */
-        logger_info_with_category("Call", "Call established - audio should be working");
-        metrics_increment_counter("calls_established", 1);
-        
-        update_display_with_content("Call active", "Audio connected");
+        /* Handle call established (when the SIP stack reports CALL_ESTABLISHED).
+         *
+         * Guarded on the *physical* handset position, not on current_state:
+         * CALL_INCOMING is reachable both on-hook (ringing in the cradle) and
+         * off-hook (#92), so a current_state test cannot tell them apart.
+         *
+         * A CALL_ESTABLISHED arriving with the handset cradled -- a SIP-side
+         * answer, or one queued by the PJSUA thread and dispatched after the
+         * user already hung up -- would otherwise leave the daemon in
+         * CALL_ACTIVE on-hook, with nothing to recover it. Found by
+         * tests/EventOrdering.tla; see docs/EVENT_ORDERING.md. */
+        if (daemon_state->handset_up) {
+            logger_info_with_category("Call", "Call established - audio should be working");
+            metrics_increment_counter("calls_established", 1);
 
-        daemon_state->current_state = DAEMON_STATE_CALL_ACTIVE;
-        daemon_state_update_activity(daemon_state);
-        /* If this transition answered a ring (SIP-side answer), close it out;
-         * a no-op for outbound calls that were never ringing. */
-        call_metrics_ringing_answered();
-        call_metrics_started();
+            update_display_with_content("Call active", "Audio connected");
+
+            daemon_state->current_state = DAEMON_STATE_CALL_ACTIVE;
+            daemon_state_update_activity(daemon_state);
+            /* If this transition answered a ring (SIP-side answer), close it out;
+             * a no-op for outbound calls that were never ringing. */
+            call_metrics_ringing_answered();
+            call_metrics_started();
+        } else {
+            logger_warn_with_category("Call",
+                    "Ignoring CALL_ESTABLISHED received with handset on hook");
+            metrics_increment_counter("calls_established_ignored_onhook", 1);
+        }
     } else if (call_state_event_get_state(call_state_event) == EVENT_CALL_STATE_INVALID) {
         /* #90/#91: Call ended - remote hung up or call failed during dial */
         if (daemon_state->current_state == DAEMON_STATE_CALL_ACTIVE) {
@@ -405,7 +421,11 @@ void handle_call_state_event(call_state_event_t *call_state_event) {
             call_metrics_ended();
             daemon_state_clear_keypad(daemon_state);
             daemon_state->inserted_cents = 0;
-            daemon_state->current_state = DAEMON_STATE_IDLE_UP;
+            /* Return to whichever idle state matches the physical handset: a
+             * call that ended while the handset was cradled must land in
+             * IDLE_DOWN, not IDLE_UP. See docs/EVENT_ORDERING.md. */
+            daemon_state->current_state = daemon_state->handset_up
+                    ? DAEMON_STATE_IDLE_UP : DAEMON_STATE_IDLE_DOWN;
             daemon_state_update_activity(daemon_state);
             need_hangup_sync = 1;
         } else if (daemon_state->current_state == DAEMON_STATE_CALL_INCOMING) {
@@ -417,7 +437,11 @@ void handle_call_state_event(call_state_event_t *call_state_event) {
              * without a ring) counts an outbound dial failure (calls_failed). */
             call_metrics_incoming_ended();
             daemon_state_clear_keypad(daemon_state);
-            daemon_state->current_state = DAEMON_STATE_IDLE_UP;
+            /* Same as above: an unanswered ring that ends while the handset is
+             * still in the cradle returns to IDLE_DOWN. Coins are preserved
+             * either way (#91) for the plugin to refund. */
+            daemon_state->current_state = daemon_state->handset_up
+                    ? DAEMON_STATE_IDLE_UP : DAEMON_STATE_IDLE_DOWN;
             daemon_state_update_activity(daemon_state);
             need_hangup_sync = 1;
         }
@@ -468,7 +492,15 @@ void handle_hook_event(hook_state_change_event_t *hook_event) {
     pthread_mutex_lock(&daemon_state_mutex);
     hook_up = (hook_state_change_event_get_direction(hook_event) == 'U');
     hook_down = (hook_state_change_event_get_direction(hook_event) == 'D');
-    
+
+    /* Record the physical handset position before any state-machine decision.
+     * This is ground truth; current_state is only the daemon's belief. */
+    if (hook_up) {
+        daemon_state->handset_up = 1;
+    } else if (hook_down) {
+        daemon_state->handset_up = 0;
+    }
+
     if (hook_up) {
         int call_incoming = (daemon_state->current_state == DAEMON_STATE_CALL_INCOMING);
         int phone_down = (daemon_state->current_state == DAEMON_STATE_IDLE_DOWN);
@@ -1137,6 +1169,13 @@ int main(int argc, char *argv[]) {
 
             pthread_mutex_lock(&daemon_state_mutex);
             daemon_state->inserted_cents = ps.inserted_cents;
+            /* handset_up is not persisted (the keypad firmware only reports
+             * hook *transitions*, so a restart cannot observe the position).
+             * Derive it from the state we are restoring, which keeps the two
+             * self-consistent: the daemon already trusts last_state enough to
+             * come back up in IDLE_UP, so the handset must have been lifted.
+             * The next real hook event corrects it either way. */
+            daemon_state->handset_up = (ps.last_state == (int)DAEMON_STATE_IDLE_UP);
             pthread_mutex_unlock(&daemon_state_mutex);
 
             if (strlen(ps.active_plugin) > 0) {
