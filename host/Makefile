@@ -352,4 +352,16 @@ coin-check:
 coin-check-drift:
 	cd tests && $(TLC) -config CoinLedgerDrift.cfg CoinLedger.tla
 
-.PHONY: all clean install uninstall test unit_tests api-test device-test break-test operator-smoke regen-clips tsan-queue cbmc-parser cbmc-parsers model-check game-check state-check tla-check tla-check-race coin-check coin-check-drift pjsip-smoke
+# TLC model-check of the OTA updater (tests/Updater.tla): the check FSM, the
+# four-step apply pipeline, and what a restart does to a call in progress.
+# See docs/OTA_UPDATE.md.
+ota-check:
+	cd tests && $(TLC) -config Updater.cfg Updater.tla
+
+# The open updater findings. Expected to report violations: the check FSM is a
+# one-way ratchet, "success" is reported without checking the restart, a failed
+# build strands the tree, and the restart ignores call state.
+ota-check-open:
+	cd tests && $(TLC) -config UpdaterOpen.cfg Updater.tla
+
+.PHONY: all clean install uninstall test unit_tests api-test device-test break-test operator-smoke regen-clips tsan-queue cbmc-parser cbmc-parsers model-check game-check state-check tla-check tla-check-race coin-check coin-check-drift ota-check ota-check-open pjsip-smoke
