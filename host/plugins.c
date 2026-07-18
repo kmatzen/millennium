@@ -117,33 +117,56 @@ static void plugins_record_activation(const char *name) {
 
 int plugins_activate(const char *plugin_name) {
     int i;
+    void (*activation)(void) = NULL;
+    int found = 0;
+
     if (!plugin_name) {
         logger_error_with_category("Plugins", "Plugin name required for activation");
         return -1;
     }
 
+    /* Look the plugin up and snapshot its activation handler under the lock,
+     * but CALL the handler after releasing it (#226).
+     *
+     * This is the same discipline plugins_snapshot_active() documents below:
+     * plugins_mutex is not recursive, so a handler that re-enters the registry
+     * -- plugins_activate, plugins_get_active_name, plugins_get_info,
+     * plugins_to_json -- would deadlock against itself. This function used to
+     * be the one place that broke that rule.
+     *
+     * The plugins[] table is a fixed static array whose entries are never moved
+     * or unregistered, so the snapshotted function pointer stays valid. */
     pthread_mutex_lock(&plugins_mutex);
-
-    /* Find the plugin */
     for (i = 0; i < plugin_count; i++) {
         if (strcmp(plugins[i].name, plugin_name) == 0) {
-            active_plugin_index = i;
-
-            /* Call the plugin's activation handler if it exists */
-            if (plugins[i].handle_activation) {
-                plugins[i].handle_activation();
-            }
-
-            logger_infof_with_category("Plugins", "Plugin %s activated", plugin_name);
-            pthread_mutex_unlock(&plugins_mutex);
-            plugins_record_activation(plugin_name);
-            return 0;
+            activation = plugins[i].handle_activation;
+            found = 1;
+            break;
         }
     }
-    
-    logger_warnf_with_category("Plugins", "Plugin %s not found", plugin_name);
     pthread_mutex_unlock(&plugins_mutex);
-    return -1;
+
+    if (!found) {
+        logger_warnf_with_category("Plugins", "Plugin %s not found", plugin_name);
+        return -1;
+    }
+
+    /* Initialize BEFORE publishing the new active index. The old code assigned
+     * active_plugin_index first and relied on holding plugins_mutex across the
+     * handler to keep dispatch out; dispatching unlocked, that order would let
+     * an event reach a half-initialized plugin. Publishing last means dispatch
+     * sees the previous plugin until the new one is ready. */
+    if (activation) {
+        activation();
+    }
+
+    pthread_mutex_lock(&plugins_mutex);
+    active_plugin_index = i;
+    pthread_mutex_unlock(&plugins_mutex);
+
+    logger_infof_with_category("Plugins", "Plugin %s activated", plugin_name);
+    plugins_record_activation(plugin_name);
+    return 0;
 }
 
 const char* plugins_get_active_name(void) {

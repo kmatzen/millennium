@@ -605,6 +605,53 @@ static void test_plugins_register_custom(void) {
     plugins_cleanup();
 }
 
+/* #226 regression: plugins_activate used to call handle_activation while
+ * holding plugins_mutex, which is not recursive -- so a handler that touched
+ * the registry deadlocked against itself. This handler re-enters via
+ * plugins_get_active_name(), which is exactly what used to hang.
+ *
+ * It also pins the ordering: the new active index is published only AFTER the
+ * handler returns, so a handler still observes the PREVIOUS active plugin and
+ * can never be dispatched to while half-initialized.
+ *
+ * Note the failure mode if this regresses is a hang, not an assertion -- there
+ * is no way to test "does not deadlock" that fails fast. */
+static const char *g_name_seen_during_activation;
+static int g_reentrant_activation_ran;
+
+static void reentrant_activation_handler(void) {
+    const char *n = plugins_get_active_name();   /* would deadlock pre-#226 */
+    g_name_seen_during_activation = n ? n : "(none)";
+    g_reentrant_activation_ran = 1;
+}
+
+static void test_plugins_activation_handler_may_reenter_registry(void) {
+    daemon_state_data_t ds;
+    daemon_state_init(&ds);
+    daemon_state = &ds;
+    client = millennium_client_create();
+
+    plugins_init();   /* leaves "Classic Phone" active */
+    g_reentrant_activation_ran = 0;
+    g_name_seen_during_activation = NULL;
+
+    TEST_ASSERT_EQ_INT(plugins_register("Reentrant Plugin", "Re-enters on activate",
+        NULL, NULL, NULL, NULL, NULL, reentrant_activation_handler, NULL), 0);
+
+    TEST_ASSERT_EQ_INT(plugins_activate("Reentrant Plugin"), 0);
+    TEST_ASSERT_EQ_INT(g_reentrant_activation_ran, 1);
+
+    /* Published after the handler, so the handler saw the outgoing plugin. */
+    TEST_ASSERT_EQ_STR(g_name_seen_during_activation, "Classic Phone");
+    /* ...and the switch did take effect once the handler returned. */
+    TEST_ASSERT_EQ_STR(plugins_get_active_name(), "Reentrant Plugin");
+
+    millennium_client_destroy(client);
+    client = NULL;
+    daemon_state = NULL;
+    plugins_cleanup();
+}
+
 static void test_plugins_list(void) {
     daemon_state_data_t ds;
     char buf[1024];
@@ -2213,6 +2260,7 @@ int main(void) {
     TEST_SUITE_RUN(test_plugins_activation_metrics);
     TEST_SUITE_RUN(test_plugins_activate_nonexistent);
     TEST_SUITE_RUN(test_plugins_register_custom);
+    TEST_SUITE_RUN(test_plugins_activation_handler_may_reenter_registry);
     TEST_SUITE_RUN(test_plugins_list);
     TEST_SUITE_RUN(test_plugins_duplicate_register);
     TEST_SUITE_RUN(test_plugins_dispatch_to_active);
