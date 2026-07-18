@@ -7,6 +7,8 @@
 #include <unistd.h>
 #include <ctype.h>
 #include <errno.h>
+#include <fcntl.h>
+#include <sys/stat.h>
 
 int state_persistence_save(const persisted_state_t *state, const char *filepath) {
     FILE *f;
@@ -39,6 +41,43 @@ int state_persistence_save(const persisted_state_t *state, const char *filepath)
         logger_warn_with_category("Persistence", "Failed to rename state file");
         remove(tmp_path);
         return -1;
+    }
+
+    /* Sync the parent directory so the rename itself is durable (#228).
+     * fsync on the file only makes its *contents* durable; the directory entry
+     * created by rename() is not, so a power cut here could roll the balance
+     * back to the previous file or leave the .tmp behind. The phone runs on
+     * mains with no UPS, so this is a routine event, not a corner case.
+     *
+     * Best-effort: a failure to sync the directory does not invalidate the
+     * write that already succeeded, so it is logged rather than returned. */
+    {
+        char dir_path[512];
+        char *slash;
+        int dfd;
+
+        strncpy(dir_path, filepath, sizeof(dir_path) - 1);
+        dir_path[sizeof(dir_path) - 1] = '\0';
+        slash = strrchr(dir_path, '/');
+        if (slash == dir_path) {
+            dir_path[1] = '\0';          /* file sits in "/" */
+        } else if (slash) {
+            *slash = '\0';
+        } else {
+            strcpy(dir_path, ".");       /* relative path, no directory part */
+        }
+
+        dfd = open(dir_path, O_RDONLY);
+        if (dfd >= 0) {
+            if (fsync(dfd) != 0) {
+                logger_warn_with_category("Persistence",
+                        "Failed to fsync state directory; save may not survive power loss");
+            }
+            close(dfd);
+        } else {
+            logger_warn_with_category("Persistence",
+                    "Failed to open state directory for fsync");
+        }
     }
 
     return 0;

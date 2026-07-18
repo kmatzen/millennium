@@ -1636,6 +1636,42 @@ static void test_state_load_round_trip(void) {
     remove(path);
 }
 
+/* #228: the save path now derives the parent directory to fsync it. That
+ * derivation has three cases -- a normal path, a bare filename with no
+ * directory part, and a file directly in "/" -- and getting it wrong would
+ * break saving entirely. Exercise the two we can write to. */
+static void test_state_save_relative_path(void) {
+    const char *path = "millennium_state_rel.test";   /* no '/' at all */
+    persisted_state_t saved;
+    persisted_state_t loaded;
+
+    saved.inserted_cents = 25;
+    saved.last_state = (int)DAEMON_STATE_IDLE_DOWN;
+    strcpy(saved.active_plugin, "Number Guess");
+
+    TEST_ASSERT_EQ_INT(state_persistence_save(&saved, path), 0);
+    TEST_ASSERT_EQ_INT(state_persistence_load(&loaded, path), 0);
+    TEST_ASSERT_EQ_INT(loaded.inserted_cents, 25);
+    TEST_ASSERT_EQ_STR(loaded.active_plugin, "Number Guess");
+    remove(path);
+}
+
+static void test_state_save_nested_path(void) {
+    const char *path = "/tmp/millennium_state_nested.test";
+    persisted_state_t saved;
+    persisted_state_t loaded;
+
+    saved.inserted_cents = 50;
+    saved.last_state = (int)DAEMON_STATE_IDLE_UP;
+    strcpy(saved.active_plugin, "");
+
+    TEST_ASSERT_EQ_INT(state_persistence_save(&saved, path), 0);
+    TEST_ASSERT_EQ_INT(state_persistence_load(&loaded, path), 0);
+    TEST_ASSERT_EQ_INT(loaded.inserted_cents, 50);
+    TEST_ASSERT_EQ_STR(loaded.active_plugin, "");
+    remove(path);
+}
+
 static void test_state_load_absent_file_is_silent(void) {
     const char *path = "/tmp/millennium_state_absent.test";
     persisted_state_t ps;
@@ -2248,6 +2284,8 @@ int main(void) {
 
     TEST_SUITE_BEGIN("State Persistence");
     TEST_SUITE_RUN(test_state_load_round_trip);
+    TEST_SUITE_RUN(test_state_save_relative_path);
+    TEST_SUITE_RUN(test_state_save_nested_path);
     TEST_SUITE_RUN(test_state_load_absent_file_is_silent);
     TEST_SUITE_RUN(test_state_load_rejects_negative_cents);
     TEST_SUITE_RUN(test_state_load_rejects_huge_cents);
