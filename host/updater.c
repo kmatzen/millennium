@@ -149,8 +149,10 @@ int updater_get_latest_version(char *out, size_t out_size) {
     out[0] = '\0';
     pthread_mutex_lock(&check_mutex);
     if (check_state == 2 && latest_version[0]) {
-        strncpy(out, latest_version, out_size - 1);
-        out[out_size - 1] = '\0';
+        size_t n = strlen(latest_version);
+        if (n > out_size - 1) n = out_size - 1;
+        memcpy(out, latest_version, n);
+        out[n] = '\0';
         known = 1;
     }
     pthread_mutex_unlock(&check_mutex);
@@ -175,9 +177,17 @@ void updater_get_apply_status(char *out, size_t out_size) {
     pthread_mutex_lock(&apply_mutex);
     /* Copy while holding the lock. Returning apply_status itself only protected
      * the pointer read, not the buffer -- the caller then read it unlocked while
-     * updater_apply was snprintf-ing into it (#227). */
-    strncpy(out, apply_status, out_size - 1);
-    out[out_size - 1] = '\0';
+     * updater_apply was snprintf-ing into it (#227).
+     *
+     * memcpy with an explicit clamp rather than strncpy: when gcc inlines this
+     * into a caller whose buffer is the same size as the source, strncpy trips
+     * -Wstringop-truncation, and the build is -Werror. */
+    {
+        size_t n = strlen(apply_status);
+        if (n > out_size - 1) n = out_size - 1;
+        memcpy(out, apply_status, n);
+        out[n] = '\0';
+    }
     pthread_mutex_unlock(&apply_mutex);
 }
 
