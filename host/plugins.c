@@ -9,6 +9,7 @@
 #include "logger.h"
 #include "millennium_sdk.h"
 #include "metrics.h"
+#include "plugin_sdk.h"
 
 /* Maximum number of plugins. Generous headroom so experimenters can add
  * their own alongside the built-ins (8 ship by default). */
@@ -119,6 +120,7 @@ int plugins_activate(const char *plugin_name) {
     int i;
     void (*activation)(void) = NULL;
     int found = 0;
+    int previous = -1;
 
     if (!plugin_name) {
         logger_error_with_category("Plugins", "Plugin name required for activation");
@@ -137,6 +139,7 @@ int plugins_activate(const char *plugin_name) {
      * The plugins[] table is a fixed static array whose entries are never moved
      * or unregistered, so the snapshotted function pointer stays valid. */
     pthread_mutex_lock(&plugins_mutex);
+    previous = active_plugin_index;
     for (i = 0; i < plugin_count; i++) {
         if (strcmp(plugins[i].name, plugin_name) == 0) {
             activation = plugins[i].handle_activation;
@@ -146,9 +149,24 @@ int plugins_activate(const char *plugin_name) {
     }
     pthread_mutex_unlock(&plugins_mutex);
 
+    /* Resolve the lookup BEFORE tearing anything down: a request naming a
+     * plugin that does not exist must leave the current session untouched. */
     if (!found) {
         logger_warnf_with_category("Plugins", "Plugin %s not found", plugin_name);
         return -1;
+    }
+
+    /* #223: the plugin API has no handle_deactivation hook, so the outgoing
+     * plugin never gets a chance to release what it was holding. Switching
+     * mid-call used to leave the SIP call up, the audio running and the daemon
+     * in CALL_ACTIVE, while the outgoing plugin's own activation handler later
+     * reset is_in_call and forgot the call existed. The daemon releases the
+     * resources it owns instead of obliging every plugin author to.
+     *
+     * Only on a real switch: re-activating the plugin that is already active
+     * (which the web dashboard can do) must not drop a call in progress. */
+    if (previous >= 0 && previous != i) {
+        sdk_release_session();
     }
 
     /* Initialize BEFORE publishing the new active index. The old code assigned

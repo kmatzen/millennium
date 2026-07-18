@@ -155,3 +155,32 @@ See [`plugin_sdk.h`](plugin_sdk.h) for the full API: time (`sdk_now`,
 `sdk_keypad`), balance (`sdk_balance`, `sdk_spend_balance`, …), logging
 (`sdk_log`, `sdk_logf`), and randomness (`sdk_rand_below`, `sdk_rand_range`,
 `sdk_rand_choice`).
+
+## Session teardown on plugin switch
+
+There is deliberately **no `handle_deactivation` callback**. When the active
+plugin is switched away from, it is simply frozen — it stops receiving events
+and ticks, and its static session struct keeps whatever was in it.
+
+The daemon releases the resources *it* owns before activating the incoming
+plugin (`sdk_release_session`, called from `plugins_activate`): a call in
+progress is hung up, continuous audio is stopped, the keypad is cleared, and
+the state drops to the idle state matching the physical handset.
+
+Two consequences for plugin authors:
+
+- **You do not need to clean up on the way out.** Do not rely on being told;
+  you will not be.
+- **Do your session reset in `handle_activation`, not on exit.** That is the
+  only hook that runs, and it runs on every activation — boot, a restore from
+  persistence, and every deliberate switch. `plugins/classic_phone.c`'s
+  `classic_phone_on_activation` is the reference: it re-reads the coin balance
+  from `sdk_balance()` and zeroes its own per-session flags.
+
+The coin balance is deliberately **not** cleared on a switch — an operator
+changing plugins should not swallow the customer's money — so read it fresh in
+`handle_activation` rather than assuming it is zero.
+
+If your plugin ever holds a resource the daemon cannot see, say a file handle
+or an external connection, that is the case this design does not cover; raise
+it rather than leaking it.

@@ -13,6 +13,8 @@
 #include "clock_source.h"
 #include "logger.h"
 #include "config.h"
+#include "metrics.h"
+#include "call_metrics.h"
 
 /* Globals owned by the daemon / simulator / test harness. */
 extern daemon_state_data_t *daemon_state;
@@ -131,6 +133,39 @@ void sdk_spend_balance(int cents) {
 void sdk_clear_balance(void) {
     if (daemon_state && daemon_state->inserted_cents != 0) {
         plugins_adjust_inserted_cents(-daemon_state->inserted_cents);
+    }
+}
+
+/* ── Session teardown (see plugin_sdk.h) ─────────────────────────────── */
+
+void sdk_release_session(void) {
+    daemon_state_t s = sdk_state();
+    int in_call = (s == DAEMON_STATE_CALL_ACTIVE || s == DAEMON_STATE_CALL_INCOMING);
+
+    sdk_stop_audio();
+
+    if (in_call) {
+        sdk_hangup();
+        /* Resolve the call phase so the duration/miss metrics stay honest --
+         * mirrors what handle_call_state_event does on EVENT_CALL_STATE_INVALID. */
+        if (s == DAEMON_STATE_CALL_ACTIVE) {
+            call_metrics_ended();
+        } else {
+            call_metrics_incoming_ended();
+        }
+        metrics_increment_counter("plugin_switch_calls_released", 1);
+        logger_warn_with_category("Plugins",
+                "Plugin switched during a call; releasing it");
+    }
+
+    sdk_clear_keypad();
+
+    if (daemon_state && in_call) {
+        /* Land in the idle state matching the physical handset, exactly as the
+         * call-ended path does (see docs/EVENT_ORDERING.md). */
+        daemon_state->current_state = daemon_state->handset_up
+                ? DAEMON_STATE_IDLE_UP : DAEMON_STATE_IDLE_DOWN;
+        daemon_state_update_activity(daemon_state);
     }
 }
 
