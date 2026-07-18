@@ -158,6 +158,14 @@ Pure ALSA (`libasound`), no PipeWire. Left channel → ringer (TDA2822M ch A), r
 ## Coding Conventions
 
 - **C89** across the whole codebase, compiled with `-std=gnu89` (the C89 language plus the GNU extensions the ALSA/PJSIP system headers require, e.g. `inline`; strict `-std=c89` can't parse those headers). `-Wall -Wextra -Wdeclaration-after-statement -Werror` on all targets — warnings are errors, and `-Wdeclaration-after-statement` keeps the source free of C99-style mixed declarations; no separate linter configured
+- **A clean `make compile-check` on a Mac does not mean CI will pass** (#237). On macOS `gcc` is a shim for Apple clang, which does not implement several GCC warnings this build turns into errors — `-Wstringop-truncation` and `-Wmaybe-uninitialized` among them. CI runs real GCC on ubuntu. The Makefile takes `CC`, so check with the CI toolchain before pushing:
+
+  ```bash
+  brew install gcc                    # once
+  make compile-check CC=gcc-15
+  ```
+
+  Run both rather than swapping the default — clang catches things GCC does not.
 - No external dependencies beyond ALSA, pthread, PJSIP (libpjproject), and libc
 - No C++ in the active daemon targets (`.cpp` files in `host/` are legacy/unused)
 
