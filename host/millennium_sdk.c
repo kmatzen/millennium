@@ -687,12 +687,26 @@ void millennium_client_write_to_display(struct millennium_client *client, const 
 
     logger_debugf_with_category("SDK", "Writing message to display: %s", message);
 
+    /* The declared length and the number of bytes actually written must agree
+     * (#229). The old code narrowed strlen() to uint8_t for the header but then
+     * wrote the full strlen() in the body, so any message of 256 bytes or more
+     * declared the wrong size -- and since the framing has no resync, every
+     * byte past the declared length was consumed as a command opcode.
+     *
+     * Computing the length ONCE and clamping it makes the two agree by
+     * construction rather than by the caller happening to stay short. */
+    message_length = millennium_display_payload_len(message);
+    if (strlen(message) > message_length) {
+        logger_warnf_with_category("SDK",
+                "Display message truncated from %lu to %d bytes",
+                (unsigned long)strlen(message), DISPLAY_MAX_PAYLOAD);
+    }
+
     /* Step 1: Write the command */
-    cmd_data = (uint8_t)strlen(message);
+    cmd_data = (uint8_t)message_length;
     millennium_client_write_command(client, 0x02, &cmd_data, 1);
 
     /* Step 2: Write the message in a loop to ensure all bytes are written */
-    message_length = strlen(message);
 
     while (total_bytes_written < message_length) {
         ssize_t bytes_written = write(client->display_fd, message + total_bytes_written,

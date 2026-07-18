@@ -2,6 +2,7 @@
 #define MILLENNIUM_SDK_H
 
 #include <stddef.h>
+#include <string.h>   /* strlen, for millennium_display_payload_len */
 #include <stdint.h>
 #include <time.h>
 
@@ -112,5 +113,33 @@ void millennium_sdk_get_sip_status(int *registered, char *last_error, size_t las
 #define SERIAL_MAX_BACKOFF_SECONDS 60
 #define SERIAL_WATCHDOG_ENABLED 1
 #define CMD_KEEPALIVE 0x06  /* Pi->Arduino: no-op, resets watchdog activity timer */
+
+/* Largest display payload the 0x02 frame can carry (#229).
+ *
+ * MUST match `byte buf[100]` in Arduino/sketches/display/display.ino, which
+ * rejects any frame declaring more than that (`num_bytes > sizeof(buf)`).
+ * The length is also carried in a single byte, so it could never exceed 255
+ * regardless.
+ *
+ * The framing has no resynchronisation: the receiver consumes exactly the
+ * number of bytes the header declares, so if the header and the body ever
+ * disagree the remainder of the message is read as command opcodes. */
+#define DISPLAY_MAX_PAYLOAD 100
+
+/* Number of bytes millennium_client_write_to_display will actually send for
+ * `message`: strlen clamped to DISPLAY_MAX_PAYLOAD, and 0 for NULL.
+ *
+ * Defined here rather than in millennium_sdk.c so the unit tests can exercise
+ * it -- unit_tests does not link millennium_sdk.o, which would pull in the
+ * PJSIP symbols that are only available on the Pi.
+ *
+ * `static inline` (a GNU extension the build already relies on via -std=gnu89)
+ * so translation units that never call it do not trip -Wunused-function. */
+static inline size_t millennium_display_payload_len(const char *message) {
+    size_t len;
+    if (!message) return 0;
+    len = strlen(message);
+    return (len > DISPLAY_MAX_PAYLOAD) ? (size_t)DISPLAY_MAX_PAYLOAD : len;
+}
 
 #endif /* MILLENNIUM_SDK_H */
