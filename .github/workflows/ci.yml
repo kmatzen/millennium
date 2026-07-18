@@ -31,3 +31,27 @@ jobs:
       - name: Run scenario tests
         working-directory: host
         run: make test
+
+  # Second opinion from clang (#237). The two compilers implement different
+  # warning sets, and the build treats warnings as errors: GCC has
+  # -Wstringop-truncation and -Wmaybe-uninitialized, clang has its own
+  # -Wunused-* and -Wconditional-uninitialized behaviour. Neither alone covers
+  # the other, so a clean GCC build is not evidence the source is warning-free.
+  #
+  # This also mirrors what a developer sees on macOS, where `gcc` is a shim for
+  # Apple clang -- previously the local build and CI could disagree with no
+  # signal until CI failed.
+  #
+  # compile-check only: the scenario/unit suites are behavioural and the `test`
+  # job above already runs them. This job is about diagnostics.
+  compile-check-clang:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev clang
+
+      - name: Compile-check daemon sources with clang
+        working-directory: host
+        run: make compile-check CC=clang
