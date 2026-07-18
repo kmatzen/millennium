@@ -339,4 +339,17 @@ tla-check:
 tla-check-race:
 	cd tests && $(TLC) -config EventOrderingRace.cfg EventOrdering.tla
 
-.PHONY: all clean install uninstall test unit_tests api-test device-test break-test operator-smoke regen-clips tsan-queue cbmc-parser cbmc-parsers model-check game-check state-check tla-check tla-check-race pjsip-smoke
+# TLC model-check of coin accounting across the three ledgers that hold the
+# same balance: daemon_state->inserted_cents, classic_phone_data.inserted_cents
+# and the persisted file. Only the charge and refund paths sync the first two
+# (#109); every other write is unilateral. See docs/COIN_LEDGER.md.
+coin-check:
+	cd tests && $(TLC) -config CoinLedger.cfg CoinLedger.tla
+
+# The ledger-divergence properties. Expected to report violations: four
+# independent paths let the daemon and plugin ledgers drift. Each counterexample
+# and its code site is listed in tests/CoinLedgerDrift.cfg.
+coin-check-drift:
+	cd tests && $(TLC) -config CoinLedgerDrift.cfg CoinLedger.tla
+
+.PHONY: all clean install uninstall test unit_tests api-test device-test break-test operator-smoke regen-clips tsan-queue cbmc-parser cbmc-parsers model-check game-check state-check tla-check tla-check-race coin-check coin-check-drift pjsip-smoke
