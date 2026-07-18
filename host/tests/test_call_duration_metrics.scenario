@@ -16,7 +16,11 @@ activate_plugin Number Guess
 call_incoming
 assert_state CALL_INCOMING
 call_ended
-assert_state IDLE_UP
+# The handset was never lifted, so the call ending returns to IDLE_DOWN,
+# not IDLE_UP. (Was IDLE_UP until the handset position became a tracked
+# field -- inferring it from current_state left the daemon believing the
+# handset was up while it sat in the cradle. See docs/EVENT_ORDERING.md.)
+assert_state IDLE_DOWN
 
 # 2) An incoming call answered by lifting the handset, then ended by the far
 #    end. Connected for 30 seconds.

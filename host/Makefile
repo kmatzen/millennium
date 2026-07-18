@@ -318,4 +318,25 @@ state-check:
 	$(CBMC) tests/cbmc_state_machine.c --function verify_invariants
 	$(CBMC) tests/cbmc_state_machine.c --function verify_equiv
 
-.PHONY: all clean install uninstall test unit_tests api-test device-test break-test operator-smoke regen-clips tsan-queue cbmc-parser cbmc-parsers model-check game-check state-check pjsip-smoke
+# TLC model-check of concurrent event ordering (tests/EventOrdering.tla).
+# Where state-check verifies ONE transition sequentially, this checks every
+# interleaving of the two racing producers -- the serial/Arduino path and the
+# PJSUA worker thread -- through the single-consumer main loop. Formalizes the
+# hand-written case analysis in docs/EVENT_ORDERING.md (#100).
+#
+# Needs tla2tools.jar (https://github.com/tlaplus/tlaplus/releases) and a JRE:
+#   make tla-check TLA_TOOLS=/path/to/tla2tools.jar
+# Not part of `make test`; takes ~25s.
+TLA_TOOLS ?= tla2tools.jar
+TLC = java -XX:+UseParallelGC -cp $(TLA_TOOLS) tlc2.TLC
+
+tla-check:
+	cd tests && $(TLC) -config EventOrdering.cfg EventOrdering.tla
+
+# The two invariants that currently FAIL, both from the unguarded
+# EVENT_CALL_STATE_ACTIVE arm at daemon.c:387. Expected to report a violation
+# until that arm is guarded -- see tests/EventOrderingRace.cfg for the traces.
+tla-check-race:
+	cd tests && $(TLC) -config EventOrderingRace.cfg EventOrdering.tla
+
+.PHONY: all clean install uninstall test unit_tests api-test device-test break-test operator-smoke regen-clips tsan-queue cbmc-parser cbmc-parsers model-check game-check state-check tla-check tla-check-race pjsip-smoke

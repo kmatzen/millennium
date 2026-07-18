@@ -24,4 +24,74 @@ Events are processed asynchronously: the PJSIP (PJSUA worker) thread queues call
 
 ## Testing
 
-Scenario tests `test_remote_hangup.scenario` and `test_incoming_handset_up.scenario` cover call-state transitions. Interleaved hook + call_ended could be added for more comprehensive race testing.
+Scenario tests `test_remote_hangup.scenario` and `test_incoming_handset_up.scenario` cover call-state transitions.
+
+## Model checking (`make tla-check`)
+
+The idempotency argument above is a hand analysis of two orderings of two events. `tests/EventOrdering.tla` discharges it mechanically over *all* interleavings of every event type, across the two producers that actually race: the serial/Arduino path and the PJSUA worker thread, feeding the single-consumer main loop.
+
+The model separates `hook` (the *physical* handset position) from `state` (the daemon's *belief*). The daemon's five-state enum conflates the two, so they can silently disagree — and that disagreement is only statable as an invariant once they are distinct variables.
+
+**Verified (`make tla-check`, 3389 states):** under every interleaving, not just the two above — no reachable `INVALID`, balance stays non-negative, `IDLE_DOWN` always implies zero credit, and once the queue drains the daemon never sits in `CALL_ACTIVE` on-hook (`SettledNotActiveOnHook`) and its belief agrees with the physical handset (`Converged`).
+
+**Confirms the analysis above:** the hook-down vs. `CALL_INVALID` race really is idempotent; both orders settle in `IDLE_DOWN`. The intermediate `IDLE_UP` in Order 2 is a genuine transient.
+
+### Finding: the daemon could not tell an on-hook ring from an off-hook one
+
+The first run of this spec produced three violations with a **single structural
+root cause**, not a missing guard.
+
+`daemon_state_data_t` had no field for the handset position, so the daemon
+*inferred* it from `current_state` — and that inference is unsound, because
+`CALL_INCOMING` is reachable both on-hook (a phone ringing in its cradle) and
+off-hook (#92 interrupt dialing). No test on `current_state` can distinguish
+them, so no guard placed there could be correct. Two intermediate attempts at a
+`current_state` guard were both refuted by TLC before this became clear.
+
+| Invariant | Failing behaviour |
+|---|---|
+| `SettledNotActiveOnHook` | A `CALL_ESTABLISHED` dispatched after the user hung up left the phone parked in `CALL_ACTIVE` with the handset cradled, with nothing left in the queue to recover it. |
+| `Converged` | `CALL_INVALID` ending an unanswered on-hook ring dropped to `IDLE_UP` (`daemon.c:407`, `:411`), leaving the daemon believing the handset was lifted while it sat in the cradle. |
+| `ActiveImpliesOffHook` | The instantaneous version of the first — see "By design" below. |
+
+**Fix applied.** `daemon_state_data_t` gained an explicit `handset_up` field,
+recorded in `handle_hook_event` from the physical hook direction. The
+`EVENT_CALL_STATE_ACTIVE` arm now guards on it, and both `EVENT_CALL_STATE_INVALID`
+arms return to `IDLE_DOWN` or `IDLE_UP` to match it. Mirrored in `simulator.c`
+and `tests/cbmc_state_machine.c`.
+
+Two consequences worth knowing:
+
+- **`handset_up` is not persisted.** The keypad firmware only emits hook
+  *transitions*, never the position at boot, so a restart cannot observe it. It
+  is derived from the restored `last_state` instead, which keeps the two
+  self-consistent.
+- **Six scenario assertions changed** in `test_call_duration_metrics`,
+  `test_failed_call_metrics`, and `test_missed_call_metrics`. Each was a
+  `call_ended` with no preceding `hook_up`, asserting `IDLE_UP`. They were
+  encoding the bug: the handset was never lifted, so `IDLE_DOWN` is correct.
+
+### By design: `ActiveImpliesOffHook` (`make tla-check-race`)
+
+The *instantaneous* property — never `CALL_ACTIVE` while the handset is
+physically cradled, at every moment — cannot hold in an event-queue
+architecture, and its violation is not a defect. The handset moves, the firmware
+queues a hook event, and until the main loop dispatches it the daemon has not
+yet learned. Every queued-event design has this window.
+
+What is verified is that the window always **closes**: `SettledNotActiveOnHook`
+and `Converged` both hold once the queue drains. Closing the instantaneous
+window would require the firmware to report hook position synchronously — a
+hardware change, not a daemon one.
+
+### How the three tools divide the work
+
+`make state-check` (CBMC) proves the **inductive step**: given a consistent
+state, one transition preserves consistency — and that `simulator.c` and
+`daemon.c` agree, now including `handset_up`. It cannot express two events in
+flight.
+
+`make tla-check` (TLC) proves the **reachability** half: no interleaving of
+queued events can reach an inconsistent state to begin with. Neither tool covers
+both halves alone, which is why the `CALL_ACTIVE` bug survived until now — CBMC
+transcribed the unguarded arm faithfully and asserted nothing about it.

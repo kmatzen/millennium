@@ -17,6 +17,20 @@ typedef struct {
     char keypad_buffer[11];  /* Fixed size: 10 digits + null terminator */
     int inserted_cents;
     time_t last_activity;  /* C89 compatible time representation */
+    /* Physical handset position, tracked separately from current_state.
+     *
+     * current_state cannot stand in for this: CALL_INCOMING is reachable both
+     * on-hook (a phone ringing in its cradle) and off-hook (#92 interrupt
+     * dialing), so inferring the handset from the state machine is unsound.
+     * Call-state events racing hook events could then strand the daemon in
+     * CALL_ACTIVE with the handset cradled, or in IDLE_UP after an unanswered
+     * on-hook ring. Found by tests/EventOrdering.tla; see docs/EVENT_ORDERING.md.
+     *
+     * Not persisted: the keypad firmware never reports the hook position at
+     * boot (it only emits on a transition), so a restart cannot know it. 0 is
+     * the safe assumption and matches the existing unclean-shutdown coercion
+     * to IDLE_DOWN in daemon.c. */
+    int handset_up;
 } daemon_state_data_t;
 
 /* Function declarations (C equivalent of class methods) */
