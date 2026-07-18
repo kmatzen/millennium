@@ -67,8 +67,11 @@ static int do_check(void) {
     {
         const char *end = strchr(tag, '"');
         if (!end || (size_t)(end - tag) >= sizeof(latest_version)) return -1;
+        /* Under the lock: readers take check_mutex, so the write must too (#227). */
+        pthread_mutex_lock(&check_mutex);
         memcpy(latest_version, tag, (size_t)(end - tag));
         latest_version[end - tag] = '\0';
+        pthread_mutex_unlock(&check_mutex);
     }
 
     {
@@ -140,22 +143,28 @@ int updater_check(void) {
     return rc;
 }
 
-const char *updater_get_latest_version(void) {
-    const char *v = NULL;
+int updater_get_latest_version(char *out, size_t out_size) {
+    int known = 0;
+    if (!out || out_size == 0) return 0;
+    out[0] = '\0';
     pthread_mutex_lock(&check_mutex);
-    if (check_state == 2 && latest_version[0]) v = latest_version;
+    if (check_state == 2 && latest_version[0]) {
+        size_t n = strlen(latest_version);
+        if (n > out_size - 1) n = out_size - 1;
+        memcpy(out, latest_version, n);
+        out[n] = '\0';
+        known = 1;
+    }
     pthread_mutex_unlock(&check_mutex);
-    return v;
+    return known;
 }
 
 int updater_is_update_available(void) {
-    const char *lv;
-    int avail = 0;
-    pthread_mutex_lock(&check_mutex);
-    lv = (check_state == 2 && latest_version[0]) ? latest_version : NULL;
-    pthread_mutex_unlock(&check_mutex);
-    if (lv) avail = updater_compare_versions(lv, version_get_string()) > 0;
-    return avail;
+    char lv[64];
+    /* Compare against a copy, not the shared buffer: holding the pointer past
+     * the unlock had the same race as the getters (#227). */
+    if (!updater_get_latest_version(lv, sizeof(lv))) return 0;
+    return updater_compare_versions(lv, version_get_string()) > 0;
 }
 
 static char apply_status[256] = "No update attempted";
@@ -163,12 +172,23 @@ static int apply_state = 0;  /* 0=idle, 1=applying */
 static char apply_source_dir[512] = {0};
 static pthread_mutex_t apply_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-const char *updater_get_apply_status(void) {
-    const char *s;
+void updater_get_apply_status(char *out, size_t out_size) {
+    if (!out || out_size == 0) return;
     pthread_mutex_lock(&apply_mutex);
-    s = apply_status;
+    /* Copy while holding the lock. Returning apply_status itself only protected
+     * the pointer read, not the buffer -- the caller then read it unlocked while
+     * updater_apply was snprintf-ing into it (#227).
+     *
+     * memcpy with an explicit clamp rather than strncpy: when gcc inlines this
+     * into a caller whose buffer is the same size as the source, strncpy trips
+     * -Wstringop-truncation, and the build is -Werror. */
+    {
+        size_t n = strlen(apply_status);
+        if (n > out_size - 1) n = out_size - 1;
+        memcpy(out, apply_status, n);
+        out[n] = '\0';
+    }
     pthread_mutex_unlock(&apply_mutex);
-    return s;
 }
 
 /* #118: Run apply in background; returns immediately. */

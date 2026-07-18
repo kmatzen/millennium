@@ -1614,7 +1614,8 @@ struct http_response web_server_handle_api_version(const struct http_request* re
 struct http_response web_server_handle_api_check_update(const struct http_request* request) {
     struct http_response response;
     char json[512];
-    const char *latest;
+    char latest[64];
+    int have_latest;
     (void)request;
     memset(&response, 0, sizeof(response));
     web_server_strcpy_safe(response.content_type, "application/json", sizeof(response.content_type));
@@ -1622,13 +1623,13 @@ struct http_response web_server_handle_api_check_update(const struct http_reques
 
     /* #119: Non-blocking - don't block HTTP handler for curl timeout */
     updater_check_async();
-    latest = updater_get_latest_version();
+    have_latest = updater_get_latest_version(latest, sizeof(latest));
 
     snprintf(json, sizeof(json),
         "{\"current_version\":\"%s\",\"latest_version\":\"%s\","
         "\"update_available\":%s,\"checking\":%s,\"git_hash\":\"%s\"}",
         version_get_string(),
-        latest ? latest : (updater_is_checking() ? "" : "unknown"),
+        have_latest ? latest : (updater_is_checking() ? "" : "unknown"),
         updater_is_update_available() ? "true" : "false",
         updater_is_checking() ? "true" : "false",
         version_get_git_hash());
@@ -1639,6 +1640,7 @@ struct http_response web_server_handle_api_check_update(const struct http_reques
 struct http_response web_server_handle_api_update(const struct http_request* request) {
     struct http_response response;
     char json[512];
+    char apply_status[256];
     const char *source_dir;
     int rc;
     (void)request;
@@ -1654,10 +1656,11 @@ struct http_response web_server_handle_api_update(const struct http_request* req
             "{\"success\":true,\"status\":\"Applying update in background. Daemon will restart when complete.\",\"accepted\":true}");
         response.status_code = 202;  /* Accepted */
     } else {
+        updater_get_apply_status(apply_status, sizeof(apply_status));
         snprintf(json, sizeof(json),
             "{\"success\":%s,\"status\":\"%s\"}",
             rc == 0 ? "true" : "false",
-            updater_get_apply_status());
+            apply_status);
         response.status_code = rc == 0 ? 200 : 500;
     }
     web_server_strcpy_safe(response.body, json, sizeof(response.body));

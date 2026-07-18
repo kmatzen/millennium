@@ -1,6 +1,8 @@
 #ifndef UPDATER_H
 #define UPDATER_H
 
+#include <stddef.h>   /* size_t */
+
 /*
  * OTA update checker.
  * Compares the running version against the latest GitHub release tag.
@@ -24,7 +26,11 @@ void updater_check_async(void);
 int updater_is_checking(void);
 
 /* Returns the cached latest version string, or NULL if never checked. */
-const char *updater_get_latest_version(void);
+/* Copy the last known release tag into `out` (always NUL-terminated).
+ * Returns 1 if a version is known, 0 otherwise (out becomes ""). Copying under
+ * the lock is the point: returning the internal pointer let callers read the
+ * buffer while the check thread was writing it (#227). */
+int updater_get_latest_version(char *out, size_t out_size);
 
 /* Returns 1 if the latest version is newer than the running version. */
 int updater_is_update_available(void);
@@ -45,6 +51,8 @@ int updater_apply_async(const char *source_dir);
 int updater_is_applying(void);
 
 /* Get a human-readable status message from the last updater_apply call. */
-const char *updater_get_apply_status(void);
+/* Copy the current apply status into `out` (always NUL-terminated). Copying
+ * under the lock is the point -- see updater_get_latest_version (#227). */
+void updater_get_apply_status(char *out, size_t out_size);
 
 #endif /* UPDATER_H */
