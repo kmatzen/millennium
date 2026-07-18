@@ -1206,18 +1206,24 @@ static void test_version_compare_with_v_prefix(void) {
 }
 
 static void test_version_no_update_initially(void) {
+    char latest[64];
     TEST_ASSERT_EQ_INT(0, updater_is_update_available());
-    TEST_ASSERT_NULL((void *)updater_get_latest_version());
+    TEST_ASSERT_EQ_INT(0, updater_get_latest_version(latest, sizeof(latest)));
+    TEST_ASSERT_EQ_INT(0, (int)strlen(latest));   /* cleared, not left stale */
 }
 
 static void test_updater_apply_null_dir(void) {
+    char st[256];
     TEST_ASSERT_EQ_INT(-1, updater_apply(NULL));
-    TEST_ASSERT(strstr(updater_get_apply_status(), "no source") != NULL);
+    updater_get_apply_status(st, sizeof(st));
+    TEST_ASSERT(strstr(st, "no source") != NULL);
 }
 
 static void test_updater_apply_bad_dir(void) {
+    char st[256];
     TEST_ASSERT_EQ_INT(-1, updater_apply("/nonexistent/path/to/repo"));
-    TEST_ASSERT(strstr(updater_get_apply_status(), "git pull failed") != NULL);
+    updater_get_apply_status(st, sizeof(st));
+    TEST_ASSERT(strstr(st, "git pull failed") != NULL);
 }
 
 /* ── Card config tests ─────────────────────────────────────────── */
