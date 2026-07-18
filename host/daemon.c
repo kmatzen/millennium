@@ -59,8 +59,42 @@ pthread_mutex_t daemon_state_mutex = PTHREAD_MUTEX_INITIALIZER;
 /* Serializes one whole engine step (serial read + event dispatch + plugin ticks
  * + display writes) in the main loop against web-thread control commands, which
  * run the same paths via send_control_command. Held only around the work, never
- * across the idle sleep. Lock order: engine_mutex -> daemon_state_mutex /
- * plugins_mutex / the SDK queue mutex (never the reverse). */
+ * across the idle sleep.
+ *
+ * LOCK ORDER (#231). Acquire only left to right, never the reverse:
+ *
+ *   engine_mutex
+ *     -> g_monitor_mutex
+ *          -> daemon_state_mutex
+ *               -> metrics_mutex
+ *     -> daemon_state_mutex
+ *          -> metrics_mutex
+ *     -> plugins_mutex
+ *     -> g_queue_mutex        (the SDK event queue)
+ *
+ * Two paths here are easy to miss, so spelling them out:
+ *
+ *   - engine_mutex -> g_monitor_mutex: the main loop holds engine_mutex across
+ *     the engine step and calls update_metrics(), which reaches
+ *     health_monitor_publish_metrics -> health_monitor_get_all_checks and takes
+ *     g_monitor_mutex. Meanwhile the health thread's monitoring_loop holds
+ *     g_monitor_mutex across execute_check(), and check_daemon_activity() takes
+ *     daemon_state_mutex -- hence the three-deep chain.
+ *
+ *   - daemon_state_mutex -> metrics_mutex: the event handlers below bump
+ *     counters and call_metrics_* from INSIDE the daemon_state_mutex region
+ *     (handle_coin_event, handle_call_state_event, handle_hook_event). So
+ *     metrics_mutex is genuinely nested, not leaf-only. Nothing in metrics.c or
+ *     call_metrics.c reaches back into daemon_state, which is what keeps this
+ *     acyclic -- do not add such a call.
+ *
+ * Note plugins_mutex and metrics_mutex are deliberately kept UN-nested in the
+ * other direction: plugins_record_activation is called after releasing
+ * plugins_mutex (see plugins.c). That is a choice, not an accident.
+ *
+ * These are outside the order because they are always taken alone: running_mutex,
+ * the logger mutexes, tone_mutex, the updater's check_mutex / apply_mutex, the
+ * web server's state_mutex and conn_queue.mutex. */
 static pthread_mutex_t engine_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 /* Simple validation macro */

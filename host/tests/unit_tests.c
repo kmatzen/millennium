@@ -652,6 +652,38 @@ static void test_plugins_activation_handler_may_reenter_registry(void) {
     plugins_cleanup();
 }
 
+/* #229: the 0x02 display frame carries its length in one byte, and the
+ * receiver consumes exactly that many bytes with no resynchronisation. The old
+ * code narrowed strlen() to uint8_t for the header but wrote the full strlen()
+ * in the body, so a message of 256+ bytes declared the wrong length and the
+ * remainder was consumed as command opcodes.
+ *
+ * The write path now derives both the header and the body from this one
+ * function, so these cases pin the agreement. */
+static void test_display_payload_len_clamps(void) {
+    char big[DISPLAY_MAX_PAYLOAD + 200];
+    char exact[DISPLAY_MAX_PAYLOAD + 1];
+
+    /* NULL and empty */
+    TEST_ASSERT_EQ_INT((int)millennium_display_payload_len(NULL), 0);
+    TEST_ASSERT_EQ_INT((int)millennium_display_payload_len(""), 0);
+
+    /* Ordinary two-line display text passes through untouched */
+    TEST_ASSERT_EQ_INT((int)millennium_display_payload_len("Insert 50c"), 10);
+
+    /* Exactly at the limit is allowed: the firmware's check is `>`, not `>=` */
+    memset(exact, 'x', DISPLAY_MAX_PAYLOAD);
+    exact[DISPLAY_MAX_PAYLOAD] = '\0';
+    TEST_ASSERT_EQ_INT((int)millennium_display_payload_len(exact), DISPLAY_MAX_PAYLOAD);
+
+    /* Over the limit clamps -- and critically stays inside one byte, which is
+     * what the old code failed to do */
+    memset(big, 'y', sizeof(big) - 1);
+    big[sizeof(big) - 1] = '\0';
+    TEST_ASSERT_EQ_INT((int)millennium_display_payload_len(big), DISPLAY_MAX_PAYLOAD);
+    TEST_ASSERT(millennium_display_payload_len(big) <= 255);
+}
+
 static void test_plugins_list(void) {
     daemon_state_data_t ds;
     char buf[1024];
@@ -2261,6 +2293,7 @@ int main(void) {
     TEST_SUITE_RUN(test_plugins_activate_nonexistent);
     TEST_SUITE_RUN(test_plugins_register_custom);
     TEST_SUITE_RUN(test_plugins_activation_handler_may_reenter_registry);
+    TEST_SUITE_RUN(test_display_payload_len_clamps);
     TEST_SUITE_RUN(test_plugins_list);
     TEST_SUITE_RUN(test_plugins_duplicate_register);
     TEST_SUITE_RUN(test_plugins_dispatch_to_active);
