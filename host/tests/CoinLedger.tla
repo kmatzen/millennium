@@ -9,10 +9,23 @@
 (*   pcents -- classic_phone_data.inserted_cents   (classic_phone.c:18)    *)
 (*   fcents -- persisted_state_t.inserted_cents    (state_persistence.h:8) *)
 (*                                                                         *)
-(* The only sync channel between the first two is                          *)
-(* plugins_adjust_inserted_cents (daemon.c:102-110, added by #109), and it *)
-(* is called from exactly two sites in classic_phone.c -- the charge (:396)*)
-(* and the refund (:190). Every other write to either ledger is unilateral.*)
+(* RESOLVED (#222). There is now ONE ledger. classic_phone, jukebox and       *)
+(* fortune_teller no longer keep a private inserted_cents; they read and      *)
+(* write daemon_state->inserted_cents through sdk_balance/sdk_spend_balance/  *)
+(* sdk_add_balance/sdk_clear_balance, which is the pattern number_guess (the  *)
+(* canonical example) already used.                                          *)
+(*                                                                           *)
+(* This spec is kept as the regression guard. pcents is retained as a         *)
+(* separate variable ON PURPOSE: every action now keeps it equal to dcents by *)
+(* construction, so LedgerAgreement holding is a statement that no code path  *)
+(* updates one without the other. Re-introducing a private ledger means       *)
+(* re-introducing an unsynced action here, and the invariant fails again.     *)
+(*                                                                           *)
+(* Previously the only sync channel was plugins_adjust_inserted_cents         *)
+(* (#109), called from just two sites, and four other paths wrote one ledger  *)
+(* without the other -- coin return, the plugin idle timeout, the plugin call *)
+(* timeout, and the boot ordering. All four are modelled below as they now    *)
+(* behave.                                                                    *)
 (*                                                                         *)
 (* SCOPE -- what this deliberately does NOT model:                         *)
 (*                                                                         *)
@@ -62,7 +75,7 @@ HookUp ==
     /\ state'  = "IDLE_UP"
     /\ dcents' = 0
     /\ pcents' = 0
-    /\ UNCHANGED fcents
+    /\ fcents' = 0
     /\ budget' = budget - 1
 
 (* Handset replaced. daemon.c:507 and classic_phone.c:153. BOTH -- consistent. *)
@@ -72,7 +85,7 @@ HookDown ==
     /\ state'  = "IDLE_DOWN"
     /\ dcents' = 0
     /\ pcents' = 0
-    /\ UNCHANGED fcents
+    /\ fcents' = 0
     /\ budget' = budget - 1
 
 (* A coin drops. daemon.c:328 credits the daemon ledger under the mutex, then
@@ -84,7 +97,8 @@ Coin ==
     /\ \E v \in CoinValues :
          /\ dcents' = dcents + v
          /\ pcents' = pcents + v
-    /\ UNCHANGED <<state, fcents>>
+         /\ fcents' = dcents + v            \* handle_coin_event saves
+    /\ UNCHANGED state
     /\ budget' = budget - 1
 
 (* Web dashboard "return coins". daemon.c:800-819 zeroes the DAEMON ledger and
@@ -93,7 +107,9 @@ Coin ==
 CoinReturn ==
     /\ budget > 0
     /\ dcents' = 0
-    /\ UNCHANGED <<state, pcents, fcents>>
+    /\ pcents' = 0          \* one ledger: the plugin reads sdk_balance() live
+    /\ fcents' = 0
+    /\ UNCHANGED state
     /\ budget' = budget - 1
 
 (* Classic Phone idle timeout. classic_phone.c:477 zeroes the PLUGIN ledger
@@ -103,22 +119,22 @@ IdleTimeout ==
     /\ budget > 0
     /\ state = "IDLE_UP"
     /\ pcents' = 0
-    /\ UNCHANGED <<state, dcents, fcents>>
+    /\ dcents' = 0          \* classic_phone.c now calls sdk_clear_balance()
+    /\ fcents' = 0          \* tick -> keypad-less path; persisted on the next event
+    /\ UNCHANGED state
     /\ budget' = budget - 1
 
-(* Dialling a paid call. classic_phone.c:395-396 debits the plugin ledger and
-   calls plugins_adjust_inserted_cents(-cost) to mirror it. SYNCED -- but note
-   the daemon side clamps at zero (daemon.c:107), so if the two ledgers have
-   already diverged the clamp silently absorbs the difference instead of
-   surfacing it. *)
+(* Dialling a paid call: sdk_spend_balance(cost). Note the clamp at
+   daemon.c:107 is still there; with a single ledger it can no longer absorb a
+   divergence, because there is none to absorb. *)
 Charge ==
     /\ budget > 0
     /\ state = "IDLE_UP"
     /\ pcents >= Cost                       \* classic_phone.c:334 gates on the plugin ledger
     /\ pcents' = pcents - Cost
     /\ dcents' = Max(0, dcents - Cost)      \* daemon.c:106-108, clamped
+    /\ fcents' = Max(0, dcents - Cost)      \* handle_keypad_event now saves
     /\ state'  = "CALL_ACTIVE"
-    /\ UNCHANGED fcents
     /\ budget' = budget - 1
 
 (* Call failed while dialling (#91). classic_phone.c:189-190 credits both. *)
@@ -127,8 +143,8 @@ Refund ==
     /\ state = "CALL_ACTIVE"
     /\ pcents' = pcents + Cost
     /\ dcents' = dcents + Cost
+    /\ fcents' = dcents + Cost              \* refund runs from a call-state event, which saves
     /\ state'  = "IDLE_UP"
-    /\ UNCHANGED fcents
     /\ budget' = budget - 1
 
 (* Call ends on the plugin's own timeout: classic_phone_end_call (:430) zeroes
@@ -138,8 +154,9 @@ EndCallTimeout ==
     /\ budget > 0
     /\ state = "CALL_ACTIVE"
     /\ pcents' = 0
+    /\ dcents' = 0          \* classic_phone_end_call now calls sdk_clear_balance()
+    /\ fcents' = 0
     /\ state'  = "IDLE_UP"
-    /\ UNCHANGED <<dcents, fcents>>
     /\ budget' = budget - 1
 
 (* daemon_save_state (daemon.c:223-237) snapshots the DAEMON ledger only. *)
@@ -156,11 +173,14 @@ Save ==
    into daemon_state (:1171). So the plugin seeds from 0, not from the file.
    daemon.c:1174 re-activates the persisted plugin afterwards, which would
    re-seed it -- but only when the persisted plugin name is non-empty. *)
+(* The boot-ordering path is gone too: no plugin seeds a balance on activation
+   any more, so there is nothing to seed early. Both restart cases collapse to
+   the same behaviour -- the plugin reads whatever the daemon restored. *)
 RestartPluginNameEmpty ==
     /\ budget > 0
     /\ state'  = "IDLE_DOWN"
-    /\ dcents' = fcents      \* daemon ledger restored from the file
-    /\ pcents' = 0           \* plugin seeded from daemon_state while it was still 0
+    /\ dcents' = fcents
+    /\ pcents' = fcents
     /\ UNCHANGED fcents
     /\ budget' = budget - 1
 
@@ -207,7 +227,16 @@ LedgerAgreement == dcents = pcents
 NeverPromiseMoreThanHeld == pcents <= dcents
 
 (* A restart must not resurrect credit that was already spent or returned, nor
-   silently destroy credit the customer still has. *)
-PersistenceFaithful == fcents = 0 \/ fcents = dcents
+   silently destroy credit the customer still has.
+   
+   Stated as "the file always matches the live balance". The earlier form
+   (fcents = 0 \/ fcents = dcents) was wrong and never actually evaluated --
+   it sat in the drift config behind LedgerAgreement, which failed first.
+   
+   This is what caught the real bug: handle_keypad_event was the only event
+   handler that never called daemon_save_state, and a keypress is how money
+   gets SPENT. Insert 50c (saved), dial (charged, live 0, file still 50),
+   restart -- and the customer got their money back. *)
+PersistenceFaithful == fcents = dcents
 
 =============================================================================

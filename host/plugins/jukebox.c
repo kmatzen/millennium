@@ -22,7 +22,11 @@
 
 /* Jukebox plugin data */
 typedef struct {
-    int inserted_cents;
+    /* No inserted_cents here (#222) -- the balance lives only in
+     * daemon_state->inserted_cents, via sdk_balance()/sdk_spend_balance().
+     * This plugin previously never synced its private copy at all, so a song
+     * it charged for was invisible to /api/state, the persisted file and the
+     * revenue metrics. */
     int song_cost_cents;
     int selected_song;
     int is_playing;
@@ -84,10 +88,10 @@ static void jukebox_check_playback(void);
 /* Jukebox event handlers */
 static int jukebox_handle_coin(int coin_value, const char *coin_code) {
     if (coin_value > 0) {
-        jukebox_data.inserted_cents += coin_value;
+        /* The daemon already credited the balance; just react to the total. */
         jukebox_data.last_activity = sdk_now();
-        
-        if (jukebox_data.inserted_cents >= jukebox_data.song_cost_cents) {
+
+        if (sdk_balance() >= jukebox_data.song_cost_cents) {
             jukebox_show_menu();
         } else {
             jukebox_show_welcome();
@@ -95,7 +99,7 @@ static int jukebox_handle_coin(int coin_value, const char *coin_code) {
         
         logger_infof_with_category("Jukebox", 
                 "Coin inserted: %s, value: %d cents, total: %d cents",
-                coin_code, coin_value, jukebox_data.inserted_cents);
+                coin_code, coin_value, sdk_balance());
     }
     return 0;
 }
@@ -117,8 +121,8 @@ static int jukebox_handle_keypad(char key) {
     if (key >= '1' && key <= '9') {
         int song_number = key - '1'; /* Convert to 0-8 */
         if (song_number < (int)NUM_SONGS) {
-            if (jukebox_data.inserted_cents >= jukebox_data.song_cost_cents) {
-                jukebox_data.inserted_cents -= jukebox_data.song_cost_cents;
+            if (sdk_balance() >= jukebox_data.song_cost_cents) {
+                sdk_spend_balance(jukebox_data.song_cost_cents);
                 jukebox_play_song(song_number);
             }
         }
@@ -128,8 +132,8 @@ static int jukebox_handle_keypad(char key) {
 
 static int jukebox_handle_hook(int hook_up, int hook_down) {
     if (hook_up) {
-        /* Reset for new session */
-        jukebox_data.inserted_cents = 0;
+        /* Reset for new session. The balance is not touched here -- the daemon
+         * zeroes it on both hook transitions before the plugin runs. */
         jukebox_data.selected_song = -1;
         jukebox_data.is_playing = 0;
         jukebox_data.last_activity = sdk_now();
@@ -138,9 +142,6 @@ static int jukebox_handle_hook(int hook_up, int hook_down) {
         /* Stop playback and return coins */
         if (jukebox_data.is_playing) {
             jukebox_stop_song();
-        }
-        if (jukebox_data.inserted_cents > 0) {
-            jukebox_data.inserted_cents = 0;
         }
         jukebox_data.selected_song = -1;
         jukebox_data.is_playing = 0;
@@ -157,8 +158,9 @@ static int jukebox_handle_call_state(int call_state) {
 
 /* Internal function implementations */
 static void jukebox_on_activation(void) {
-    /* Reset state and show welcome when plugin is activated */
-    jukebox_data.inserted_cents = 0;
+    /* Reset state and show welcome when plugin is activated. The balance is
+     * read live from sdk_balance(), so whatever the customer already inserted
+     * carries into this plugin rather than being silently discarded. */
     jukebox_data.selected_song = -1;
     jukebox_data.is_playing = 0;
     jukebox_data.last_activity = sdk_now();
@@ -176,9 +178,10 @@ static void jukebox_show_welcome(void) {
     if (daemon_state && daemon_state->current_state == DAEMON_STATE_IDLE_DOWN) {
         strcpy(line1, "Lift receiver");
         strcpy(line2, "to play music");
-    } else if (jukebox_data.inserted_cents > 0) {
-        snprintf(line1, sizeof(line1), "Have: %dc", jukebox_data.inserted_cents);
-        snprintf(line2, sizeof(line2), "Need: %dc", jukebox_data.song_cost_cents - jukebox_data.inserted_cents);
+    } else if (sdk_balance() > 0) {
+        snprintf(line1, sizeof(line1), "Have: %dc", sdk_balance());
+        snprintf(line2, sizeof(line2), "Need: %dc",
+                 jukebox_data.song_cost_cents - sdk_balance());
     } else {
         snprintf(line1, sizeof(line1), "Insert %dc", jukebox_data.song_cost_cents);
         strcpy(line2, "to play music");
@@ -242,7 +245,7 @@ static void jukebox_stop_song(void) {
         jukebox_stop_audio();
         
         /* Return to menu or welcome */
-        if (jukebox_data.inserted_cents >= jukebox_data.song_cost_cents) {
+        if (sdk_balance() >= jukebox_data.song_cost_cents) {
             jukebox_show_menu();
         } else {
             jukebox_show_welcome();
@@ -469,7 +472,6 @@ int jukebox_display_strings(const char **out, int max) {
 /* Plugin registration function */
 void register_jukebox_plugin(void) {
     /* Initialize plugin data */
-    jukebox_data.inserted_cents = 0;
     jukebox_data.song_cost_cents = 25; /* 25 cents per song */
     jukebox_data.selected_song = -1;
     jukebox_data.is_playing = 0;

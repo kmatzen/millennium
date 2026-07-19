@@ -634,6 +634,13 @@ void handle_keypad_event(keypad_event_t *keypad_event) {
      * care about. */
     metrics_increment_counter("keypad_presses", 1);
     plugins_handle_keypad(key);
+    /* Persist after the plugin runs: a keypress is how money gets SPENT (the
+     * dial that charges call_cost_cents, a game that charges to start), and
+     * this was the only event handler that never saved. A restart between the
+     * spend and the next coin/hook/call event restored the pre-spend balance
+     * and handed the customer their money back. Same reason handle_card_event
+     * saves below. */
+    daemon_save_state();
     daemon_broadcast_state("keypad");
 }
 
@@ -648,6 +655,7 @@ void handle_card_event(card_event_t *card_event) {
     metrics_increment_counter("card_swipes", 1);
 
     plugins_handle_card(card_event->card_number);
+    daemon_save_state();
     daemon_broadcast_state("card");
 }
 
