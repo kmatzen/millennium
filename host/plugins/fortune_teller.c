@@ -16,7 +16,11 @@
 
 /* Fortune teller plugin data */
 typedef struct {
-    int inserted_cents;
+    /* No inserted_cents here (#222). The coin balance lives in exactly one
+     * place -- daemon_state->inserted_cents, reached via sdk_balance() /
+     * sdk_spend_balance(). A private copy has no way to learn about a coin
+     * return from the web dashboard, a hook event, or a restart, and this
+     * plugin never synced its copy back at all. */
     int fortune_cost_cents;
     int fortune_type;
     int is_ready;
@@ -86,10 +90,11 @@ static const char* fortune_teller_get_random_fortune(int category);
 /* Fortune teller event handlers */
 static int fortune_teller_handle_coin(int coin_value, const char *coin_code) {
     if (coin_value > 0) {
-        fortune_teller_data.inserted_cents += coin_value;
+        /* The daemon has already credited the balance (gated on IDLE_UP), so
+         * there is nothing to add here -- just react to the new total. */
         fortune_teller_data.last_activity = sdk_now();
-        
-        if (fortune_teller_data.inserted_cents >= fortune_teller_data.fortune_cost_cents) {
+
+        if (sdk_balance() >= fortune_teller_data.fortune_cost_cents) {
             fortune_teller_data.is_ready = 1;
             fortune_teller_show_menu();
         } else {
@@ -98,7 +103,7 @@ static int fortune_teller_handle_coin(int coin_value, const char *coin_code) {
         
         logger_infof_with_category("FortuneTeller", 
                 "Coin inserted: %s, value: %d cents, total: %d cents",
-                coin_code, coin_value, fortune_teller_data.inserted_cents);
+                coin_code, coin_value, sdk_balance());
     }
     return 0;
 }
@@ -110,7 +115,7 @@ static int fortune_teller_handle_keypad(char key) {
     
     if (key >= '1' && key <= '5') {
         fortune_teller_data.fortune_type = key - '1'; /* Convert to 0-4 */
-        fortune_teller_data.inserted_cents -= fortune_teller_data.fortune_cost_cents;
+        sdk_spend_balance(fortune_teller_data.fortune_cost_cents);
         fortune_teller_data.is_ready = 0;
         fortune_teller_give_fortune();
     }
@@ -119,17 +124,13 @@ static int fortune_teller_handle_keypad(char key) {
 
 static int fortune_teller_handle_hook(int hook_up, int hook_down) {
     if (hook_up) {
-        /* Reset for new session */
-        fortune_teller_data.inserted_cents = 0;
+        /* Reset for new session. The balance is not touched here: the daemon
+         * already zeroes it on both hook transitions, before the plugin runs. */
         fortune_teller_data.fortune_type = 0;
         fortune_teller_data.is_ready = 0;
         fortune_teller_data.last_activity = sdk_now();
         fortune_teller_show_welcome();
     } else if (hook_down) {
-        /* Return coins if handset down without fortune */
-        if (fortune_teller_data.inserted_cents > 0) {
-            fortune_teller_data.inserted_cents = 0;
-        }
         fortune_teller_data.fortune_type = 0;
         fortune_teller_data.is_ready = 0;
         fortune_teller_show_welcome();
@@ -145,9 +146,10 @@ static int fortune_teller_handle_call_state(int call_state) {
 
 /* Internal function implementations */
 static void fortune_teller_on_activation(void) {
-    fortune_teller_data.inserted_cents = 0;
+    /* Balance is read live from sdk_balance(), so there is nothing to restore
+     * -- whatever the customer has already inserted carries into this plugin. */
     fortune_teller_data.fortune_type = 0;
-    fortune_teller_data.is_ready = 0;
+    fortune_teller_data.is_ready = (sdk_balance() >= fortune_teller_data.fortune_cost_cents);
     fortune_teller_data.delay_state = FT_STATE_IDLE;
     fortune_teller_data.last_activity = sdk_now();
     fortune_teller_show_welcome();
@@ -161,9 +163,10 @@ static void fortune_teller_show_welcome(void) {
     if (daemon_state && daemon_state->current_state == DAEMON_STATE_IDLE_DOWN) {
         strcpy(line1, "Lift receiver");
         strcpy(line2, "for fortune");
-    } else if (fortune_teller_data.inserted_cents > 0) {
-        snprintf(line1, sizeof(line1), "Have: %dc", fortune_teller_data.inserted_cents);
-        snprintf(line2, sizeof(line2), "Need: %dc", fortune_teller_data.fortune_cost_cents - fortune_teller_data.inserted_cents);
+    } else if (sdk_balance() > 0) {
+        snprintf(line1, sizeof(line1), "Have: %dc", sdk_balance());
+        snprintf(line2, sizeof(line2), "Need: %dc",
+                 fortune_teller_data.fortune_cost_cents - sdk_balance());
     } else {
         snprintf(line1, sizeof(line1), "Insert %dc", fortune_teller_data.fortune_cost_cents);
         strcpy(line2, "for your fortune");
@@ -197,7 +200,10 @@ static void fortune_teller_tick(void) {
             snprintf(log_msg, sizeof(log_msg), "Fortune given: %s - %s", category, fortune);
             logger_info_with_category("FortuneTeller", log_msg);
         }
-        fortune_teller_data.inserted_cents = 0;
+        /* The cost was already deducted with sdk_spend_balance() when the
+         * category was chosen. Zeroing the balance here as well used to wipe
+         * the customer's change: insert 50c for a 25c fortune and the
+         * remaining 25c vanished. */
         fortune_teller_data.fortune_type = 0;
         fortune_teller_data.is_ready = 0;
         fortune_teller_data.delay_state = FT_STATE_SHOWING;
@@ -257,7 +263,6 @@ int fortune_teller_display_strings(const char **out, int max) {
 /* Plugin registration function */
 void register_fortune_teller_plugin(void) {
     /* Initialize plugin data */
-    fortune_teller_data.inserted_cents = 0;
     fortune_teller_data.fortune_cost_cents = 25; /* 25 cents per fortune */
     fortune_teller_data.fortune_type = 0;
     fortune_teller_data.is_ready = 0;

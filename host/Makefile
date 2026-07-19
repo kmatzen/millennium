@@ -365,12 +365,6 @@ tla-check-race:
 coin-check:
 	cd tests && $(TLC) -config CoinLedger.cfg CoinLedger.tla
 
-# The ledger-divergence properties. Expected to report violations: four
-# independent paths let the daemon and plugin ledgers drift. Each counterexample
-# and its code site is listed in tests/CoinLedgerDrift.cfg.
-coin-check-drift:
-	cd tests && $(TLC) -config CoinLedgerDrift.cfg CoinLedger.tla
-
 # TLC model-check of the OTA updater (tests/Updater.tla): the check FSM, the
 # four-step apply pipeline, and what a restart does to a call in progress.
 # See docs/OTA_UPDATE.md.
@@ -396,4 +390,4 @@ lock-check:
 lock-check-mutant:
 	cd tests && $(TLC) -config LockOrderMutant.cfg LockOrder.tla
 
-.PHONY: all clean install uninstall test unit_tests api-test device-test break-test operator-smoke regen-clips tsan-queue cbmc-parser cbmc-parsers model-check game-check state-check tla-check tla-check-race coin-check coin-check-drift ota-check ota-check-open lock-check lock-check-mutant pjsip-smoke
+.PHONY: all clean install uninstall test unit_tests api-test device-test break-test operator-smoke regen-clips tsan-queue cbmc-parser cbmc-parsers model-check game-check state-check tla-check tla-check-race coin-check ota-check ota-check-open lock-check lock-check-mutant pjsip-smoke

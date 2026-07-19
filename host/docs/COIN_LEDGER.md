@@ -25,6 +25,52 @@ money would need the meaning of the validator's `'c'` / `'z'` commands, and
 Modelling them would mean inventing semantics. The three software ledgers are
 fully determined by code, so those are what is checked.
 
+## Status: resolved (#222)
+
+There is now **one** ledger. `classic_phone`, `jukebox` and `fortune_teller` no
+longer keep a private `inserted_cents`; they read and write
+`daemon_state->inserted_cents` through `sdk_balance()` / `sdk_spend_balance()` /
+`sdk_add_balance()` / `sdk_clear_balance()` — the pattern `number_guess` (the
+canonical example in `CLAUDE.md`) already used. The other four plugins hold no
+money.
+
+`make coin-check-drift` is gone: with a single ledger the four divergence paths
+cannot be expressed, so a config asserting they exist would pass and mean
+nothing. The invariants it used to check (`LedgerAgreement`,
+`NeverPromiseMoreThanHeld`, `PersistenceFaithful`) moved into `make coin-check`,
+where they now hold. `pcents` is deliberately kept as a separate variable in the
+spec so that re-introducing a private ledger re-breaks `LedgerAgreement`.
+
+### What the four paths were
+
+| # | Path | Site | Effect |
+|---|---|---|---|
+| 1 | Coin return | `daemon.c:800` | Zeroed the daemon ledger only; the VFD kept offering credit that was gone |
+| 2 | Idle timeout | `classic_phone.c` | Zeroed the plugin ledger only, raising no daemon event |
+| 3 | Boot ordering | `daemon.c:1160-1174` | Plugin seeded from a balance not yet restored |
+| 4 | Call timeout | `classic_phone.c` | Zeroed the plugin ledger only |
+
+Two further problems surfaced during the fix, both worse than the modelled ones:
+
+- **`jukebox` and `fortune_teller` never synced at all** — zero calls to the
+  sync channel. Money they charged was invisible to `/api/state`, the persisted
+  file and the revenue metrics.
+- **`fortune_teller` zeroed the balance after already deducting the cost**, so
+  a 50¢ insert for a 25¢ fortune silently ate the 25¢ change.
+
+### And one the spec caught only after the fix
+
+`handle_keypad_event` was the **only** event handler that never called
+`daemon_save_state` — and a keypress is how money gets *spent* (the dial that
+charges `call_cost_cents`, a game that charges to start). Insert 50¢ (saved),
+dial (charged, live balance 0, file still 50¢), restart — and the customer got
+their money back. `handle_card_event` had the same gap. Both now save.
+
+This only became visible once `PersistenceFaithful` was stated correctly. Its
+earlier form (`fcents = 0 \/ fcents = dcents`) was wrong and had never actually
+been evaluated: it sat in the drift config behind `LedgerAgreement`, which
+failed first.
+
 ## Verified (`make coin-check`, 3316 states)
 
 No ledger goes negative, and all three stay well-typed across every interleaving

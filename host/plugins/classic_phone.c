@@ -15,7 +15,11 @@
 
 /* Classic phone plugin data */
 typedef struct {
-    int inserted_cents;
+    /* No inserted_cents here (#222). The balance lives in exactly one place --
+     * daemon_state->inserted_cents, reached via sdk_balance()/sdk_spend_balance().
+     * The private copy could not see a coin return from the dashboard, and the
+     * plugin's own idle/call timeouts zeroed it without telling the daemon, so
+     * the two ledgers drifted in both directions. */
     int call_cost_cents;
     char keypad_buffer[11];
     int keypad_length;
@@ -60,7 +64,7 @@ static int classic_phone_handle_coin(int coin_value, const char *coin_code) {
     /* Only accept coins when phone is ready for operation (IDLE_UP state) */
     if (coin_value > 0 && daemon_state && daemon_state->current_state == DAEMON_STATE_IDLE_UP) {
         audio_tones_play_coin_tone();
-        classic_phone_data.inserted_cents += coin_value;
+        /* The daemon already credited the balance (gated on IDLE_UP). */
         classic_phone_data.last_activity = sdk_now();
 
         classic_phone_update_display();
@@ -68,7 +72,7 @@ static int classic_phone_handle_coin(int coin_value, const char *coin_code) {
         
         logger_infof_with_category("ClassicPhone", 
                 "Coin inserted: %s, value: %d cents, total: %d cents",
-                coin_code, coin_value, classic_phone_data.inserted_cents);
+                coin_code, coin_value, sdk_balance());
     }
     return 0;
 }
@@ -108,10 +112,10 @@ static int classic_phone_handle_keypad(char key) {
          * money) the '#' request stays armed; tell the user what's missing. */
         if (!classic_phone_data.is_dialing && !classic_phone_data.is_in_call &&
             !classic_phone_is_free_number() && !classic_phone_data.is_card_call &&
-            classic_phone_data.inserted_cents < classic_phone_data.call_cost_cents) {
+            sdk_balance() < classic_phone_data.call_cost_cents) {
             char line2[21];
             snprintf(line2, sizeof(line2), "Insert %dc",
-                     classic_phone_data.call_cost_cents - classic_phone_data.inserted_cents);
+                     classic_phone_data.call_cost_cents - sdk_balance());
             display_manager_set_text("Need more coins", line2);
         }
     }
@@ -138,8 +142,9 @@ static int classic_phone_handle_hook(int hook_up, int hook_down) {
             classic_phone_data.call_start_time = sdk_now();
             classic_phone_update_display();
         } else {
-            /* Start new call session — play dial tone */
-            classic_phone_data.inserted_cents = 0;
+            /* Start new call session — play dial tone. The balance is not
+              * cleared here: the daemon already zeroed it on the hook-up
+              * transition, before this handler runs. */
             classic_phone_data.keypad_length = 0;
             classic_phone_data.send_requested = 0;
             classic_phone_data.last_activity = sdk_now();
@@ -150,7 +155,7 @@ static int classic_phone_handle_hook(int hook_up, int hook_down) {
         audio_tones_stop();
         classic_phone_data.keypad_length = 0;
         classic_phone_data.send_requested = 0;
-        classic_phone_data.inserted_cents = 0;
+        /* Balance already zeroed by the daemon's hook-down handler. */
         classic_phone_data.is_card_call = 0;
         classic_phone_data.card_number[0] = '\0';
         classic_phone_data.is_dialing = 0;  /* #93: clear on hang-up during dialing */
@@ -186,8 +191,7 @@ static int classic_phone_handle_call_state(int call_state) {
     } else if (call_state == EVENT_CALL_STATE_INVALID) {
         if (classic_phone_data.is_dialing) {
             /* #91: Call failed during dial - refund and show failure */
-            classic_phone_data.inserted_cents += classic_phone_data.call_cost_cents;
-            plugins_adjust_inserted_cents(classic_phone_data.call_cost_cents);  /* #109: sync daemon_state */
+            sdk_add_balance(classic_phone_data.call_cost_cents);
             classic_phone_data.is_dialing = 0;
             display_manager_set_text("Call failed", "Coins refunded");
             logger_info_with_category("ClassicPhone", "Call failed - coins refunded");
@@ -243,7 +247,7 @@ static int classic_phone_handle_card(const char *card_number) {
 /* Internal function implementations */
 static void classic_phone_on_activation(void) {
     /* Restore coins from daemon_state (may have been loaded from persisted state) */
-    classic_phone_data.inserted_cents = daemon_state ? daemon_state->inserted_cents : 0;
+    /* Nothing to restore: the balance is read live from sdk_balance(). */
     classic_phone_data.keypad_length = 0;
     classic_phone_data.send_requested = 0;
     classic_phone_data.is_dialing = 0;
@@ -294,8 +298,8 @@ static void classic_phone_update_display(void) {
             classic_phone_format_number("", line1);
         }
         
-        if (classic_phone_data.inserted_cents > 0) {
-            snprintf(line2, sizeof(line2), "Have: %dc", classic_phone_data.inserted_cents);
+        if (sdk_balance() > 0) {
+            snprintf(line2, sizeof(line2), "Have: %dc", sdk_balance());
         } else {
             snprintf(line2, sizeof(line2), "Insert %dc", classic_phone_data.call_cost_cents);
         }
@@ -331,7 +335,7 @@ static void classic_phone_remove_last_key(void) {
 }
 
 static int classic_phone_has_enough_money(void) {
-    return classic_phone_data.inserted_cents >= classic_phone_data.call_cost_cents;
+    return sdk_balance() >= classic_phone_data.call_cost_cents;
 }
 
 static int classic_phone_has_complete_number(void) {
@@ -392,8 +396,7 @@ static void classic_phone_start_call(void) {
     classic_phone_update_display();
 
     if (!classic_phone_data.is_emergency_call && !classic_phone_data.is_card_call) {
-        classic_phone_data.inserted_cents -= classic_phone_data.call_cost_cents;
-        plugins_adjust_inserted_cents(-classic_phone_data.call_cost_cents);  /* #109: sync daemon_state */
+        sdk_spend_balance(classic_phone_data.call_cost_cents);
     }
 
     millennium_client_call(client, classic_phone_data.current_number);
@@ -427,7 +430,11 @@ static void classic_phone_end_call(void) {
     classic_phone_data.card_number[0] = '\0';
     classic_phone_data.keypad_length = 0;
     classic_phone_data.send_requested = 0;
-    classic_phone_data.inserted_cents = 0;
+    /* #222: was a bare `inserted_cents = 0`, which the daemon never saw. On the
+     * plugin's own call timeout no daemon event fires, so the daemon ledger and
+     * the persisted file kept credit the customer could no longer spend.
+     * sdk_clear_balance goes through the one ledger, so it cannot drift. */
+    sdk_clear_balance();
 
     millennium_client_hangup(client);
     classic_phone_update_display();
@@ -474,7 +481,9 @@ static void classic_phone_tick(void) {
             audio_tones_stop();
             classic_phone_data.keypad_length = 0;
             classic_phone_data.send_requested = 0;
-            classic_phone_data.inserted_cents = 0;
+            /* #222: same as the call-timeout path -- the idle timeout raises no
+             * daemon event, so a bare local zero left the ledgers diverged. */
+            sdk_clear_balance();
             classic_phone_data.last_activity = sdk_now();
             classic_phone_update_display();
         }
@@ -520,7 +529,6 @@ static void classic_phone_tick(void) {
 /* Plugin registration function */
 void register_classic_phone_plugin(void) {
     /* Initialize plugin data */
-    classic_phone_data.inserted_cents = 0;
     classic_phone_data.call_cost_cents = config_get_call_cost_cents(config_get_instance()); /* Use configurable cost like original daemon */
     classic_phone_data.keypad_length = 0;
     classic_phone_data.send_requested = 0;
