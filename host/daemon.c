@@ -7,6 +7,7 @@
 #include "call_metrics.h"
 #include "health_monitor.h"
 #include "web_server.h"
+#include "updater.h"
 #include "millennium_sdk.h"
 #include "events.h"
 #include "event_processor.h"
@@ -131,6 +132,7 @@ static void daemon_save_state(void);
 static void daemon_broadcast_state(const char *event_type);
 static health_status_t check_sip_connection(char *message, size_t message_len);
 static health_status_t check_daemon_activity(char *message, size_t message_len);
+static int daemon_restart_is_safe(void);
 static void update_metrics(void);
 
 /* C-compatible functions for web server */
@@ -947,6 +949,17 @@ health_status_t check_sip_connection(char *message, size_t message_len) {
     return HEALTH_STATUS_UNKNOWN;
 }
 
+/* #225: non-zero when it is safe to restart the daemon -- i.e. the phone is
+ * not ringing and not on a call. Installed into the updater at startup. */
+static int daemon_restart_is_safe(void) {
+    daemon_state_t st;
+    if (!daemon_state) return 1;
+    pthread_mutex_lock(&daemon_state_mutex);
+    st = daemon_state->current_state;
+    pthread_mutex_unlock(&daemon_state_mutex);
+    return !(st == DAEMON_STATE_CALL_ACTIVE || st == DAEMON_STATE_CALL_INCOMING);
+}
+
 health_status_t check_daemon_activity(char *message, size_t message_len) {
     time_t now;
     time_t last_activity;
@@ -1149,6 +1162,12 @@ int main(int argc, char *argv[]) {
     health_monitor_register_check("serial_connection", check_serial_connection, 30);
     health_monitor_register_check("sip_connection", check_sip_connection, 60);
     health_monitor_register_check("daemon_activity", check_daemon_activity, 120);
+
+    /* #225: let the updater ask whether a restart is safe. /api/update already
+     * refuses with 409 during a call, but the build takes minutes and the
+     * handset may be lifted in between, so the updater re-checks immediately
+     * before `systemctl restart` and defers if the phone is in use. */
+    updater_set_restart_guard(daemon_restart_is_safe);
     health_monitor_start_monitoring();
     
     /* Start metrics server if enabled */

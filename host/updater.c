@@ -171,6 +171,13 @@ static char apply_status[256] = "No update attempted";
 static int apply_state = 0;  /* 0=idle, 1=applying */
 static char apply_source_dir[512] = {0};
 static pthread_mutex_t apply_mutex = PTHREAD_MUTEX_INITIALIZER;
+static int (*restart_guard)(void) = NULL;
+
+void updater_set_restart_guard(int (*guard)(void)) {
+    pthread_mutex_lock(&apply_mutex);
+    restart_guard = guard;
+    pthread_mutex_unlock(&apply_mutex);
+}
 
 void updater_get_apply_status(char *out, size_t out_size) {
     if (!out || out_size == 0) return;
@@ -253,14 +260,73 @@ static int run_command(const char *cmd) {
     return rc;
 }
 
+/* Capture the first line of a command's stdout into `out` (NUL-terminated,
+ * trailing newline stripped). Returns 0 on success, -1 if the command could not
+ * be run or produced nothing. Used to record the pre-update commit (#224). */
+static int capture_command(const char *cmd, char *out, size_t out_size) {
+    FILE *fp;
+    size_t len;
+
+    if (!out || out_size == 0) return -1;
+    out[0] = '\0';
+
+    fp = popen(cmd, "r");
+    if (!fp) return -1;
+    if (fgets(out, (int)out_size, fp) == NULL) {
+        pclose(fp);
+        return -1;
+    }
+    pclose(fp);
+
+    len = strlen(out);
+    while (len > 0 && (out[len - 1] == '\n' || out[len - 1] == '\r')) {
+        out[--len] = '\0';
+    }
+    return len > 0 ? 0 : -1;
+}
+
+/* Put the working tree back on the commit it was on before the pull (#224).
+ *
+ * `make clean` runs before `make daemon`, and the pull has already moved the
+ * tree, so a failure after step 1 otherwise strands new source with no binary
+ * and no record of where it came from. Best-effort: if the reset itself fails
+ * there is nothing further to try, so it is logged and the original failure is
+ * still what gets reported. */
+static void rollback_to(const char *source_dir, const char *commit) {
+    char cmd[512];
+
+    if (!commit || !*commit) return;
+
+    logger_warnf_with_category("Updater", "Rolling back working tree to %s", commit);
+    snprintf(cmd, sizeof(cmd), "cd '%s' && git reset --hard %s 2>&1", source_dir, commit);
+    if (run_command(cmd) != 0) {
+        logger_error_with_category("Updater",
+                "Rollback failed; working tree left at the updated commit");
+    }
+}
+
 int updater_apply(const char *source_dir) {
     char cmd[512];
+    char prev_commit[64];
 
     if (!source_dir || !*source_dir) {
         pthread_mutex_lock(&apply_mutex);
         snprintf(apply_status, sizeof(apply_status), "Error: no source directory specified");
         pthread_mutex_unlock(&apply_mutex);
         return -1;
+    }
+
+    /* Record where we are BEFORE touching anything, so a later step can undo
+     * the pull (#224). If this fails we carry on without a rollback point
+     * rather than refusing the update -- but say so, because a failure after
+     * this point will then leave the tree moved. */
+    snprintf(cmd, sizeof(cmd), "cd '%s' && git rev-parse HEAD 2>/dev/null", source_dir);
+    if (capture_command(cmd, prev_commit, sizeof(prev_commit)) != 0) {
+        prev_commit[0] = '\0';
+        logger_warn_with_category("Updater",
+                "Could not record current commit; update will not be rollback-able");
+    } else {
+        logger_infof_with_category("Updater", "Pre-update commit: %s", prev_commit);
     }
 
     pthread_mutex_lock(&apply_mutex);
@@ -279,8 +345,11 @@ int updater_apply(const char *source_dir) {
     pthread_mutex_unlock(&apply_mutex);
     snprintf(cmd, sizeof(cmd), "cd '%s/host' && make clean && make daemon 2>&1", source_dir);
     if (run_command(cmd) != 0) {
+        rollback_to(source_dir, prev_commit);
         pthread_mutex_lock(&apply_mutex);
-        snprintf(apply_status, sizeof(apply_status), "Error: build failed");
+        snprintf(apply_status, sizeof(apply_status),
+                 prev_commit[0] ? "Error: build failed (rolled back)"
+                                : "Error: build failed");
         pthread_mutex_unlock(&apply_mutex);
         return -1;
     }
@@ -290,10 +359,42 @@ int updater_apply(const char *source_dir) {
     pthread_mutex_unlock(&apply_mutex);
     snprintf(cmd, sizeof(cmd), "cd '%s/host' && sudo make install 2>&1", source_dir);
     if (run_command(cmd) != 0) {
+        /* Source is rolled back; the installed binary is NOT. Undoing an
+         * install needs a backup of the previous binary, which does not exist
+         * -- so this restores the tree and says plainly that it did not restore
+         * the installed daemon. */
+        rollback_to(source_dir, prev_commit);
         pthread_mutex_lock(&apply_mutex);
-        snprintf(apply_status, sizeof(apply_status), "Error: install failed");
+        snprintf(apply_status, sizeof(apply_status),
+                 prev_commit[0]
+                   ? "Error: install failed (source rolled back; installed binary unchanged)"
+                   : "Error: install failed");
         pthread_mutex_unlock(&apply_mutex);
         return -1;
+    }
+
+    /* #225, second check. The handler refused this request if the phone was in
+     * a call, but that was minutes ago -- the build and install have run since,
+     * and the handset may have been lifted. Re-check at the moment it matters.
+     *
+     * Deferring rather than dropping the call: the new binary is installed and
+     * will be running after the next restart, whenever that happens. Nothing is
+     * lost by waiting, whereas restarting here would cut off a live call. */
+    {
+        int (*guard)(void);
+        pthread_mutex_lock(&apply_mutex);
+        guard = restart_guard;
+        pthread_mutex_unlock(&apply_mutex);
+
+        if (guard != NULL && !guard()) {
+            logger_warn_with_category("Updater",
+                    "Phone in use; installed the update but deferring the restart");
+            pthread_mutex_lock(&apply_mutex);
+            snprintf(apply_status, sizeof(apply_status),
+                     "Update installed; restart deferred (phone in use)");
+            pthread_mutex_unlock(&apply_mutex);
+            return 0;
+        }
     }
 
     pthread_mutex_lock(&apply_mutex);

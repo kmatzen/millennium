@@ -1647,6 +1647,28 @@ struct http_response web_server_handle_api_update(const struct http_request* req
     memset(&response, 0, sizeof(response));
     web_server_strcpy_safe(response.content_type, "application/json", sizeof(response.content_type));
 
+    /* #225: never restart the daemon out from under a call. The apply ends in
+     * `systemctl restart`, which kills the process and drops whatever call is
+     * up, with no warning to either party. Nothing in this path used to check.
+     *
+     * Refusing rather than deferring: the operator can retry in a moment, and
+     * queueing the request would need somewhere to park it plus a way to report
+     * that it is pending. 409 Conflict, because the request is valid but the
+     * current state forbids it.
+     *
+     * Escrowed coins are NOT at risk either way -- daemon_save_state runs after
+     * every event, and the balance is restored on boot (verified by
+     * tests/Updater.tla, NoCreditLostOnRestart). It is the call that is lost. */
+    if (web_server_is_in_call()) {
+        snprintf(json, sizeof(json),
+            "{\"success\":false,\"status\":\"Phone is in a call; update refused. Retry when the call ends.\",\"accepted\":false}");
+        response.status_code = 409;  /* Conflict */
+        web_server_strcpy_safe(response.body, json, sizeof(response.body));
+        logger_warn_with_category("WebServer",
+                "Update requested during a call; refused with 409");
+        return response;
+    }
+
     /* #118: Non-blocking - don't block web server for minutes */
     source_dir = config_get_string(config_get_instance(), "system.source_dir", "/home/matzen/millennium");
     rc = updater_apply_async(source_dir);

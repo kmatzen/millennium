@@ -371,12 +371,6 @@ coin-check:
 ota-check:
 	cd tests && $(TLC) -config Updater.cfg Updater.tla
 
-# The open updater findings. Expected to report violations: the check FSM is a
-# one-way ratchet, "success" is reported without checking the restart, a failed
-# build strands the tree, and the restart ignores call state.
-ota-check-open:
-	cd tests && $(TLC) -config UpdaterOpen.cfg Updater.tla
-
 # TLC model-check of the mutex acquisition graph (tests/LockOrder.tla) for
 # circular wait. The chains were extracted from the source, not from the
 # comment in daemon.c -- see the module header. Needs tla2tools.jar.
@@ -390,4 +384,4 @@ lock-check:
 lock-check-mutant:
 	cd tests && $(TLC) -config LockOrderMutant.cfg LockOrder.tla
 
-.PHONY: all clean install uninstall test unit_tests api-test device-test break-test operator-smoke regen-clips tsan-queue cbmc-parser cbmc-parsers model-check game-check state-check tla-check tla-check-race coin-check ota-check ota-check-open lock-check lock-check-mutant pjsip-smoke
+.PHONY: all clean install uninstall test unit_tests api-test device-test break-test operator-smoke regen-clips tsan-queue cbmc-parser cbmc-parsers model-check game-check state-check tla-check tla-check-race coin-check ota-check lock-check lock-check-mutant pjsip-smoke

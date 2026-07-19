@@ -55,4 +55,18 @@ int updater_is_applying(void);
  * under the lock is the point -- see updater_get_latest_version (#227). */
 void updater_get_apply_status(char *out, size_t out_size);
 
+/* Install a predicate answering "is it safe to restart the daemon right now?"
+ * (returns non-zero for yes). updater_apply consults it immediately before
+ * `systemctl restart` and DEFERS the restart if it says no.
+ *
+ * The /api/update handler already refuses with 409 while the phone is in a
+ * call (#225), but that only checks at request time -- the build takes minutes,
+ * and someone can lift the handset in the meantime. This is the second check,
+ * at the moment it actually matters.
+ *
+ * A function pointer rather than a direct call so updater.c stays free of
+ * daemon/web_server dependencies: updater.o is linked into the unit tests,
+ * which link neither. NULL (the default) means "always safe". */
+void updater_set_restart_guard(int (*guard)(void));
+
 #endif /* UPDATER_H */
