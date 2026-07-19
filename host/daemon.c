@@ -61,40 +61,45 @@ pthread_mutex_t daemon_state_mutex = PTHREAD_MUTEX_INITIALIZER;
  * run the same paths via send_control_command. Held only around the work, never
  * across the idle sleep.
  *
- * LOCK ORDER (#231). Acquire only left to right, never the reverse:
+ * LOCK ORDER (#231). Acquire only in increasing rank, never the reverse:
  *
- *   engine_mutex
- *     -> g_monitor_mutex
- *          -> daemon_state_mutex
- *               -> metrics_mutex
- *     -> daemon_state_mutex
- *          -> metrics_mutex
- *     -> plugins_mutex
- *     -> g_queue_mutex        (the SDK event queue)
+ *   1. engine_mutex
+ *   2. g_monitor_mutex
+ *   3. daemon_state_mutex
+ *   4. plugins_mutex
+ *   5. leaves, never held while taking anything else:
+ *        metrics_mutex, logger_mutex, g_queue_mutex, g_sip_mutex,
+ *        tone_mutex, server->state_mutex, conn_queue.mutex
+ *      plus logger_file_mutex -> log_queue.lock, which is ordered only
+ *      against each other.
  *
- * Two paths here are easy to miss, so spelling them out:
+ * This is verified, not asserted: tests/LockOrder.tla model-checks the real
+ * acquisition chains for circular wait (`make lock-check`), and the edge set
+ * was extracted from the source rather than written from memory. An earlier
+ * version of this comment was incomplete in two ways the extraction caught:
  *
- *   - engine_mutex -> g_monitor_mutex: the main loop holds engine_mutex across
- *     the engine step and calls update_metrics(), which reaches
- *     health_monitor_publish_metrics -> health_monitor_get_all_checks and takes
- *     g_monitor_mutex. Meanwhile the health thread's monitoring_loop holds
- *     g_monitor_mutex across execute_check(), and check_daemon_activity() takes
- *     daemon_state_mutex -- hence the three-deep chain.
+ *   - daemon_state_mutex -> plugins_mutex is real. daemon_broadcast_state
+ *     holds daemon_state_mutex and calls plugins_get_active_name (:304-306).
+ *     The two are NOT siblings, as this comment previously implied.
+ *   - daemon_state_mutex -> logger_mutex / log_queue.lock is real: the event
+ *     handlers below log from inside the state-mutex region.
  *
- *   - daemon_state_mutex -> metrics_mutex: the event handlers below bump
- *     counters and call_metrics_* from INSIDE the daemon_state_mutex region
- *     (handle_coin_event, handle_call_state_event, handle_hook_event). So
- *     metrics_mutex is genuinely nested, not leaf-only. Nothing in metrics.c or
- *     call_metrics.c reaches back into daemon_state, which is what keeps this
- *     acyclic -- do not add such a call.
+ * The g_monitor_mutex -> daemon_state_mutex edge is invisible to any
+ * call-graph tool, because it runs through a function pointer:
+ * health_monitor_run_all_checks holds g_monitor_mutex across execute_check
+ * (health_monitor.c:213-216), which dispatches check->check_function (:397),
+ * registered here (:1138) as check_daemon_activity, which takes
+ * daemon_state_mutex (:948). It has to be read to be found.
  *
- * Note plugins_mutex and metrics_mutex are deliberately kept UN-nested in the
- * other direction: plugins_record_activation is called after releasing
- * plugins_mutex (see plugins.c). That is a choice, not an accident.
+ * Two properties are load-bearing for acyclicity, so do not "tidy" them away:
  *
- * These are outside the order because they are always taken alone: running_mutex,
- * the logger mutexes, tone_mutex, the updater's check_mutex / apply_mutex, the
- * web server's state_mutex and conn_queue.mutex. */
+ *   - Plugin callbacks run OUTSIDE plugins_mutex (#226, #223). Moving
+ *     handle_activation or sdk_release_session back inside the lock adds
+ *     plugins_mutex -> daemon_state_mutex and closes a cycle against the
+ *     daemon_state -> plugins edge above. LockOrder.tla's Mutated config is
+ *     exactly that change, and it deadlocks.
+ *   - Nothing in metrics.c or call_metrics.c reaches back into daemon_state,
+ *     and nothing under g_monitor_mutex takes engine_mutex. */
 static pthread_mutex_t engine_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 /* Simple validation macro */
