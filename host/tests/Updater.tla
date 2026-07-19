@@ -29,10 +29,12 @@ VARIABLES
     inCall,    \* daemon_state->current_state == CALL_ACTIVE
     escrow,    \* daemon_state->inserted_cents
     persisted, \* the persisted state file
+    callDropped,   \* ghost: TRUE if an update restart ever cut off a live call
+    badInstall,    \* ghost: TRUE if anything was ever installed without a pull
     budget
 
 vars == <<check, verKnown, apply, src, build, installed, running,
-          status, inCall, escrow, persisted, budget>>
+          status, inCall, escrow, persisted, callDropped, badInstall, budget>>
 
 Init ==
     /\ check     = "idle"
@@ -46,6 +48,8 @@ Init ==
     /\ inCall    = FALSE
     /\ escrow    = 0
     /\ persisted = 0
+    /\ callDropped = FALSE
+    /\ badInstall  = FALSE
     /\ budget    = MaxEvents
 
 Tick == budget > 0 /\ budget' = budget - 1
@@ -67,7 +71,7 @@ CheckStart ==
     /\ check # "checking"                  \* updater.c:99 -- the guard (was `== "idle"`)
     /\ check' = "checking"
     /\ UNCHANGED <<verKnown, apply, src, build, installed, running,
-                   status, inCall, escrow, persisted>>
+                   status, inCall, escrow, persisted, callDropped, badInstall>>
 
 CheckFinish ==
     /\ Tick
@@ -75,7 +79,7 @@ CheckFinish ==
     /\ check' = "checked"
     /\ \E ok \in {TRUE, FALSE} : verKnown' = ok   \* curl may fail (:44, :51, :57)
     /\ UNCHANGED <<apply, src, build, installed, running,
-                   status, inCall, escrow, persisted>>
+                   status, inCall, escrow, persisted, callDropped, badInstall>>
 
 -----------------------------------------------------------------------------
 (***************************************************************************)
@@ -87,10 +91,11 @@ CheckFinish ==
 ApplyStart ==
     /\ Tick
     /\ apply = "idle"
+    /\ ~inCall                    \* #225: /api/update returns 409 during a call
     /\ apply'  = "applying"
     /\ status' = "pulling"
     /\ UNCHANGED <<check, verKnown, src, build, installed, running,
-                   inCall, escrow, persisted>>
+                   inCall, escrow, persisted, callDropped, badInstall>>
 
 (* Step 1: git pull --ff-only. On failure the pipeline returns -1 with the
    tree untouched -- this step alone is clean. *)
@@ -100,7 +105,7 @@ PullOk ==
     /\ src' = "new"
     /\ status' = "building"
     /\ UNCHANGED <<check, verKnown, apply, build, installed, running,
-                   inCall, escrow, persisted>>
+                   inCall, escrow, persisted, callDropped, badInstall>>
 
 PullFail ==
     /\ Tick
@@ -108,7 +113,7 @@ PullFail ==
     /\ apply'  = "idle"
     /\ status' = "err_pull"
     /\ UNCHANGED <<check, verKnown, src, build, installed, running,
-                   inCall, escrow, persisted>>
+                   inCall, escrow, persisted, callDropped, badInstall>>
 
 (* Step 2: `make clean && make daemon`. make clean runs FIRST and
    unconditionally, so a build failure leaves no binary behind -- and the tree
@@ -119,33 +124,39 @@ BuildOk ==
     /\ build'  = "new"
     /\ status' = "installing"
     /\ UNCHANGED <<check, verKnown, apply, src, installed, running,
-                   inCall, escrow, persisted>>
+                   inCall, escrow, persisted, callDropped, badInstall>>
 
 BuildFail ==
     /\ Tick
     /\ apply = "applying" /\ status = "building"
     /\ build'  = "wiped"          \* make clean already ran; make daemon did not finish
+    /\ src'    = "old"            \* #224: rollback_to(prev_commit)
     /\ apply'  = "idle"
     /\ status' = "err_build"
-    /\ UNCHANGED <<check, verKnown, src, installed, running,
-                   inCall, escrow, persisted>>
+    /\ UNCHANGED <<check, verKnown, installed, running,
+                   inCall, escrow, persisted, callDropped, badInstall>>
 
 (* Step 3: sudo make install. *)
 InstallOk ==
     /\ Tick
     /\ apply = "applying" /\ status = "installing"
+    /\ badInstall' = (badInstall \/ (src # "new"))
     /\ installed' = "new"
     /\ status'    = "restarting"
     /\ UNCHANGED <<check, verKnown, apply, src, build, running,
-                   inCall, escrow, persisted>>
+                   inCall, escrow, persisted, callDropped, badInstall>>
 
 InstallFail ==
     /\ Tick
     /\ apply = "applying" /\ status = "installing"
+    /\ src'    = "old"            \* #224: source rolled back...
     /\ apply'  = "idle"
     /\ status' = "err_install"
-    /\ UNCHANGED <<check, verKnown, src, build, installed, running,
-                   inCall, escrow, persisted>>
+    \* ...but `installed` is deliberately NOT restored: undoing an install
+    \* needs a backup of the previous binary, which does not exist. The status
+    \* string says so rather than pretending otherwise.
+    /\ UNCHANGED <<check, verKnown, build, installed, running,
+                   inCall, escrow, persisted, callDropped, badInstall>>
 
 (* Step 4: sudo systemctl restart daemon.service.
    updater.c:273 calls run_command WITHOUT checking its return value, then
@@ -155,23 +166,42 @@ InstallFail ==
    The restart is also not coordinated with call state -- nothing in
    web_server_handle_api_update consults web_server_is_in_call() or
    daemon_state->current_state. *)
+(* #225 second check: the guard re-tests call state immediately before the
+   restart, because the build has taken minutes since /api/update refused.
+   Deferring rather than dropping the call -- the installed binary takes effect
+   at the next restart, whenever that is. *)
+RestartDeferred ==
+    /\ Tick
+    /\ apply = "applying" /\ status = "restarting"
+    /\ inCall
+    /\ apply'  = "idle"
+    /\ status' = "deferred"
+    /\ UNCHANGED <<check, verKnown, src, build, installed, running,
+                   inCall, escrow, persisted, callDropped, badInstall>>
+
 RestartOk ==
     /\ Tick
     /\ apply = "applying" /\ status = "restarting"
+    /\ ~inCall
+    \* Records whether this restart cut off a live call. With the ~inCall guard
+    \* above it cannot, which is exactly what NoCallDroppedByUpdate asserts --
+    \* remove the guard (the pre-#225 code) and this latches TRUE.
+    /\ callDropped' = (callDropped \/ inCall)
     /\ running'   = installed
     /\ inCall'    = FALSE            \* the process dies; any call goes with it
     /\ escrow'    = persisted        \* restored from the file at daemon.c:1171
     /\ apply'     = "idle"
     /\ status'    = "success"
-    /\ UNCHANGED <<check, verKnown, src, build, installed, persisted>>
+    /\ UNCHANGED <<check, verKnown, src, build, installed, persisted, badInstall>>
 
 RestartFail ==
     /\ Tick
     /\ apply = "applying" /\ status = "restarting"
+    /\ ~inCall
     /\ apply'  = "idle"
     /\ status' = "err_restart"       \* now checked -- updater.c:273
     /\ UNCHANGED <<check, verKnown, src, build, installed, running,
-                   inCall, escrow, persisted>>
+                   inCall, escrow, persisted, callDropped, badInstall>>
 
 -----------------------------------------------------------------------------
 (* Ordinary phone activity, so the restart has something to interrupt. *)
@@ -182,14 +212,14 @@ InsertCoin ==
     /\ escrow' = escrow + CallCost
     /\ persisted' = escrow + CallCost      \* daemon_save_state after each coin
     /\ UNCHANGED <<check, verKnown, apply, src, build, installed, running,
-                   status, inCall>>
+                   status, inCall, callDropped, badInstall>>
 
 StartCall ==
     /\ Tick
     /\ ~inCall /\ escrow >= CallCost
     /\ inCall' = TRUE
     /\ UNCHANGED <<check, verKnown, apply, src, build, installed, running,
-                   status, escrow, persisted>>
+                   status, escrow, persisted, callDropped, badInstall>>
 
 Next ==
     \/ CheckStart \/ CheckFinish
@@ -197,7 +227,7 @@ Next ==
     \/ PullOk \/ PullFail
     \/ BuildOk \/ BuildFail
     \/ InstallOk \/ InstallFail
-    \/ RestartOk \/ RestartFail
+    \/ RestartOk \/ RestartFail \/ RestartDeferred
     \/ InsertCoin \/ StartCall
 
 Spec == Init /\ [][Next]_vars
@@ -220,14 +250,18 @@ TypeOK ==
     /\ persisted \in Nat
     /\ budget    \in 0..MaxEvents
 
-(* Holds: nothing is ever installed without having been pulled first -- the
-   pipeline's step ordering is genuinely enforced by the status sequencing.
+(* Nothing is ever installed without having been pulled first.
 
-   Note the weaker phrasing. The obvious invariant, "installed = new implies
-   build = new", is FALSE and correctly so: a second apply runs `make clean`
-   and wipes the build tree while the previously installed binary is still in
-   place. That is expected, not a defect. *)
-NoInstallWithoutPull == (installed = "new") => (src = "new")
+   Stated over a ghost flag, because the state-predicate forms are both false
+   for legitimate reasons:
+     "installed = new => build = new" -- a SECOND apply runs `make clean` and
+       wipes the build tree while the previously installed binary is in place.
+     "installed = new => src = new"   -- since #224 a failed apply rolls the
+       source back while the installed binary is deliberately left alone.
+   Neither is a defect; both are the system working as designed. What must
+   never happen is an install step running without its pull, and that is what
+   this records. *)
+NoInstallWithoutPull == ~badInstall
 
 (* Holds: coins are saved after every insert, so a restart restores them. *)
 NoCreditLostOnRestart == escrow = persisted
@@ -251,13 +285,22 @@ RecheckAlwaysPossible ==
 StatusHonest == (status = "success") => (running = installed)
 
 (* A failed apply must not leave the box in a mixed state. `make clean` runs
-   before `make daemon` (:250), and the tree is already at the new commit from
-   step 1, so a build failure strands new source with no binary and no record
-   of the previous commit to go back to. *)
+   before `make daemon` and the tree is already at the new commit, so a build
+   failure used to strand new source with no binary and no record of where it
+   came from. Holds since #224: the pre-update commit is captured with
+   `git rev-parse HEAD` before the pull, and a failure at build or install
+   resets the tree back to it. *)
 NoStrandedTree == (apply = "idle") => ~(src = "new" /\ build = "wiped")
 
-(* An OTA restart must not drop a call in progress. Nothing in the update path
-   consults call state. *)
-NoRestartMidCall == ~(status = "restarting" /\ inCall)
+(* An OTA restart must not drop a call in progress. Holds since #225: the
+   handler checks web_server_is_in_call() and refuses with 409, so an apply
+   cannot even start during a call. Refusing rather than deferring -- queueing
+   would need somewhere to park the request and a way to report it pending. *)
+(* Stated over a ghost flag rather than a state predicate. "status = restarting
+   implies not inCall" is too strong -- the phone can legitimately be picked up
+   while an apply sits at that step; what must not happen is the RESTART firing
+   anyway. And "running = new implies not inCall" is nonsense, since calls
+   happen normally after an update. So: did any restart ever cut off a call. *)
+NoCallDroppedByUpdate == ~callDropped
 
 =============================================================================
