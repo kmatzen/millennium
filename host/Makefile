@@ -384,4 +384,12 @@ lock-check:
 lock-check-mutant:
 	cd tests && $(TLC) -config LockOrderMutant.cfg LockOrder.tla
 
-.PHONY: all clean install uninstall test unit_tests api-test device-test break-test operator-smoke regen-clips tsan-queue cbmc-parser cbmc-parsers model-check game-check state-check tla-check tla-check-race coin-check ota-check lock-check lock-check-mutant pjsip-smoke
+# Mutation-test every model-checked property: break the system in a way each one
+# is supposed to notice, and check that it actually does. A property that cannot
+# fail is not verifying anything, and a green TLC run looks identical either way
+# -- this has already caught two such properties. See the header of
+# tests/mutation_audit.sh. Slow (runs TLC once per mutation); not in `make test`.
+mutation-audit:
+	cd tests && TLA_TOOLS=$(abspath $(TLA_TOOLS)) ./mutation_audit.sh
+
+.PHONY: all clean install uninstall test unit_tests api-test device-test break-test operator-smoke regen-clips tsan-queue cbmc-parser cbmc-parsers model-check game-check state-check tla-check tla-check-race coin-check ota-check lock-check lock-check-mutant mutation-audit pjsip-smoke
