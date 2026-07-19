@@ -212,6 +212,8 @@ TypeOK ==
     /\ fcents \in Nat
     /\ budget \in 0..MaxEvents
 
+(* SUBSUMED by TypeOK (all three are `\in Nat`), so this can never be the
+   invariant TLC reports. Kept for readability; adds no coverage. *)
 NonNegative == dcents >= 0 /\ pcents >= 0 /\ fcents >= 0
 
 (* THE property. The daemon ledger is what the web API, the metrics gauge and
@@ -222,8 +224,10 @@ NonNegative == dcents >= 0 /\ pcents >= 0 /\ fcents >= 0
    revenue figures do not match what the customer was charged. *)
 LedgerAgreement == dcents = pcents
 
-(* Weaker fallback: even if the exact figures drift, the customer should never
-   be shown MORE credit than the daemon will actually honour. *)
+(* SUBSUMED by LedgerAgreement (dcents = pcents implies pcents <= dcents), so
+   this can never be the invariant TLC reports while that one is checked. It
+   was the meaningful weaker fallback back when the two ledgers could legitimately
+   differ; with a single ledger it is documentation, not coverage. *)
 NeverPromiseMoreThanHeld == pcents <= dcents
 
 (* A restart must not resurrect credit that was already spent or returned, nor

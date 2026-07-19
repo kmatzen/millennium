@@ -121,3 +121,27 @@ relied on TLC's built-in deadlock detection, which only flags a *global* stall
 — and reported "no error" even on the deliberately-cycled model, because two
 threads deadlocking while three keep running is not a global stall. The spec
 now states circular wait directly as a waits-for cycle.
+
+## Auditing the specs themselves (`make mutation-audit`)
+
+A green TLC run is not evidence that a property is doing anything. Twice while
+writing these specs a property passed for a reason unrelated to the system:
+
+- `LockOrder.tla` relied on TLC's built-in deadlock detection, which flags only
+  a state with *no successor*. A lock-order bug does not produce one — two
+  threads deadlock while others keep running — so it reported "no error" on a
+  deliberately-cycled version of itself.
+- `Updater.tla`'s `RestartOk` both assigned `callDropped'` and listed it in
+  `UNCHANGED`. That contradiction silently disabled the action whenever a call
+  was up, so the guard under test was never exercised.
+
+Both were caught by accident. `tests/mutation_audit.sh` makes it systematic:
+for each property, break the system in the way that property is meant to notice
+and confirm it fires. Anything reported `NOT CAUGHT` is vacuous or subsumed, and
+its green result means nothing.
+
+The audit also identified three properties that are **subsumed** and can never
+be the invariant TLC reports — `NonNegative` in both specs (implied by
+`TypeOK`'s `\in Nat`) and `NeverPromiseMoreThanHeld` (implied by
+`LedgerAgreement`). They are kept for readability and now say so in place, so
+nobody counts them as coverage.

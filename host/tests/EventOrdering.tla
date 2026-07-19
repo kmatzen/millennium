@@ -198,6 +198,13 @@ TypeOK ==
 (* Already proven by CBMC for a single step; restated here to confirm they
    survive arbitrary interleaving. Expected to HOLD. *)
 NoInvalidState == state # "INVALID"
+
+(* SUBSUMED by TypeOK (`cents \in Nat`), so it can never be the invariant TLC
+   reports -- any state violating this violates TypeOK too. Kept because it
+   states the intent in the reader's terms, but it adds no coverage: do not
+   count it when judging how much this spec actually checks.
+   Confirmed by ./mutation_audit.sh, where the underflow mutation is caught by
+   TypeOK rather than by this. *)
 NonNegative    == cents >= 0
 
 (* Credit must never survive the handset going down (the coins were either
