@@ -35,3 +35,8 @@ host/unit_tests
 host/pjsip_smoke
 host/daemon-override.conf.tmp
 host/audio/out/
+
+# TLC scratch output. `make tla-check` and friends write a states/ directory
+# next to the spec on every run (fingerprint and state-queue files). It is
+# per-run scratch, never useful to commit.
+host/tests/states/
