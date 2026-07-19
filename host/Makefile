@@ -383,4 +383,17 @@ ota-check:
 ota-check-open:
 	cd tests && $(TLC) -config UpdaterOpen.cfg Updater.tla
 
-.PHONY: all clean install uninstall test unit_tests api-test device-test break-test operator-smoke regen-clips tsan-queue cbmc-parser cbmc-parsers model-check game-check state-check tla-check tla-check-race coin-check coin-check-drift ota-check ota-check-open pjsip-smoke
+# TLC model-check of the mutex acquisition graph (tests/LockOrder.tla) for
+# circular wait. The chains were extracted from the source, not from the
+# comment in daemon.c -- see the module header. Needs tla2tools.jar.
+lock-check:
+	cd tests && $(TLC) -config LockOrder.cfg LockOrder.tla
+
+# The same model with one edge reversed (a plugin callback taking
+# daemon_state_mutex under plugins_mutex, i.e. reverting #226/#223). EXPECTED to
+# report a violation: a deadlock-freedom result means nothing unless the model
+# catches a planted deadlock, and the first version of this spec did not.
+lock-check-mutant:
+	cd tests && $(TLC) -config LockOrderMutant.cfg LockOrder.tla
+
+.PHONY: all clean install uninstall test unit_tests api-test device-test break-test operator-smoke regen-clips tsan-queue cbmc-parser cbmc-parsers model-check game-check state-check tla-check tla-check-race coin-check coin-check-drift ota-check ota-check-open lock-check lock-check-mutant pjsip-smoke

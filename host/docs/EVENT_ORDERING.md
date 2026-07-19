@@ -95,3 +95,29 @@ flight.
 queued events can reach an inconsistent state to begin with. Neither tool covers
 both halves alone, which is why the `CALL_ACTIVE` bug survived until now — CBMC
 transcribed the unguarded arm faithfully and asserted nothing about it.
+
+## Related: lock-order verification (`make lock-check`)
+
+`tests/LockOrder.tla` model-checks the mutex acquisition graph for circular
+wait, as a follow-up to #231. The full lock order is documented at
+`daemon.c:59`.
+
+Three things about it are worth knowing:
+
+**The edge set was extracted, not remembered.** `tests/extract_lock_edges.py`
+walks the source tracking lock/unlock nesting and takes the transitive closure
+over the call graph. It found two edges the original #231 comment had missed —
+`daemon_state_mutex -> plugins_mutex` (via `daemon_broadcast_state` calling
+`plugins_get_active_name`) and `daemon_state_mutex -> logger_mutex`.
+
+**Static analysis cannot see through function pointers.** The
+`g_monitor_mutex -> daemon_state_mutex` edge runs through a registered health
+check callback and had to be found by reading. The script says so in its own
+docstring; treat its "no cycle" as necessary, not sufficient.
+
+**`make lock-check-mutant` is what makes `make lock-check` mean anything.** It
+reverses one edge and must report a violation. The first version of this spec
+relied on TLC's built-in deadlock detection, which only flags a *global* stall
+— and reported "no error" even on the deliberately-cycled model, because two
+threads deadlocking while three keep running is not a global stall. The spec
+now states circular wait directly as a waits-for cycle.
