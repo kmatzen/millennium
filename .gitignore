@@ -40,3 +40,8 @@ host/audio/out/
 # next to the spec on every run (fingerprint and state-queue files). It is
 # per-run scratch, never useful to commit.
 host/tests/states/
+
+# TLA+ tools, fetched on demand rather than vendored (~2MB). CI downloads it
+# into host/ and caches it; locally, pass TLA_TOOLS=/path/to/tla2tools.jar.
+host/tla2tools.jar
+tla2tools.jar

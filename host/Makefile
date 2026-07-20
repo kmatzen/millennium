@@ -307,28 +307,24 @@ cbmc-parsers:
 # (tests/protocol.pml, mirrors display.ino's framing). Proves overrun-freedom,
 # deadlock-freedom, and full-consumption (self-resync). Needs spin; not in `make test`.
 SPIN ?= spin
+# tests/spin_check.sh asserts spin reported "errors: 0" and exits non-zero
+# otherwise -- these recipes previously piped into grep, which made the exit
+# status grep's and left the targets unable to fail. See that script's header.
 model-check:
-	@tmp=$$(mktemp -d); \
+	@set -e; tmp=$$(mktemp -d); trap 'rm -rf $$tmp' EXIT; \
 	 grep -v '^ltl ' tests/protocol.pml > $$tmp/safety.pml; cp tests/protocol.pml $$tmp/live.pml; \
-	 echo "== safety: overrun-freedom + deadlock-freedom =="; \
-	 ( cd $$tmp && $(SPIN) -run -safety -m200000 safety.pml ) | grep -iE "assertion viol|invalid end|errors:"; \
-	 echo "== liveness: full-consumption []<> at_idle =="; \
-	 ( cd $$tmp && $(SPIN) -run -ltl progress -m200000 live.pml ) | grep -iE "acceptance|never claim|errors:"; \
-	 rm -rf $$tmp
+	 SPIN='$(SPIN)' tests/spin_check.sh $$tmp "safety: overrun-freedom + deadlock-freedom" -run -safety -m200000 safety.pml; \
+	 SPIN='$(SPIN)' tests/spin_check.sh $$tmp "liveness: full-consumption []<> at_idle" -run -ltl progress -m200000 live.pml
 
 # SPIN model-check of The Operator game (tests/operator_game.pml, mirrors
 # plugins/time_operator.c). Proves no dead-ends, bounded pieces, and no soft-lock
 # (WIN reachable from every state, AG EF win). Needs spin; not in `make test`.
 game-check:
-	@tmp=$$(mktemp -d); \
+	@set -e; tmp=$$(mktemp -d); trap 'rm -rf $$tmp' EXIT; \
 	 grep -v '^ltl ' tests/operator_game.pml > $$tmp/safety.pml; cp tests/operator_game.pml $$tmp/g.pml; \
-	 echo "== no dead-ends =="; \
-	 ( cd $$tmp && $(SPIN) -run -safety -m300000 safety.pml ) | grep -iE "invalid end|errors:"; \
-	 echo "== bounded pieces ([] pieces<=3) =="; \
-	 ( cd $$tmp && $(SPIN) -run -ltl pieces_ok -m300000 g.pml ) | grep -iE "errors:"; \
-	 echo "== no soft-lock (AG EF win) =="; \
-	 ( cd $$tmp && $(SPIN) -run -ltl can_win -f -m1000000 g.pml ) | grep -iE "acceptance|errors:"; \
-	 rm -rf $$tmp
+	 SPIN='$(SPIN)' tests/spin_check.sh $$tmp "no dead-ends" -run -safety -m300000 safety.pml; \
+	 SPIN='$(SPIN)' tests/spin_check.sh $$tmp "bounded pieces" -run -ltl pieces_ok -m300000 g.pml; \
+	 SPIN='$(SPIN)' tests/spin_check.sh $$tmp "no soft-lock (AG EF win)" -run -ltl can_win -f -m1000000 g.pml
 
 # CBMC of the daemon phone state machine (tests/cbmc_state_machine.c): proves the
 # state+balance invariants AND that simulator.c and daemon.c implement the same
@@ -347,7 +343,10 @@ state-check:
 #   make tla-check TLA_TOOLS=/path/to/tla2tools.jar
 # Not part of `make test`; takes ~25s.
 TLA_TOOLS ?= tla2tools.jar
-TLC = java -XX:+UseParallelGC -cp $(TLA_TOOLS) tlc2.TLC
+# abspath because every TLC target runs from tests/, so a relative TLA_TOOLS
+# (e.g. the `tla2tools.jar` CI downloads into host/) would resolve against
+# tests/ and fail with ClassNotFoundException.
+TLC = java -XX:+UseParallelGC -cp $(abspath $(TLA_TOOLS)) tlc2.TLC
 
 tla-check:
 	cd tests && $(TLC) -config EventOrdering.cfg EventOrdering.tla

@@ -55,3 +55,96 @@ jobs:
       - name: Compile-check daemon sources with clang
         working-directory: host
         run: make compile-check CC=clang
+
+  # Formal verification: CBMC proofs and SPIN model checks.
+  #
+  # Split from `test` because it needs extra toolchains and is slower. The
+  # CBMC parser proofs dominate the runtime; they are the ones that found real
+  # bugs in wav.c and the websocket decoder, so they are worth the minutes.
+  proofs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev cbmc spin
+
+      # State machine + simulator/daemon equivalence. The equivalence proof is
+      # what stops simulator.c and daemon.c drifting apart, which the scenario
+      # tests cannot detect on their own.
+      - name: CBMC - daemon state machine
+        working-directory: host
+        run: make state-check
+
+      - name: CBMC - untrusted-input parsers
+        working-directory: host
+        run: make cbmc-parser && make cbmc-parsers
+
+      - name: SPIN - Pi/Arduino wire protocol
+        working-directory: host
+        run: make model-check
+
+      - name: SPIN - Operator game soft-lock
+        working-directory: host
+        run: make game-check
+
+  # TLA+ model checking.
+  #
+  # Separate job so a TLC failure is immediately distinguishable from a build
+  # or CBMC failure, and so the jar download does not slow the other jobs.
+  models:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Cache tla2tools.jar
+        id: cache-tla
+        uses: actions/cache@v4
+        with:
+          path: host/tla2tools.jar
+          key: tla2tools-v1
+
+      - name: Download tla2tools.jar
+        if: steps.cache-tla.outputs.cache-hit != 'true'
+        run: |
+          curl -fsSL -o host/tla2tools.jar \
+            https://github.com/tlaplus/tlaplus/releases/latest/download/tla2tools.jar
+
+      - name: TLC - event ordering, coin ledger, OTA, lock order
+        working-directory: host
+        run: |
+          make tla-check   TLA_TOOLS=tla2tools.jar
+          make coin-check  TLA_TOOLS=tla2tools.jar
+          make ota-check   TLA_TOOLS=tla2tools.jar
+          make lock-check  TLA_TOOLS=tla2tools.jar
+
+      # These two MUST fail: they encode a property that is unachievable by
+      # design (tla-check-race) and a deliberately-cycled lock graph
+      # (lock-check-mutant). If either starts passing, the model has stopped
+      # detecting the thing it exists to detect -- which has happened twice in
+      # this repo already. Inverted on purpose; do not "fix" them to pass.
+      - name: TLC - negative controls must fail
+        working-directory: host
+        run: |
+          if make tla-check-race TLA_TOOLS=tla2tools.jar >/dev/null 2>&1; then
+            echo "tla-check-race PASSED but must fail -- ActiveImpliesOffHook is no longer detecting anything"
+            exit 1
+          fi
+          echo "OK: tla-check-race fails as designed"
+          if make lock-check-mutant TLA_TOOLS=tla2tools.jar >/dev/null 2>&1; then
+            echo "lock-check-mutant PASSED but must fail -- the model cannot detect a planted deadlock"
+            exit 1
+          fi
+          echo "OK: lock-check-mutant fails as designed"
+
+      # Break the system in the way each property is meant to notice, and check
+      # it fires. Guards against properties that hold vacuously -- see the
+      # header of tests/mutation_audit.sh.
+      - name: TLC - mutation audit
+        working-directory: host
+        run: make mutation-audit TLA_TOOLS=tla2tools.jar
