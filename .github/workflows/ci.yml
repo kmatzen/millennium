@@ -66,8 +66,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # gcc-multilib supplies the 32-bit libc headers. cbmc-parsers passes --32
+      # deliberately, to model the Pi's 32-bit userland rather than the runner's
+      # 64-bit one -- pointer and size_t width are exactly what those
+      # memory-safety proofs are about. Without it CBMC's preprocessing step
+      # dies on `bits/libc-header-start.h: No such file or directory`.
       - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get install -y libasound2-dev cbmc spin
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev cbmc spin gcc-multilib
 
       # State machine + simulator/daemon equivalence. The equivalence proof is
       # what stops simulator.c and daemon.c drifting apart, which the scenario
@@ -76,9 +83,15 @@ jobs:
         working-directory: host
         run: make state-check
 
-      - name: CBMC - untrusted-input parsers
+      # Split so a failure names which proof broke. cbmc-parser is the slow one
+      # (~2 min, --unwind 37); cbmc-parsers is seconds.
+      - name: CBMC - serial parser
         working-directory: host
-        run: make cbmc-parser && make cbmc-parsers
+        run: make cbmc-parser
+
+      - name: CBMC - wav / websocket / config parsers
+        working-directory: host
+        run: make cbmc-parsers
 
       - name: SPIN - Pi/Arduino wire protocol
         working-directory: host
