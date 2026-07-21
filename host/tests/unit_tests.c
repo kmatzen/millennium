@@ -18,6 +18,7 @@
 #include "../wav.h"
 #include "../events.h"
 #include "../event_processor.h"
+#include "../control_commands.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <pthread.h>
@@ -27,6 +28,8 @@
 
 daemon_state_data_t *daemon_state = NULL;
 millennium_client_t *client = NULL;
+event_processor_t *event_processor = NULL;
+pthread_mutex_t daemon_state_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 millennium_client_t *millennium_client_create(void) {
     millennium_client_t *c = calloc(1, sizeof(millennium_client_t));
@@ -2446,9 +2449,22 @@ static int ut_ep_keypad_hits;
 static int ut_ep_card_hits;
 static int ut_ep_call_state_hits;
 static char ut_ep_last_key;
+static char ut_ep_last_coin_code[16];
+static char ut_ep_last_hook_direction;
 
-static void ut_ep_coin_handler(coin_event_t *ev) { (void)ev; ut_ep_coin_hits++; }
-static void ut_ep_hook_handler(hook_state_change_event_t *ev) { (void)ev; ut_ep_hook_hits++; }
+static void ut_ep_coin_handler(coin_event_t *ev) {
+    char *code = coin_event_get_coin_code(ev);
+    ut_ep_coin_hits++;
+    if (code) {
+        strncpy(ut_ep_last_coin_code, code, sizeof(ut_ep_last_coin_code) - 1);
+        ut_ep_last_coin_code[sizeof(ut_ep_last_coin_code) - 1] = '\0';
+        free(code);
+    }
+}
+static void ut_ep_hook_handler(hook_state_change_event_t *ev) {
+    ut_ep_hook_hits++;
+    ut_ep_last_hook_direction = hook_state_change_event_get_direction(ev);
+}
 static void ut_ep_keypad_handler(keypad_event_t *ev) {
     ut_ep_keypad_hits++;
     ut_ep_last_key = keypad_event_get_key(ev);
@@ -2463,6 +2479,8 @@ static void ut_ep_reset_counters(void) {
     ut_ep_card_hits = 0;
     ut_ep_call_state_hits = 0;
     ut_ep_last_key = 0;
+    ut_ep_last_coin_code[0] = '\0';
+    ut_ep_last_hook_direction = 0;
 }
 
 static void test_event_processor_create_destroy(void) {
@@ -2564,6 +2582,263 @@ static void test_event_processor_null_safety(void) {
 
     event_destroy((event_t *)kev);
     event_processor_destroy(p);
+}
+
+/* ── Control Commands ──────────────────────────────────────────── */
+/* dispatch_control_command() (control_commands.c) is the parser/dispatcher
+ * behind POST /api/control -- extracted out of daemon.c (#248) so it can be
+ * exercised here directly instead of only by hand against the web portal or
+ * real hardware. */
+
+static daemon_state_data_t ut_cc_state;
+static event_processor_t *ut_cc_processor;
+
+static void ut_cc_setup(void) {
+    daemon_state_init(&ut_cc_state);
+    daemon_state = &ut_cc_state;
+    ut_cc_processor = event_processor_create();
+    event_processor_register_coin_handler(ut_cc_processor, ut_ep_coin_handler);
+    event_processor_register_hook_handler(ut_cc_processor, ut_ep_hook_handler);
+    event_processor_register_keypad_handler(ut_cc_processor, ut_ep_keypad_handler);
+    event_processor_register_card_handler(ut_cc_processor, ut_ep_card_handler);
+    event_processor_register_call_state_handler(ut_cc_processor, ut_ep_call_state_handler);
+    event_processor = ut_cc_processor;
+    ut_ep_reset_counters();
+    metrics_init();
+}
+
+static void ut_cc_teardown(void) {
+    event_processor_destroy(ut_cc_processor);
+    ut_cc_processor = NULL;
+    event_processor = NULL;
+    daemon_state = NULL;
+    metrics_cleanup();
+}
+
+/* NULL daemon_state, NULL event_processor, and a NULL action must each be
+ * rejected (return 0) without crashing -- the three guards at the top of
+ * dispatch_control_command(). */
+static void test_control_null_safety(void) {
+    daemon_state = NULL;
+    event_processor = NULL;
+    TEST_ASSERT_EQ_INT(dispatch_control_command("start_call"), 0);
+
+    ut_cc_setup();
+    event_processor = NULL;
+    TEST_ASSERT_EQ_INT(dispatch_control_command("start_call"), 0);
+    event_processor = ut_cc_processor;
+
+    TEST_ASSERT_EQ_INT(dispatch_control_command(NULL), 0);
+    ut_cc_teardown();
+}
+
+static void test_control_start_call(void) {
+    ut_cc_setup();
+
+    TEST_ASSERT_EQ_INT(dispatch_control_command("start_call"), 1);
+    TEST_ASSERT_EQ_INT((int)daemon_state->current_state, (int)DAEMON_STATE_CALL_INCOMING);
+    TEST_ASSERT_EQ_INT((int)metrics_get_counter("calls_initiated"), 1);
+
+    ut_cc_teardown();
+}
+
+static void test_control_reset_system(void) {
+    ut_cc_setup();
+    daemon_state->current_state = DAEMON_STATE_CALL_ACTIVE;
+    daemon_state->inserted_cents = 75;
+    daemon_state_add_key(daemon_state, '5');
+
+    TEST_ASSERT_EQ_INT(dispatch_control_command("reset_system"), 1);
+    TEST_ASSERT_EQ_INT((int)daemon_state->current_state, (int)DAEMON_STATE_IDLE_DOWN);
+    TEST_ASSERT_EQ_INT(daemon_state->inserted_cents, 0);
+    TEST_ASSERT_EQ_INT(daemon_state_get_keypad_length(daemon_state), 0);
+    TEST_ASSERT_EQ_INT((int)metrics_get_counter("system_resets"), 1);
+
+    ut_cc_teardown();
+}
+
+static void test_control_emergency_stop(void) {
+    ut_cc_setup();
+    daemon_state->current_state = DAEMON_STATE_IDLE_UP;
+
+    TEST_ASSERT_EQ_INT(dispatch_control_command("emergency_stop"), 1);
+    TEST_ASSERT_EQ_INT((int)daemon_state->current_state, (int)DAEMON_STATE_INVALID);
+    TEST_ASSERT_EQ_INT((int)metrics_get_counter("emergency_stops"), 1);
+
+    ut_cc_teardown();
+}
+
+static void test_control_keypad_press(void) {
+    ut_cc_setup();
+
+    TEST_ASSERT_EQ_INT(dispatch_control_command("keypad_press:5"), 1);
+    TEST_ASSERT_EQ_INT(ut_ep_keypad_hits, 1);
+    TEST_ASSERT_EQ_INT(ut_ep_last_key, '5');
+
+    /* '*', '#' and the A-D matrix letters are valid keys too. */
+    TEST_ASSERT_EQ_INT(dispatch_control_command("keypad_press:*"), 1);
+    TEST_ASSERT_EQ_INT(ut_ep_last_key, '*');
+    TEST_ASSERT_EQ_INT(dispatch_control_command("keypad_press:C"), 1);
+    TEST_ASSERT_EQ_INT(ut_ep_last_key, 'C');
+
+    /* An invalid key is rejected before it ever reaches the handler. */
+    TEST_ASSERT_EQ_INT(dispatch_control_command("keypad_press:!"), 0);
+    TEST_ASSERT_EQ_INT(ut_ep_keypad_hits, 3);
+
+    ut_cc_teardown();
+}
+
+/* keypad_clear/keypad_backspace only take effect while the handset is up --
+ * same guard as the physical keypad path -- and report that via the return
+ * value, not just a side effect. */
+static void test_control_keypad_clear_and_backspace_guarded(void) {
+    ut_cc_setup();
+    daemon_state->current_state = DAEMON_STATE_IDLE_DOWN;
+    daemon_state_add_key(daemon_state, '1');
+
+    TEST_ASSERT_EQ_INT(dispatch_control_command("keypad_clear"), 0);
+    TEST_ASSERT_EQ_INT(daemon_state_get_keypad_length(daemon_state), 1);
+    TEST_ASSERT_EQ_INT(dispatch_control_command("keypad_backspace"), 0);
+    TEST_ASSERT_EQ_INT(daemon_state_get_keypad_length(daemon_state), 1);
+    TEST_ASSERT_EQ_INT((int)metrics_get_counter("keypad_clears"), 0);
+    TEST_ASSERT_EQ_INT((int)metrics_get_counter("keypad_backspaces"), 0);
+
+    daemon_state->current_state = DAEMON_STATE_IDLE_UP;
+
+    /* An empty buffer still can't be backspaced even with the handset up. */
+    daemon_state_clear_keypad(daemon_state);
+    TEST_ASSERT_EQ_INT(dispatch_control_command("keypad_backspace"), 0);
+
+    daemon_state_add_key(daemon_state, '1');
+    daemon_state_add_key(daemon_state, '2');
+    TEST_ASSERT_EQ_INT(dispatch_control_command("keypad_backspace"), 1);
+    TEST_ASSERT_EQ_INT(daemon_state_get_keypad_length(daemon_state), 1);
+    TEST_ASSERT_EQ_INT((int)metrics_get_counter("keypad_backspaces"), 1);
+
+    TEST_ASSERT_EQ_INT(dispatch_control_command("keypad_clear"), 1);
+    TEST_ASSERT_EQ_INT(daemon_state_get_keypad_length(daemon_state), 0);
+    TEST_ASSERT_EQ_INT((int)metrics_get_counter("keypad_clears"), 1);
+
+    ut_cc_teardown();
+}
+
+/* coin_insert maps the same three coin-validator cent values (5/10/25) the
+ * physical reader can report onto the matching coin codes, and rejects
+ * anything else (missing, non-positive, or unmapped) before dispatch. */
+static void test_control_coin_insert(void) {
+    ut_cc_setup();
+
+    TEST_ASSERT_EQ_INT(dispatch_control_command("coin_insert:25"), 1);
+    TEST_ASSERT_EQ_INT(ut_ep_coin_hits, 1);
+    TEST_ASSERT_EQ_STR(ut_ep_last_coin_code, "COIN_8");
+
+    TEST_ASSERT_EQ_INT(dispatch_control_command("coin_insert:10"), 1);
+    TEST_ASSERT_EQ_STR(ut_ep_last_coin_code, "COIN_7");
+
+    TEST_ASSERT_EQ_INT(dispatch_control_command("coin_insert:5"), 1);
+    TEST_ASSERT_EQ_STR(ut_ep_last_coin_code, "COIN_6");
+    TEST_ASSERT_EQ_INT(ut_ep_coin_hits, 3);
+
+    /* Missing argument, non-positive value, and an unmapped denomination all
+     * fail without touching the coin handler. */
+    TEST_ASSERT_EQ_INT(dispatch_control_command("coin_insert"), 0);
+    TEST_ASSERT_EQ_INT(dispatch_control_command("coin_insert:0"), 0);
+    TEST_ASSERT_EQ_INT(dispatch_control_command("coin_insert:-5"), 0);
+    TEST_ASSERT_EQ_INT(dispatch_control_command("coin_insert:7"), 0);
+    TEST_ASSERT_EQ_INT(ut_ep_coin_hits, 3);
+
+    ut_cc_teardown();
+}
+
+static void test_control_coin_return(void) {
+    ut_cc_setup();
+    daemon_state->inserted_cents = 60;
+
+    TEST_ASSERT_EQ_INT(dispatch_control_command("coin_return"), 1);
+    TEST_ASSERT_EQ_INT(daemon_state->inserted_cents, 0);
+    TEST_ASSERT_EQ_INT((int)metrics_get_counter("coin_returns"), 1);
+    TEST_ASSERT_EQ_INT((int)metrics_get_counter("coins_returned_cents"), 60);
+
+    /* Returning with nothing in the slot still counts the return event, but
+     * must not add a phantom 0 into the returned-cents tally. */
+    TEST_ASSERT_EQ_INT(dispatch_control_command("coin_return"), 1);
+    TEST_ASSERT_EQ_INT((int)metrics_get_counter("coin_returns"), 2);
+    TEST_ASSERT_EQ_INT((int)metrics_get_counter("coins_returned_cents"), 60);
+
+    ut_cc_teardown();
+}
+
+static void test_control_handset_up_down(void) {
+    ut_cc_setup();
+
+    TEST_ASSERT_EQ_INT(dispatch_control_command("handset_up"), 1);
+    TEST_ASSERT_EQ_INT(ut_ep_hook_hits, 1);
+    TEST_ASSERT_EQ_INT(ut_ep_last_hook_direction, 'U');
+
+    TEST_ASSERT_EQ_INT(dispatch_control_command("handset_down"), 1);
+    TEST_ASSERT_EQ_INT(ut_ep_hook_hits, 2);
+    TEST_ASSERT_EQ_INT(ut_ep_last_hook_direction, 'D');
+
+    ut_cc_teardown();
+}
+
+static void test_control_activate_plugin(void) {
+    ut_cc_setup();
+    client = millennium_client_create();
+    plugins_init();
+
+    TEST_ASSERT_EQ_INT(dispatch_control_command("activate_plugin:Fortune Teller"), 1);
+    TEST_ASSERT_EQ_STR(plugins_get_active_name(), "Fortune Teller");
+
+    /* An unknown plugin name and a missing argument both fail cleanly. */
+    TEST_ASSERT_EQ_INT(dispatch_control_command("activate_plugin:Not A Real Plugin"), 0);
+    TEST_ASSERT_EQ_INT(dispatch_control_command("activate_plugin"), 0);
+
+    plugins_cleanup();
+    millennium_client_destroy(client);
+    client = NULL;
+    ut_cc_teardown();
+}
+
+static void test_control_unknown_command(void) {
+    ut_cc_setup();
+    TEST_ASSERT_EQ_INT(dispatch_control_command("not_a_real_command"), 0);
+    ut_cc_teardown();
+}
+
+/* The command name (and, separately, its colon-delimited argument) is copied
+ * into a fixed MAX_STRING_LEN (256) byte buffer. An oversized command name --
+ * more than 256 bytes before the colon -- exercises the cmd_len clamp; an
+ * oversized argument exercises safe_strcpy's own truncation. Neither may
+ * overflow, and both simply fail to match/act on anything meaningful. */
+static void test_control_oversized_command_is_truncated_safely(void) {
+    char action[600];
+
+    memset(action, 'x', sizeof(action) - 1);
+    action[sizeof(action) - 1] = '\0';
+    ut_cc_setup();
+    TEST_ASSERT_EQ_INT(dispatch_control_command(action), 0);
+    ut_cc_teardown();
+
+    /* An oversized command name before the colon. */
+    memset(action, 'x', 300);
+    action[300] = ':';
+    strcpy(action + 301, "5");
+    ut_cc_setup();
+    TEST_ASSERT_EQ_INT(dispatch_control_command(action), 0);
+    ut_cc_teardown();
+
+    /* A valid command with an oversized argument -- keypad_press only looks
+     * at arg[0], so this just exercises the copy/truncation path safely. */
+    memset(action, 'y', sizeof(action) - 1);
+    action[sizeof(action) - 1] = '\0';
+    strcpy(action, "keypad_press:");
+    memset(action + strlen("keypad_press:"), '9', sizeof(action) - strlen("keypad_press:") - 1);
+    action[sizeof(action) - 1] = '\0';
+    ut_cc_setup();
+    TEST_ASSERT_EQ_INT(dispatch_control_command(action), 1);
+    TEST_ASSERT_EQ_INT(ut_ep_last_key, '9');
+    ut_cc_teardown();
 }
 
 /* ── Main ───────────────────────────────────────────────────────── */
@@ -2749,6 +3024,20 @@ int main(void) {
     TEST_SUITE_RUN(test_event_processor_dispatches_each_type_once);
     TEST_SUITE_RUN(test_event_processor_missing_handler_is_noop);
     TEST_SUITE_RUN(test_event_processor_null_safety);
+
+    TEST_SUITE_BEGIN("Control Commands");
+    TEST_SUITE_RUN(test_control_null_safety);
+    TEST_SUITE_RUN(test_control_start_call);
+    TEST_SUITE_RUN(test_control_reset_system);
+    TEST_SUITE_RUN(test_control_emergency_stop);
+    TEST_SUITE_RUN(test_control_keypad_press);
+    TEST_SUITE_RUN(test_control_keypad_clear_and_backspace_guarded);
+    TEST_SUITE_RUN(test_control_coin_insert);
+    TEST_SUITE_RUN(test_control_coin_return);
+    TEST_SUITE_RUN(test_control_handset_up_down);
+    TEST_SUITE_RUN(test_control_activate_plugin);
+    TEST_SUITE_RUN(test_control_unknown_command);
+    TEST_SUITE_RUN(test_control_oversized_command_is_truncated_safely);
 
     TEST_REPORT();
 }
