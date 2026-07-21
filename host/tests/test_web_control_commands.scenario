@@ -1,0 +1,36 @@
+# Test: web-portal control commands (POST /api/control) that were previously
+# only handled in daemon.c's handle_control_command() and never exercised by
+# any scenario: keypad_clear, keypad_backspace, reset_system, emergency_stop.
+
+hook_up
+keys 555123
+
+# keypad_backspace drops exactly one digit off the end
+keypad_backspace
+assert_metric keypad_backspaces 1
+
+# keypad_clear wipes the whole buffer
+keypad_clear
+assert_metric keypad_clears 1
+
+# keypad_clear/backspace are no-ops while the handset is down (same guard as
+# the physical keypad): the metrics must not advance.
+hook_down
+keypad_clear
+keypad_backspace
+assert_metric keypad_clears 1
+assert_metric keypad_backspaces 1
+
+# reset_system drops the phone back to IDLE_DOWN with the balance zeroed,
+# from any state -- including with money in the slot.
+hook_up
+coin 25
+reset_system
+assert_state IDLE_DOWN
+assert_metric system_resets 1
+
+# emergency_stop forces DAEMON_STATE_INVALID regardless of prior state.
+hook_up
+emergency_stop
+assert_state INVALID
+assert_metric emergency_stops 1

@@ -571,6 +571,45 @@ static int run_scenario(const char *path) {
             }
         }
 
+        /* ── keypad_clear — mirror daemon.c's "keypad_clear" web control
+         * command: only takes effect while the handset is up, same guard as
+         * the physical keypad path. ──────────────────────────────────── */
+        else if (strcmp(cmd, "keypad_clear") == 0) {
+            if (daemon_state->current_state == DAEMON_STATE_IDLE_UP) {
+                daemon_state_clear_keypad(daemon_state);
+                daemon_state_update_activity(daemon_state);
+                metrics_increment_counter("keypad_clears", 1);
+            }
+        }
+
+        /* ── keypad_backspace — mirror daemon.c's "keypad_backspace" web
+         * control command: handset up AND a non-empty buffer. ──────────── */
+        else if (strcmp(cmd, "keypad_backspace") == 0) {
+            if (daemon_state->current_state == DAEMON_STATE_IDLE_UP &&
+                daemon_state_get_keypad_length(daemon_state) > 0) {
+                daemon_state_remove_last_key(daemon_state);
+                daemon_state_update_activity(daemon_state);
+                metrics_increment_counter("keypad_backspaces", 1);
+            }
+        }
+
+        /* ── reset_system — mirror daemon.c's "reset_system" web control
+         * command: drop back to IDLE_DOWN with an empty keypad/balance. ─── */
+        else if (strcmp(cmd, "reset_system") == 0) {
+            daemon_state_reset(daemon_state);
+            metrics_increment_counter("system_resets", 1);
+        }
+
+        /* ── emergency_stop — mirror daemon.c's "emergency_stop" web control
+         * command: forces the state machine into DAEMON_STATE_INVALID. The
+         * daemon does not actually exit; it just stops serving calls/coins
+         * until a hook or reset moves it out of INVALID again. ──────────── */
+        else if (strcmp(cmd, "emergency_stop") == 0) {
+            daemon_state->current_state = DAEMON_STATE_INVALID;
+            daemon_state_update_activity(daemon_state);
+            metrics_increment_counter("emergency_stops", 1);
+        }
+
         /* ── key <char> — any keypad key: 0-9, *, #, A-D ─────────────── */
         else if (strncmp(cmd, "key ", 4) == 0) {
             char key = cmd[4];
