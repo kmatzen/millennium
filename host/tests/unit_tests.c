@@ -16,6 +16,8 @@
 #include "../health_monitor.h"
 #include "../display_manager.h"
 #include "../wav.h"
+#include "../events.h"
+#include "../event_processor.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <pthread.h>
@@ -2247,6 +2249,323 @@ static void test_health_metrics_published(void) {
     health_monitor_unregister_check("ut_sip");
 }
 
+/* ── Events ─────────────────────────────────────────────────────── */
+
+static void test_event_keypad_roundtrip(void) {
+    keypad_event_t *ev = keypad_event_create('7');
+    char *repr;
+
+    TEST_ASSERT_NOT_NULL(ev);
+    TEST_ASSERT_EQ_INT(ev->base.type, EVENT_KEYPAD);
+    TEST_ASSERT_EQ_INT(keypad_event_get_key(ev), '7');
+    TEST_ASSERT_EQ_STR(event_get_name((event_t *)ev), "KeypadEvent");
+
+    repr = event_get_repr((event_t *)ev);
+    TEST_ASSERT_EQ_STR(repr, "7");
+    free(repr);
+
+    event_destroy((event_t *)ev);
+}
+
+static void test_event_card_roundtrip(void) {
+    card_event_t *ev = card_event_create("1234567890123456");
+    char *repr;
+
+    TEST_ASSERT_NOT_NULL(ev);
+    TEST_ASSERT_EQ_INT(ev->base.type, EVENT_CARD);
+    TEST_ASSERT_EQ_STR(ev->card_number, "1234567890123456");
+    TEST_ASSERT_EQ_STR(event_get_name((event_t *)ev), "CardEvent");
+
+    repr = event_get_repr((event_t *)ev);
+    TEST_ASSERT_EQ_STR(repr, "1234567890123456");
+    free(repr);
+
+    event_destroy((event_t *)ev);
+}
+
+/* A NULL card number must not crash and yields an empty string, not garbage. */
+static void test_event_card_null_number(void) {
+    card_event_t *ev = card_event_create(NULL);
+
+    TEST_ASSERT_NOT_NULL(ev);
+    TEST_ASSERT_EQ_STR(ev->card_number, "");
+
+    event_destroy((event_t *)ev);
+}
+
+/* card_number is a fixed 17-byte buffer (16 chars + NUL); an oversized swipe
+ * must be truncated in place rather than overflowing the struct. */
+static void test_event_card_number_truncates(void) {
+    card_event_t *ev = card_event_create("12345678901234567890");
+
+    TEST_ASSERT_NOT_NULL(ev);
+    TEST_ASSERT_EQ_INT((int)strlen(ev->card_number), 16);
+    TEST_ASSERT_EQ_STR(ev->card_number, "1234567890123456");
+
+    event_destroy((event_t *)ev);
+}
+
+static void test_event_coin_code_mapping(void) {
+    coin_event_t *ev = coin_event_create(0x38);
+    char *code;
+
+    TEST_ASSERT_NOT_NULL(ev);
+    TEST_ASSERT_EQ_INT(ev->base.type, EVENT_COIN);
+
+    code = coin_event_get_coin_code(ev);
+    TEST_ASSERT_EQ_STR(code, "COIN_8");
+    free(code);
+
+    event_destroy((event_t *)ev);
+}
+
+/* An unrecognized coin validator byte must map to a safe sentinel string
+ * rather than a NULL or an out-of-bounds table lookup. */
+static void test_event_coin_code_unknown(void) {
+    coin_event_t *ev = coin_event_create(0xFF);
+    char *code = coin_event_get_coin_code(ev);
+
+    TEST_ASSERT_EQ_STR(code, "UNKNOWN_COIN");
+    free(code);
+
+    event_destroy((event_t *)ev);
+}
+
+static void test_event_hook_direction(void) {
+    hook_state_change_event_t *up = hook_state_change_event_create('U');
+    hook_state_change_event_t *down = hook_state_change_event_create('D');
+    char *repr;
+
+    TEST_ASSERT_EQ_INT(hook_state_change_event_get_direction(up), 'U');
+    TEST_ASSERT_EQ_INT(hook_state_change_event_get_direction(down), 'D');
+
+    repr = event_get_repr((event_t *)up);
+    TEST_ASSERT_EQ_STR(repr, "Up");
+    free(repr);
+
+    repr = event_get_repr((event_t *)down);
+    TEST_ASSERT_EQ_STR(repr, "Down");
+    free(repr);
+
+    event_destroy((event_t *)up);
+    event_destroy((event_t *)down);
+}
+
+static void test_event_call_state_roundtrip(void) {
+    call_state_event_t *ev = call_state_event_create("CALL_ESTABLISHED", NULL,
+                                                       EVENT_CALL_STATE_ACTIVE);
+
+    TEST_ASSERT_NOT_NULL(ev);
+    TEST_ASSERT_EQ_STR(ev->state, "CALL_ESTABLISHED");
+    TEST_ASSERT_EQ_INT((int)call_state_event_get_state(ev), (int)EVENT_CALL_STATE_ACTIVE);
+    TEST_ASSERT_NULL(call_state_event_get_call(ev));
+
+    event_destroy((event_t *)ev);
+}
+
+/* A NULL state string is a valid input (e.g. a synthetic hangup) and must not
+ * crash; it leaves the buffer empty rather than reading through a NULL. */
+static void test_event_call_state_null_string(void) {
+    call_state_event_t *ev = call_state_event_create(NULL, NULL, EVENT_CALL_STATE_INVALID);
+
+    TEST_ASSERT_NOT_NULL(ev);
+    TEST_ASSERT_EQ_STR(ev->state, "");
+
+    event_destroy((event_t *)ev);
+}
+
+static void test_event_eeprom_validation_error_repr(void) {
+    coin_eeprom_validation_error_t *ev =
+        coin_eeprom_validation_error_create(3, 0xAA, 0xBB);
+    char *repr;
+
+    TEST_ASSERT_NOT_NULL(ev);
+    TEST_ASSERT_EQ_INT(ev->addr, 3);
+    TEST_ASSERT_EQ_INT(ev->expected, 0xAA);
+    TEST_ASSERT_EQ_INT(ev->actual, 0xBB);
+
+    repr = event_get_repr((event_t *)ev);
+    TEST_ASSERT_EQ_STR(repr, "Addr: 3, Expected: 170, Actual: 187");
+    free(repr);
+
+    event_destroy((event_t *)ev);
+}
+
+static void test_event_eeprom_upload_start_end(void) {
+    coin_eeprom_upload_start_t *start = coin_eeprom_upload_start_create();
+    coin_eeprom_upload_end_t *end = coin_eeprom_upload_end_create();
+
+    TEST_ASSERT_NOT_NULL(start);
+    TEST_ASSERT_NOT_NULL(end);
+    TEST_ASSERT_EQ_INT(start->base.type, EVENT_COIN_EEPROM_UPLOAD_START);
+    TEST_ASSERT_EQ_INT(end->base.type, EVENT_COIN_EEPROM_UPLOAD_END);
+    TEST_ASSERT_EQ_STR(event_get_name((event_t *)start), "CoinEepromUploadStart");
+    TEST_ASSERT_EQ_STR(event_get_name((event_t *)end), "CoinEepromUploadEnd");
+
+    event_destroy((event_t *)start);
+    event_destroy((event_t *)end);
+}
+
+static void test_event_eeprom_validation_start_end(void) {
+    coin_eeprom_validation_start_t *start = coin_eeprom_validation_start_create();
+    coin_eeprom_validation_end_t *end = coin_eeprom_validation_end_create();
+
+    TEST_ASSERT_NOT_NULL(start);
+    TEST_ASSERT_NOT_NULL(end);
+    TEST_ASSERT_EQ_INT(start->base.type, EVENT_COIN_EEPROM_VALIDATION_START);
+    TEST_ASSERT_EQ_INT(end->base.type, EVENT_COIN_EEPROM_VALIDATION_END);
+
+    event_destroy((event_t *)start);
+    event_destroy((event_t *)end);
+}
+
+/* event_destroy/get_name/get_repr must tolerate a NULL event (defensive
+ * callers, e.g. a queue pop that raced a producer) without crashing. */
+static void test_event_null_safety(void) {
+    char *repr;
+
+    event_destroy(NULL);
+    TEST_ASSERT_EQ_STR(event_get_name(NULL), "UnknownEvent");
+
+    repr = event_get_repr(NULL);
+    TEST_ASSERT_EQ_STR(repr, "Unknown");
+    free(repr);
+
+    TEST_ASSERT_EQ_INT(keypad_event_get_key(NULL), 0);
+    TEST_ASSERT_EQ_INT(hook_state_change_event_get_direction(NULL), 0);
+    TEST_ASSERT_EQ_INT((int)call_state_event_get_state(NULL), (int)EVENT_CALL_STATE_INVALID);
+    TEST_ASSERT_NULL(call_state_event_get_call(NULL));
+    TEST_ASSERT_NULL(coin_event_get_coin_code(NULL));
+}
+
+/* ── Event Processor ────────────────────────────────────────────── */
+
+static int ut_ep_coin_hits;
+static int ut_ep_hook_hits;
+static int ut_ep_keypad_hits;
+static int ut_ep_card_hits;
+static int ut_ep_call_state_hits;
+static char ut_ep_last_key;
+
+static void ut_ep_coin_handler(coin_event_t *ev) { (void)ev; ut_ep_coin_hits++; }
+static void ut_ep_hook_handler(hook_state_change_event_t *ev) { (void)ev; ut_ep_hook_hits++; }
+static void ut_ep_keypad_handler(keypad_event_t *ev) {
+    ut_ep_keypad_hits++;
+    ut_ep_last_key = keypad_event_get_key(ev);
+}
+static void ut_ep_card_handler(card_event_t *ev) { (void)ev; ut_ep_card_hits++; }
+static void ut_ep_call_state_handler(call_state_event_t *ev) { (void)ev; ut_ep_call_state_hits++; }
+
+static void ut_ep_reset_counters(void) {
+    ut_ep_coin_hits = 0;
+    ut_ep_hook_hits = 0;
+    ut_ep_keypad_hits = 0;
+    ut_ep_card_hits = 0;
+    ut_ep_call_state_hits = 0;
+    ut_ep_last_key = 0;
+}
+
+static void test_event_processor_create_destroy(void) {
+    event_processor_t *p = event_processor_create();
+    TEST_ASSERT_NOT_NULL(p);
+    event_processor_destroy(p);
+    event_processor_destroy(NULL); /* must not crash */
+}
+
+/* Each registered handler is invoked only for its own event type, with the
+ * concrete event handed straight through -- no cross-wiring between types. */
+static void test_event_processor_dispatches_to_registered_handler(void) {
+    event_processor_t *p = event_processor_create();
+    keypad_event_t *kev = keypad_event_create('9');
+
+    ut_ep_reset_counters();
+    event_processor_register_coin_handler(p, ut_ep_coin_handler);
+    event_processor_register_hook_handler(p, ut_ep_hook_handler);
+    event_processor_register_keypad_handler(p, ut_ep_keypad_handler);
+    event_processor_register_card_handler(p, ut_ep_card_handler);
+    event_processor_register_call_state_handler(p, ut_ep_call_state_handler);
+
+    event_processor_process_event(p, (event_t *)kev);
+
+    TEST_ASSERT_EQ_INT(ut_ep_keypad_hits, 1);
+    TEST_ASSERT_EQ_INT(ut_ep_last_key, '9');
+    TEST_ASSERT_EQ_INT(ut_ep_coin_hits, 0);
+    TEST_ASSERT_EQ_INT(ut_ep_hook_hits, 0);
+    TEST_ASSERT_EQ_INT(ut_ep_card_hits, 0);
+    TEST_ASSERT_EQ_INT(ut_ep_call_state_hits, 0);
+
+    event_destroy((event_t *)kev);
+    event_processor_destroy(p);
+}
+
+static void test_event_processor_dispatches_each_type_once(void) {
+    event_processor_t *p = event_processor_create();
+    coin_event_t *coin_ev = coin_event_create(0x36);
+    hook_state_change_event_t *hook_ev = hook_state_change_event_create('U');
+    card_event_t *card_ev = card_event_create("1111222233334444");
+    call_state_event_t *call_ev =
+        call_state_event_create("CALL_CLOSED", NULL, EVENT_CALL_STATE_INVALID);
+
+    ut_ep_reset_counters();
+    event_processor_register_coin_handler(p, ut_ep_coin_handler);
+    event_processor_register_hook_handler(p, ut_ep_hook_handler);
+    event_processor_register_keypad_handler(p, ut_ep_keypad_handler);
+    event_processor_register_card_handler(p, ut_ep_card_handler);
+    event_processor_register_call_state_handler(p, ut_ep_call_state_handler);
+
+    event_processor_process_event(p, (event_t *)coin_ev);
+    event_processor_process_event(p, (event_t *)hook_ev);
+    event_processor_process_event(p, (event_t *)card_ev);
+    event_processor_process_event(p, (event_t *)call_ev);
+
+    TEST_ASSERT_EQ_INT(ut_ep_coin_hits, 1);
+    TEST_ASSERT_EQ_INT(ut_ep_hook_hits, 1);
+    TEST_ASSERT_EQ_INT(ut_ep_card_hits, 1);
+    TEST_ASSERT_EQ_INT(ut_ep_call_state_hits, 1);
+    TEST_ASSERT_EQ_INT(ut_ep_keypad_hits, 0);
+
+    event_destroy((event_t *)coin_ev);
+    event_destroy((event_t *)hook_ev);
+    event_destroy((event_t *)card_ev);
+    event_destroy((event_t *)call_ev);
+    event_processor_destroy(p);
+}
+
+/* An event type with no registered handler (and the EEPROM upload/validation
+ * types, which never get handlers) must be a no-op, not a crash. */
+static void test_event_processor_missing_handler_is_noop(void) {
+    event_processor_t *p = event_processor_create();
+    keypad_event_t *kev = keypad_event_create('1');
+    coin_eeprom_upload_start_t *up = coin_eeprom_upload_start_create();
+
+    ut_ep_reset_counters();
+    event_processor_process_event(p, (event_t *)kev); /* no keypad handler registered */
+    event_processor_process_event(p, (event_t *)up);  /* type with no handler slot at all */
+
+    TEST_ASSERT_EQ_INT(ut_ep_keypad_hits, 0);
+
+    event_destroy((event_t *)kev);
+    event_destroy((event_t *)up);
+    event_processor_destroy(p);
+}
+
+/* NULL processor or NULL event must not crash. */
+static void test_event_processor_null_safety(void) {
+    event_processor_t *p = event_processor_create();
+    keypad_event_t *kev = keypad_event_create('1');
+
+    event_processor_process_event(NULL, (event_t *)kev);
+    event_processor_process_event(p, NULL);
+    event_processor_register_coin_handler(NULL, ut_ep_coin_handler);
+    event_processor_register_hook_handler(NULL, ut_ep_hook_handler);
+    event_processor_register_keypad_handler(NULL, ut_ep_keypad_handler);
+    event_processor_register_card_handler(NULL, ut_ep_card_handler);
+    event_processor_register_call_state_handler(NULL, ut_ep_call_state_handler);
+
+    event_destroy((event_t *)kev);
+    event_processor_destroy(p);
+}
+
 /* ── Main ───────────────────────────────────────────────────────── */
 
 int main(void) {
@@ -2408,6 +2727,28 @@ int main(void) {
 
     TEST_SUITE_BEGIN("Health Metrics");
     TEST_SUITE_RUN(test_health_metrics_published);
+
+    TEST_SUITE_BEGIN("Events");
+    TEST_SUITE_RUN(test_event_keypad_roundtrip);
+    TEST_SUITE_RUN(test_event_card_roundtrip);
+    TEST_SUITE_RUN(test_event_card_null_number);
+    TEST_SUITE_RUN(test_event_card_number_truncates);
+    TEST_SUITE_RUN(test_event_coin_code_mapping);
+    TEST_SUITE_RUN(test_event_coin_code_unknown);
+    TEST_SUITE_RUN(test_event_hook_direction);
+    TEST_SUITE_RUN(test_event_call_state_roundtrip);
+    TEST_SUITE_RUN(test_event_call_state_null_string);
+    TEST_SUITE_RUN(test_event_eeprom_validation_error_repr);
+    TEST_SUITE_RUN(test_event_eeprom_upload_start_end);
+    TEST_SUITE_RUN(test_event_eeprom_validation_start_end);
+    TEST_SUITE_RUN(test_event_null_safety);
+
+    TEST_SUITE_BEGIN("Event Processor");
+    TEST_SUITE_RUN(test_event_processor_create_destroy);
+    TEST_SUITE_RUN(test_event_processor_dispatches_to_registered_handler);
+    TEST_SUITE_RUN(test_event_processor_dispatches_each_type_once);
+    TEST_SUITE_RUN(test_event_processor_missing_handler_is_noop);
+    TEST_SUITE_RUN(test_event_processor_null_safety);
 
     TEST_REPORT();
 }

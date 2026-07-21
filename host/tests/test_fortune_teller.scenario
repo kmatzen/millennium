@@ -1,0 +1,39 @@
+# Test: Fortune Teller plugin
+# Coin -> menu, keypad category selection -> reading delay -> fortune shown,
+# then returns to the welcome screen after the display delay.
+
+activate_plugin Fortune Teller
+hook_up
+assert_display Insert 25c
+assert_display for your fortune
+
+# Partial payment: still short, welcome shows the running total
+coin 10
+assert_display Have: 10c
+assert_display Need: 15c
+
+# Enough to cover the 25c fortune -> menu appears
+coin 25
+assert_display Choose Fortune
+assert_display 1-5 Keys
+
+# Pick category 1 (Love) -> "Reading" while the crystal ball "warms up"
+key 1
+assert_display Reading
+assert_display Crystal...
+
+# Reading takes 2 simulated seconds
+wait 2
+assert_display Love
+
+# The fortune stays up for 3 seconds, then it's back to the welcome screen.
+# 10c + 25c = 35c inserted, 25c spent on the fortune -> 10c change remains.
+wait 3
+assert_display Have: 10c
+assert_display Need: 15c
+
+# Hanging up resets the session, clears the balance, and shows the
+# lift-receiver prompt since the handset is back down
+hook_down
+assert_display Lift receiver
+assert_display for fortune
