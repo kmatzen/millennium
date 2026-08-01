@@ -11,6 +11,57 @@ When the display Arduino or serial link disconnects during a call (USB unplug, c
 
 - **SIP call**: PJSIP (the PJSUA worker thread) runs separately and uses the network. The call continues; audio is independent of the serial link.
 - **Plugin state**: Daemon state, plugin state (e.g. `classic_phone_data`), and display_manager state keep updating via `plugins_tick` / `display_manager_tick`. These run in the main loop regardless of serial.
+- **Web API / metrics**: served by their own threads over the network. They keep working while the phone hardware is unreachable — see the escape hatch below.
+
+## What Is Lost (#103)
+
+**Every** phone input is lost for the duration, not just the display. The hook
+switch, keypad and magstripe reader are on the *keypad* Arduino (Alpha), which has
+no USB path of its own — it reaches the Pi as Alpha → I2C → Beta → USB. The coin
+validator hangs off Beta's `SoftwareSerial`. So dropping Beta's USB link severs
+all five channels at once.
+
+Mid-call, the consequence is that **hanging up the handset does not end the call.**
+The daemon never sees the `HD` event, so it never calls `millennium_client_hangup`.
+The call then runs until the remote party hangs up, or a plugin's own tick-driven
+timeout fires — `classic_phone` has `call.timeout_seconds` (default 300 s) and
+`plugins_handle_tick` keeps running through the outage, but plugins without a
+timeout (e.g. The Operator) will not end it at all.
+
+Coins inserted during the outage are lost: if the gate was left open (`'a'`), the
+mech still accepts them, but the `V` event cannot reach the daemon to be credited.
+
+### Escape hatch
+
+The web API is served over the network, independent of the serial link, so
+`POST /api/control {"action":"handset_down"}` ends a call even while the phone
+hardware is unreachable. This is the way out of the case above, and it is how the
+verification run below was terminated.
+
+### Caveat: hook state can go stale
+
+Alpha emits `HU`/`HD` only on a debounced *transition*, so a hook change that
+happens during the outage is lost permanently — the daemon's idea of the hook, and
+therefore the coin gate replayed on reconnect (see `COIN_VALIDATOR.md`), can both
+be wrong until the handset next moves. Related: #232.
+
+## Verified Mid-Call (#103)
+
+Confirmed on the phone with a live call up, by unbinding Beta from `cdc_acm` for
+80 s and rebinding:
+
+```
+T+0    current_state 4 (CALL_ACTIVE), sip_registered 1
+       ... watchdog fires at 61s, reconnect attempts 1-4 fail ...
+T+80   current_state 4, sip_registered 1        <- call survived untouched
+       reconnect attempt 5 -> Serial port reopened successfully
+       Writing to coin validator: 97            <- gate replayed ('a', handset up)
+       Writing message to display: Call active  <- display re-synced
+T+120  current_state 4, health HEALTHY
+```
+
+The call was unaffected throughout and the display returned to the correct
+call state without intervention.
 
 ## Display Re-sync on Reconnect
 
