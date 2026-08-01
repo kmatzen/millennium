@@ -24,6 +24,24 @@ bool hookUpState = true;
 unsigned long lastHookChange = 0;
 const unsigned long DEBOUNCE_MS = 50;
 
+/* (#230) Retry budget for an I2C message to Beta.  Deliberately short: it
+ * comfortably covers a VFD repaint (~180 ms, display.ino:199-207) but NOT the
+ * ~2 s coin-validator reset (display.ino:213-216).  Blocking the keypad scan
+ * for two seconds would lose more keypresses than it saved, and the watchdog
+ * is only 4 s. */
+const uint8_t I2C_SEND_ATTEMPTS = 8;
+const unsigned long I2C_RETRY_DELAY_MS = 25;
+
+/* Messages Beta never acknowledged, even after the retries above.  Surfacing
+ * this to the host properly needs a protocol addition; see #230 item 2. */
+unsigned int i2cDropped = 0;
+
+/* (#232) What the hook read as during setup(), kept for the status query.
+ * Printing it at boot would be useless: an external reset re-enumerates the
+ * USB CDC port, so anything written before a host attaches is discarded. */
+bool bootHookUp = false;
+bool bootHookReported = false;
+
 const byte ROWS = 4;
 const byte COLS = 7;
 char keys[ROWS][COLS] = {{'1', '2', '3', 'A', 'B', 'C', 'D'},
@@ -39,8 +57,49 @@ Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
 
 MagStripe card(22, 0, 1);
 
+/*
+ * (#230) Send one I2C message to Beta, retrying while it NACKs.
+ *
+ * Wire.endTransmission() returns 0 only when Beta acknowledged every byte; 2
+ * and 3 are NACKs, which is exactly what happens while Beta sits in a delay()
+ * or repaints the VFD.  Every call site used to discard that status, so a
+ * keypress lost to a busy Beta was indistinguishable from one delivered --
+ * which is why "every keypress eventually reaches the Pi" did not hold.
+ *
+ * Returns true if the message landed.
+ */
+bool i2cSend(const uint8_t *payload, uint8_t len) {
+  for (uint8_t attempt = 0; attempt < I2C_SEND_ATTEMPTS; attempt++) {
+    Wire.beginTransmission(I2C_DISPLAY_ADDR);
+    Wire.write(payload, len);
+    if (Wire.endTransmission() == 0) {
+      return true;
+    }
+    wdt_reset();
+    delay(I2C_RETRY_DELAY_MS);
+  }
+
+  i2cDropped++;
+  return false;
+}
+
+/*
+ * Sample the hook switch.  hookCommonPin is driven low only for the read, the
+ * same way loop() does it, so the two pull-ups can be told apart.
+ */
+bool readHookUp() {
+  bool up;
+  digitalWrite(hookCommonPin, LOW);
+  delayMicroseconds(50);   /* let the pull-ups settle before sampling */
+  up = !digitalRead(hookUpPin) && digitalRead(hookDownPin);
+  digitalWrite(hookCommonPin, HIGH);
+  return up;
+}
+
 void setup() {
   delay(2000);
+
+  Serial.begin(9600);   /* diagnostics only; nothing on the Pi reads this port */
 
   card.begin(2);
 
@@ -50,6 +109,35 @@ void setup() {
   pinMode(hookDownPin, INPUT_PULLUP);
   pinMode(hookCommonPin, OUTPUT);
   digitalWrite(hookCommonPin, HIGH);
+
+  /* (#232) Sample the hook once and report it, so the firmware and the Pi
+   * start out agreeing.  Previously hookUpState was simply assumed true and
+   * HU/HD were only ever emitted on a transition, so a phone that booted with
+   * the handset off the hook had the firmware believing it was up and the
+   * daemon believing it was down, with nothing to reconcile them until the
+   * handset next moved.
+   *
+   * An ambiguous reading (both pins alike, i.e. mid-travel) is treated as
+   * down, which is what daemon_state.c already defaults to -- agreeing on the
+   * safe state beats agreeing on nothing.
+   *
+   * Beta may still be inside its own setup() when we first try, so this leans
+   * on i2cSend()'s retry (#230); a bare fire-and-forget write would vanish.
+   * The extra outer attempts are affordable here because the keypad scan has
+   * not started yet.
+   */
+  hookUpState = readHookUp();
+  bootHookUp = hookUpState;
+  bootHookReported = false;
+  lastHookChange = millis();
+  {
+    const uint8_t *msg = (const uint8_t *)(hookUpState ? EVT_HOOK_UP : EVT_HOOK_DOWN);
+    uint8_t attempt;
+    for (attempt = 0; attempt < 3; attempt++) {
+      if (i2cSend(msg, 2)) { bootHookReported = true; break; }
+      delay(100);
+    }
+  }
 
   wdt_enable(WDTO_4S);
 }
@@ -132,16 +220,42 @@ struct MagstripeData parseTrack2(char *rawData, int length) {
   return result;
 }
 
+/*
+ * Status query on Alpha's own USB serial, which nothing else uses -- the daemon
+ * only opens Beta. Send any byte to that port and the firmware reports what it
+ * sampled at boot, whether Beta took the report, the live hook state, and the
+ * running I2C drop count.
+ *
+ * This is how the #232 boot sample is observable at all: the value cannot be
+ * printed as it happens, because the reset that produces it also re-enumerates
+ * the port.
+ */
+void serviceStatusQuery() {
+  if (!Serial.available()) return;
+  while (Serial.available()) Serial.read();
+
+  Serial.print(F("boot_hook="));
+  Serial.print(bootHookUp ? F("UP") : F("DOWN"));
+  Serial.print(F(" boot_reported="));
+  Serial.print(bootHookReported ? F("yes") : F("no"));
+  Serial.print(F(" hook="));
+  Serial.print(hookUpState ? F("UP") : F("DOWN"));
+  Serial.print(F(" i2c_drops="));
+  Serial.println(i2cDropped);
+}
+
 void loop() {
   wdt_reset();
+
+  serviceStatusQuery();
 
   char key = keypad.getKey();
 
   if (key != NO_KEY) {
-    Wire.beginTransmission(I2C_DISPLAY_ADDR);
-    Wire.write(EVT_KEY);
-    Wire.write(key);
-    Wire.endTransmission();
+    uint8_t msg[2];
+    msg[0] = EVT_KEY;
+    msg[1] = (uint8_t)key;
+    i2cSend(msg, sizeof(msg));
   }
 
   if (card.available()) {
@@ -153,10 +267,15 @@ void loop() {
     if (chars > 0) {
       MagstripeData parsedData = parseTrack2(data, chars);
       if (parsedData.valid && parsedData.pan_len > 0) {
-        Wire.beginTransmission(I2C_DISPLAY_ADDR);
-        Wire.write(EVT_CARD);
-        Wire.write(parsedData.pan, parsedData.pan_len);
-        Wire.endTransmission();
+        /* Wire's TX buffer is 32 bytes on AVR, and a longer write is silently
+         * truncated -- clamp explicitly so the limit is visible here rather
+         * than being discovered as a mangled PAN. */
+        uint8_t pan_len = parsedData.pan_len;
+        uint8_t msg[1 + 31];
+        if (pan_len > sizeof(msg) - 1) pan_len = sizeof(msg) - 1;
+        msg[0] = EVT_CARD;
+        memcpy(msg + 1, parsedData.pan, pan_len);
+        i2cSend(msg, 1 + pan_len);
       }
     }
   }
@@ -169,18 +288,14 @@ void loop() {
       if (hookDownNow) {
         hookUpState = false;
         lastHookChange = now;
-        Wire.beginTransmission(I2C_DISPLAY_ADDR);
-        Wire.write(EVT_HOOK_DOWN);
-        Wire.endTransmission();
+        i2cSend((const uint8_t *)EVT_HOOK_DOWN, 2);
       }
     } else {
       bool hookUpNow = !digitalRead(hookUpPin) && digitalRead(hookDownPin);
       if (hookUpNow) {
         hookUpState = true;
         lastHookChange = now;
-        Wire.beginTransmission(I2C_DISPLAY_ADDR);
-        Wire.write(EVT_HOOK_UP);
-        Wire.endTransmission();
+        i2cSend((const uint8_t *)EVT_HOOK_UP, 2);
       }
     }
   }
