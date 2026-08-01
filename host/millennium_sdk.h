@@ -56,6 +56,10 @@ typedef struct millennium_client {
     int reconnect_attempts;
     struct timespec next_reconnect_time;
     char serial_device_path[256];
+
+    /* (#239) Last coin-gate command sent to the validator, replayed after a
+     * serial reconnect.  0 until the daemon gates the validator once. */
+    uint8_t coin_gate_cmd;
 } millennium_client_t;
 
 /* Function declarations */

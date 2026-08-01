@@ -81,8 +81,11 @@ events.o: events.c events.h
 event_processor.o: event_processor.c event_processor.h events.h
 	$(CC) event_processor.c -o event_processor.o -c $(CFLAGS)
 
-millennium_sdk.o: millennium_sdk.c millennium_sdk.h events.h pjsip_interface.h config.h
+millennium_sdk.o: millennium_sdk.c millennium_sdk.h events.h pjsip_interface.h config.h coin_gate.h
 	$(CC) millennium_sdk.c -o millennium_sdk.o -c $(CFLAGS)
+
+coin_gate.o: coin_gate.c coin_gate.h
+	$(CC) coin_gate.c -o coin_gate.o -c $(CFLAGS)
 
 state_persistence.o: state_persistence.c state_persistence.h daemon_state.h logger.h
 	$(CC) state_persistence.c -o state_persistence.o -c $(CFLAGS)
@@ -136,8 +139,8 @@ plugins/trivia.o: plugins/trivia.c plugins.h plugin_sdk.h config.h
 plugins/time_operator.o: plugins/time_operator.c plugins.h plugin_sdk.h
 	$(CC) plugins/time_operator.c -o plugins/time_operator.o -c $(CFLAGS)
 
-daemon: daemon.o daemon_state.o clock_source.o millennium_sdk.o pjsip_interface.o events.o event_processor.o config.o cli.o logger.o health_monitor.o metrics.o metrics_server.o call_metrics.o web_server.o websocket.o conn_queue.o plugins.o plugin_sdk.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o plugins/number_guess.o plugins/simon.o plugins/dial_a_joke.o plugins/trivia.o plugins/time_operator.o state_persistence.o display_manager.o version.o audio_tones.o wav.o updater.o
-	$(CC) daemon.o daemon_state.o clock_source.o millennium_sdk.o pjsip_interface.o events.o event_processor.o config.o cli.o logger.o health_monitor.o metrics.o metrics_server.o call_metrics.o web_server.o websocket.o conn_queue.o plugins.o plugin_sdk.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o plugins/number_guess.o plugins/simon.o plugins/dial_a_joke.o plugins/trivia.o plugins/time_operator.o state_persistence.o display_manager.o version.o audio_tones.o wav.o updater.o -o daemon $(LDFLAGS) -lm
+daemon: daemon.o daemon_state.o clock_source.o millennium_sdk.o coin_gate.o pjsip_interface.o events.o event_processor.o config.o cli.o logger.o health_monitor.o metrics.o metrics_server.o call_metrics.o web_server.o websocket.o conn_queue.o plugins.o plugin_sdk.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o plugins/number_guess.o plugins/simon.o plugins/dial_a_joke.o plugins/trivia.o plugins/time_operator.o state_persistence.o display_manager.o version.o audio_tones.o wav.o updater.o
+	$(CC) daemon.o daemon_state.o clock_source.o millennium_sdk.o coin_gate.o pjsip_interface.o events.o event_processor.o config.o cli.o logger.o health_monitor.o metrics.o metrics_server.o call_metrics.o web_server.o websocket.o conn_queue.o plugins.o plugin_sdk.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o plugins/number_guess.o plugins/simon.o plugins/dial_a_joke.o plugins/trivia.o plugins/time_operator.o state_persistence.o display_manager.o version.o audio_tones.o wav.o updater.o -o daemon $(LDFLAGS) -lm
 
 # Simulator object file
 simulator.o: simulator.c millennium_sdk.h events.h config.h daemon_state.h logger.h metrics.h call_metrics.h plugins.h
@@ -156,9 +159,9 @@ simulator: $(SIM_OBJS)
 all: daemon
 
 # Unit test binary
-UNIT_TEST_OBJS = tests/unit_tests.o daemon_state.o clock_source.o events.o event_processor.o config.o cli.o logger.o metrics.o call_metrics.o health_monitor.o plugins.o plugin_sdk.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o plugins/number_guess.o plugins/simon.o plugins/dial_a_joke.o plugins/trivia.o plugins/time_operator.o state_persistence.o display_manager.o version.o wav.o updater.o conn_queue.o
+UNIT_TEST_OBJS = tests/unit_tests.o coin_gate.o daemon_state.o clock_source.o events.o event_processor.o config.o cli.o logger.o metrics.o call_metrics.o health_monitor.o plugins.o plugin_sdk.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o plugins/number_guess.o plugins/simon.o plugins/dial_a_joke.o plugins/trivia.o plugins/time_operator.o state_persistence.o display_manager.o version.o wav.o updater.o conn_queue.o
 
-tests/unit_tests.o: tests/unit_tests.c tests/test_framework.h config.h cli.h daemon_state.h plugins.h logger.h metrics.h call_metrics.h millennium_sdk.h updater.h state_persistence.h conn_queue.h health_monitor.h
+tests/unit_tests.o: tests/unit_tests.c tests/test_framework.h coin_gate.h config.h cli.h daemon_state.h plugins.h logger.h metrics.h call_metrics.h millennium_sdk.h updater.h state_persistence.h conn_queue.h health_monitor.h
 	$(CC) tests/unit_tests.c -o tests/unit_tests.o -c $(CFLAGS) -I.
 
 # Unit tests don't use time wrapping; link ALSA on Linux for jukebox
@@ -194,7 +197,7 @@ test: simulator unit_tests
 # ALSA paths in audio_tones.c, plus web_server/websocket/health_monitor — is
 # never compiled by `make test`. This target catches type/syntax errors in that
 # code on any Linux box with libasound2-dev (e.g. CI), short of a full link.
-COMPILE_CHECK_OBJS = daemon.o daemon_state.o clock_source.o millennium_sdk.o events.o \
+COMPILE_CHECK_OBJS = daemon.o daemon_state.o clock_source.o millennium_sdk.o coin_gate.o events.o \
 	event_processor.o config.o logger.o health_monitor.o metrics.o \
 	metrics_server.o call_metrics.o web_server.o websocket.o conn_queue.o plugins.o plugin_sdk.o \
 	plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o \
