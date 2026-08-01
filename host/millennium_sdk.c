@@ -6,6 +6,7 @@
 #include "pjsip_interface.h"
 #include "config.h"
 #include "logger.h"
+#include "coin_gate.h"
 #include <errno.h>
 #include <fcntl.h>
 /* #include <linux/serial.h> */ /* Linux-specific, not available on macOS */
@@ -484,10 +485,21 @@ void millennium_client_check_serial(struct millennium_client *client) {
         if (open_serial_port(client, client->serial_device_path) == 0) {
             logger_info_with_category("SDK", "Serial port reopened successfully");
 
-            /* Re-init coin validator (send 'f' command). See docs/COIN_VALIDATOR.md (#110) */
+            /* (#239) Put the coin gate back where the daemon last asked for
+             * it, replaying that call site's exact byte sequence -- the same
+             * idea as the display refresh below.  This used to send a bare
+             * 'f': it dropped the 'z' every other 'f' call site pairs with,
+             * and it armed the validator even with the handset on the hook,
+             * where handle_coin_event() drops the coin uncredited.
+             * See docs/COIN_VALIDATOR.md (#110). */
             {
-                uint8_t coin_init = 'f';
-                millennium_client_write_to_coin_validator(client, coin_init);
+                uint8_t coin_seq[COIN_GATE_RESYNC_MAX];
+                size_t coin_len = millennium_coin_gate_resync(
+                        client->coin_gate_cmd, coin_seq, sizeof(coin_seq));
+                size_t i;
+                for (i = 0; i < coin_len; i++) {
+                    millennium_client_write_to_coin_validator(client, coin_seq[i]);
+                }
             }
 
             /* Refresh display */
@@ -754,6 +766,11 @@ void millennium_client_write_to_display(struct millennium_client *client, const 
 
 void millennium_client_write_to_coin_validator(struct millennium_client *client, uint8_t data) {
     logger_debugf_with_category("SDK", "Writing to coin validator: %d", data);
+
+    /* (#239) Remember the gate state so a reconnect can restore it. */
+    if (client) {
+        client->coin_gate_cmd = millennium_coin_gate_track(client->coin_gate_cmd, data);
+    }
 
     /* Step 1: Write the command */
     millennium_client_write_command(client, 0x03, &data, 1);

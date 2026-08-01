@@ -22,6 +22,14 @@ When `open_serial_port` succeeds:
 
 **Result**: After reconnect, the display shows the correct state (e.g. "Call active | 2:15 remaining") because the SDK re-sends the last display content.
 
+## Coin Gate Re-sync on Reconnect (#239)
+
+The same reconnect path restores the coin validator's gate the same way it restores
+the display: by replaying the last command the daemon sent (`'a'`, `'c'` `'z'`, or
+`'f'` `'z'`), tracked in `client->coin_gate_cmd`. If the link died before the daemon
+ever gated the validator, the reconnect rejects coins rather than accepting them.
+See `COIN_VALIDATOR.md`.
+
 ## Buffered Updates While Disconnected
 
 While the serial link is down:

@@ -8,6 +8,7 @@
 #include "../metrics.h"
 #include "../call_metrics.h"
 #include "../millennium_sdk.h"
+#include "../coin_gate.h"
 #include "../updater.h"
 #include "../plugin_sdk.h"
 #include "../clock_source.h"
@@ -2247,6 +2248,85 @@ static void test_health_metrics_published(void) {
     health_monitor_unregister_check("ut_sip");
 }
 
+/* ── Coin validator gate (#239) ─────────────────────────────────── */
+
+/* Run the tracked gate through the byte sequence a call site sends, the way
+ * millennium_client_write_to_coin_validator() folds each byte in one at a
+ * time, and return the resulting state. */
+static uint8_t gate_after(uint8_t gate, const char *bytes) {
+    size_t i;
+    for (i = 0; bytes[i]; i++) {
+        gate = millennium_coin_gate_track(gate, (uint8_t)bytes[i]);
+    }
+    return gate;
+}
+
+static void test_coin_gate_tracks_gate_commands(void) {
+    TEST_ASSERT_EQ_INT(gate_after(0, "a"), 'a');    /* hook up */
+    TEST_ASSERT_EQ_INT(gate_after(0, "cz"), 'c');   /* hook down */
+    TEST_ASSERT_EQ_INT(gate_after(0, "fz"), 'f');   /* call incoming */
+    /* Last one wins, and the 'z' terminator never clobbers the gate. */
+    TEST_ASSERT_EQ_INT(gate_after(0, "acz"), 'c');
+    TEST_ASSERT_EQ_INT(gate_after(0, "czfza"), 'a');
+}
+
+static void test_coin_gate_ignores_non_gate_bytes(void) {
+    TEST_ASSERT_EQ_INT(millennium_coin_gate_track('a', 'z'), 'a');
+    TEST_ASSERT_EQ_INT(millennium_coin_gate_track('a', '@'), 'a');
+    TEST_ASSERT_EQ_INT(millennium_coin_gate_track('c', 'q'), 'c');
+    TEST_ASSERT_EQ_INT(millennium_coin_gate_track(0, 'z'), 0);
+}
+
+static void test_coin_gate_resync_replays_call_site_sequence(void) {
+    uint8_t seq[COIN_GATE_RESYNC_MAX];
+
+    /* 'a' travels alone -- daemon.c sends no 'z' on the IDLE_UP edge. */
+    TEST_ASSERT_EQ_INT((int)millennium_coin_gate_resync('a', seq, sizeof(seq)), 1);
+    TEST_ASSERT_EQ_INT(seq[0], 'a');
+
+    TEST_ASSERT_EQ_INT((int)millennium_coin_gate_resync('c', seq, sizeof(seq)), 2);
+    TEST_ASSERT_EQ_INT(seq[0], 'c');
+    TEST_ASSERT_EQ_INT(seq[1], 'z');
+
+    /* #239: the reconnect path used to send this one without its 'z'. */
+    TEST_ASSERT_EQ_INT((int)millennium_coin_gate_resync('f', seq, sizeof(seq)), 2);
+    TEST_ASSERT_EQ_INT(seq[0], 'f');
+    TEST_ASSERT_EQ_INT(seq[1], 'z');
+}
+
+static void test_coin_gate_resync_untracked_rejects(void) {
+    uint8_t seq[COIN_GATE_RESYNC_MAX];
+
+    /* #239: reconnecting before the daemon ever gated the validator must not
+     * arm it -- a coin accepted with the handset down is never credited. */
+    TEST_ASSERT_EQ_INT((int)millennium_coin_gate_resync(0, seq, sizeof(seq)), 2);
+    TEST_ASSERT_EQ_INT(seq[0], 'c');
+    TEST_ASSERT_EQ_INT(seq[1], 'z');
+}
+
+/* #239's core claim: a reconnect while the handset is on the hook must leave
+ * the validator closed, and one with the handset lifted must leave it open. */
+static void test_coin_gate_resync_follows_hook_state(void) {
+    uint8_t seq[COIN_GATE_RESYNC_MAX];
+    uint8_t gate;
+
+    gate = gate_after(0, "cz");  /* handset down */
+    TEST_ASSERT_EQ_INT((int)millennium_coin_gate_resync(gate, seq, sizeof(seq)), 2);
+    TEST_ASSERT_EQ_INT(seq[0], 'c');
+
+    gate = gate_after(gate, "a");  /* handset lifted */
+    TEST_ASSERT_EQ_INT((int)millennium_coin_gate_resync(gate, seq, sizeof(seq)), 1);
+    TEST_ASSERT_EQ_INT(seq[0], 'a');
+}
+
+static void test_coin_gate_resync_rejects_short_buffer(void) {
+    uint8_t seq[COIN_GATE_RESYNC_MAX];
+
+    TEST_ASSERT_EQ_INT((int)millennium_coin_gate_resync('c', NULL, sizeof(seq)), 0);
+    TEST_ASSERT_EQ_INT((int)millennium_coin_gate_resync('c', seq, 1), 0);
+    TEST_ASSERT_EQ_INT((int)millennium_coin_gate_resync('c', seq, 0), 0);
+}
+
 /* ── Main ───────────────────────────────────────────────────────── */
 
 int main(void) {
@@ -2316,6 +2396,14 @@ int main(void) {
     TEST_SUITE_RUN(test_sdk_rand_choice);
     TEST_SUITE_RUN(test_sdk_balance);
     TEST_SUITE_RUN(test_sdk_state);
+
+    TEST_SUITE_BEGIN("Coin Validator Gate");
+    TEST_SUITE_RUN(test_coin_gate_tracks_gate_commands);
+    TEST_SUITE_RUN(test_coin_gate_ignores_non_gate_bytes);
+    TEST_SUITE_RUN(test_coin_gate_resync_replays_call_site_sequence);
+    TEST_SUITE_RUN(test_coin_gate_resync_untracked_rejects);
+    TEST_SUITE_RUN(test_coin_gate_resync_follows_hook_state);
+    TEST_SUITE_RUN(test_coin_gate_resync_rejects_short_buffer);
 
     TEST_SUITE_BEGIN("Clock Seam");
     TEST_SUITE_RUN(test_clock_default_is_real_time);
