@@ -9,9 +9,11 @@
 # `ssh` calls reliably misses that window. Doing it in one local script catches
 # it on the first try.
 #
-# Alpha (keypad) and Beta (display) share one USB hub; resetting both together
-# (BOTH_RESET=1, the default) gives a clean re-enumeration so the target's
-# bootloader appears reliably.
+# Only the target is reset by default. Both boards' Caterina bootloaders
+# enumerate under the SAME product string ("Arduino Micro") and carry no USB
+# serial number, so resetting both at once leaves two devices contending for one
+# by-id path and there is no way to tell which one avrdude would reach. Set
+# BOTH_RESET=1 only if you need it and can accept that ambiguity.
 #
 # A trap restarts daemon.service however the script exits, so a failed or
 # interrupted flash never leaves the phone's daemon down.
@@ -27,12 +29,23 @@ TARGET="${1:-}"
 HEX="${2:-}"
 RETRIES="${RETRIES:-4}"
 AVRDUDE_TIMEOUT="${AVRDUDE_TIMEOUT:-25}"
-BOTH_RESET="${BOTH_RESET:-1}"
+BOTH_RESET="${BOTH_RESET:-0}"
 
 [ -n "$TARGET" ] && [ -n "$HEX" ] || { echo "usage: pi_flash.sh <keypad|display> <hex-path>"; exit 2; }
 [ -f "$HEX" ] || { echo "hex not found: $HEX"; exit 2; }
 
 # GPIO17 -> Alpha (keypad) RST, GPIO27 -> Beta (display) RST.
+#
+# BY_ID is the RUNNING SKETCH's port, named by the custom board's usb_product
+# ("Millennium Alpha"/"Millennium Beta"). We wait for it to disappear to confirm
+# the reset took.
+#
+# BOOT_BY_ID is where avrdude must actually talk. Once reset, the board runs the
+# stock Caterina bootloader, which enumerates under ITS OWN product string --
+# "Arduino Micro" -- not the sketch's. Flashing the sketch port instead just
+# reaches the running firmware, which answers avrdude with nothing:
+#   avrdude: butterfly_recv(): programmer is not responding
+BOOT_BY_ID=/dev/serial/by-id/usb-Arduino_LLC_Arduino_Micro-if00
 case "$TARGET" in
   keypad)  GPIO=17; BY_ID=/dev/serial/by-id/usb-Arduino_LLC_Millennium_Alpha-if00 ;;
   display) GPIO=27; BY_ID=/dev/serial/by-id/usb-Arduino_LLC_Millennium_Beta-if00 ;;
@@ -59,15 +72,17 @@ flash_once() {
     else
         raspi-gpio set "$GPIO" op dl; sleep 0.15; raspi-gpio set "$GPIO" ip
     fi
-    # Wait for the port to drop (confirms the reset took).
+    # Wait for the sketch port to drop (confirms the reset took).
     for i in $(seq 1 100); do [ ! -e "$BY_ID" ] && break; sleep 0.02; done
-    # Tight poll for the bootloader, resolve, and flash with NO added latency.
+    # Tight poll for the BOOTLOADER port, resolve, and flash with NO added
+    # latency. An external reset holds Caterina open for several seconds, but
+    # poll tightly anyway so a USB-triggered reset works too.
     P=""
     for i in $(seq 1 600); do
-        if [ -e "$BY_ID" ]; then P=$(readlink -f "$BY_ID"); break; fi
+        if [ -e "$BOOT_BY_ID" ]; then P=$(readlink -f "$BOOT_BY_ID"); break; fi
         sleep 0.01
     done
-    [ -n "$P" ] || { echo "  bootloader did not enumerate"; return 1; }
+    [ -n "$P" ] || { echo "  bootloader did not enumerate at $BOOT_BY_ID"; return 1; }
     echo "  bootloader at $P, flashing..."
     out=$(timeout "$AVRDUDE_TIMEOUT" avrdude -p atmega32u4 -c avr109 -P "$P" \
             -b 57600 -U "flash:w:$HEX:i" 2>&1)
