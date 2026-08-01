@@ -7,6 +7,7 @@
 #include "config.h"
 #include "logger.h"
 #include "coin_gate.h"
+#include "serial_recovery.h"
 #include <errno.h>
 #include <fcntl.h>
 /* #include <linux/serial.h> */ /* Linux-specific, not available on macOS */
@@ -435,50 +436,51 @@ int millennium_client_serial_is_healthy(struct millennium_client *client) {
 void millennium_client_check_serial(struct millennium_client *client) {
 #if SERIAL_WATCHDOG_ENABLED
     struct timespec now;
-    long elapsed;
+    serial_link_state_t st;
+    serial_action_t action;
     int backoff;
 #endif
     if (!client) return;
 
 #if SERIAL_WATCHDOG_ENABLED
     clock_gettime(CLOCK_MONOTONIC, &now);
-    elapsed = now.tv_sec - client->last_serial_activity.tv_sec;
 
-    /* (#247) A failed reconnect leaves display_fd == -1, because
-     * open_serial_port() drops the stale fd before it tries the open.  This
-     * used to be an early return at the top of this function, which stranded
-     * the daemon for good: the retry that would reopen the port lives further
-     * down, so the first failed attempt was also the last one and the link
-     * never came back without a restart.  Treat a missing fd as a dead link
-     * instead -- getting it back is exactly this function's job. */
-    if (client->display_fd == -1 && client->serial_healthy) {
-        logger_warn_with_category("SDK", "Serial fd is closed, marking link dead");
+    /* The policy lives in serial_recovery.c so it can be unit-tested; this
+     * function just samples the link and carries the verdict out (#247). */
+    st.fd_open = (client->display_fd != -1);
+    st.link_healthy = client->serial_healthy;
+    st.idle_seconds = now.tv_sec - client->last_serial_activity.tv_sec;
+    st.seconds_until_retry = client->next_reconnect_time.tv_sec - now.tv_sec;
+
+    action = serial_recovery_next_action(&st);
+
+    if (action == SERIAL_ACTION_MARK_DEAD) {
+        if (st.fd_open) {
+            logger_warnf_with_category("SDK",
+                "Serial watchdog: no activity for %ld seconds, marking link dead",
+                st.idle_seconds);
+        } else {
+            logger_warn_with_category("SDK", "Serial fd is closed, marking link dead");
+        }
         client->serial_healthy = 0;
         client->reconnect_attempts = 0;
         client->next_reconnect_time = now;
+
+        /* Marking the link dead makes a retry due immediately, so ask again and
+         * reconnect in this same pass -- which is what the daemon has always
+         * done on the pass where the watchdog fires. */
+        st.link_healthy = 0;
+        st.seconds_until_retry = 0;
+        action = serial_recovery_next_action(&st);
     }
 
-    /* The keepalive and the activity watchdog both need a live fd; skip them
-     * while the link is down and fall through to the reconnect below. */
-    if (client->display_fd != -1) {
-        /* (#59) Send periodic keepalive when idle to avoid false watchdog triggers.
-         * Arduino consumes CMD_KEEPALIVE (0x06) as no-op; write_command updates last_serial_activity. */
-        if (client->serial_healthy && elapsed >= SERIAL_KEEPALIVE_INTERVAL && elapsed < SERIAL_WATCHDOG_SECONDS) {
-            millennium_client_write_command(client, CMD_KEEPALIVE, NULL, 0);
-        }
-
-        if (client->serial_healthy && elapsed > SERIAL_WATCHDOG_SECONDS) {
-            logger_warnf_with_category("SDK",
-                "Serial watchdog: no activity for %ld seconds, marking link dead", elapsed);
-            client->serial_healthy = 0;
-            client->reconnect_attempts = 0;
-            client->next_reconnect_time = now;
-        }
+    /* (#59) Send periodic keepalive when idle to avoid false watchdog triggers.
+     * Arduino consumes CMD_KEEPALIVE (0x06) as no-op; write_command updates last_serial_activity. */
+    if (action == SERIAL_ACTION_KEEPALIVE) {
+        millennium_client_write_command(client, CMD_KEEPALIVE, NULL, 0);
     }
 
-    if (!client->serial_healthy) {
-        if (now.tv_sec < client->next_reconnect_time.tv_sec) return;
-
+    if (action == SERIAL_ACTION_RECONNECT) {
         logger_infof_with_category("SDK",
             "Serial reconnect attempt %d", client->reconnect_attempts + 1);
 
@@ -508,8 +510,7 @@ void millennium_client_check_serial(struct millennium_client *client) {
             }
         } else {
             client->reconnect_attempts++;
-            backoff = 1 << client->reconnect_attempts;
-            if (backoff > SERIAL_MAX_BACKOFF_SECONDS) backoff = SERIAL_MAX_BACKOFF_SECONDS;
+            backoff = serial_recovery_backoff_seconds(client->reconnect_attempts);
             client->next_reconnect_time.tv_sec = now.tv_sec + backoff;
             logger_warnf_with_category("SDK",
                 "Serial reconnect failed, next attempt in %d seconds", backoff);
