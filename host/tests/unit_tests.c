@@ -9,6 +9,7 @@
 #include "../call_metrics.h"
 #include "../millennium_sdk.h"
 #include "../coin_gate.h"
+#include "../serial_recovery.h"
 #include "../updater.h"
 #include "../plugin_sdk.h"
 #include "../clock_source.h"
@@ -2327,6 +2328,85 @@ static void test_coin_gate_resync_rejects_short_buffer(void) {
     TEST_ASSERT_EQ_INT((int)millennium_coin_gate_resync('c', seq, 0), 0);
 }
 
+/* ── Serial recovery policy (#247) ──────────────────────────────── */
+
+static serial_action_t action_for(int fd_open, int healthy, long idle, long until_retry) {
+    serial_link_state_t st;
+    st.fd_open = fd_open;
+    st.link_healthy = healthy;
+    st.idle_seconds = idle;
+    st.seconds_until_retry = until_retry;
+    return serial_recovery_next_action(&st);
+}
+
+static void test_serial_healthy_link_idles_quietly(void) {
+    TEST_ASSERT_EQ_INT(action_for(1, 1, 0, 0), SERIAL_ACTION_NONE);
+    TEST_ASSERT_EQ_INT(action_for(1, 1, SERIAL_KEEPALIVE_INTERVAL - 1, 0), SERIAL_ACTION_NONE);
+}
+
+static void test_serial_keepalive_window(void) {
+    TEST_ASSERT_EQ_INT(action_for(1, 1, SERIAL_KEEPALIVE_INTERVAL, 0), SERIAL_ACTION_KEEPALIVE);
+    TEST_ASSERT_EQ_INT(action_for(1, 1, SERIAL_WATCHDOG_SECONDS - 1, 0), SERIAL_ACTION_KEEPALIVE);
+    /* Long-standing boundary: exactly at the watchdog threshold, neither the
+     * keepalive nor the watchdog fires; the next pass declares it dead. */
+    TEST_ASSERT_EQ_INT(action_for(1, 1, SERIAL_WATCHDOG_SECONDS, 0), SERIAL_ACTION_NONE);
+}
+
+static void test_serial_watchdog_marks_dead(void) {
+    TEST_ASSERT_EQ_INT(action_for(1, 1, SERIAL_WATCHDOG_SECONDS + 1, 0), SERIAL_ACTION_MARK_DEAD);
+}
+
+/* #247's regression: open_serial_port() drops the fd before it retries, so a
+ * failed reconnect leaves fd_open == 0 while the health flag is still set.
+ * That state must not resolve to NONE -- doing so stranded the daemon until a
+ * manual restart. */
+static void test_serial_closed_fd_is_a_dead_link(void) {
+    TEST_ASSERT_EQ_INT(action_for(0, 1, 0, 0), SERIAL_ACTION_MARK_DEAD);
+    TEST_ASSERT_EQ_INT(action_for(0, 1, 1000, 9999), SERIAL_ACTION_MARK_DEAD);
+}
+
+static void test_serial_down_link_retries_when_due(void) {
+    /* Backoff still running: wait. */
+    TEST_ASSERT_EQ_INT(action_for(0, 0, 0, 5), SERIAL_ACTION_NONE);
+    /* Due now, and overdue. */
+    TEST_ASSERT_EQ_INT(action_for(0, 0, 0, 0), SERIAL_ACTION_RECONNECT);
+    TEST_ASSERT_EQ_INT(action_for(0, 0, 0, -30), SERIAL_ACTION_RECONNECT);
+}
+
+/* The daemon keeps retrying for as long as the link stays down -- the failure
+ * mode in #247 was the retries stopping after the first one. */
+static void test_serial_retries_do_not_give_up(void) {
+    int i;
+    for (i = 0; i < 500; i++) {
+        TEST_ASSERT_EQ_INT(action_for(0, 0, i, 0), SERIAL_ACTION_RECONNECT);
+    }
+}
+
+static void test_serial_null_state(void) {
+    TEST_ASSERT_EQ_INT(serial_recovery_next_action(NULL), SERIAL_ACTION_NONE);
+}
+
+static void test_serial_backoff_doubles_then_caps(void) {
+    TEST_ASSERT_EQ_INT(serial_recovery_backoff_seconds(1), 2);
+    TEST_ASSERT_EQ_INT(serial_recovery_backoff_seconds(2), 4);
+    TEST_ASSERT_EQ_INT(serial_recovery_backoff_seconds(3), 8);
+    TEST_ASSERT_EQ_INT(serial_recovery_backoff_seconds(4), 16);
+    TEST_ASSERT_EQ_INT(serial_recovery_backoff_seconds(5), 32);
+    TEST_ASSERT_EQ_INT(serial_recovery_backoff_seconds(6), SERIAL_MAX_BACKOFF_SECONDS);
+}
+
+/* reconnect_attempts is never reset while the link stays down, so a long outage
+ * drives it arbitrarily high.  Shifting by that directly would run past the
+ * width of an int within about half an hour. */
+static void test_serial_backoff_survives_a_long_outage(void) {
+    int i;
+    for (i = 0; i < 100000; i++) {
+        int b = serial_recovery_backoff_seconds(i);
+        TEST_ASSERT(b > 0 && b <= SERIAL_MAX_BACKOFF_SECONDS);
+    }
+    TEST_ASSERT_EQ_INT(serial_recovery_backoff_seconds(-1), 1);
+}
+
 /* ── Main ───────────────────────────────────────────────────────── */
 
 int main(void) {
@@ -2404,6 +2484,17 @@ int main(void) {
     TEST_SUITE_RUN(test_coin_gate_resync_untracked_rejects);
     TEST_SUITE_RUN(test_coin_gate_resync_follows_hook_state);
     TEST_SUITE_RUN(test_coin_gate_resync_rejects_short_buffer);
+
+    TEST_SUITE_BEGIN("Serial Recovery");
+    TEST_SUITE_RUN(test_serial_healthy_link_idles_quietly);
+    TEST_SUITE_RUN(test_serial_keepalive_window);
+    TEST_SUITE_RUN(test_serial_watchdog_marks_dead);
+    TEST_SUITE_RUN(test_serial_closed_fd_is_a_dead_link);
+    TEST_SUITE_RUN(test_serial_down_link_retries_when_due);
+    TEST_SUITE_RUN(test_serial_retries_do_not_give_up);
+    TEST_SUITE_RUN(test_serial_null_state);
+    TEST_SUITE_RUN(test_serial_backoff_doubles_then_caps);
+    TEST_SUITE_RUN(test_serial_backoff_survives_a_long_outage);
 
     TEST_SUITE_BEGIN("Clock Seam");
     TEST_SUITE_RUN(test_clock_default_is_real_time);
