@@ -59,11 +59,21 @@ Pi layout: scratch build dir `~/millennium-pjsip/host` · installed binary
 
 3. **Rebuild — `make clean` FIRST.** rsync preserves source mtimes, so a plain
    `make daemon` often prints "up to date" and silently keeps the OLD binary.
-   The build takes ~40 s on the Pi Zero 2 W:
+   The build takes ~40 s on the Pi Zero 2 W.
+
+   **Pass `GIT_HASH` (#250).** The rsync above excludes `.git`, so `git rev-parse`
+   on the Pi fails and the binary would be stamped `git unknown` — leaving no way
+   to ask a running phone which commit it is on. Compute it on the Mac and hand it
+   to the remote `make`; the `-dirty` suffix is what tells you the deploy did not
+   match any commit:
    ```bash
+   HASH=$(git rev-parse --short HEAD)
+   git diff --quiet HEAD || HASH="$HASH-dirty"
    ssh -i "$KEY" -o IdentitiesOnly=yes -o BatchMode=yes "$PI" \
-     'cd ~/millennium-pjsip/host && make clean && make daemon 2>&1 | tail -15'
+     "cd ~/millennium-pjsip/host && make clean && make daemon GIT_HASH=$HASH 2>&1 | tail -15"
    ```
+   Confirm it took, in step 5: `millennium-daemon --version` should report that
+   hash, not `unknown`.
    GOTCHA: never `pkill -f "make daemon"` over SSH — the remote shell's own argv
    contains that string, so it self-matches and kills your command. Use a `[m]ake`
    bracket pattern or check the binary mtime instead.
@@ -90,9 +100,11 @@ Pi layout: scratch build dir `~/millennium-pjsip/host` · installed binary
    ssh -i "$KEY" -o IdentitiesOnly=yes -o BatchMode=yes "$PI" \
      'systemctl is-active daemon.service; \
      echo NRestarts=$(systemctl show daemon.service -p NRestarts --value); \
+     /usr/local/bin/millennium-daemon --version; \
      curl -s --max-time 4 http://127.0.0.1:80/api/state'
    ```
-   Expect `active`, `NRestarts=0`, `"sip_registered":1`, empty `sip_last_error`.
+   Expect `active`, `NRestarts=0`, `"sip_registered":1`, empty `sip_last_error`,
+   and a `--version` reporting the hash from step 3 rather than `git unknown`.
    On failure: check `sip.*` keys in `/etc/millennium/daemon.conf` and
    `sudo journalctl -u daemon.service -n 50 --no-pager`.
 

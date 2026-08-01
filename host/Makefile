@@ -29,8 +29,27 @@ CFLAGS=-g -O3 -Wall -Wextra -std=gnu89 -Wdeclaration-after-statement -Werror
 # makefile assignments.
 CC = gcc
 
-# Build version info
-GIT_HASH := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+# Build version info.
+#
+# GIT_HASH is deliberately overridable from the command line (#250): the Pi
+# deploy rsyncs host/ WITHOUT .git, so `git rev-parse` there always fails and
+# every deployed binary used to be stamped "unknown" -- leaving no way to ask a
+# running phone which commit it is on. The deploy passes the hash from the Mac:
+#
+#   make daemon GIT_HASH="$(git rev-parse --short HEAD)"
+#
+# A `:=` assignment (not `override`) is what makes that work, since command-line
+# variables beat makefile assignments.
+#
+# The `-dirty` suffix matters as much as the hash: deploying an uncommitted
+# working tree is routine during development, and a bare hash would claim the
+# binary matches a commit it does not.
+GIT_HASH := $(shell if git rev-parse --short HEAD >/dev/null 2>&1; then \
+	    printf '%s' "`git rev-parse --short HEAD`"; \
+	    git diff --quiet HEAD 2>/dev/null || printf '%s' '-dirty'; \
+	else \
+	    printf 'unknown'; \
+	fi)
 BUILD_TIME := $(shell date -u '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || echo "unknown")
 VERSION_CFLAGS = -DGIT_HASH='"$(GIT_HASH)"' -DBUILD_TIME='"$(BUILD_TIME)"'
 
