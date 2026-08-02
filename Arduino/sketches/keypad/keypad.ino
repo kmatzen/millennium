@@ -15,6 +15,7 @@
 #define EVT_HOOK_UP    "HU"
 #define EVT_HOOK_DOWN  "HD"
 #define EVT_CARD       'C'
+#define EVT_DIAG       'X'   /* (#230) diagnostics: 'X' + 'A' + 3 ASCII digits */
 
 const int hookUpPin = 5;
 const int hookDownPin = 4;
@@ -32,9 +33,25 @@ const unsigned long DEBOUNCE_MS = 50;
 const uint8_t I2C_SEND_ATTEMPTS = 8;
 const unsigned long I2C_RETRY_DELAY_MS = 25;
 
-/* Messages Beta never acknowledged, even after the retries above.  Surfacing
- * this to the host properly needs a protocol addition; see #230 item 2. */
+/* Messages Beta never acknowledged, even after the retries above, and the last
+ * value we managed to report to the host. */
 unsigned int i2cDropped = 0;
+unsigned int i2cDroppedReported = 0;
+unsigned long lastDropReport = 0;
+
+/* Re-announce the drop count this often, zero included.
+ *
+ * Reporting only on change loses the news entirely in the case that matters
+ * most: drops happen when the link to Beta is sick, which is exactly when the
+ * Pi is likely to be mid-reconnect and not reading the port. Beta forwards to
+ * a USB endpoint that discards when no host is attached, so a one-shot report
+ * simply evaporates -- observed doing exactly that.
+ *
+ * Re-announcing zero matters too: without it, a gauge left at 3 would stay at
+ * 3 after Alpha reboots with a clean counter. It also gives the Pi its only
+ * positive sign of life from Alpha -- Beta's heartbeat says nothing about
+ * whether the keypad board is still running. 5 bytes every 30 s. */
+const unsigned long DROP_REPORT_INTERVAL_MS = 30000;
 
 /* (#232) What the hook read as during setup(), kept for the status query.
  * Printing it at boot would be useless: an external reset re-enumerates the
@@ -68,7 +85,7 @@ MagStripe card(22, 0, 1);
  *
  * Returns true if the message landed.
  */
-bool i2cSend(const uint8_t *payload, uint8_t len) {
+bool i2cTrySend(const uint8_t *payload, uint8_t len) {
   for (uint8_t attempt = 0; attempt < I2C_SEND_ATTEMPTS; attempt++) {
     Wire.beginTransmission(I2C_DISPLAY_ADDR);
     Wire.write(payload, len);
@@ -78,9 +95,48 @@ bool i2cSend(const uint8_t *payload, uint8_t len) {
     wdt_reset();
     delay(I2C_RETRY_DELAY_MS);
   }
+  return false;
+}
 
+/* As above, but tallies a failure. Use this for real phone events; the drop
+ * report itself uses i2cTrySend so a failed report cannot inflate the very
+ * number it is trying to report. */
+bool i2cSend(const uint8_t *payload, uint8_t len) {
+  if (i2cTrySend(payload, len)) return true;
   i2cDropped++;
   return false;
+}
+
+/*
+ * (#230 item 2) Tell the host how many messages we lost.
+ *
+ * This necessarily rides the same I2C link that dropped them, so it only gets
+ * through once the link is healthy again. That is fine: the count is
+ * cumulative and the host publishes it as a gauge, so a late report is still
+ * correct. Encoded as ASCII digits because the host consumes the payload with
+ * strlen(), and a raw zero byte would truncate the event and desync the stream.
+ */
+void reportDropsIfChanged() {
+  uint8_t msg[5];
+  unsigned int n;
+  unsigned long now = millis();
+  bool changed = (i2cDropped != i2cDroppedReported);
+  bool due = (lastDropReport == 0) ||
+             (now - lastDropReport >= DROP_REPORT_INTERVAL_MS);
+
+  if (!changed && !due) return;
+
+  n = (i2cDropped > 999) ? 999 : i2cDropped;
+  msg[0] = EVT_DIAG;
+  msg[1] = 'A';
+  msg[2] = '0' + (n / 100) % 10;
+  msg[3] = '0' + (n / 10) % 10;
+  msg[4] = '0' + n % 10;
+
+  if (i2cTrySend(msg, sizeof(msg))) {
+    i2cDroppedReported = i2cDropped;
+    lastDropReport = now;
+  }
 }
 
 /*
@@ -241,13 +297,16 @@ void serviceStatusQuery() {
   Serial.print(F(" hook="));
   Serial.print(hookUpState ? F("UP") : F("DOWN"));
   Serial.print(F(" i2c_drops="));
-  Serial.println(i2cDropped);
+  Serial.print(i2cDropped);
+  Serial.print(F(" reported="));
+  Serial.println(i2cDroppedReported);
 }
 
 void loop() {
   wdt_reset();
 
   serviceStatusQuery();
+  reportDropsIfChanged();
 
   char key = keypad.getKey();
 

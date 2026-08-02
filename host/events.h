@@ -18,6 +18,17 @@ struct call;
 #define EVENT_TYPE_EEPROM_ERROR 'E'
 #define EVENT_TYPE_HOOK 'H'
 #define EVENT_TYPE_HEARTBEAT 'P'
+/* (#230) Arduino diagnostics: 'X' + source ('A'=Alpha I2C send drops,
+ * 'B'=Beta I2C receive-ring overflows) + a 3-digit ASCII count.
+ * ASCII rather than a raw byte on purpose: process_event_buffer() computes how
+ * much to consume with strlen(), so a payload byte of 0 would truncate the
+ * event and desync the stream. */
+#define EVENT_TYPE_DIAG 'X'
+#define EVENT_DIAG_PAYLOAD_LEN 4
+
+/* Decode a diagnostic payload. Returns 1 and fills *source ("alpha"/"beta")
+ * and *count on success, 0 if the payload is malformed. */
+int event_diag_parse(const char *payload, const char **source, long *count);
 #define EVENT_TYPE_CALL_STATE '1'
 
 /* Event type enumeration */

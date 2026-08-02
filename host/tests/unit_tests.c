@@ -9,6 +9,7 @@
 #include "../call_metrics.h"
 #include "../millennium_sdk.h"
 #include "../coin_gate.h"
+#include "../events.h"
 #include "../serial_recovery.h"
 #include "../updater.h"
 #include "../plugin_sdk.h"
@@ -2407,6 +2408,51 @@ static void test_serial_backoff_survives_a_long_outage(void) {
     TEST_ASSERT_EQ_INT(serial_recovery_backoff_seconds(-1), 1);
 }
 
+/* ── Arduino diagnostics (#230) ─────────────────────────────────── */
+
+static void test_diag_parse_alpha_and_beta(void) {
+    const char *src = NULL;
+    long n = -1;
+
+    TEST_ASSERT_EQ_INT(event_diag_parse("A007", &src, &n), 1);
+    TEST_ASSERT_EQ_STR(src, "alpha");
+    TEST_ASSERT_EQ_INT((int)n, 7);
+
+    TEST_ASSERT_EQ_INT(event_diag_parse("B123", &src, &n), 1);
+    TEST_ASSERT_EQ_STR(src, "beta");
+    TEST_ASSERT_EQ_INT((int)n, 123);
+
+    TEST_ASSERT_EQ_INT(event_diag_parse("A000", &src, &n), 1);
+    TEST_ASSERT_EQ_INT((int)n, 0);
+    TEST_ASSERT_EQ_INT(event_diag_parse("B999", &src, &n), 1);
+    TEST_ASSERT_EQ_INT((int)n, 999);
+}
+
+/* A malformed payload means the serial stream is already misaligned, so this
+ * must refuse rather than invent a number and publish it as a metric. */
+static void test_diag_parse_rejects_malformed(void) {
+    const char *src = NULL;
+    long n = -1;
+
+    TEST_ASSERT_EQ_INT(event_diag_parse("C001", &src, &n), 0);   /* unknown source */
+    TEST_ASSERT_EQ_INT(event_diag_parse("A12", &src, &n), 0);    /* too short */
+    TEST_ASSERT_EQ_INT(event_diag_parse("", &src, &n), 0);
+    TEST_ASSERT_EQ_INT(event_diag_parse("A1x2", &src, &n), 0);   /* non-digit */
+    TEST_ASSERT_EQ_INT(event_diag_parse("A 12", &src, &n), 0);
+    TEST_ASSERT_EQ_INT(event_diag_parse("Axyz", &src, &n), 0);
+    TEST_ASSERT_EQ_INT(event_diag_parse(NULL, &src, &n), 0);
+    TEST_ASSERT_EQ_INT(event_diag_parse("A001", NULL, &n), 0);
+    TEST_ASSERT_EQ_INT(event_diag_parse("A001", &src, NULL), 0);
+}
+
+/* The count is ASCII rather than a raw byte precisely so a zero never appears
+ * as NUL: process_event_buffer() consumes strlen(payload)+1, so an embedded
+ * NUL would truncate the event and desync everything after it. */
+static void test_diag_payload_has_no_embedded_nul(void) {
+    TEST_ASSERT_EQ_INT((int)strlen("A000"), EVENT_DIAG_PAYLOAD_LEN);
+    TEST_ASSERT_EQ_INT((int)strlen("B000"), EVENT_DIAG_PAYLOAD_LEN);
+}
+
 /* ── Main ───────────────────────────────────────────────────────── */
 
 int main(void) {
@@ -2476,6 +2522,11 @@ int main(void) {
     TEST_SUITE_RUN(test_sdk_rand_choice);
     TEST_SUITE_RUN(test_sdk_balance);
     TEST_SUITE_RUN(test_sdk_state);
+
+    TEST_SUITE_BEGIN("Arduino Diagnostics");
+    TEST_SUITE_RUN(test_diag_parse_alpha_and_beta);
+    TEST_SUITE_RUN(test_diag_parse_rejects_malformed);
+    TEST_SUITE_RUN(test_diag_payload_has_no_embedded_nul);
 
     TEST_SUITE_BEGIN("Coin Validator Gate");
     TEST_SUITE_RUN(test_coin_gate_tracks_gate_commands);
