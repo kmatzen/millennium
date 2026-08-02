@@ -29,9 +29,7 @@ echo "Deploying display firmware (Millennium Beta) to $REMOTE"
 if [ "$SKIP_BUILD" != "1" ]; then
   echo "  Step 1: Building display sketch..."
   cd "$SCRIPT_DIR"
-  if ! BUILD_CONFIG=0 make build_display 2>/dev/null; then
-    make build_display
-  fi
+  make build_display
   cd "$REPO_ROOT"
   if ! git diff --quiet Arduino/build/display/display.ino.hex 2>/dev/null; then
     if [ "$VIA_SCP" = "1" ]; then

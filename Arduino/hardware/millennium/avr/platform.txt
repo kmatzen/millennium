@@ -1,0 +1,13 @@
+# Millennium payphone platform (#256)
+#
+# Deliberately minimal. Every board in boards.txt references the installed
+# arduino:avr platform for its core, variant and tools, so the Arduino build
+# system takes that platform's compile and upload recipes as the base for this
+# one. Nothing needs restating here, and nothing pins a core version.
+#
+# Requires the AVR core to be installed:
+#
+#   arduino-cli core install arduino:avr
+
+name=Millennium Payphone AVR Boards
+version=1.0.0

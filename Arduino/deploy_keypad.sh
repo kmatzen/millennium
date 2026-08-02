@@ -29,9 +29,7 @@ echo "Deploying keypad firmware (Millennium Alpha) to $REMOTE"
 if [ "$SKIP_BUILD" != "1" ]; then
   echo "  Step 1: Building keypad sketch..."
   cd "$SCRIPT_DIR"
-  if ! BUILD_CONFIG=0 make build 2>/dev/null; then
-    make build
-  fi
+  make build
   cd "$REPO_ROOT"
   if ! git diff --quiet Arduino/build/keypad/keypad.ino.hex 2>/dev/null; then
     if [ "$VIA_SCP" = "1" ]; then
