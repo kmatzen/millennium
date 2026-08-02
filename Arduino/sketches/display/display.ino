@@ -92,7 +92,24 @@ byte coinEeprom[] = {
 
 /* I2C rx buffer: 64 bytes. Wire lib on AVR uses 32-byte hw buffer.
  * Host must keep commands under this limit (#134). */
-#define I2C_BUF_SIZE 64
+/* (#230 item 3) Sized against the worst case a blocked main loop can face.
+ *
+ * A VFD repaint blocks this loop for ~192 ms (vfdreset 12 ms + delay(100) +
+ * ~2 ms per character), and the coin-validator reset for ~2 s. The TWI ISR
+ * keeps running throughout -- nothing here disables interrupts, and AVR
+ * delay() does not either -- so Alpha's messages are still ACKed and still
+ * land in this ring. What stops for that window is the drain into USB, so the
+ * ring is the only thing standing between a long repaint and a lost message.
+ *
+ * Alpha sends at most 17 bytes per message (a card PAN); keypresses and hook
+ * changes are 2. At 256 the ring absorbs ~15 card swipes or 128 keypresses
+ * inside a single repaint, which is far past anything a person can produce.
+ * At the previous 64 it was ~3 swipes -- still ample, but the margin was
+ * reasoned rather than generous, and 192 bytes of SRAM is cheap insurance on a
+ * board sitting at 30% usage.
+ *
+ * Keep this <= 256: i2cHead/i2cTail are bytes. */
+#define I2C_BUF_SIZE 256
 static volatile byte i2cBuf[I2C_BUF_SIZE];
 static volatile byte i2cHead = 0, i2cTail = 0;
 
