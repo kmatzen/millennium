@@ -1,0 +1,88 @@
+# Millennium payphone boards (#256)
+#
+# Both Arduinos are stock Arduino Micros. They exist as custom boards for ONE
+# reason: build.usb_product. That string is what makes them enumerate as
+#
+#   /dev/serial/by-id/usb-Arduino_LLC_Millennium_Alpha-if00
+#   /dev/serial/by-id/usb-Arduino_LLC_Millennium_Beta-if00
+#
+# which is the only way the Pi tells the two boards apart. pi_flash.sh and the
+# daemon's hardware.display_device both depend on those paths, so building with
+# stock arduino:avr:micro is NOT a valid substitute -- it would produce two
+# indistinguishable "Arduino Micro" ports.
+#
+# These definitions used to live only in a hand-edited copy of the Arduino AVR
+# core's own boards.txt on the Pi's SD card, where any `arduino-cli core
+# upgrade` would silently erase them. They are vendored here so the firmware
+# stays buildable on any machine.
+#
+# Everything below matches stock `micro` except build.pid and build.usb_product.
+# The core, variant and toolchain are referenced from the installed arduino:avr
+# platform rather than duplicated, so this package carries no toolchain of its
+# own and does not pin a core version.
+
+millennium_alpha.name=Millennium Alpha
+
+millennium_alpha.upload.tool=arduino:avrdude
+millennium_alpha.upload.tool.default=arduino:avrdude
+millennium_alpha.upload.protocol=avr109
+millennium_alpha.upload.maximum_size=28672
+millennium_alpha.upload.maximum_data_size=2560
+millennium_alpha.upload.speed=57600
+millennium_alpha.upload.disable_flushing=true
+millennium_alpha.upload.use_1200bps_touch=true
+millennium_alpha.upload.wait_for_upload_port=true
+
+millennium_alpha.build.mcu=atmega32u4
+millennium_alpha.build.f_cpu=16000000L
+millennium_alpha.build.vid=0x2341
+millennium_alpha.build.pid=0x8045
+millennium_alpha.build.usb_product="Millennium Alpha"
+millennium_alpha.build.board=AVR_MICRO
+millennium_alpha.build.core=arduino:arduino
+millennium_alpha.build.variant=arduino:micro
+millennium_alpha.build.extra_flags={build.usb_flags}
+
+# USB IDs used to match an attached board to this definition. Both the sketch
+# (0x8045) and the Caterina bootloader (0x0045) are listed; the bootloader also
+# reports itself as a plain Arduino Micro, which is why pi_flash.sh waits on the
+# Arduino_Micro by-id path rather than this one (#254).
+millennium_alpha.vid.0=0x2341
+millennium_alpha.pid.0=0x0045
+millennium_alpha.vid.1=0x2341
+millennium_alpha.pid.1=0x8045
+millennium_alpha.vid.2=0x2A03
+millennium_alpha.pid.2=0x0045
+millennium_alpha.vid.3=0x2A03
+millennium_alpha.pid.3=0x8045
+
+millennium_beta.name=Millennium Beta
+
+millennium_beta.upload.tool=arduino:avrdude
+millennium_beta.upload.tool.default=arduino:avrdude
+millennium_beta.upload.protocol=avr109
+millennium_beta.upload.maximum_size=28672
+millennium_beta.upload.maximum_data_size=2560
+millennium_beta.upload.speed=57600
+millennium_beta.upload.disable_flushing=true
+millennium_beta.upload.use_1200bps_touch=true
+millennium_beta.upload.wait_for_upload_port=true
+
+millennium_beta.build.mcu=atmega32u4
+millennium_beta.build.f_cpu=16000000L
+millennium_beta.build.vid=0x2341
+millennium_beta.build.pid=0x8046
+millennium_beta.build.usb_product="Millennium Beta"
+millennium_beta.build.board=AVR_MICRO
+millennium_beta.build.core=arduino:arduino
+millennium_beta.build.variant=arduino:micro
+millennium_beta.build.extra_flags={build.usb_flags}
+
+millennium_beta.vid.0=0x2341
+millennium_beta.pid.0=0x0046
+millennium_beta.vid.1=0x2341
+millennium_beta.pid.1=0x8046
+millennium_beta.vid.2=0x2A03
+millennium_beta.pid.2=0x0046
+millennium_beta.vid.3=0x2A03
+millennium_beta.pid.3=0x8046

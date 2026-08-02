@@ -47,6 +47,11 @@ make break-test
 ### Arduino (`Arduino/`)
 
 ```bash
+# One-time setup on any machine: arduino-cli in PATH, plus
+#   arduino-cli core install arduino:avr
+# The Millennium board definitions are vendored in Arduino/hardware/ (#256), so
+# nothing machine-specific is needed.
+
 make build            # compile both sketches (run on Mac)
 make install          # flash both via arduino-cli (Arduino directly connected to Mac)
 make install_keypad   # flash Alpha via arduino-cli (Mac)

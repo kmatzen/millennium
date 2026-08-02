@@ -6,8 +6,8 @@ This document maps every Arduino pin used by the firmware to its physical functi
 
 | Board Name        | Ref | FQBN                            | USB Product Name  | Firmware         |
 |-------------------|-----|---------------------------------|-------------------|------------------|
-| Millennium Alpha  | A1  | `arduino:avr:millennium_alpha`  | Millennium Alpha  | `keypad.ino`     |
-| Millennium Beta   | A2  | `arduino:avr:millennium_beta`   | Millennium Beta   | `display.ino`    |
+| Millennium Alpha  | A1  | `millennium:avr:millennium_alpha`  | Millennium Alpha  | `keypad.ino`     |
+| Millennium Beta   | A2  | `millennium:avr:millennium_beta`   | Millennium Beta   | `display.ino`    |
 
 Both are ATmega32U4-based (Arduino Micro clones) at 16 MHz. The custom board
 definitions only change the USB VID/PID so the Pi can distinguish them via
@@ -138,27 +138,34 @@ prefixes it with `V` and forwards over USB serial:
 
 ## Custom Board Definitions
 
-The custom boards are appended to the stock Arduino AVR `boards.txt` at:
+The board definitions are vendored in the repo (#256):
 ```
-~/.arduino15/packages/arduino/hardware/avr/1.8.6/boards.txt
+Arduino/hardware/millennium/avr/boards.txt
 ```
 
 Key differences from stock Arduino Micro:
 
-| Property       | Stock Micro    | Millennium Alpha                | Millennium Beta                |
-|----------------|----------------|---------------------------------|--------------------------------|
-| USB PID (app)  | 0x0037         | 0x0045                          | 0x0046                         |
-| USB PID (boot) | 0x8037         | 0x8045                          | 0x8046                         |
-| Product name   | Arduino Micro  | Millennium Alpha                | Millennium Beta                |
-| Bootloader     | Caterina-Micro | Caterina-Micro-Millennium-Alpha | Caterina-Micro-Millennium-Beta |
+| Property       | Stock Micro    | Millennium Alpha  | Millennium Beta  |
+|----------------|----------------|-------------------|------------------|
+| USB PID (app)  | 0x0037         | 0x0045            | 0x0046           |
+| USB PID (boot) | 0x8037         | 0x8045            | 0x8046           |
+| Product name   | Arduino Micro  | Millennium Alpha  | Millennium Beta  |
+| Bootloader     | Caterina-Micro | Caterina-Micro    | Caterina-Micro   |
 
-**Issue**: The custom bootloader hex files (`Caterina-Micro-Millennium-Alpha.hex`,
-`Caterina-Micro-Millennium-Beta.hex`) do not exist in the bootloaders directory.
-The boards currently have the stock Micro bootloader flashed. If you ever need to
-reflash the bootloader (e.g., after bricking), you would need to either:
-1. Build custom Caterina bootloaders from source with the modified VID/PIDs, or
-2. Temporarily change `boards.txt` to reference `Caterina-Micro.hex` (losing the
-   custom USB product name until the sketch is uploaded)
+The boards run **stock** Caterina bootloaders flashed at the factory. The old
+hand-edited definitions named `Caterina-Micro-Millennium-Alpha.hex` / `-Beta.hex`
+bootloaders that were never built; the vendored definitions drop those keys,
+since burning a bootloader is not part of any workflow here.
+
+The practical consequence is that the custom product name only applies while the
+**sketch** is running. During the bootloader window both boards present as a
+plain `Arduino Micro` — which is why `pi_flash.sh` flashes the
+`usb-Arduino_LLC_Arduino_Micro-if00` path and resets only one board at a time
+(#254).
+
+If a board is ever bricked badly enough to need its bootloader reflashed, stock
+`Caterina-Micro.hex` is the right image; the custom identity comes back as soon
+as a sketch is uploaded.
 
 ## Known Issues and Recommendations
 

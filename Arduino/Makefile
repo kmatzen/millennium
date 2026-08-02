@@ -1,11 +1,20 @@
 ARDUINO_CLI ?= arduino-cli
-CONFIG_FILE = arduino-cli.yaml
-# Set BUILD_CONFIG=0 to skip config (e.g. on macOS when arduino-cli.yaml has Linux paths)
-BUILD_CONFIG ?= 1
-BUILD_ARGS = $(if $(filter 0,$(BUILD_CONFIG)),,--config-file $(CONFIG_FILE))
 
-DISPLAY_FQBN = arduino:avr:millennium_beta
-KEYPAD_FQBN  = arduino:avr:millennium_alpha
+# (#256) Point arduino-cli at this directory so it picks up hardware/ (the
+# vendored Millennium board definitions) and libraries/. Exported rather than
+# written into a config file: arduino-cli's own data directory differs per OS
+# (~/Library/Arduino15 on macOS, ~/.arduino15 on Linux), and the config file
+# this build used to pass hardcoded one machine's absolute paths, which made
+# `make build` fail outright anywhere else.
+#
+# Requires the AVR core, once per machine:
+#   arduino-cli core install arduino:avr
+export ARDUINO_DIRECTORIES_USER = $(CURDIR)
+
+BUILD_ARGS =
+
+DISPLAY_FQBN = millennium:avr:millennium_beta
+KEYPAD_FQBN  = millennium:avr:millennium_alpha
 
 # Override with DISPLAY_DEVICE=/dev/cu.usbmodemXXX on macOS if needed
 DISPLAY_DEVICE ?= $(shell realpath /dev/serial/by-id/usb-Arduino_LLC_Millennium_Beta-if00 2>/dev/null)
