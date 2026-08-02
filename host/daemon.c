@@ -1156,6 +1156,18 @@ int main(int argc, char *argv[]) {
     
     /* Initialize client */
     client = millennium_client_create();
+    if (!client) {
+        /* (#263) Almost always the serial device not being there yet -- the Pi
+         * reaching this point before USB enumeration finishes, or a restart
+         * landing while a Micro is mid-reflash. Exit cleanly and let systemd
+         * retry, which is what already happened; the difference is that this
+         * used to be a SEGV, because millennium_client_update() dereferences
+         * the client with no NULL guard. A crash here is indistinguishable
+         * from a real memory fault and hides one. */
+        logger_error_with_category("Daemon",
+            "Client init failed (serial device unavailable?); exiting for restart");
+        return 1;
+    }
     display_manager_init(client);
     
     /* Initialize health monitoring */
