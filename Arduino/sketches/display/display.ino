@@ -102,6 +102,14 @@ static volatile byte i2cHead = 0, i2cTail = 0;
  * short result as a valid event, so the loss has to be visible. */
 static volatile unsigned int i2cOverflow = 0;
 static unsigned int i2cOverflowReported = 0;
+static unsigned long lastOverflowReport = 0;
+
+/* Re-announce the overflow count this often, zero included -- matching Alpha.
+ * Reporting only on change means a count that starts at 0 and stays there is
+ * never sent at all, so the host's gauge simply does not exist and "no metric"
+ * cannot be told apart from "no overflows". An affirmative zero is the whole
+ * point of instrumenting this. */
+static const unsigned long OVERFLOW_REPORT_INTERVAL_MS = 30000;
 
 static unsigned long lastHeartbeat = 0;
 
@@ -207,7 +215,10 @@ void loop() {
     noInterrupts();
     ov = i2cOverflow;
     interrupts();
-    if (ov != i2cOverflowReported) {
+    unsigned long nowMs = millis();
+    if (ov != i2cOverflowReported ||
+        lastOverflowReport == 0 ||
+        nowMs - lastOverflowReport >= OVERFLOW_REPORT_INTERVAL_MS) {
       unsigned int n = (ov > 999) ? 999 : ov;
       SerialUSB.write(EVT_DIAG);
       SerialUSB.write('B');
@@ -215,6 +226,7 @@ void loop() {
       SerialUSB.write('0' + (n / 10) % 10);
       SerialUSB.write('0' + n % 10);
       i2cOverflowReported = ov;
+      lastOverflowReport = nowMs;
     }
   }
 
