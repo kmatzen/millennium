@@ -526,7 +526,9 @@ void millennium_client_update(struct millennium_client *client) {
     struct timespec current_time;
     long elapsed_ms;
 
-    if (client->display_fd == -1) return;
+    /* (#263) NULL-guard to match check_serial. This is where a NULL client
+     * from a failed millennium_client_create() used to land as a SEGV. */
+    if (!client || client->display_fd == -1) return;
 
     /* Read directly from the file descriptor */
     while ((bytes_read = read(client->display_fd, buffer, sizeof(buffer))) > 0) {
