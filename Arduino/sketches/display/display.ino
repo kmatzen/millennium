@@ -22,7 +22,10 @@
 #define EVT_HOOK_DOWN  "HD"
 #define EVT_CARD       'C'
 #define EVT_COIN_DATA  'V'
-#define EVT_DIAG       'X'   /* (#230) diagnostics: 'X' + 'B' + 3 ASCII digits */
+#define EVT_DIAG       'G'   /* (#230) diagnostics: 'G' + 'B' + 3 ASCII digits.
+                                * Not 'X' -- that is this sketch's own serial
+                                * timeout response, and a marker collision makes
+                                * the host eat the events behind it (#259). */
 #define EVT_HEARTBEAT  'P'
 
 #define HEARTBEAT_INTERVAL_MS 10000UL

@@ -15,7 +15,10 @@
 #define EVT_HOOK_UP    "HU"
 #define EVT_HOOK_DOWN  "HD"
 #define EVT_CARD       'C'
-#define EVT_DIAG       'X'   /* (#230) diagnostics: 'X' + 'A' + 3 ASCII digits */
+#define EVT_DIAG       'G'   /* (#230) diagnostics: 'G' + 'A' + 3 ASCII digits.
+                                * Not 'X' -- display.ino uses that for a serial
+                                * timeout, and a marker collision makes the host
+                                * eat the events behind it (#259). */
 
 const int hookUpPin = 5;
 const int hookDownPin = 4;

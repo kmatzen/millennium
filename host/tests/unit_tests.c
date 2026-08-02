@@ -2453,6 +2453,42 @@ static void test_diag_payload_has_no_embedded_nul(void) {
     TEST_ASSERT_EQ_INT((int)strlen("B000"), EVENT_DIAG_PAYLOAD_LEN);
 }
 
+/* (#259) Every letter registered as an event type becomes a marker that
+ * consumes a fixed-width payload, so it must not collide with a byte the
+ * Arduinos already send for some other purpose. display.ino writes these back
+ * as debug responses; reusing one makes a stray debug byte eat the real events
+ * queued behind it, which is exactly what 'X' did. */
+static void test_event_types_do_not_collide_with_debug_bytes(void) {
+    /* Debug/ack bytes display.ino writes that are NOT event types. */
+    static const char beta_debug_only[] = { '?', 'L', 'W', 'R', 'X', 'Y', 'Z' };
+    /* Event types the host registers as stream markers. */
+    static const char event_types[] = {
+        EVENT_TYPE_KEYPAD, EVENT_TYPE_CARD, EVENT_TYPE_COIN,
+        EVENT_TYPE_HOOK, EVENT_TYPE_HEARTBEAT, EVENT_TYPE_DIAG,
+        EVENT_TYPE_COIN_UPLOAD_START, EVENT_TYPE_COIN_UPLOAD_END,
+        EVENT_TYPE_COIN_VALIDATION_START, EVENT_TYPE_COIN_VALIDATION_END,
+        EVENT_TYPE_EEPROM_ERROR
+    };
+    size_t i, j;
+
+    for (i = 0; i < sizeof(event_types); i++) {
+        for (j = 0; j < sizeof(beta_debug_only); j++) {
+            if (event_types[i] == beta_debug_only[j]) {
+                fprintf(stderr, "  event type '%c' collides with a Beta debug byte\n",
+                        event_types[i]);
+            }
+            TEST_ASSERT(event_types[i] != beta_debug_only[j]);
+        }
+    }
+
+    /* Event types must also be distinct from each other. */
+    for (i = 0; i < sizeof(event_types); i++) {
+        for (j = i + 1; j < sizeof(event_types); j++) {
+            TEST_ASSERT(event_types[i] != event_types[j]);
+        }
+    }
+}
+
 /* ── Main ───────────────────────────────────────────────────────── */
 
 int main(void) {
@@ -2527,6 +2563,7 @@ int main(void) {
     TEST_SUITE_RUN(test_diag_parse_alpha_and_beta);
     TEST_SUITE_RUN(test_diag_parse_rejects_malformed);
     TEST_SUITE_RUN(test_diag_payload_has_no_embedded_nul);
+    TEST_SUITE_RUN(test_event_types_do_not_collide_with_debug_bytes);
 
     TEST_SUITE_BEGIN("Coin Validator Gate");
     TEST_SUITE_RUN(test_coin_gate_tracks_gate_commands);
