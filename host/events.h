@@ -18,12 +18,23 @@ struct call;
 #define EVENT_TYPE_EEPROM_ERROR 'E'
 #define EVENT_TYPE_HOOK 'H'
 #define EVENT_TYPE_HEARTBEAT 'P'
-/* (#230) Arduino diagnostics: 'X' + source ('A'=Alpha I2C send drops,
+/* (#230) Arduino diagnostics: 'G' + source ('A'=Alpha I2C send drops,
  * 'B'=Beta I2C receive-ring overflows) + a 3-digit ASCII count.
  * ASCII rather than a raw byte on purpose: process_event_buffer() computes how
  * much to consume with strlen(), so a payload byte of 0 would truncate the
- * event and desync the stream. */
-#define EVENT_TYPE_DIAG 'X'
+ * event and desync the stream.
+ *
+ * (#259) 'G' and not 'X': display.ino spends 'X' on a display-timeout debug
+ * response. Any letter registered here is a marker that consumes a fixed-width
+ * payload, so reusing one of Beta's debug letters makes a stray debug byte eat
+ * the real events queued behind it. Letters Beta already writes back, none of
+ * which may be reused here:
+ *
+ *   '?' unknown-command echo   'L' payload length    'W' display write ack
+ *   'R' display repaint        'X' serial timeout     'Y' display cmd probe
+ *   'Z' payload too long       'A' 'B' 'D' 'E' 'F' coin EEPROM program/verify
+ */
+#define EVENT_TYPE_DIAG 'G'
 #define EVENT_DIAG_PAYLOAD_LEN 4
 
 /* Decode a diagnostic payload. Returns 1 and fills *source ("alpha"/"beta")
