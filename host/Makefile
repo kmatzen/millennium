@@ -100,7 +100,7 @@ events.o: events.c events.h
 event_processor.o: event_processor.c event_processor.h events.h
 	$(CC) event_processor.c -o event_processor.o -c $(CFLAGS)
 
-millennium_sdk.o: millennium_sdk.c millennium_sdk.h events.h pjsip_interface.h config.h coin_gate.h serial_recovery.h
+millennium_sdk.o: millennium_sdk.c millennium_sdk.h events.h pjsip_interface.h config.h coin_gate.h serial_recovery.h metrics.h
 	$(CC) millennium_sdk.c -o millennium_sdk.o -c $(CFLAGS)
 
 coin_gate.o: coin_gate.c coin_gate.h

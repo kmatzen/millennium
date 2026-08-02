@@ -384,3 +384,34 @@ char *event_get_repr(event_t *event) {
     }
     return strdup_safe("Unknown");
 }
+
+/* (#230) Decode an Arduino diagnostic payload: source letter + 3 ASCII digits.
+ *
+ * Strict about the digits on purpose. This rides the same serial stream as
+ * keypresses and coins, and process_event_buffer() consumes a fixed width, so
+ * a malformed payload means the stream is already misaligned -- inventing a
+ * number from it would turn a parsing bug into a bogus metric. */
+int event_diag_parse(const char *payload, const char **source, long *count) {
+    long n;
+    int i;
+
+    if (!payload || !source || !count) return 0;
+    if (strlen(payload) < EVENT_DIAG_PAYLOAD_LEN) return 0;
+
+    if (payload[0] == 'A') {
+        *source = "alpha";
+    } else if (payload[0] == 'B') {
+        *source = "beta";
+    } else {
+        return 0;
+    }
+
+    n = 0;
+    for (i = 1; i < EVENT_DIAG_PAYLOAD_LEN; i++) {
+        if (payload[i] < '0' || payload[i] > '9') return 0;
+        n = n * 10 + (payload[i] - '0');
+    }
+
+    *count = n;
+    return 1;
+}

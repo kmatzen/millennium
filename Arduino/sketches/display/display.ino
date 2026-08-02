@@ -22,6 +22,7 @@
 #define EVT_HOOK_DOWN  "HD"
 #define EVT_CARD       'C'
 #define EVT_COIN_DATA  'V'
+#define EVT_DIAG       'X'   /* (#230) diagnostics: 'X' + 'B' + 3 ASCII digits */
 #define EVT_HEARTBEAT  'P'
 
 #define HEARTBEAT_INTERVAL_MS 10000UL
@@ -92,6 +93,13 @@ byte coinEeprom[] = {
 static volatile byte i2cBuf[I2C_BUF_SIZE];
 static volatile byte i2cHead = 0, i2cTail = 0;
 
+/* (#230) Bytes the ISR had to throw away because the ring was full, and the
+ * last value reported to the host. A full ring silently truncates whatever
+ * Alpha was sending -- a card PAN included -- and the host still parses the
+ * short result as a valid event, so the loss has to be visible. */
+static volatile unsigned int i2cOverflow = 0;
+static unsigned int i2cOverflowReported = 0;
+
 static unsigned long lastHeartbeat = 0;
 
 const unsigned long SERIAL_TIMEOUT_MS = 2000;
@@ -161,6 +169,8 @@ void receiveEvent(int howMany) {
     if (next != i2cTail) {
       i2cBuf[i2cHead] = b;
       i2cHead = next;
+    } else {
+      i2cOverflow++;   /* (#230) ring full; this byte is gone */
     }
   }
 }
@@ -181,6 +191,28 @@ void loop() {
   while (i2cTail != head) {
     SerialUSB.write(i2cBuf[i2cTail]);
     i2cTail = (i2cTail + 1) % I2C_BUF_SIZE;
+  }
+
+  /* (#230 item 2) Report ring overflows. Emitted only here, after the drain has
+   * finished, so it can never land in the middle of one of Alpha's messages:
+   * Wire delivers a whole transmission per ISR call, so at this point the
+   * stream sits on an event boundary. Beta talks to the Pi directly, so unlike
+   * Alpha's report this always gets through. ASCII digits, because the host
+   * consumes the payload with strlen() and a zero byte would desync it. */
+  {
+    unsigned int ov;
+    noInterrupts();
+    ov = i2cOverflow;
+    interrupts();
+    if (ov != i2cOverflowReported) {
+      unsigned int n = (ov > 999) ? 999 : ov;
+      SerialUSB.write(EVT_DIAG);
+      SerialUSB.write('B');
+      SerialUSB.write('0' + (n / 100) % 10);
+      SerialUSB.write('0' + (n / 10) % 10);
+      SerialUSB.write('0' + n % 10);
+      i2cOverflowReported = ov;
+    }
   }
 
   byte buf[100];
