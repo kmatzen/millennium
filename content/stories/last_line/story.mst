@@ -1,73 +1,123 @@
-MSTORY	1	last-line	1.1.0	invitation
+MSTORY	1	last-line	2.0.0	invitation
 ACCESS	*	12	80	1	1
 VAR	choice	0
 VAR	coin_found	0
+VAR	route	0
 VAR	token_found	0
 VAR	visits	0
-SCENE	bridge	THE LAST LINE	WAIT FOR THE TONE	connecting_line.wav		15	configured
-TRANS	bridge	call_connected	past	choice	1
-TRANS	bridge	call_connected	future	choice	2
-TRANS	bridge	call_ended	past	choice	1
-TRANS	bridge	call_ended	future	choice	2
-TRANS	bridge	timeout	past	choice	1
-TRANS	bridge	timeout	future	choice	2
-TRANS	bridge	hook_down	interrupted
-SCENE	coin_secret	THE COIN REMEMBERS	#=RETURN	coin_secret.wav		12
-TRANS	coin_secret	key:#	operator
-TRANS	coin_secret	timeout	operator
-TRANS	coin_secret	hook_down	interrupted
-SCENE	future	MESSAGE SEALED	RETURN TOMORROW	future_sealed.wav	future-sealed	12
-TRANS	future	hook_down	invitation
-SCENE	future_choice	FUTURE SELECTED	CONNECTING...	future_selected.wav		12
-TRANS	future_choice	timeout	bridge
-TRANS	future_choice	hook_down	interrupted
-SCENE	future_coda	THE FUTURE HEARD	YOUR WORDS REMAIN	future_coda.wav	future-return-coda	12
-TRANS	future_coda	hook_down	invitation
-SCENE	interrupted	CALL SAVED	LIFT TO RESUME	call_saved.wav		12
-TRANS	interrupted	resume	operator
-TRANS	interrupted	hook_up	operator
-TRANS	interrupted	timeout	return_later
-SCENE	invitation	A LINE IS RINGING	LIFT TO ANSWER	incoming_line.wav		30
-TRANS	invitation	hook_up	operator	visits	0			visits	1
-TRANS	invitation	hook_up	returning	visits	1			visits	1
-TRANS	invitation	hook_up	veteran					visits	1
-TRANS	invitation	timeout	return_later
-SCENE	operator	SAVE ONE MESSAGE	1=PAST  2=FUTURE	choose_message.wav		24
-TRANS	operator	key:1	past_choice			choice	1
-TRANS	operator	key:2	future_choice			choice	2
-TRANS	operator	coin	coin_secret			coin_found	1
-TRANS	operator	card	token_secret			token_found	1
-TRANS	operator	hook_down	interrupted
-TRANS	operator	timeout	repeat
-TRANS	operator	default	repeat
-SCENE	past	MESSAGE DELIVERED	RETURN TOMORROW	past_delivered.wav	past-kept	12
-TRANS	past	hook_down	invitation
-SCENE	past_choice	PAST SELECTED	CONNECTING...	past_selected.wav		12
-TRANS	past_choice	timeout	bridge
-TRANS	past_choice	hook_down	interrupted
-SCENE	past_coda	THE PAST ANSWERED	YOUR WORDS REMAIN	past_coda.wav	past-return-coda	12
-TRANS	past_coda	hook_down	invitation
-SCENE	repeat	PRESS 1 OR 2	*=REPEAT	repeat_choice.wav		12
-TRANS	repeat	key:1	past_choice			choice	1
-TRANS	repeat	key:2	future_choice			choice	2
-TRANS	repeat	coin	coin_secret			coin_found	1
-TRANS	repeat	card	token_secret			token_found	1
-TRANS	repeat	hook_down	interrupted
-TRANS	repeat	timeout	return_later
-SCENE	return_later	THE LINE REMEMBERS	COME BACK SOON	come_back.wav	return-invitation	12
-SCENE	returning	YOU CAME BACK	THE LINE REMEMBERS	welcome_back.wav		12
-TRANS	returning	timeout	past_coda	choice	1
-TRANS	returning	timeout	future_coda	choice	2
-TRANS	returning	timeout	operator
-TRANS	returning	hook_down	invitation
-SCENE	token_secret	A HIDDEN LINE OPENS	#=RETURN	token_secret.wav		12
-TRANS	token_secret	key:#	operator
-TRANS	token_secret	timeout	operator
-TRANS	token_secret	hook_down	interrupted
-SCENE	veteran	THE LINE KNOWS YOU	1=PAST  2=FUTURE	veteran_line.wav		12
-TRANS	veteran	key:1	past_choice			choice	1
-TRANS	veteran	key:2	future_choice			choice	2
-TRANS	veteran	coin	coin_secret			coin_found	1
-TRANS	veteran	card	token_secret			token_found	1
-TRANS	veteran	hook_down	invitation
-TRANS	veteran	timeout	return_later
+SCENE	answer_coda	IT KNOWS YOUR VOICE	DO NOT SAY YOUR NAME	answer_coda.wav	the-voice-crossed	12	-
+TRANS	answer_coda	hook_down	invitation	-	-	-	-	-	-
+SCENE	answer_result	TWO VOICES SPEAK	BOTH VOICES ARE MARA	answer_result.wav	mara-answered-herself	12	-
+TRANS	answer_result	hook_down	invitation	-	-	-	-	-	-
+SCENE	bridge	THE LINE IS OPEN	DO NOT SPEAK	bridge.wav	-	18	configured
+TRANS	bridge	call_connected	leave_result	choice	1	-	-	-	-
+TRANS	bridge	call_connected	answer_result	choice	2	-	-	-	-
+TRANS	bridge	call_ended	leave_result	choice	1	-	-	-	-
+TRANS	bridge	call_ended	answer_result	choice	2	-	-	-	-
+TRANS	bridge	timeout	leave_result	choice	1	-	-	-	-
+TRANS	bridge	timeout	answer_result	choice	2	-	-	-	-
+TRANS	bridge	hook_down	interrupted	-	-	-	-	-	-
+SCENE	coin_secret	A LOST VOICEMAIL	SAYS: DO NOT ANSWER	coin_secret.wav	-	20	-
+TRANS	coin_secret	timeout	decision	-	-	-	-	-	-
+TRANS	coin_secret	key:#	decision	-	-	-	-	-	-
+TRANS	coin_secret	hook_down	interrupted	-	-	-	-	-	-
+SCENE	decision	YOUR WORDS CROSS	1=LEAVE  2=ANSWER	decision.wav	-	30	-
+TRANS	decision	key:1	send_leave	-	-	choice	1	-	-
+TRANS	decision	key:2	send_answer	-	-	choice	2	-	-
+TRANS	decision	key:*	decision_repeat	-	-	-	-	-	-
+TRANS	decision	coin	coin_secret	-	-	coin_found	1	-	-
+TRANS	decision	card	token_secret	-	-	token_found	1	-	-
+TRANS	decision	hook_down	interrupted	-	-	-	-	-	-
+TRANS	decision	timeout	decision_repeat	-	-	-	-	-	-
+TRANS	decision	default	decision_repeat	-	-	-	-	-	-
+SCENE	decision_repeat	WHAT SHOULD SHE DO?	1=LEAVE  2=ANSWER	decision_repeat.wav	-	12	-
+TRANS	decision_repeat	key:1	send_leave	-	-	choice	1	-	-
+TRANS	decision_repeat	key:2	send_answer	-	-	choice	2	-	-
+TRANS	decision_repeat	key:*	decision	-	-	-	-	-	-
+TRANS	decision_repeat	coin	coin_secret	-	-	coin_found	1	-	-
+TRANS	decision_repeat	card	token_secret	-	-	token_found	1	-	-
+TRANS	decision_repeat	hook_down	interrupted	-	-	-	-	-	-
+TRANS	decision_repeat	timeout	interrupted	-	-	-	-	-	-
+TRANS	decision_repeat	default	decision_repeat	-	-	-	-	-	-
+SCENE	held_for_return	CALL HELD OVERNIGHT	IT REMEMBERS YOU	held_for_return.wav	call-held	12	-
+SCENE	interrupted	THE LINE HOLDS	LIFT TO CONTINUE	interrupted.wav	-	30	-
+TRANS	interrupted	resume	decision	-	-	-	-	-	-
+TRANS	interrupted	hook_up	decision	-	-	-	-	-	-
+TRANS	interrupted	timeout	held_for_return	-	-	-	-	-	-
+SCENE	invitation	THIS CALL IS FOR	YOU. LIFT TO ANSWER	invitation.wav	-	35	-
+TRANS	invitation	hook_up	return_leave	choice	1	-	-	visits	1
+TRANS	invitation	hook_up	return_answer	choice	2	-	-	visits	1
+TRANS	invitation	hook_up	operator_intro	-	-	-	-	visits	1
+TRANS	invitation	timeout	missed	-	-	-	-	-	-
+SCENE	leave_coda	I BUILT THIS PHONE	SO YOU COULD ANSWER	leave_coda.wav	the-loop-is-closed	12	-
+TRANS	leave_coda	hook_down	invitation	-	-	-	-	-	-
+SCENE	leave_result	A DOOR SLAMS	FOOTSTEPS RUN FREE	leave_result.wav	mara-left-the-house	12	-
+TRANS	leave_result	hook_down	invitation	-	-	-	-	-	-
+SCENE	mara_intro	MARA, AGE 9	1=STAY  2=TRACE	mara_intro.wav	-	30	-
+TRANS	mara_intro	key:1	stay_with_mara	-	-	route	1	-	-
+TRANS	mara_intro	key:2	trace_call	-	-	route	2	-	-
+TRANS	mara_intro	key:*	mara_intro	-	-	-	-	-	-
+TRANS	mara_intro	hook_down	interrupted	-	-	-	-	-	-
+TRANS	mara_intro	timeout	mara_repeat	-	-	-	-	-	-
+TRANS	mara_intro	default	mara_repeat	-	-	-	-	-	-
+SCENE	mara_repeat	SHE HEARS A VOICE	1=STAY  2=TRACE	mara_repeat.wav	-	12	-
+TRANS	mara_repeat	key:1	stay_with_mara	-	-	route	1	-	-
+TRANS	mara_repeat	key:2	trace_call	-	-	route	2	-	-
+TRANS	mara_repeat	key:*	mara_intro	-	-	-	-	-	-
+TRANS	mara_repeat	hook_down	interrupted	-	-	-	-	-	-
+TRANS	mara_repeat	timeout	interrupted	-	-	-	-	-	-
+TRANS	mara_repeat	default	mara_repeat	-	-	-	-	-	-
+SCENE	missed	MISSED CALL	IT WILL RING AGAIN	missed.wav	missed-call	12	-
+SCENE	operator_intro	OPERATOR 17	PRESS # TO ACCEPT	operator_intro.wav	-	25	-
+TRANS	operator_intro	key:#	mara_intro	-	-	-	-	-	-
+TRANS	operator_intro	key:*	operator_intro	-	-	-	-	-	-
+TRANS	operator_intro	hook_down	interrupted	-	-	-	-	-	-
+TRANS	operator_intro	timeout	operator_repeat	-	-	-	-	-	-
+TRANS	operator_intro	default	operator_repeat	-	-	-	-	-	-
+SCENE	operator_repeat	A CHILD IS WAITING	#=ANSWER  *=REPEAT	operator_repeat.wav	-	25	-
+TRANS	operator_repeat	key:#	mara_intro	-	-	-	-	-	-
+TRANS	operator_repeat	key:*	operator_intro	-	-	-	-	-	-
+TRANS	operator_repeat	hook_down	interrupted	-	-	-	-	-	-
+TRANS	operator_repeat	timeout	interrupted	-	-	-	-	-	-
+TRANS	operator_repeat	default	operator_repeat	-	-	-	-	-	-
+SCENE	operator_report	HOUSE BURNED 1989	NO CHILD WAS FOUND	operator_report.wav	-	22	-
+TRANS	operator_report	timeout	upstairs_calls	-	-	-	-	-	-
+TRANS	operator_report	coin	coin_secret	-	-	coin_found	1	-	-
+TRANS	operator_report	card	token_secret	-	-	token_found	1	-	-
+TRANS	operator_report	hook_down	interrupted	-	-	-	-	-	-
+SCENE	return_answer	THE UPSTAIRS LINE	IS RINGING AGAIN	return_answer.wav	-	24	-
+TRANS	return_answer	timeout	answer_coda	-	-	-	-	-	-
+TRANS	return_answer	key:#	answer_coda	-	-	-	-	-	-
+TRANS	return_answer	hook_down	invitation	-	-	-	-	-	-
+SCENE	return_leave	MARA VALE, 2019	LEFT YOU A MESSAGE	return_leave.wav	-	24	-
+TRANS	return_leave	timeout	leave_coda	-	-	-	-	-	-
+TRANS	return_leave	key:#	leave_coda	-	-	-	-	-	-
+TRANS	return_leave	hook_down	invitation	-	-	-	-	-	-
+SCENE	send_answer	MESSAGE: ANSWER IT	CONNECTING TO 1989	send_answer.wav	-	12	-
+TRANS	send_answer	timeout	bridge	-	-	-	-	-	-
+TRANS	send_answer	hook_down	interrupted	-	-	-	-	-	-
+SCENE	send_leave	MESSAGE: LEAVE NOW	CONNECTING TO 1989	send_leave.wav	-	12	-
+TRANS	send_leave	timeout	bridge	-	-	-	-	-	-
+TRANS	send_leave	hook_down	interrupted	-	-	-	-	-	-
+SCENE	stay_with_mara	DO NOT HANG UP	LISTEN...	stay_with_mara.wav	-	18	-
+TRANS	stay_with_mara	timeout	voice_clue	-	-	-	-	-	-
+TRANS	stay_with_mara	hook_down	interrupted	-	-	-	-	-	-
+SCENE	token_secret	A DEED FROM 2019	OWNER: MARA VALE	token_secret.wav	-	20	-
+TRANS	token_secret	timeout	decision	-	-	-	-	-	-
+TRANS	token_secret	key:#	decision	-	-	-	-	-	-
+TRANS	token_secret	hook_down	interrupted	-	-	-	-	-	-
+SCENE	trace_call	TRACING THE LINE	PLEASE HOLD	trace_call.wav	-	18	-
+TRANS	trace_call	timeout	operator_report	-	-	-	-	-	-
+TRANS	trace_call	coin	coin_secret	-	-	coin_found	1	-	-
+TRANS	trace_call	card	token_secret	-	-	token_found	1	-	-
+TRANS	trace_call	hook_down	interrupted	-	-	-	-	-	-
+SCENE	upstairs_calls	UPSTAIRS: MARA?	SHE ASKS WHAT TO DO	upstairs_calls.wav	-	20	-
+TRANS	upstairs_calls	timeout	decision	-	-	-	-	-	-
+TRANS	upstairs_calls	coin	coin_secret	-	-	coin_found	1	-	-
+TRANS	upstairs_calls	card	token_secret	-	-	token_found	1	-	-
+TRANS	upstairs_calls	hook_down	interrupted	-	-	-	-	-	-
+SCENE	voice_clue	THE VOICE KNOWS	HER SECRET NAME	voice_clue.wav	-	18	-
+TRANS	voice_clue	timeout	operator_report	-	-	-	-	-	-
+TRANS	voice_clue	coin	coin_secret	-	-	coin_found	1	-	-
+TRANS	voice_clue	card	token_secret	-	-	token_found	1	-	-
+TRANS	voice_clue	hook_down	interrupted	-	-	-	-	-	-

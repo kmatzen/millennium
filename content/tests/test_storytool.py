@@ -23,7 +23,7 @@ class StoryToolTests(unittest.TestCase):
 
     def test_unreachable_and_missing_target_are_rejected(self):
         story = copy.deepcopy(self.story)
-        story["scenes"]["operator"]["transitions"][0]["target"] = "absent"
+        story["scenes"]["operator_intro"]["transitions"][0]["target"] = "absent"
         story["scenes"]["orphan"] = {"display": ["LOST", ""],
                                        "ending": "unused", "transitions": []}
         errors = TOOL.validate(story, STORY_PATH.parent)

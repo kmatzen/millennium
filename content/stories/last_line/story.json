@@ -1,164 +1,79 @@
 {
-  "id": "last-line",
-  "version": "1.1.0",
-  "title": "The Last Line",
-  "entry": "invitation",
-  "offline_entry": "invitation",
-  "initial_state": {"visits": 0, "choice": 0, "coin_found": 0, "token_found": 0},
+  "id": "last-line", "version": "2.0.0",
+  "title": "The House at the End of the Line",
+  "entry": "invitation", "offline_entry": "invitation",
+  "initial_state": {"visits": 0, "choice": 0, "route": 0, "coin_found": 0, "token_found": 0},
   "scenes": {
-    "invitation": {
-      "display": ["A LINE IS RINGING", "LIFT TO ANSWER"],
-      "audio": "incoming_line.wav",
-      "timeout_seconds": 30,
-      "transitions": [
-        {"event": "hook_up", "target": "operator", "when": {"var": "visits", "equals": 0}, "increment": {"visits": 1}},
-        {"event": "hook_up", "target": "returning", "when": {"var": "visits", "equals": 1}, "increment": {"visits": 1}},
-        {"event": "hook_up", "target": "veteran", "increment": {"visits": 1}},
-        {"event": "timeout", "target": "return_later"}
-      ]
-    },
-    "operator": {
-      "display": ["SAVE ONE MESSAGE", "1=PAST  2=FUTURE"],
-      "audio": "choose_message.wav",
-      "timeout_seconds": 24,
-      "transitions": [
-        {"event": "key:1", "target": "past_choice", "set": {"choice": 1}},
-        {"event": "key:2", "target": "future_choice", "set": {"choice": 2}},
-        {"event": "coin", "target": "coin_secret", "set": {"coin_found": 1}},
-        {"event": "card", "target": "token_secret", "set": {"token_found": 1}},
-        {"event": "hook_down", "target": "interrupted"},
-        {"event": "timeout", "target": "repeat"},
-        {"event": "default", "target": "repeat"}
-      ]
-    },
-    "repeat": {
-      "display": ["PRESS 1 OR 2", "*=REPEAT"],
-      "audio": "repeat_choice.wav",
-      "transitions": [
-        {"event": "key:1", "target": "past_choice", "set": {"choice": 1}},
-        {"event": "key:2", "target": "future_choice", "set": {"choice": 2}},
-        {"event": "coin", "target": "coin_secret", "set": {"coin_found": 1}},
-        {"event": "card", "target": "token_secret", "set": {"token_found": 1}},
-        {"event": "hook_down", "target": "interrupted"},
-        {"event": "timeout", "target": "return_later"}
-      ]
-    },
-    "coin_secret": {
-      "display": ["THE COIN REMEMBERS", "#=RETURN"],
-      "audio": "coin_secret.wav",
-      "transitions": [
-        {"event": "key:#", "target": "operator"},
-        {"event": "timeout", "target": "operator"},
-        {"event": "hook_down", "target": "interrupted"}
-      ]
-    },
-    "token_secret": {
-      "display": ["A HIDDEN LINE OPENS", "#=RETURN"],
-      "audio": "token_secret.wav",
-      "transitions": [
-        {"event": "key:#", "target": "operator"},
-        {"event": "timeout", "target": "operator"},
-        {"event": "hook_down", "target": "interrupted"}
-      ]
-    },
-    "past_choice": {
-      "display": ["PAST SELECTED", "CONNECTING..."],
-      "audio": "past_selected.wav",
-      "transitions": [
-        {"event": "timeout", "target": "bridge"},
-        {"event": "hook_down", "target": "interrupted"}
-      ]
-    },
-    "future_choice": {
-      "display": ["FUTURE SELECTED", "CONNECTING..."],
-      "audio": "future_selected.wav",
-      "transitions": [
-        {"event": "timeout", "target": "bridge"},
-        {"event": "hook_down", "target": "interrupted"}
-      ]
-    },
-    "bridge": {
-      "display": ["THE LAST LINE", "WAIT FOR THE TONE"],
-      "audio": "connecting_line.wav",
-      "call": "configured",
-      "timeout_seconds": 15,
-      "transitions": [
-        {"event": "call_connected", "target": "past", "when": {"var": "choice", "equals": 1}},
-        {"event": "call_connected", "target": "future", "when": {"var": "choice", "equals": 2}},
-        {"event": "call_ended", "target": "past", "when": {"var": "choice", "equals": 1}},
-        {"event": "call_ended", "target": "future", "when": {"var": "choice", "equals": 2}},
-        {"event": "timeout", "target": "past", "when": {"var": "choice", "equals": 1}},
-        {"event": "timeout", "target": "future", "when": {"var": "choice", "equals": 2}},
-        {"event": "hook_down", "target": "interrupted"}
-      ]
-    },
-    "past": {
-      "display": ["MESSAGE DELIVERED", "RETURN TOMORROW"],
-      "audio": "past_delivered.wav",
-      "ending": "past-kept",
-      "transitions": [{"event": "hook_down", "target": "invitation"}]
-    },
-    "future": {
-      "display": ["MESSAGE SEALED", "RETURN TOMORROW"],
-      "audio": "future_sealed.wav",
-      "ending": "future-sealed",
-      "transitions": [{"event": "hook_down", "target": "invitation"}]
-    },
-    "interrupted": {
-      "display": ["CALL SAVED", "LIFT TO RESUME"],
-      "audio": "call_saved.wav",
-      "transitions": [
-        {"event": "resume", "target": "operator"},
-        {"event": "hook_up", "target": "operator"},
-        {"event": "timeout", "target": "return_later"}
-      ]
-    },
-    "return_later": {
-      "display": ["THE LINE REMEMBERS", "COME BACK SOON"],
-      "audio": "come_back.wav",
-      "ending": "return-invitation",
-      "transitions": []
-    },
-    "returning": {
-      "display": ["YOU CAME BACK", "THE LINE REMEMBERS"],
-      "audio": "welcome_back.wav",
-      "transitions": [
-        {"event": "timeout", "target": "past_coda", "when": {"var": "choice", "equals": 1}},
-        {"event": "timeout", "target": "future_coda", "when": {"var": "choice", "equals": 2}},
-        {"event": "timeout", "target": "operator"},
-        {"event": "hook_down", "target": "invitation"}
-      ]
-    },
-    "past_coda": {
-      "display": ["THE PAST ANSWERED", "YOUR WORDS REMAIN"],
-      "audio": "past_coda.wav",
-      "ending": "past-return-coda",
-      "transitions": [{"event": "hook_down", "target": "invitation"}]
-    },
-    "future_coda": {
-      "display": ["THE FUTURE HEARD", "YOUR WORDS REMAIN"],
-      "audio": "future_coda.wav",
-      "ending": "future-return-coda",
-      "transitions": [{"event": "hook_down", "target": "invitation"}]
-    },
-    "veteran": {
-      "display": ["THE LINE KNOWS YOU", "1=PAST  2=FUTURE"],
-      "audio": "veteran_line.wav",
-      "transitions": [
-        {"event": "key:1", "target": "past_choice", "set": {"choice": 1}},
-        {"event": "key:2", "target": "future_choice", "set": {"choice": 2}},
-        {"event": "coin", "target": "coin_secret", "set": {"coin_found": 1}},
-        {"event": "card", "target": "token_secret", "set": {"token_found": 1}},
-        {"event": "hook_down", "target": "invitation"},
-        {"event": "timeout", "target": "return_later"}
-      ]
-    }
+    "invitation": {"display": ["THIS CALL IS FOR", "YOU. LIFT TO ANSWER"], "audio": "invitation.wav", "timeout_seconds": 35, "transitions": [
+      {"event": "hook_up", "target": "return_leave", "when": {"var": "choice", "equals": 1}, "increment": {"visits": 1}},
+      {"event": "hook_up", "target": "return_answer", "when": {"var": "choice", "equals": 2}, "increment": {"visits": 1}},
+      {"event": "hook_up", "target": "operator_intro", "increment": {"visits": 1}},
+      {"event": "timeout", "target": "missed"}]},
+    "missed": {"display": ["MISSED CALL", "IT WILL RING AGAIN"], "audio": "missed.wav", "ending": "missed-call", "transitions": []},
+    "operator_intro": {"display": ["OPERATOR 17", "PRESS # TO ACCEPT"], "audio": "operator_intro.wav", "timeout_seconds": 25, "transitions": [
+      {"event": "key:#", "target": "mara_intro"}, {"event": "key:*", "target": "operator_intro"},
+      {"event": "hook_down", "target": "interrupted"}, {"event": "timeout", "target": "operator_repeat"}, {"event": "default", "target": "operator_repeat"}]},
+    "operator_repeat": {"display": ["A CHILD IS WAITING", "#=ANSWER  *=REPEAT"], "audio": "operator_repeat.wav", "timeout_seconds": 25, "transitions": [
+      {"event": "key:#", "target": "mara_intro"}, {"event": "key:*", "target": "operator_intro"},
+      {"event": "hook_down", "target": "interrupted"}, {"event": "timeout", "target": "interrupted"}, {"event": "default", "target": "operator_repeat"}]},
+    "mara_intro": {"display": ["MARA, AGE 9", "1=STAY  2=TRACE"], "audio": "mara_intro.wav", "timeout_seconds": 30, "transitions": [
+      {"event": "key:1", "target": "stay_with_mara", "set": {"route": 1}}, {"event": "key:2", "target": "trace_call", "set": {"route": 2}},
+      {"event": "key:*", "target": "mara_intro"}, {"event": "hook_down", "target": "interrupted"},
+      {"event": "timeout", "target": "mara_repeat"}, {"event": "default", "target": "mara_repeat"}]},
+    "mara_repeat": {"display": ["SHE HEARS A VOICE", "1=STAY  2=TRACE"], "audio": "mara_repeat.wav", "transitions": [
+      {"event": "key:1", "target": "stay_with_mara", "set": {"route": 1}}, {"event": "key:2", "target": "trace_call", "set": {"route": 2}},
+      {"event": "key:*", "target": "mara_intro"}, {"event": "hook_down", "target": "interrupted"},
+      {"event": "timeout", "target": "interrupted"}, {"event": "default", "target": "mara_repeat"}]},
+    "stay_with_mara": {"display": ["DO NOT HANG UP", "LISTEN..."], "audio": "stay_with_mara.wav", "timeout_seconds": 18, "transitions": [
+      {"event": "timeout", "target": "voice_clue"}, {"event": "hook_down", "target": "interrupted"}]},
+    "voice_clue": {"display": ["THE VOICE KNOWS", "HER SECRET NAME"], "audio": "voice_clue.wav", "timeout_seconds": 18, "transitions": [
+      {"event": "timeout", "target": "operator_report"}, {"event": "coin", "target": "coin_secret", "set": {"coin_found": 1}},
+      {"event": "card", "target": "token_secret", "set": {"token_found": 1}}, {"event": "hook_down", "target": "interrupted"}]},
+    "trace_call": {"display": ["TRACING THE LINE", "PLEASE HOLD"], "audio": "trace_call.wav", "timeout_seconds": 18, "transitions": [
+      {"event": "timeout", "target": "operator_report"}, {"event": "coin", "target": "coin_secret", "set": {"coin_found": 1}},
+      {"event": "card", "target": "token_secret", "set": {"token_found": 1}}, {"event": "hook_down", "target": "interrupted"}]},
+    "operator_report": {"display": ["HOUSE BURNED 1989", "NO CHILD WAS FOUND"], "audio": "operator_report.wav", "timeout_seconds": 22, "transitions": [
+      {"event": "timeout", "target": "upstairs_calls"}, {"event": "coin", "target": "coin_secret", "set": {"coin_found": 1}},
+      {"event": "card", "target": "token_secret", "set": {"token_found": 1}}, {"event": "hook_down", "target": "interrupted"}]},
+    "upstairs_calls": {"display": ["UPSTAIRS: MARA?", "SHE ASKS WHAT TO DO"], "audio": "upstairs_calls.wav", "timeout_seconds": 20, "transitions": [
+      {"event": "timeout", "target": "decision"}, {"event": "coin", "target": "coin_secret", "set": {"coin_found": 1}},
+      {"event": "card", "target": "token_secret", "set": {"token_found": 1}}, {"event": "hook_down", "target": "interrupted"}]},
+    "coin_secret": {"display": ["A LOST VOICEMAIL", "SAYS: DO NOT ANSWER"], "audio": "coin_secret.wav", "timeout_seconds": 20, "transitions": [
+      {"event": "timeout", "target": "decision"}, {"event": "key:#", "target": "decision"}, {"event": "hook_down", "target": "interrupted"}]},
+    "token_secret": {"display": ["A DEED FROM 2019", "OWNER: MARA VALE"], "audio": "token_secret.wav", "timeout_seconds": 20, "transitions": [
+      {"event": "timeout", "target": "decision"}, {"event": "key:#", "target": "decision"}, {"event": "hook_down", "target": "interrupted"}]},
+    "decision": {"display": ["YOUR WORDS CROSS", "1=LEAVE  2=ANSWER"], "audio": "decision.wav", "timeout_seconds": 30, "transitions": [
+      {"event": "key:1", "target": "send_leave", "set": {"choice": 1}}, {"event": "key:2", "target": "send_answer", "set": {"choice": 2}},
+      {"event": "key:*", "target": "decision_repeat"}, {"event": "coin", "target": "coin_secret", "set": {"coin_found": 1}},
+      {"event": "card", "target": "token_secret", "set": {"token_found": 1}}, {"event": "hook_down", "target": "interrupted"},
+      {"event": "timeout", "target": "decision_repeat"}, {"event": "default", "target": "decision_repeat"}]},
+    "decision_repeat": {"display": ["WHAT SHOULD SHE DO?", "1=LEAVE  2=ANSWER"], "audio": "decision_repeat.wav", "transitions": [
+      {"event": "key:1", "target": "send_leave", "set": {"choice": 1}}, {"event": "key:2", "target": "send_answer", "set": {"choice": 2}},
+      {"event": "key:*", "target": "decision"}, {"event": "coin", "target": "coin_secret", "set": {"coin_found": 1}},
+      {"event": "card", "target": "token_secret", "set": {"token_found": 1}}, {"event": "hook_down", "target": "interrupted"},
+      {"event": "timeout", "target": "interrupted"}, {"event": "default", "target": "decision_repeat"}]},
+    "send_leave": {"display": ["MESSAGE: LEAVE NOW", "CONNECTING TO 1989"], "audio": "send_leave.wav", "timeout_seconds": 12, "transitions": [
+      {"event": "timeout", "target": "bridge"}, {"event": "hook_down", "target": "interrupted"}]},
+    "send_answer": {"display": ["MESSAGE: ANSWER IT", "CONNECTING TO 1989"], "audio": "send_answer.wav", "timeout_seconds": 12, "transitions": [
+      {"event": "timeout", "target": "bridge"}, {"event": "hook_down", "target": "interrupted"}]},
+    "bridge": {"display": ["THE LINE IS OPEN", "DO NOT SPEAK"], "audio": "bridge.wav", "call": "configured", "timeout_seconds": 18, "transitions": [
+      {"event": "call_connected", "target": "leave_result", "when": {"var": "choice", "equals": 1}},
+      {"event": "call_connected", "target": "answer_result", "when": {"var": "choice", "equals": 2}},
+      {"event": "call_ended", "target": "leave_result", "when": {"var": "choice", "equals": 1}},
+      {"event": "call_ended", "target": "answer_result", "when": {"var": "choice", "equals": 2}},
+      {"event": "timeout", "target": "leave_result", "when": {"var": "choice", "equals": 1}},
+      {"event": "timeout", "target": "answer_result", "when": {"var": "choice", "equals": 2}}, {"event": "hook_down", "target": "interrupted"}]},
+    "leave_result": {"display": ["A DOOR SLAMS", "FOOTSTEPS RUN FREE"], "audio": "leave_result.wav", "ending": "mara-left-the-house", "transitions": [{"event": "hook_down", "target": "invitation"}]},
+    "answer_result": {"display": ["TWO VOICES SPEAK", "BOTH VOICES ARE MARA"], "audio": "answer_result.wav", "ending": "mara-answered-herself", "transitions": [{"event": "hook_down", "target": "invitation"}]},
+    "interrupted": {"display": ["THE LINE HOLDS", "LIFT TO CONTINUE"], "audio": "interrupted.wav", "timeout_seconds": 30, "transitions": [
+      {"event": "resume", "target": "decision"}, {"event": "hook_up", "target": "decision"}, {"event": "timeout", "target": "held_for_return"}]},
+    "held_for_return": {"display": ["CALL HELD OVERNIGHT", "IT REMEMBERS YOU"], "audio": "held_for_return.wav", "ending": "call-held", "transitions": []},
+    "return_leave": {"display": ["MARA VALE, 2019", "LEFT YOU A MESSAGE"], "audio": "return_leave.wav", "timeout_seconds": 24, "transitions": [
+      {"event": "timeout", "target": "leave_coda"}, {"event": "key:#", "target": "leave_coda"}, {"event": "hook_down", "target": "invitation"}]},
+    "leave_coda": {"display": ["I BUILT THIS PHONE", "SO YOU COULD ANSWER"], "audio": "leave_coda.wav", "ending": "the-loop-is-closed", "transitions": [{"event": "hook_down", "target": "invitation"}]},
+    "return_answer": {"display": ["THE UPSTAIRS LINE", "IS RINGING AGAIN"], "audio": "return_answer.wav", "timeout_seconds": 24, "transitions": [
+      {"event": "timeout", "target": "answer_coda"}, {"event": "key:#", "target": "answer_coda"}, {"event": "hook_down", "target": "invitation"}]},
+    "answer_coda": {"display": ["IT KNOWS YOUR VOICE", "DO NOT SAY YOUR NAME"], "audio": "answer_coda.wav", "ending": "the-voice-crossed", "transitions": [{"event": "hook_down", "target": "invitation"}]}
   },
-  "accessibility": {
-    "repeat_key": "*",
-    "minimum_response_seconds": 12,
-    "spoken_instructions": true,
-    "volume_percent": 80,
-    "high_contrast_display": true
-  }
+  "accessibility": {"repeat_key": "*", "minimum_response_seconds": 12, "spoken_instructions": true, "volume_percent": 80, "high_contrast_display": true}
 }

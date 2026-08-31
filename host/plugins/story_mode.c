@@ -68,6 +68,10 @@ static void copy_field(char *destination, size_t size, const char *source) {
     destination[size - 1] = '\0';
 }
 
+static const char *optional_field(const char *source) {
+    return source && strcmp(source, "-") == 0 ? "" : source;
+}
+
 static int split_tabs(char *line, char **fields, int maximum) {
     int count = 0;
     char *cursor = line;
@@ -198,22 +202,22 @@ static int load_story(void) {
             copy_field(scene->name, sizeof(scene->name), fields[1]);
             copy_field(scene->line1, sizeof(scene->line1), fields[2]);
             copy_field(scene->line2, sizeof(scene->line2), fields[3]);
-            copy_field(scene->audio, sizeof(scene->audio), fields[4]);
-            copy_field(scene->ending, sizeof(scene->ending), fields[5]);
+            copy_field(scene->audio, sizeof(scene->audio), optional_field(fields[4]));
+            copy_field(scene->ending, sizeof(scene->ending), optional_field(fields[5]));
             scene->timeout_seconds = atoi(fields[6]);
-            copy_field(scene->call, sizeof(scene->call), fields[7]);
+            copy_field(scene->call, sizeof(scene->call), optional_field(fields[7]));
         } else if (field_count == 10 && strcmp(fields[0], "TRANS") == 0 &&
                    runtime.transition_count < STORY_MAX_TRANSITIONS) {
             story_transition_t *transition = &runtime.transitions[runtime.transition_count++];
             copy_field(transition->scene, sizeof(transition->scene), fields[1]);
             copy_field(transition->event, sizeof(transition->event), fields[2]);
             copy_field(transition->target, sizeof(transition->target), fields[3]);
-            copy_field(transition->when_var, sizeof(transition->when_var), fields[4]);
-            transition->has_condition = fields[4][0] != '\0';
+            copy_field(transition->when_var, sizeof(transition->when_var), optional_field(fields[4]));
+            transition->has_condition = fields[4][0] != '\0' && strcmp(fields[4], "-") != 0;
             transition->when_value = atoi(fields[5]);
-            copy_field(transition->set_var, sizeof(transition->set_var), fields[6]);
+            copy_field(transition->set_var, sizeof(transition->set_var), optional_field(fields[6]));
             transition->set_value = atoi(fields[7]);
-            copy_field(transition->increment_var, sizeof(transition->increment_var), fields[8]);
+            copy_field(transition->increment_var, sizeof(transition->increment_var), optional_field(fields[8]));
             transition->increment_value = atoi(fields[9]);
         } else {
             fclose(stream);

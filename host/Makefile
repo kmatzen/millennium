@@ -291,11 +291,11 @@ install: daemon
 	sudo cp web_portal.html /usr/local/share/millennium/
 	sudo install -m 0755 ../content/install_content.py /usr/local/libexec/millennium-content
 	sudo install -m 0644 ../content/storytool.py /usr/local/libexec/storytool.py
-	sudo install -d -m 0755 /var/lib/millennium/content/releases/last-line-1.1.0/media
-	sudo install -m 0644 ../content/stories/last_line/story.mst /var/lib/millennium/content/releases/last-line-1.1.0/story.mst
-	sudo install -m 0644 ../content/stories/last_line/story.json /var/lib/millennium/content/releases/last-line-1.1.0/story.json
-	sudo install -m 0644 ../content/stories/last_line/media/*.wav /var/lib/millennium/content/releases/last-line-1.1.0/media/
-	@test -e /var/lib/millennium/content/current || sudo ln -s releases/last-line-1.1.0 /var/lib/millennium/content/current
+	sudo install -d -m 0755 /var/lib/millennium/content/releases/last-line-2.0.0/media
+	sudo install -m 0644 ../content/stories/last_line/story.mst /var/lib/millennium/content/releases/last-line-2.0.0/story.mst
+	sudo install -m 0644 ../content/stories/last_line/story.json /var/lib/millennium/content/releases/last-line-2.0.0/story.json
+	sudo install -m 0644 ../content/stories/last_line/media/*.wav /var/lib/millennium/content/releases/last-line-2.0.0/media/
+	@test -e /var/lib/millennium/content/current || sudo ln -s releases/last-line-2.0.0 /var/lib/millennium/content/current
 	sudo cp systemd/daemon.service /etc/systemd/system/
 	sudo install -m 0644 firewall/millennium.nft /etc/millennium/millennium.nft
 	sudo cp systemd/millennium-firewall.service /etc/systemd/system/

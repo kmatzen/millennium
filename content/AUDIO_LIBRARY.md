@@ -1,6 +1,6 @@
 # Reusable narrative audio and interaction patterns
 
-The initial reviewed library is embodied by *The Last Line* 1.1.0. Its clips
+The initial reviewed library is embodied by *The House at the End of the Line* 2.0.0. Its clips
 are deliberately small, handset-normalized, transcript-backed patterns that a
 new story may copy and re-record without inheriting story logic:
 

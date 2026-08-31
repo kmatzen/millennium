@@ -200,6 +200,9 @@ def validate(story, root):
 
 def compile_runtime(story):
     """Compile author-friendly JSON into the daemon's strict tabular format."""
+    def field(value):
+        return "-" if value == "" else str(value)
+
     lines = [f"MSTORY\t1\t{story['id']}\t{story['version']}\t{story['entry']}"]
     accessibility = story.get("accessibility", {})
     lines.append("\t".join(str(value) for value in (
@@ -217,12 +220,12 @@ def compile_runtime(story):
                   scene.get("audio", ""), scene.get("ending", ""),
                   str(scene.get("timeout_seconds", timeout)),
                   scene.get("call", "")]
-        lines.append("\t".join(fields))
+        lines.append("\t".join(field(value) for value in fields))
         for item in scene.get("transitions", []):
             condition = item.get("when", {})
             setting = next(iter(item.get("set", {}).items()), ("", ""))
             increment = next(iter(item.get("increment", {}).items()), ("", ""))
-            lines.append("\t".join(str(value) for value in (
+            lines.append("\t".join(field(value) for value in (
                 "TRANS", name, item["event"], item["target"],
                 condition.get("var", ""), condition.get("equals", ""),
                 setting[0], setting[1], increment[0], increment[1])))

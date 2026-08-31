@@ -33,7 +33,7 @@ daemon or MCU firmware. Configure `story.path` to
 `/var/lib/millennium/content/current/story.mst`.
 
 `make -C host install` installs the verifier as
-`/usr/local/libexec/millennium-content` and provisions *The Last Line* as an
+`/usr/local/libexec/millennium-content` and provisions *The House at the End of the Line* as an
 immutable offline bootstrap release. It never replaces an existing `current`
 content link. New content can therefore be installed and rolled back without
 replacing the daemon, while a factory-new or disconnected phone still has a
