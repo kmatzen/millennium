@@ -35,6 +35,18 @@ through the scheduled production timer.
 - Content release: `last-line-1.1.0`
 - HIL result: passed all eight gates at `2026-08-31T16:07:19Z`
 
+Signed sequence 3 was subsequently published at `updates.kmatzen.com` with
+key ID `release-2026-08`, accepted by the normal update-check service, and
+committed by the timer-owned automatic-apply service at 2026-08-31 09:57 PDT.
+The post-update HIL run passed all eight gates at `2026-08-31T16:57:53Z`.
+
+- New signing public-key SHA-256: `581a1ff72d1867b3dfb3b1ffc5521308ac646878050f1c4c12739e0dedaf7348`
+- Installed release: sequence 3, version `0.4.0`, key ID `release-2026-08`
+- Encrypted-key recovery evidence: `signing-key-recovery-2026-08-31.json`
+- Device backup: Restic snapshot `0226382e` on anima, restore-stream checked
+  on 2026-08-31; nightly timer enabled with 14 daily, 8 weekly, and 12 monthly
+  retention points.
+
 ### Superseded sequence 1 provenance
 
 - Release: sequence 1, version `0.4.0`, `armv7l`

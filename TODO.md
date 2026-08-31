@@ -72,7 +72,7 @@ as an unattended appliance. Items are ordered by priority.
   - [x] Support key IDs and multiple trusted public keys during rotation.
   - [x] Document revocation and emergency recovery.
   - [ ] Maintain an encrypted offline backup of the private signing key.
-  - [ ] Perform and document a recovery drill.
+  - [x] Perform and document a recovery drill.
 
 - [x] Expand CI into a reproducible release pipeline.
   - [x] Link and test against a pinned PJSIP version.
@@ -88,10 +88,10 @@ as an unattended appliance. Items are ordered by priority.
   - [x] Monitor last check-in, SIP registration, and maintenance-tunnel availability.
   - [x] Alert on OTA failure or rollback, serial drops, and MCU resets.
   - [x] Monitor disk space, filesystem errors, certificate expiry, and reboot frequency.
-  - [ ] Back up OTA artifacts, server configuration, and authorized maintenance keys.
+  - [x] Back up OTA artifacts, server configuration, and authorized maintenance keys.
 
 - [ ] Validate the full unattended workflow on real hardware.
-  - [ ] Install a release from `kmatzen.com` using the normal timer path.
+  - [x] Install a release from `kmatzen.com` using the normal timer path.
   - [ ] Confirm both MCUs, the host daemon, audio, SIP, and controls after activation.
   - [ ] Force a failed health check and verify automatic rollback.
   - [ ] Test loss of power and network during download, flash, and activation.
@@ -163,7 +163,7 @@ A release is ready for an inexperienced end user only when:
 
 - [x] Administrative controls are inaccessible without authentication.
 - [ ] The host and both MCU images are authenticated and attested.
-- [ ] A successful OTA has completed through the scheduled production path.
+- [x] A successful OTA has completed through the scheduled production path.
 - [ ] A deliberately bad OTA has rolled back without manual intervention.
 - [x] Failed releases stop retrying automatically.
 - [ ] Power and network interruption tests recover safely.

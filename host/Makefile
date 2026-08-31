@@ -301,6 +301,7 @@ install: daemon
 	sudo cp systemd/millennium-firewall.service /etc/systemd/system/
 	sudo install -m 0755 monitoring/millennium_monitor.py /usr/local/libexec/millennium-monitor
 	sudo install -m 0755 monitoring/millennium_backup.sh /usr/local/libexec/millennium-backup
+	sudo install -m 0755 monitoring/millennium_backup_export.sh /usr/local/libexec/millennium-backup-export
 	sudo install -m 0755 monitoring/millennium_hil_smoke.py /usr/local/libexec/millennium-hil-smoke
 	sudo install -d -m 0755 /var/lib/millennium/hil
 	sudo cp systemd/millennium-monitor.service systemd/millennium-monitor.timer /etc/systemd/system/

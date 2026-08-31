@@ -28,6 +28,14 @@ operator-supplied memory-backed scratch directory, decrypts there, signs and
 verifies a disposable challenge, removes the plaintext, and writes a dated
 evidence record. Store that record in the private operations log.
 
+For `release-2026-08`, a second recovery format is retained as AES-256-CBC
+with PBKDF2 (600,000 iterations). Its random 256-bit recovery secret is stored
+as the macOS Keychain item `millennium-ota-release-2026-08`; ciphertext copies
+are held in the local restricted recovery vault and anima's restricted signing
+vault. The dated as-built evidence records a successful RAM-disk restore and
+disposable sign/verify drill. The OpenPGP/YubiKey copy remains an additional
+recovery option, not the sole recovery path.
+
 ## Rotation
 
 1. Provision the new public key alongside the old one on every phone through a
