@@ -22,7 +22,26 @@ ota = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(ota)
 
 
+def write_identity_hex(path, role, version="0.4.0", build="test-build"):
+    payload = ("MILLENNIUM role=%s version=%s protocol=1 build=%s selftest=ok" %
+               (role, version, build)).encode()
+    lines = []
+    for address in range(0, len(payload), 16):
+        chunk = payload[address:address + 16]
+        record = bytes([len(chunk), address >> 8, address & 0xff, 0]) + chunk
+        checksum = (-sum(record)) & 0xff
+        lines.append(":" + (record + bytes([checksum])).hex().upper())
+    lines.append(":00000001FF")
+    path.write_text("\n".join(lines) + "\n")
+
+
 class OtaTests(unittest.TestCase):
+    def test_release_identity_includes_sequence(self):
+        self.assertEqual(ota.release_identity({"sequence": 7, "version": "0.4.0"}),
+                         "00000007-0.4.0")
+        self.assertNotEqual(ota.release_identity({"sequence": 7, "version": "0.4.0"}),
+                            ota.release_identity({"sequence": 8, "version": "0.4.0"}))
+
     def test_install_window_handles_midnight(self):
         config = {"install_window_start": "23:00", "install_window_end": "02:00"}
         self.assertTrue(ota.within_install_window(config, time.struct_time((2026, 1, 1, 1, 0, 0, 0, 1, -1))))
@@ -31,11 +50,69 @@ class OtaTests(unittest.TestCase):
     def test_manifest_validation_rejects_insecure_bundle(self):
         manifest = {
             "schema": 1, "channel": "stable", "version": "1.0.0", "sequence": 1,
+            "key_id": "primary",
             "minimum_sequence": 0,
             "bundle": {"url": "http://example/bundle", "sha256": "a" * 64, "size": 1},
         }
         with self.assertRaises(ota.OtaError):
             ota.validate_manifest(manifest, "stable")
+
+    def test_rollout_group_hold_and_withdrawal(self):
+        config = {"device_group": "canary"}
+        manifest = {"rollout": {"groups": ["canary"], "hold": False,
+                                 "withdrawn": False}}
+        self.assertIsNone(ota.rollout_block_reason(config, manifest))
+        manifest["rollout"]["hold"] = True
+        self.assertIn("hold", ota.rollout_block_reason(config, manifest))
+        manifest["rollout"]["hold"] = False
+        manifest["rollout"]["withdrawn"] = True
+        self.assertIn("withdrawn", ota.rollout_block_reason(config, manifest))
+        manifest["rollout"] = {"groups": ["production"], "hold": False,
+                               "withdrawn": False}
+        self.assertIn("group", ota.rollout_block_reason(config, manifest))
+
+    def test_firmware_attestation_rejects_swapped_or_stale_role(self):
+        with tempfile.TemporaryDirectory() as name:
+            release = Path(name)
+            expected = {"keypad": {"role": "keypad", "version": "0.4.0",
+                                    "protocol": 1, "build": "expected"},
+                        "display": {"role": "display", "version": "0.4.0",
+                                    "protocol": 1, "build": "expected"}}
+            (release / "release.json").write_text(json.dumps({"firmware": expected}))
+            config = {"keypad_device": "/dev/keypad", "display_device": "/dev/display"}
+            stale = {"role": "display", "version": "0.3.0", "protocol": 1,
+                     "build": "stale", "selftest": "ok"}
+            with mock.patch.object(ota, "read_firmware_identity", return_value=stale):
+                with self.assertRaisesRegex(ota.OtaError, "attestation mismatch"):
+                    ota.attest_firmware(config, release, "keypad")
+
+    def test_firmware_attestation_accepts_exact_signed_identity(self):
+        with tempfile.TemporaryDirectory() as name:
+            release = Path(name)
+            identity = {"role": "display", "version": "0.4.0", "protocol": 1,
+                        "build": "exact"}
+            (release / "release.json").write_text(json.dumps(
+                {"firmware": {"display": identity}}))
+            actual = dict(identity, selftest="ok")
+            config = {"display_device": "/dev/display"}
+            with mock.patch.object(ota, "read_firmware_identity", return_value=actual):
+                self.assertEqual(actual, ota.attest_firmware(config, release, "display"))
+
+    def test_health_check_uses_daemon_protocol_after_prestart_attestation(self):
+        config = {
+            "version_url": "version", "health_url": "health",
+            "metrics_url": "metrics", "health_timeout_seconds": "1",
+            "keypad_device": "/dev/keypad", "display_device": "/dev/display",
+        }
+        replies = [
+            {"version": "0.4.0"}, {"overall_status": "WARNING"},
+            {"gauges": {"mcu_protocol_version": 2}},
+        ]
+        with mock.patch.object(ota, "get_json", side_effect=replies), \
+                mock.patch.object(ota.Path, "exists", return_value=True), \
+                mock.patch.object(ota, "attest_firmware") as attest:
+            ota.health_check(config, "0.4.0", Path("/release"))
+        attest.assert_not_called()
 
     def test_safe_extract_rejects_traversal(self):
         with tempfile.TemporaryDirectory() as name:
@@ -48,6 +125,51 @@ class OtaTests(unittest.TestCase):
             with self.assertRaises(ota.OtaError):
                 ota.safe_extract(bundle, root / "out")
 
+    def test_builder_rejects_version_mismatch(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            daemon = root / "daemon"
+            daemon.write_text("#!/bin/sh\necho 'millennium-daemon 9.9.9 (test)'\n")
+            daemon.chmod(0o755)
+            result = subprocess.run([
+                sys.executable, str(BUILDER), "--version", "0.4.0", "--sequence", "8",
+                "--base-url", "https://updates.example/millennium",
+                "--daemon", str(daemon), "--output-dir", str(root / "out"),
+            ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(b"daemon version does not match", result.stderr)
+
+    def test_failed_release_is_backed_off_and_quarantined(self):
+        with tempfile.TemporaryDirectory() as name:
+            state = Path(name)
+            manifest_path = state / "pending/manifest.json"
+            manifest_path.parent.mkdir(parents=True)
+            manifest = {"sequence": 9, "version": "0.4.0"}
+            manifest_path.write_text(json.dumps(manifest))
+            config = {
+                "state_dir": str(state), "automatic": "true",
+                "install_window_start": "00:00", "install_window_end": "00:00",
+                "max_failure_attempts": "3", "failure_backoff_seconds": "60",
+            }
+            first = ota.record_failure(config, manifest_path, manifest, "failed once")
+            self.assertEqual(first["attempts"], 1)
+            apply = mock.Mock()
+            with mock.patch.object(ota, "command_apply", apply):
+                ota.command_auto_apply(config)
+            apply.assert_not_called()
+
+            with mock.patch.object(ota.os, "geteuid", return_value=0):
+                ota.command_clear_failure(config)
+            self.assertIsNone(ota.read_failure(state, manifest_path, manifest))
+
+            ota.record_failure(config, manifest_path, manifest, "failed twice")
+            ota.record_failure(config, manifest_path, manifest, "failed three times")
+            third = ota.record_failure(config, manifest_path, manifest, "failed four times")
+            self.assertEqual(third["attempts"], 3)
+            with mock.patch.object(ota, "command_apply", apply):
+                ota.command_auto_apply(config)
+            apply.assert_not_called()
+
     def test_builder_signs_verifiable_reproducible_bundle(self):
         with tempfile.TemporaryDirectory() as name:
             root = Path(name)
@@ -57,6 +179,10 @@ class OtaTests(unittest.TestCase):
             for filename in ("daemon", "portal", "keypad", "display", "flash"):
                 paths[filename] = inputs / filename
                 paths[filename].write_bytes((filename + "\n").encode())
+            paths["daemon"].write_text("#!/bin/sh\necho 'millennium-daemon 0.4.0 (test)'\n")
+            paths["daemon"].chmod(0o755)
+            write_identity_hex(paths["keypad"], "keypad")
+            write_identity_hex(paths["display"], "display")
             private = root / "private.pem"
             public = root / "public.pem"
             subprocess.run(["openssl", "genpkey", "-algorithm", "ED25519", "-out", str(private)], check=True)
@@ -64,7 +190,7 @@ class OtaTests(unittest.TestCase):
             output_a = root / "a"
             output_b = root / "b"
             base = [
-                sys.executable, str(BUILDER), "--version", "1.2.3", "--sequence", "7",
+                sys.executable, str(BUILDER), "--version", "0.4.0", "--sequence", "7",
                 "--base-url", "https://updates.example/millennium", "--daemon", str(paths["daemon"]),
                 "--portal", str(paths["portal"]), "--keypad", str(paths["keypad"]),
                 "--display", str(paths["display"]), "--flash-script", str(paths["flash"]),
@@ -73,18 +199,19 @@ class OtaTests(unittest.TestCase):
             ]
             subprocess.run(base + ["--output-dir", str(output_a)], check=True, stdout=subprocess.PIPE)
             subprocess.run(base + ["--output-dir", str(output_b)], check=True, stdout=subprocess.PIPE)
-            self.assertEqual((output_a / "millennium-1.2.3.tar.gz").read_bytes(),
-                             (output_b / "millennium-1.2.3.tar.gz").read_bytes())
+            bundle_name = "millennium-00000007-0.4.0.tar.gz"
+            self.assertEqual((output_a / bundle_name).read_bytes(),
+                             (output_b / bundle_name).read_bytes())
             ota.verify_signature(public, output_a / "manifest.json", output_a / "manifest.json.sig")
             web_root = root / "web"
             subprocess.run([str(PUBLISHER), str(output_a), str(web_root)], check=True, stdout=subprocess.PIPE)
             self.assertEqual((web_root / "stable/manifest.json").read_bytes(),
                              (output_a / "manifest.json").read_bytes())
-            self.assertTrue((web_root / "releases/1.2.3/millennium-1.2.3.tar.gz").is_file())
+            self.assertTrue((web_root / "releases/00000007-0.4.0" / bundle_name).is_file())
             data = json.loads((output_a / "manifest.json").read_text())
             ota.validate_manifest(data, "stable")
             extracted = root / "extracted"
-            ota.safe_extract(output_a / "millennium-1.2.3.tar.gz", extracted)
+            ota.safe_extract(output_a / bundle_name, extracted)
             ota.verify_release(extracted, data)
 
             state = root / "state"
@@ -117,7 +244,7 @@ class OtaTests(unittest.TestCase):
             self.assertTrue((state / "pending/manifest.json").is_file())
 
             def fake_apply_download(url, destination, maximum):
-                shutil.copyfile(output_a / "millennium-1.2.3.tar.gz", destination)
+                shutil.copyfile(output_a / bundle_name, destination)
 
             real_subprocess_run = subprocess.run
             def fake_subprocess_run(arguments, *args, **kwargs):
@@ -140,7 +267,7 @@ class OtaTests(unittest.TestCase):
             self.assertFalse((state / "installed-sequence").exists())
             self.assertEqual([call.args[-1] for call in rollback_flash.call_args_list], ["display", "keypad"])
 
-            interrupted = releases / "1.2.3"
+            interrupted = releases / "00000007-0.4.0"
             ota.atomic_symlink(current, interrupted)
             ota.write_activation(state, old, interrupted, ["keypad", "display"])
             boot_recovery_flash = mock.Mock(return_value=True)
@@ -158,7 +285,7 @@ class OtaTests(unittest.TestCase):
                  mock.patch.object(ota, "flash_if_changed", return_value=False), \
                  mock.patch.object(ota, "health_check"):
                 ota.command_apply(config)
-            self.assertEqual(current.resolve(), (releases / "1.2.3").resolve())
+            self.assertEqual(current.resolve(), (releases / "00000007-0.4.0").resolve())
             self.assertEqual((state / "installed-sequence").read_text().strip(), "7")
 
             with (output_a / "manifest.json").open("ab") as stream:

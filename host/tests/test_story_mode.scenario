@@ -1,0 +1,43 @@
+# Polished data-authored story: spoken/display prompts, optional physical
+# discoveries, keypad choice, call-state climax, persistence, and return coda.
+config story.path ../content/stories/last_line/story.mst
+config story.state_path /tmp/millennium_story_mode_test_state
+config story.call_target 5550100
+clear_story_state
+activate_plugin Story Mode
+assert_display A LINE IS RINGING
+hook_up
+assert_display SAVE ONE MESSAGE
+
+# Optional hardware paths reward exploration and return to the main story.
+coin 25
+assert_display THE COIN REMEMBERS
+key #
+assert_display SAVE ONE MESSAGE
+card purpose-built-test-token
+assert_display A HIDDEN LINE OPENS
+key #
+assert_display SAVE ONE MESSAGE
+
+# Main choice leads to a configured outbound call and reacts to connection.
+key 1
+assert_display PAST SELECTED
+wait 12
+assert_display THE LAST LINE
+call_active
+assert_display MESSAGE DELIVERED
+assert_display RETURN TOMORROW
+
+# Reloading restores the content-version-scoped scene.
+activate_plugin Classic Phone
+activate_plugin Story Mode
+assert_display MESSAGE DELIVERED
+
+# Persistent choice/visit state unlocks a distinct return-visit consequence.
+hook_down
+assert_display A LINE IS RINGING
+hook_up
+assert_display YOU CAME BACK
+wait 12
+assert_display THE PAST ANSWERED
+assert_display YOUR WORDS REMAIN

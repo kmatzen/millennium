@@ -6,29 +6,42 @@
  */
 #include "pjsip_interface.h"
 #include "logger.h"
+#include "sip_text.h"
+#include "sip_call_slot.h"
 
 #include <pjsua-lib/pjsua.h>
 #include <string.h>
 #include <stdio.h>
+#include <pthread.h>
 
 #define THIS_FILE "pjsip_interface"
 
 /* ── Module state ─────────────────────────────────────────────────────── */
 
 static pjsua_acc_id  g_acc_id  = PJSUA_INVALID_ID;
-static pjsua_call_id g_call_id = PJSUA_INVALID_ID; /* current call, if any */
+static sip_call_slot_t g_call_slot = SIP_CALL_SLOT_INITIALIZER(PJSUA_INVALID_ID);
 static pjsip_iface_event_cb g_cb = NULL;
 static void *g_cb_arg = NULL;
 static int   g_registered = 0;
 static int   g_started = 0;        /* 1 once pjsua_create/init/start succeeded */
 static int   g_transport = PJSIP_IFACE_TRANSPORT_UDP;
 static char  g_domain[128] = "";  /* host part of the AOR, for outbound URIs */
+static pthread_mutex_t g_state_mutex = PTHREAD_MUTEX_INITIALIZER;
+/* Serializes public PJSUA operations with destroy(). State snapshots alone do
+ * not prevent stop from destroying PJSUA between a readiness check and a call. */
+static pthread_mutex_t g_api_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 /* pj_str_t from a C string (PJSUA treats these as read-only). */
 static pj_str_t S(const char *s) { return pj_str((char *)s); }
 
 static void emit(enum pjsip_iface_event ev, const char *text) {
-    if (g_cb) g_cb(ev, text, g_cb_arg);
+    pjsip_iface_event_cb cb;
+    void *arg;
+    pthread_mutex_lock(&g_state_mutex);
+    cb = g_cb;
+    arg = g_cb_arg;
+    pthread_mutex_unlock(&g_state_mutex);
+    if (cb) cb(ev, text, arg);
 }
 
 /* Resolve an ALSA device name to a PJSUA audio device index, or
@@ -67,7 +80,7 @@ static void on_incoming_call(pjsua_acc_id acc_id, pjsua_call_id call_id,
     /* Track the inbound call; the daemon decides whether/when to answer
      * (handset lift -> pjsip_iface_answer). Send 180 Ringing so the caller
      * hears ringback while the phone bell rings. */
-    g_call_id = call_id;
+    sip_call_slot_set(&g_call_slot, call_id);
     pjsua_call_answer(call_id, 180, NULL, NULL);
     logger_info_with_category("SIP", "Incoming call");
     emit(PJSIP_IFACE_CALL_INCOMING, NULL);
@@ -75,6 +88,7 @@ static void on_incoming_call(pjsua_acc_id acc_id, pjsua_call_id call_id,
 
 static void on_call_state(pjsua_call_id call_id, pjsip_event *e) {
     pjsua_call_info ci;
+    char status_text[256];
     PJ_UNUSED_ARG(e);
 
     if (pjsua_call_get_info(call_id, &ci) != PJ_SUCCESS)
@@ -84,13 +98,13 @@ static void on_call_state(pjsua_call_id call_id, pjsip_event *e) {
         call_id, (int)ci.state_text.slen, ci.state_text.ptr);
 
     if (ci.state == PJSIP_INV_STATE_CONFIRMED) {
-        g_call_id = call_id;
+        sip_call_slot_set(&g_call_slot, call_id);
         emit(PJSIP_IFACE_CALL_ESTABLISHED, NULL);
     } else if (ci.state == PJSIP_INV_STATE_DISCONNECTED) {
-        if (call_id == g_call_id)
-            g_call_id = PJSUA_INVALID_ID;
-        emit(PJSIP_IFACE_CALL_CLOSED,
-             ci.last_status_text.slen ? ci.last_status_text.ptr : NULL);
+        sip_call_slot_clear_if(&g_call_slot, call_id, PJSUA_INVALID_ID);
+        sip_text_copy(status_text, sizeof(status_text), ci.last_status_text.ptr,
+                      (long)ci.last_status_text.slen);
+        emit(PJSIP_IFACE_CALL_CLOSED, status_text[0] ? status_text : NULL);
     }
 }
 
@@ -107,21 +121,27 @@ static void on_call_media_state(pjsua_call_id call_id) {
 
 static void on_reg_state2(pjsua_acc_id acc_id, pjsua_reg_info *info) {
     int code = (info && info->cbparam) ? info->cbparam->code : 0;
-    const char *reason = NULL;
+    char reason[256];
     PJ_UNUSED_ARG(acc_id);
 
-    if (info && info->cbparam && info->cbparam->reason.slen)
-        reason = info->cbparam->reason.ptr;
+    reason[0] = '\0';
+    if (info && info->cbparam)
+        sip_text_copy(reason, sizeof(reason), info->cbparam->reason.ptr,
+                      (long)info->cbparam->reason.slen);
 
     if (code >= 200 && code < 300) {
+        pthread_mutex_lock(&g_state_mutex);
         g_registered = 1;
+        pthread_mutex_unlock(&g_state_mutex);
         logger_info_with_category("SIP", "Registration OK");
         emit(PJSIP_IFACE_REG_OK, NULL);
     } else {
+        pthread_mutex_lock(&g_state_mutex);
         g_registered = 0;
+        pthread_mutex_unlock(&g_state_mutex);
         logger_warnf_with_category("SIP", "Registration failed: %d %s",
-            code, reason ? reason : "");
-        emit(PJSIP_IFACE_REG_FAIL, reason);
+            code, reason);
+        emit(PJSIP_IFACE_REG_FAIL, reason[0] ? reason : NULL);
     }
 }
 
@@ -151,6 +171,7 @@ int pjsip_iface_start(const pjsip_iface_account_t *acc,
     pjsua_acc_config acc_cfg;
     pjsip_transport_type_e tp_type;
     pjsua_transport_id tid = PJSUA_INVALID_ID;
+    pjsua_acc_id new_acc_id = PJSUA_INVALID_ID;
     char reg_uri_buf[256];
 
     if (!acc || !acc->id_uri || !acc->reg_uri) {
@@ -158,14 +179,19 @@ int pjsip_iface_start(const pjsip_iface_account_t *acc,
         return -1;
     }
 
+    pthread_mutex_lock(&g_api_mutex);
+
+    pthread_mutex_lock(&g_state_mutex);
     g_cb = cb;
     g_cb_arg = arg;
     g_transport = acc->transport;
     extract_domain(acc->id_uri);
+    pthread_mutex_unlock(&g_state_mutex);
 
     status = pjsua_create();
     if (status != PJ_SUCCESS) {
         logger_error_with_category("SIP", "pjsua_create failed");
+        pthread_mutex_unlock(&g_api_mutex);
         return -1;
     }
 
@@ -215,6 +241,7 @@ int pjsip_iface_start(const pjsip_iface_account_t *acc,
     if (status != PJ_SUCCESS) {
         logger_error_with_category("SIP", "pjsua_init failed");
         pjsua_destroy();
+        pthread_mutex_unlock(&g_api_mutex);
         return -1;
     }
 
@@ -230,6 +257,7 @@ int pjsip_iface_start(const pjsip_iface_account_t *acc,
     if (status != PJ_SUCCESS) {
         logger_error_with_category("SIP", "pjsua_transport_create failed");
         pjsua_destroy();
+        pthread_mutex_unlock(&g_api_mutex);
         return -1;
     }
 
@@ -237,6 +265,7 @@ int pjsip_iface_start(const pjsip_iface_account_t *acc,
     if (status != PJ_SUCCESS) {
         logger_error_with_category("SIP", "pjsua_start failed");
         pjsua_destroy();
+        pthread_mutex_unlock(&g_api_mutex);
         return -1;
     }
 
@@ -294,12 +323,16 @@ int pjsip_iface_start(const pjsip_iface_account_t *acc,
     acc_cfg.cred_info[0].data_type = PJSIP_CRED_DATA_PLAIN_PASSWD;
     acc_cfg.cred_info[0].data      = S(acc->password ? acc->password : "");
 
-    status = pjsua_acc_add(&acc_cfg, PJ_TRUE, &g_acc_id);
+    status = pjsua_acc_add(&acc_cfg, PJ_TRUE, &new_acc_id);
     if (status != PJ_SUCCESS) {
         logger_error_with_category("SIP", "pjsua_acc_add failed");
         pjsua_destroy();
+        pthread_mutex_unlock(&g_api_mutex);
         return -1;
     }
+    pthread_mutex_lock(&g_state_mutex);
+    g_acc_id = new_acc_id;
+    pthread_mutex_unlock(&g_state_mutex);
 
     /* Telephony only needs G.711 (PCMU/PCMA), which is also what Twilio uses.
      * Disable every other codec so the SDP stays small and the Pi stays cool. */
@@ -317,19 +350,35 @@ int pjsip_iface_start(const pjsip_iface_account_t *acc,
         pjsua_codec_set_priority(&pcma, (pj_uint8_t)254);
     }
 
+    pthread_mutex_lock(&g_state_mutex);
     g_started = 1;
+    pthread_mutex_unlock(&g_state_mutex);
     logger_info_with_category("SIP", "PJSUA started");
+    pthread_mutex_unlock(&g_api_mutex);
     return 0;
 }
 
 void pjsip_iface_stop(void) {
-    if (!g_started) return;  /* never came up (e.g. SIP not configured) */
+    int started;
+    pthread_mutex_lock(&g_api_mutex);
+    pthread_mutex_lock(&g_state_mutex);
+    started = g_started;
+    g_started = 0;
+    pthread_mutex_unlock(&g_state_mutex);
+    if (!started) {
+        pthread_mutex_unlock(&g_api_mutex);
+        return;  /* never came up (e.g. SIP not configured) */
+    }
     thread_ensure();
     pjsua_destroy();
-    g_started = 0;
+    pthread_mutex_lock(&g_state_mutex);
     g_acc_id = PJSUA_INVALID_ID;
-    g_call_id = PJSUA_INVALID_ID;
+    sip_call_slot_set(&g_call_slot, PJSUA_INVALID_ID);
     g_registered = 0;
+    g_cb = NULL;
+    g_cb_arg = NULL;
+    pthread_mutex_unlock(&g_state_mutex);
+    pthread_mutex_unlock(&g_api_mutex);
 }
 
 int pjsip_iface_call(const char *user) {
@@ -337,64 +386,126 @@ int pjsip_iface_call(const char *user) {
     pj_str_t puri;
     pj_status_t status;
     pjsua_call_id cid = PJSUA_INVALID_ID;
+    pjsua_acc_id acc_id;
+    int started, transport;
+    char domain[sizeof(g_domain)];
 
-    if (!g_started || !user || g_acc_id == PJSUA_INVALID_ID || !g_domain[0]) {
+    pthread_mutex_lock(&g_api_mutex);
+    pthread_mutex_lock(&g_state_mutex);
+    started = g_started;
+    acc_id = g_acc_id;
+    transport = g_transport;
+    strncpy(domain, g_domain, sizeof(domain) - 1);
+    domain[sizeof(domain) - 1] = '\0';
+    pthread_mutex_unlock(&g_state_mutex);
+    if (!started || !user || acc_id == PJSUA_INVALID_ID || !domain[0]) {
         logger_error_with_category("SIP", "Cannot call: not ready");
+        pthread_mutex_unlock(&g_api_mutex);
         return -1;
     }
     thread_ensure();
 
-    if (g_transport == PJSIP_IFACE_TRANSPORT_TLS)
-        snprintf(uri, sizeof(uri), "sip:%s@%s;transport=tls", user, g_domain);
+    if (transport == PJSIP_IFACE_TRANSPORT_TLS)
+        snprintf(uri, sizeof(uri), "sip:%s@%s;transport=tls", user, domain);
     else
-        snprintf(uri, sizeof(uri), "sip:%s@%s", user, g_domain);
+        snprintf(uri, sizeof(uri), "sip:%s@%s", user, domain);
 
     puri = S(uri);
     logger_infof_with_category("SIP", "Dialing %s", uri);
-    status = pjsua_call_make_call(g_acc_id, &puri, NULL, NULL, NULL, &cid);
+    status = pjsua_call_make_call(acc_id, &puri, NULL, NULL, NULL, &cid);
     if (status != PJ_SUCCESS) {
         logger_errorf_with_category("SIP", "make_call failed (%d)", (int)status);
+        pthread_mutex_unlock(&g_api_mutex);
         return -1;
     }
-    g_call_id = cid;
+    pthread_mutex_lock(&g_state_mutex);
+    started = g_started;
+    pthread_mutex_unlock(&g_state_mutex);
+    if (started) sip_call_slot_set(&g_call_slot, cid);
+    pthread_mutex_unlock(&g_api_mutex);
     return 0;
 }
 
 int pjsip_iface_answer(void) {
-    if (!g_started) return -1;
-    thread_ensure();
-    if (g_call_id == PJSUA_INVALID_ID) {
-        logger_warn_with_category("SIP", "No call to answer");
+    int started;
+    pjsua_call_id call_id;
+    int result;
+    pthread_mutex_lock(&g_api_mutex);
+    pthread_mutex_lock(&g_state_mutex);
+    started = g_started;
+    pthread_mutex_unlock(&g_state_mutex);
+    call_id = sip_call_slot_snapshot(&g_call_slot);
+    if (!started) {
+        pthread_mutex_unlock(&g_api_mutex);
         return -1;
     }
-    return (pjsua_call_answer(g_call_id, 200, NULL, NULL) == PJ_SUCCESS) ? 0 : -1;
+    thread_ensure();
+    if (call_id == PJSUA_INVALID_ID) {
+        logger_warn_with_category("SIP", "No call to answer");
+        pthread_mutex_unlock(&g_api_mutex);
+        return -1;
+    }
+    result = (pjsua_call_answer(call_id, 200, NULL, NULL) == PJ_SUCCESS) ? 0 : -1;
+    pthread_mutex_unlock(&g_api_mutex);
+    return result;
 }
 
 void pjsip_iface_hangup(void) {
-    if (!g_started) return;
+    int started;
+    pjsua_call_id call_id;
+    pthread_mutex_lock(&g_api_mutex);
+    pthread_mutex_lock(&g_state_mutex);
+    started = g_started;
+    pthread_mutex_unlock(&g_state_mutex);
+    call_id = sip_call_slot_snapshot(&g_call_slot);
+    if (!started) {
+        pthread_mutex_unlock(&g_api_mutex);
+        return;
+    }
     thread_ensure();
-    if (g_call_id != PJSUA_INVALID_ID) {
-        pjsua_call_hangup(g_call_id, 0, NULL, NULL);
+    if (call_id != PJSUA_INVALID_ID) {
+        pjsua_call_hangup(call_id, 0, NULL, NULL);
     } else {
         /* Defensive: drop any stray calls. */
         pjsua_call_hangup_all();
     }
+    pthread_mutex_unlock(&g_api_mutex);
 }
 
 int pjsip_iface_send_dtmf(char key) {
     char digit[2];
     pj_str_t d;
-    if (!g_started) return -1;
+    int started;
+    pjsua_call_id call_id;
+    int result;
+    pthread_mutex_lock(&g_api_mutex);
+    pthread_mutex_lock(&g_state_mutex);
+    started = g_started;
+    pthread_mutex_unlock(&g_state_mutex);
+    call_id = sip_call_slot_snapshot(&g_call_slot);
+    if (!started) {
+        pthread_mutex_unlock(&g_api_mutex);
+        return -1;
+    }
     thread_ensure();
-    if (g_call_id == PJSUA_INVALID_ID) return -1;
+    if (call_id == PJSUA_INVALID_ID) {
+        pthread_mutex_unlock(&g_api_mutex);
+        return -1;
+    }
     digit[0] = key;
     digit[1] = '\0';
     d = S(digit);
-    return (pjsua_call_dial_dtmf(g_call_id, &d) == PJ_SUCCESS) ? 0 : -1;
+    result = (pjsua_call_dial_dtmf(call_id, &d) == PJ_SUCCESS) ? 0 : -1;
+    pthread_mutex_unlock(&g_api_mutex);
+    return result;
 }
 
 int pjsip_iface_is_registered(void) {
-    return g_registered;
+    int registered;
+    pthread_mutex_lock(&g_state_mutex);
+    registered = g_registered;
+    pthread_mutex_unlock(&g_state_mutex);
+    return registered;
 }
 
 void pjsip_iface_list_audio_devices(void) {
@@ -402,14 +513,23 @@ void pjsip_iface_list_audio_devices(void) {
     pjmedia_aud_dev_info info[64];
     unsigned i;
 
-    if (!g_started) return;
+    pthread_mutex_lock(&g_api_mutex);
+    pthread_mutex_lock(&g_state_mutex);
+    if (!g_started) {
+        pthread_mutex_unlock(&g_state_mutex);
+        pthread_mutex_unlock(&g_api_mutex);
+        return;
+    }
+    pthread_mutex_unlock(&g_state_mutex);
     count = PJ_ARRAY_SIZE(info);
     if (pjsua_enum_aud_devs(info, &count) != PJ_SUCCESS) {
         logger_warn_with_category("SIP", "Could not enumerate audio devices");
+        pthread_mutex_unlock(&g_api_mutex);
         return;
     }
     for (i = 0; i < count; i++) {
         logger_infof_with_category("SIP", "Audio dev %u: %s (in=%u out=%u)",
             i, info[i].name, info[i].input_count, info[i].output_count);
     }
+    pthread_mutex_unlock(&g_api_mutex);
 }

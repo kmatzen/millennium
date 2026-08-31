@@ -1,0 +1,10 @@
+[Unit]
+Description=Nightly Millennium physical hardware smoke test
+
+[Timer]
+OnCalendar=*-*-* 04:40:00
+RandomizedDelaySec=15min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -9,11 +9,14 @@ import json
 import os
 from pathlib import Path
 import platform
+import re
+import select
 import shutil
 import subprocess
 import sys
 import tarfile
 import tempfile
+import termios
 import time
 import urllib.request
 
@@ -40,19 +43,24 @@ def log(message):
 def load_config(path):
     config = {
         "channel": "stable",
+        "device_group": "production",
         "manifest_url": "https://updates.kmatzen.com/millennium/stable/manifest.json",
         "public_key": "/etc/millennium/update-signing-key.pem",
+        "trusted_keys": "primary:/etc/millennium/update-signing-key.pem",
         "state_dir": DEFAULT_STATE,
         "release_dir": "/opt/millennium/releases",
         "current_link": "/opt/millennium/current",
         "previous_link": "/opt/millennium/previous",
         "service": "daemon.service",
-        "health_url": "http://127.0.0.1/api/health",
-        "version_url": "http://127.0.0.1/api/version",
-        "phone_state_url": "http://127.0.0.1/api/state",
+        "health_url": "http://127.0.0.1:8081/api/health",
+        "metrics_url": "http://127.0.0.1:8081/api/metrics",
+        "version_url": "http://127.0.0.1:8081/api/version",
+        "phone_state_url": "http://127.0.0.1:8081/api/state",
         "keypad_device": "/dev/serial/by-id/usb-Arduino_LLC_Millennium_Alpha-if00",
         "display_device": "/dev/serial/by-id/usb-Arduino_LLC_Millennium_Beta-if00",
-        "health_timeout_seconds": "45",
+        "health_timeout_seconds": "150",
+        "max_failure_attempts": "3",
+        "failure_backoff_seconds": "3600",
         "automatic": "true",
         "architecture": "auto",
         "install_window_start": "02:00",
@@ -137,6 +145,24 @@ def verify_signature(public_key, manifest, signature):
         raise OtaError("manifest signature verification failed") from exc
 
 
+def trusted_public_key(config, manifest):
+    key_id = manifest.get("key_id")
+    entries = config.get("trusted_keys", "")
+    keys = {}
+    for entry in entries.split(","):
+        if not entry.strip():
+            continue
+        if ":" not in entry:
+            raise OtaError("invalid trusted_keys entry")
+        name, path = entry.split(":", 1)
+        keys[name.strip()] = path.strip()
+    if not keys and config.get("public_key"):
+        keys["primary"] = config["public_key"]
+    if not isinstance(key_id, str) or key_id not in keys:
+        raise OtaError("manifest signing key is not trusted: %s" % key_id)
+    return Path(keys[key_id])
+
+
 def validate_manifest(data, expected_channel):
     if data.get("schema") != 1 or data.get("channel") != expected_channel:
         raise OtaError("unsupported manifest schema or channel")
@@ -146,6 +172,9 @@ def validate_manifest(data, expected_channel):
         raise OtaError("invalid minimum sequence")
     if data["minimum_sequence"] > data["sequence"]:
         raise OtaError("minimum sequence exceeds release sequence")
+    if not isinstance(data.get("key_id"), str) or not re.fullmatch(
+            r"[A-Za-z0-9._-]{1,64}", data["key_id"]):
+        raise OtaError("invalid signing key ID")
     version = data.get("version")
     if not isinstance(version, str) or not version or "/" in version or version in (".", ".."):
         raise OtaError("invalid manifest version")
@@ -159,6 +188,30 @@ def validate_manifest(data, expected_channel):
         raise OtaError("invalid bundle digest")
     if not isinstance(bundle.get("size"), int) or bundle["size"] <= 0:
         raise OtaError("invalid bundle size")
+    rollout = data.get("rollout", {})
+    if not isinstance(rollout, dict):
+        raise OtaError("invalid rollout policy")
+    groups = rollout.get("groups", ["production"])
+    if (not isinstance(groups, list) or not groups or
+            any(not isinstance(group, str) or not re.fullmatch(
+                r"[A-Za-z0-9._-]{1,64}", group) for group in groups)):
+        raise OtaError("invalid rollout device groups")
+    if not isinstance(rollout.get("hold", False), bool):
+        raise OtaError("invalid rollout hold")
+    if not isinstance(rollout.get("withdrawn", False), bool):
+        raise OtaError("invalid release withdrawal")
+
+
+def rollout_block_reason(config, manifest):
+    rollout = manifest.get("rollout", {})
+    if rollout.get("withdrawn", False):
+        return "release was withdrawn by its signer"
+    if rollout.get("hold", False):
+        return "release rollout is on hold"
+    groups = rollout.get("groups", ["production"])
+    if config.get("device_group", "production") not in groups:
+        return "device group is not selected for this rollout"
+    return None
 
 
 def installed_sequence(state_dir):
@@ -166,6 +219,58 @@ def installed_sequence(state_dir):
         return int((state_dir / "installed-sequence").read_text().strip())
     except (FileNotFoundError, ValueError):
         return -1
+
+
+def release_identity(manifest):
+    return "%08d-%s" % (manifest["sequence"], manifest["version"])
+
+
+def manifest_failure_id(manifest_path, manifest):
+    return "%s-%s" % (release_identity(manifest), sha256(manifest_path)[:16])
+
+
+def failure_path(state_dir, manifest_path, manifest):
+    return state_dir / "failures" / (manifest_failure_id(manifest_path, manifest) + ".json")
+
+
+def read_failure(state_dir, manifest_path, manifest):
+    path = failure_path(state_dir, manifest_path, manifest)
+    try:
+        data = json.loads(path.read_text())
+        if data.get("schema") != 1:
+            return None
+        return data
+    except (FileNotFoundError, ValueError, TypeError):
+        return None
+
+
+def record_failure(config, manifest_path, manifest, error):
+    state_dir = Path(config["state_dir"])
+    prior = read_failure(state_dir, manifest_path, manifest) or {}
+    attempts = int(prior.get("attempts", 0)) + 1
+    base = max(1, int(config.get("failure_backoff_seconds", "3600")))
+    maximum = max(1, int(config.get("max_failure_attempts", "3")))
+    delay = base * (2 ** min(attempts - 1, 8))
+    payload = {
+        "schema": 1,
+        "release": release_identity(manifest),
+        "manifest_sha256": sha256(manifest_path),
+        "attempts": attempts,
+        "maximum_attempts": maximum,
+        "last_failure": int(time.time()),
+        "retry_after": int(time.time()) + delay,
+        "error": str(error)[:512],
+    }
+    atomic_write(failure_path(state_dir, manifest_path, manifest),
+                 (json.dumps(payload, sort_keys=True) + "\n").encode(), mode=0o600)
+    return payload
+
+
+def clear_failure(state_dir, manifest_path, manifest):
+    try:
+        failure_path(state_dir, manifest_path, manifest).unlink()
+    except FileNotFoundError:
+        pass
 
 
 @contextlib.contextmanager
@@ -194,12 +299,28 @@ def command_check(config):
             url = config["manifest_url"]
             download(url, fetched_manifest, maximum=1024 * 1024)
             download(url + ".sig", fetched_signature, maximum=4096)
-            verify_signature(Path(config["public_key"]), fetched_manifest, fetched_signature)
             data = json.loads(fetched_manifest.read_text())
             validate_manifest(data, config["channel"])
+            verify_signature(trusted_public_key(config, data), fetched_manifest,
+                             fetched_signature)
             current = installed_sequence(state_dir)
             if data["sequence"] < current:
                 raise OtaError("signed manifest attempts a sequence rollback")
+            if current >= 0 and current < data["minimum_sequence"]:
+                raise OtaError("installed release is below manifest minimum sequence")
+            block_reason = rollout_block_reason(config, data)
+            if block_reason:
+                for obsolete in (manifest, signature):
+                    try:
+                        obsolete.unlink()
+                    except FileNotFoundError:
+                        pass
+                write_status(state_dir, "held", block_reason,
+                             version=data["version"], sequence=data["sequence"],
+                             available=False)
+                print(json.dumps({"available": False, "version": data["version"],
+                                  "sequence": data["sequence"], "reason": block_reason}))
+                return
             atomic_write(manifest, fetched_manifest.read_bytes())
             atomic_write(signature, fetched_signature.read_bytes())
         available = data["sequence"] > current
@@ -241,6 +362,16 @@ def verify_release(release_dir, manifest, architecture=None):
         metadata = files[relative]
         if not path.is_file() or path.stat().st_size != metadata.get("size") or sha256(path) != metadata.get("sha256"):
             raise OtaError("payload verification failed: %s" % relative)
+    firmware = data.get("firmware")
+    if not isinstance(firmware, dict) or set(firmware) != {"keypad", "display"}:
+        raise OtaError("release firmware identity set is incomplete")
+    for role in ("keypad", "display"):
+        identity = firmware[role]
+        if (not isinstance(identity, dict) or identity.get("role") != role or
+                identity.get("version") != manifest["version"] or
+                not isinstance(identity.get("protocol"), int) or
+                identity["protocol"] < 1 or not identity.get("build")):
+            raise OtaError("invalid %s firmware identity metadata" % role)
     os.chmod(release_dir / "host/millennium-daemon", 0o755)
     os.chmod(release_dir / "arduino/pi_flash.sh", 0o755)
     os.chmod(release_dir / "ota/millennium-ota", 0o755)
@@ -306,6 +437,65 @@ def firmware_digest_path(state_dir, target):
     return state_dir / "firmware" / (target + ".sha256")
 
 
+IDENTITY_PATTERN = re.compile(
+    r"MILLENNIUM role=(keypad|display) version=([^ ]+) protocol=([0-9]+) "
+    r"build=([^ ]+) selftest=(ok|fail)")
+
+
+def read_firmware_identity(device, target, timeout=5):
+    descriptor = os.open(device, os.O_RDWR | os.O_NOCTTY | os.O_NONBLOCK)
+    try:
+        attributes = termios.tcgetattr(descriptor)
+        attributes[0] = 0
+        attributes[1] = 0
+        attributes[2] = termios.CS8 | termios.CLOCAL | termios.CREAD
+        attributes[3] = 0
+        attributes[4] = termios.B9600
+        attributes[5] = termios.B9600
+        termios.tcsetattr(descriptor, termios.TCSANOW, attributes)
+        termios.tcflush(descriptor, termios.TCIFLUSH)
+        query = b"I" if target == "keypad" else b"\x07"
+        os.write(descriptor, query)
+        deadline = time.monotonic() + timeout
+        next_query = time.monotonic() + 1
+        received = bytearray()
+        while time.monotonic() < deadline:
+            if time.monotonic() >= next_query:
+                os.write(descriptor, query)
+                next_query = time.monotonic() + 1
+            readable, _, _ = select.select([descriptor], [], [], 0.25)
+            if not readable:
+                continue
+            try:
+                chunk = os.read(descriptor, 512)
+            except BlockingIOError:
+                continue
+            if chunk:
+                received.extend(chunk)
+                match = IDENTITY_PATTERN.search(received.decode(errors="ignore"))
+                if match:
+                    return {
+                        "role": match.group(1), "version": match.group(2),
+                        "protocol": int(match.group(3)), "build": match.group(4),
+                        "selftest": match.group(5),
+                    }
+        raise OtaError("%s firmware did not answer identity query" % target)
+    finally:
+        os.close(descriptor)
+
+
+def attest_firmware(config, release_dir, target):
+    release = json.loads((release_dir / "release.json").read_text())
+    expected = release["firmware"][target]
+    device = config["keypad_device" if target == "keypad" else "display_device"]
+    actual = read_firmware_identity(device, target)
+    comparable = {key: actual.get(key) for key in ("role", "version", "protocol", "build")}
+    if comparable != expected or actual.get("selftest") != "ok":
+        raise OtaError("%s firmware attestation mismatch: expected %r, got %r" %
+                       (target, expected, actual))
+    return actual
+
+
 def flash_image(config, state_dir, release_dir, target):
     image = release_dir / "arduino" / (target + ".hex")
     digest = sha256(image)
@@ -316,6 +506,7 @@ def flash_image(config, state_dir, release_dir, target):
     expected = config["keypad_device" if target == "keypad" else "display_device"]
     for _ in range(100):
         if Path(expected).exists():
+            attest_firmware(config, release_dir, target)
             atomic_write(digest_path, (digest + "\n").encode())
             return True
         time.sleep(0.1)
@@ -330,21 +521,34 @@ def flash_if_changed(config, state_dir, release_dir, target):
     return flash_image(config, state_dir, release_dir, target)
 
 
-def health_check(config, expected_version):
+def health_check(config, expected_version, release_dir):
     deadline = time.monotonic() + int(config["health_timeout_seconds"])
     last_error = "service unavailable"
     while time.monotonic() < deadline:
         try:
             version = get_json(config["version_url"])
             health = get_json(config["health_url"], parse_http_error=True)
+            metrics = get_json(config["metrics_url"])
+            keypad = Path(config["keypad_device"]).exists()
             beta = Path(config["display_device"]).exists()
             if (version.get("version") == expected_version and
-                    health.get("overall_status") in ("HEALTHY", "WARNING") and beta):
+                    health.get("overall_status") in ("HEALTHY", "WARNING") and
+                    metrics.get("gauges", {}).get("mcu_protocol_version") == 2 and
+                    keypad and beta):
+                # flash_image() already attested each MCU while the daemon was
+                # stopped.  Once it is running it exclusively owns both serial
+                # devices, so a second direct identity query would race it.
+                # The negotiated protocol gauge proves that the daemon has
+                # completed a valid v2 handshake with the running firmware.
                 return
-            last_error = "version, health, or Beta serial identity did not match"
+            last_error = "version, health, MCU protocol, or device presence did not match"
         except Exception as error:
             last_error = str(error)
-        time.sleep(1)
+        # The appliance API is deliberately rate limited.  Three probes every
+        # second can lock the updater out of the very health endpoint it needs
+        # to observe; five seconds remains responsive while staying below the
+        # local request budget.
+        time.sleep(5)
     raise OtaError("post-update health check failed: %s" % last_error)
 
 
@@ -365,33 +569,44 @@ def command_apply(config):
         pending = state_dir / "pending"
         manifest_path = pending / "manifest.json"
         signature_path = pending / "manifest.json.sig"
-        verify_signature(Path(config["public_key"]), manifest_path, signature_path)
         manifest = json.loads(manifest_path.read_text())
         validate_manifest(manifest, config["channel"])
+        block_reason = rollout_block_reason(config, manifest)
+        if block_reason:
+            raise OtaError(block_reason)
+        verify_signature(trusted_public_key(config, manifest), manifest_path,
+                         signature_path)
         if manifest["sequence"] <= installed_sequence(state_dir):
             write_status(state_dir, "current", "no newer release is pending")
             return
-        bundle = pending / ("millennium-%s.tar.gz" % manifest["version"])
+        identity = release_identity(manifest)
+        bundle = pending / ("millennium-%s.tar.gz" % identity)
         write_status(state_dir, "downloading", "downloading release bundle", version=manifest["version"])
         download(manifest["bundle"]["url"], bundle, maximum=manifest["bundle"]["size"])
         if bundle.stat().st_size != manifest["bundle"]["size"] or sha256(bundle) != manifest["bundle"]["sha256"]:
             raise OtaError("bundle digest or size mismatch")
         releases = Path(config["release_dir"])
-        release_dir = releases / manifest["version"]
-        staging = releases / (".%s.staging" % manifest["version"])
-        if staging.exists():
-            shutil.rmtree(staging)
-        safe_extract(bundle, staging)
-        verify_release(staging, manifest, config.get("architecture", "auto"))
-        if release_dir.exists():
-            shutil.rmtree(release_dir)
-        os.replace(staging, release_dir)
-
+        release_dir = releases / identity
+        staging = releases / (".%s.staging" % identity)
         current_link = Path(config["current_link"])
         previous_link = Path(config["previous_link"])
         old_release = current_link.resolve() if current_link.is_symlink() else None
         if old_release is None or not (old_release / "host/millennium-daemon").is_file():
             raise OtaError("no valid current release is available for rollback")
+        referenced = {old_release.resolve()}
+        if previous_link.is_symlink():
+            referenced.add(previous_link.resolve())
+        if release_dir.resolve() in referenced:
+            raise OtaError("new release identity conflicts with an active release")
+        if staging.exists():
+            shutil.rmtree(staging)
+        safe_extract(bundle, staging)
+        verify_release(staging, manifest, config.get("architecture", "auto"))
+        if release_dir.exists():
+            verify_release(release_dir, manifest, config.get("architecture", "auto"))
+            shutil.rmtree(staging)
+        else:
+            os.replace(staging, release_dir)
         if not phone_is_idle(config):
             raise OtaError("phone became busy while staging; update deferred")
         write_status(state_dir, "installing", "installing host and firmware", version=manifest["version"])
@@ -410,7 +625,7 @@ def command_apply(config):
             atomic_symlink(current_link, release_dir)
             switched = True
             run_checked(["systemctl", "start", config["service"]])
-            health_check(config, manifest["version"])
+            health_check(config, manifest["version"], release_dir)
         except Exception:
             rollback_complete = True
             if switched:
@@ -432,6 +647,7 @@ def command_apply(config):
             raise
         activation_path(state_dir).unlink()
         atomic_write(state_dir / "installed-sequence", (str(manifest["sequence"]) + "\n").encode())
+        clear_failure(state_dir, manifest_path, manifest)
         prune_releases(releases, (release_dir, old_release))
         write_status(state_dir, "committed", "release passed health checks",
                      version=manifest["version"], sequence=manifest["sequence"])
@@ -504,13 +720,40 @@ def command_auto_apply(config):
     if manifest.get("sequence", -1) <= installed_sequence(Path(config["state_dir"])):
         log("pending manifest is not newer than the installed release")
         return
-    command_apply(config)
+    failure = read_failure(Path(config["state_dir"]), manifest_path, manifest)
+    if failure:
+        if failure.get("attempts", 0) >= int(config.get("max_failure_attempts", "3")):
+            log("release is quarantined after repeated failures")
+            return
+        if int(time.time()) < failure.get("retry_after", 0):
+            log("release retry is in exponential backoff")
+            return
+    try:
+        command_apply(config)
+    except Exception as error:
+        record_failure(config, manifest_path, manifest, error)
+        raise
+
+
+def command_clear_failure(config):
+    if os.geteuid() != 0:
+        raise OtaError("clear-failure must run as root")
+    state_dir = Path(config["state_dir"])
+    manifest_path = state_dir / "pending/manifest.json"
+    if not manifest_path.exists():
+        raise OtaError("no pending manifest")
+    manifest = json.loads(manifest_path.read_text())
+    clear_failure(state_dir, manifest_path, manifest)
+    write_status(state_dir, "retry-enabled",
+                 "administrator cleared the release failure quarantine",
+                 version=manifest.get("version"), sequence=manifest.get("sequence"))
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", default=DEFAULT_CONFIG)
-    parser.add_argument("command", choices=("check", "apply", "auto-apply", "recover", "status"))
+    parser.add_argument("command", choices=("check", "apply", "auto-apply", "recover",
+                                             "clear-failure", "status"))
     args = parser.parse_args()
     try:
         config = load_config(args.config)
@@ -522,6 +765,8 @@ def main():
             command_auto_apply(config)
         elif args.command == "recover":
             command_recover(config)
+        elif args.command == "clear-failure":
+            command_clear_failure(config)
         else:
             command_status(config)
     except Exception as error:

@@ -1,5 +1,6 @@
 Arduino/build/**/*.elf
 Arduino/build/**/*.o
+Arduino/build/cache/
 *.so
 *.o
 *.dSYM/
@@ -34,6 +35,7 @@ pcb/DRC.rpt
 pcb/*-erc.rpt
 host/unit_tests
 host/pjsip_smoke
+host/web_auth_tests
 host/daemon-override.conf.tmp
 host/audio/out/
 

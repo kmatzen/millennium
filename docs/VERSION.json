@@ -1,0 +1,9 @@
+{
+  "content_manifest_schema": 1,
+  "mcu_protocol": 2,
+  "ota_manifest_schema": 1,
+  "ota_release_schema": 1,
+  "software_version": "0.4.0",
+  "story_runtime_schema": 1,
+  "story_source_schema": 1
+}

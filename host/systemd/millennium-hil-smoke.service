@@ -1,0 +1,20 @@
+[Unit]
+Description=Run Millennium physical hardware smoke test
+After=daemon.service millennium-maintenance-tunnel.service
+Wants=daemon.service millennium-maintenance-tunnel.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/libexec/millennium-hil-smoke
+User=root
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/millennium/hil
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictSUIDSGID=true
+LockPersonality=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true

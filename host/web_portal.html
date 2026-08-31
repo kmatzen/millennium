@@ -446,9 +446,15 @@ let timer=null, autoOn=true;
 /* ===================== helpers ===================== */
 const $=id=>document.getElementById(id);
 async function jget(u){const r=await fetch(u);if(!r.ok)throw new Error(r.status);return r.json();}
+function adminHeaders(){
+  let token=sessionStorage.getItem('millenniumAdminToken');
+  if(!token){token=window.prompt('Administrator token');if(token)sessionStorage.setItem('millenniumAdminToken',token);}
+  return {'Content-Type':'application/json','Authorization':'Bearer '+(token||'')};
+}
 async function ctl(action,extra){
-  const r=await fetch('/api/control',{method:'POST',headers:{'Content-Type':'application/json'},
+  const r=await fetch('/api/control',{method:'POST',headers:adminHeaders(),
     body:JSON.stringify(Object.assign({action},extra||{}))});
+  if(r.status===401)sessionStorage.removeItem('millenniumAdminToken');
   return r.json();
 }
 function setLed(el,cls){el.className='led'+(cls?' '+cls:'');}
@@ -652,7 +658,8 @@ $('ota-apply').addEventListener('click',async()=>{
   if(!confirm('Install the signed update? The phone will briefly restart.'))return;
   $('ota-apply').disabled=true;$('ota-status').textContent='installation requested…';
   try{
-    const response=await fetch('/api/update',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+    const response=await fetch('/api/update',{method:'POST',headers:adminHeaders(),body:'{}'});
+    if(response.status===401)sessionStorage.removeItem('millenniumAdminToken');
     const data=await response.json();
     $('ota-status').textContent=data.status||'request sent';
     toast(data.status||'Update request sent',response.ok?'success':'error');

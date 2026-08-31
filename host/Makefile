@@ -51,7 +51,8 @@ GIT_HASH := $(shell if git rev-parse --short HEAD >/dev/null 2>&1; then \
 	    printf 'unknown'; \
 	fi)
 BUILD_TIME := $(shell date -u '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || echo "unknown")
-VERSION_CFLAGS = -DGIT_HASH='"$(GIT_HASH)"' -DBUILD_TIME='"$(BUILD_TIME)"'
+PROJECT_VERSION := $(shell cat ../VERSION)
+VERSION_CFLAGS = -DVERSION_STRING='"$(PROJECT_VERSION)"' -DGIT_HASH='"$(GIT_HASH)"' -DBUILD_TIME='"$(BUILD_TIME)"'
 
 # Object files
 config.o: config.c config.h
@@ -94,13 +95,19 @@ web_server.o: web_server.c web_server.h conn_queue.h websocket.h config.h logger
 pjsip_interface.o: pjsip_interface.c pjsip_interface.h logger.h
 	$(CC) pjsip_interface.c -o pjsip_interface.o -c $(CFLAGS) `pkg-config --cflags libpjproject`
 
+sip_text.o: sip_text.c sip_text.h
+	$(CC) sip_text.c -o sip_text.o -c $(CFLAGS)
+
+sip_call_slot.o: sip_call_slot.c sip_call_slot.h
+	$(CC) sip_call_slot.c -o sip_call_slot.o -c $(CFLAGS)
+
 events.o: events.c events.h
 	$(CC) events.c -o events.o -c $(CFLAGS)
 
 event_processor.o: event_processor.c event_processor.h events.h
 	$(CC) event_processor.c -o event_processor.o -c $(CFLAGS)
 
-millennium_sdk.o: millennium_sdk.c millennium_sdk.h events.h pjsip_interface.h config.h coin_gate.h serial_recovery.h metrics.h
+millennium_sdk.o: millennium_sdk.c millennium_sdk.h events.h pjsip_interface.h config.h coin_gate.h serial_recovery.h serial_settings.h mcu_protocol.h metrics.h
 	$(CC) millennium_sdk.c -o millennium_sdk.o -c $(CFLAGS)
 
 coin_gate.o: coin_gate.c coin_gate.h
@@ -108,6 +115,12 @@ coin_gate.o: coin_gate.c coin_gate.h
 
 serial_recovery.o: serial_recovery.c serial_recovery.h millennium_sdk.h
 	$(CC) serial_recovery.c -o serial_recovery.o -c $(CFLAGS)
+
+serial_settings.o: serial_settings.c serial_settings.h config.h
+	$(CC) serial_settings.c -o serial_settings.o -c $(CFLAGS)
+
+mcu_protocol.o: mcu_protocol.c mcu_protocol.h
+	$(CC) mcu_protocol.c -o mcu_protocol.o -c $(CFLAGS)
 
 state_persistence.o: state_persistence.c state_persistence.h daemon_state.h logger.h
 	$(CC) state_persistence.c -o state_persistence.o -c $(CFLAGS)
@@ -161,15 +174,18 @@ plugins/trivia.o: plugins/trivia.c plugins.h plugin_sdk.h config.h
 plugins/time_operator.o: plugins/time_operator.c plugins.h plugin_sdk.h
 	$(CC) plugins/time_operator.c -o plugins/time_operator.o -c $(CFLAGS)
 
-daemon: daemon.o daemon_state.o clock_source.o millennium_sdk.o coin_gate.o serial_recovery.o pjsip_interface.o events.o event_processor.o config.o cli.o logger.o health_monitor.o metrics.o metrics_server.o call_metrics.o web_server.o websocket.o conn_queue.o plugins.o plugin_sdk.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o plugins/number_guess.o plugins/simon.o plugins/dial_a_joke.o plugins/trivia.o plugins/time_operator.o state_persistence.o display_manager.o version.o audio_tones.o wav.o updater.o
-	$(CC) daemon.o daemon_state.o clock_source.o millennium_sdk.o coin_gate.o serial_recovery.o pjsip_interface.o events.o event_processor.o config.o cli.o logger.o health_monitor.o metrics.o metrics_server.o call_metrics.o web_server.o websocket.o conn_queue.o plugins.o plugin_sdk.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o plugins/number_guess.o plugins/simon.o plugins/dial_a_joke.o plugins/trivia.o plugins/time_operator.o state_persistence.o display_manager.o version.o audio_tones.o wav.o updater.o -o daemon $(LDFLAGS) -lm
+plugins/story_mode.o: plugins/story_mode.c plugins.h plugin_sdk.h config.h
+	$(CC) plugins/story_mode.c -o plugins/story_mode.o -c $(CFLAGS)
+
+daemon: daemon.o daemon_state.o clock_source.o millennium_sdk.o mcu_protocol.o coin_gate.o serial_recovery.o serial_settings.o pjsip_interface.o sip_text.o sip_call_slot.o events.o event_processor.o config.o cli.o logger.o health_monitor.o metrics.o metrics_server.o call_metrics.o web_server.o websocket.o conn_queue.o plugins.o plugin_sdk.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o plugins/number_guess.o plugins/simon.o plugins/dial_a_joke.o plugins/trivia.o plugins/time_operator.o plugins/story_mode.o state_persistence.o display_manager.o version.o audio_tones.o wav.o updater.o
+	$(CC) daemon.o daemon_state.o clock_source.o millennium_sdk.o mcu_protocol.o coin_gate.o serial_recovery.o serial_settings.o pjsip_interface.o sip_text.o sip_call_slot.o events.o event_processor.o config.o cli.o logger.o health_monitor.o metrics.o metrics_server.o call_metrics.o web_server.o websocket.o conn_queue.o plugins.o plugin_sdk.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o plugins/number_guess.o plugins/simon.o plugins/dial_a_joke.o plugins/trivia.o plugins/time_operator.o plugins/story_mode.o state_persistence.o display_manager.o version.o audio_tones.o wav.o updater.o -o daemon $(LDFLAGS) -lm
 
 # Simulator object file
 simulator.o: simulator.c millennium_sdk.h events.h config.h daemon_state.h logger.h metrics.h call_metrics.h plugins.h
 	$(CC) simulator.c -o simulator.o -c $(CFLAGS)
 
 # Simulator objects — no baresip, no web server, no daemon.o
-SIM_OBJS = simulator.o daemon_state.o clock_source.o events.o event_processor.o config.o logger.o metrics.o call_metrics.o plugins.o plugin_sdk.o plugins/classic_phone.o plugins/fortune_teller.o plugins/number_guess.o plugins/simon.o plugins/dial_a_joke.o plugins/trivia.o plugins/time_operator.o state_persistence.o display_manager.o version.o
+SIM_OBJS = simulator.o daemon_state.o clock_source.o events.o event_processor.o config.o logger.o metrics.o call_metrics.o plugins.o plugin_sdk.o plugins/classic_phone.o plugins/fortune_teller.o plugins/number_guess.o plugins/simon.o plugins/dial_a_joke.o plugins/trivia.o plugins/time_operator.o plugins/story_mode.o state_persistence.o display_manager.o version.o
 
 # Simulated time is portable: the simulator installs a clock source
 # (clock_source.h) that the daemon/plugins read through, so no -Wl,--wrap hack.
@@ -181,10 +197,13 @@ simulator: $(SIM_OBJS)
 all: daemon
 
 # Unit test binary
-UNIT_TEST_OBJS = tests/unit_tests.o coin_gate.o serial_recovery.o daemon_state.o clock_source.o events.o event_processor.o config.o cli.o logger.o metrics.o call_metrics.o health_monitor.o plugins.o plugin_sdk.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o plugins/number_guess.o plugins/simon.o plugins/dial_a_joke.o plugins/trivia.o plugins/time_operator.o state_persistence.o display_manager.o version.o wav.o updater.o conn_queue.o
+UNIT_TEST_OBJS = tests/unit_tests.o coin_gate.o serial_recovery.o serial_settings.o mcu_protocol.o sip_text.o sip_call_slot.o daemon_state.o clock_source.o events.o event_processor.o config.o cli.o logger.o metrics.o call_metrics.o health_monitor.o plugins.o plugin_sdk.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o plugins/number_guess.o plugins/simon.o plugins/dial_a_joke.o plugins/trivia.o plugins/time_operator.o plugins/story_mode.o state_persistence.o display_manager.o version.o wav.o tests/updater_test.o conn_queue.o
 
 tests/unit_tests.o: tests/unit_tests.c tests/test_framework.h coin_gate.h serial_recovery.h config.h cli.h daemon_state.h plugins.h logger.h metrics.h call_metrics.h millennium_sdk.h updater.h state_persistence.h conn_queue.h health_monitor.h
 	$(CC) tests/unit_tests.c -o tests/unit_tests.o -c $(CFLAGS) -I.
+
+tests/updater_test.o: updater.c updater.h version.h logger.h
+	$(CC) updater.c -o tests/updater_test.o -c $(CFLAGS) -DMILLENNIUM_UNIT_TEST
 
 # Unit tests don't use time wrapping; link ALSA on Linux for jukebox
 UNIT_LDFLAGS = -lpthread
@@ -199,15 +218,29 @@ unit_tests: $(UNIT_TEST_OBJS)
 # (macOS: `brew install pjproject`; Pi: built from source). Brings PJSUA up and
 # down without a SIP peer or phone hardware — validates the PJSIP integration
 # compiles and runs. Not part of `make test` (which must run anywhere).
-pjsip-smoke: tests/pjsip_smoke.c pjsip_interface.c pjsip_interface.h logger.o
-	$(CC) tests/pjsip_smoke.c pjsip_interface.c logger.o -o pjsip_smoke \
+pjsip-smoke: tests/pjsip_smoke.c pjsip_interface.c pjsip_interface.h logger.o sip_text.o sip_call_slot.o
+	$(CC) tests/pjsip_smoke.c pjsip_interface.c logger.o sip_text.o sip_call_slot.o -o pjsip_smoke \
 		$(CFLAGS) `pkg-config --cflags libpjproject` \
 		`pkg-config --libs --static libpjproject` -lpthread -lm
 
 # Run all scenario tests via the simulator
-test: simulator unit_tests
+ifeq ($(shell uname -s),Darwin)
+DEAD_CODE_LDFLAG = -Wl,-dead_strip
+else
+DEAD_CODE_LDFLAG = -Wl,--gc-sections
+endif
+
+web_auth_tests: tests/web_auth_tests.c web_server.c web_server.h tests/test_framework.h
+	$(CC) tests/web_auth_tests.c web_server.c -o web_auth_tests $(CFLAGS) -I. \
+		-ffunction-sections -fdata-sections $(DEAD_CODE_LDFLAG)
+
+test: simulator unit_tests web_auth_tests
 	@echo "Running unit tests..."
 	@./unit_tests
+	@./web_auth_tests
+	@python3 tests/test_monitor.py
+	@python3 ../content/tests/test_storytool.py
+	@python3 ../content/tests/test_content_install.py
 	@echo ""
 	@echo "Running scenario tests..."
 	@./simulator tests/*.scenario
@@ -226,6 +259,7 @@ COMPILE_CHECK_OBJS = daemon.o daemon_state.o clock_source.o millennium_sdk.o coi
 	plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o \
 	plugins/number_guess.o plugins/simon.o plugins/dial_a_joke.o \
 	plugins/trivia.o plugins/time_operator.o state_persistence.o display_manager.o version.o \
+	plugins/story_mode.o sip_text.o sip_call_slot.o serial_settings.o mcu_protocol.o \
 	audio_tones.o wav.o updater.o
 
 .PHONY: compile-check
@@ -233,7 +267,7 @@ compile-check: $(COMPILE_CHECK_OBJS)
 	@echo "compile-check OK: all daemon sources (except pjsip_interface) compiled"
 
 clean:
-	rm -rf *.o daemon simulator unit_tests pjsip_smoke plugins/*.o tests/*.o
+	rm -rf *.o daemon simulator unit_tests web_auth_tests pjsip_smoke plugins/*.o tests/*.o
 
 install: daemon
 	@systemctl --user stop daemon.service 2>/dev/null || true
@@ -244,41 +278,75 @@ install: daemon
 	sudo mkdir -p /etc/millennium
 	sudo mkdir -p /var/log/millennium
 	sudo mkdir -p /var/lib/millennium
+	sudo mkdir -p /var/lib/node_exporter/textfile_collector
 	@if command -v logname >/dev/null 2>&1; then sudo chown $$(logname):$$(logname) /var/lib/millennium 2>/dev/null || true; fi
-	sudo cp daemon.conf.example /etc/millennium/daemon.conf
+	@test -f /etc/millennium/daemon.conf || sudo cp daemon.conf.example /etc/millennium/daemon.conf
+	@sudo sh -c 'umask 077; test -s /etc/millennium/admin-token || openssl rand -hex 32 > /etc/millennium/admin-token'
+	@sudo chown "$$(logname 2>/dev/null || whoami)" /etc/millennium/admin-token
+	@sudo chmod 0600 /etc/millennium/admin-token
 	sudo cp asoundrc.example /etc/asound.conf
 	sudo cp daemon /usr/local/bin/millennium-daemon
 	sudo mkdir -p /usr/local/share/millennium
 	sudo mkdir -p /usr/local/share/millennium/audio
 	sudo cp web_portal.html /usr/local/share/millennium/
+	sudo install -m 0755 ../content/install_content.py /usr/local/libexec/millennium-content
+	sudo install -m 0644 ../content/storytool.py /usr/local/libexec/storytool.py
+	sudo install -d -m 0755 /var/lib/millennium/content/releases/last-line-1.1.0/media
+	sudo install -m 0644 ../content/stories/last_line/story.mst /var/lib/millennium/content/releases/last-line-1.1.0/story.mst
+	sudo install -m 0644 ../content/stories/last_line/story.json /var/lib/millennium/content/releases/last-line-1.1.0/story.json
+	sudo install -m 0644 ../content/stories/last_line/media/*.wav /var/lib/millennium/content/releases/last-line-1.1.0/media/
+	@test -e /var/lib/millennium/content/current || sudo ln -s releases/last-line-1.1.0 /var/lib/millennium/content/current
 	sudo cp systemd/daemon.service /etc/systemd/system/
+	sudo install -m 0644 firewall/millennium.nft /etc/millennium/millennium.nft
+	sudo cp systemd/millennium-firewall.service /etc/systemd/system/
+	sudo install -m 0755 monitoring/millennium_monitor.py /usr/local/libexec/millennium-monitor
+	sudo install -m 0755 monitoring/millennium_backup.sh /usr/local/libexec/millennium-backup
+	sudo install -m 0755 monitoring/millennium_hil_smoke.py /usr/local/libexec/millennium-hil-smoke
+	sudo install -d -m 0755 /var/lib/millennium/hil
+	sudo cp systemd/millennium-monitor.service systemd/millennium-monitor.timer /etc/systemd/system/
+	sudo cp systemd/millennium-backup.service systemd/millennium-backup.timer /etc/systemd/system/
+	sudo cp systemd/millennium-hil-smoke.service systemd/millennium-hil-smoke.timer /etc/systemd/system/
 	sudo mkdir -p /etc/systemd/system/daemon.service.d
 	@printf '[Service]\nUser=%s\n' "$$(logname 2>/dev/null || whoami)" > daemon-override.conf.tmp && sudo cp daemon-override.conf.tmp /etc/systemd/system/daemon.service.d/override.conf; rm -f daemon-override.conf.tmp
 	sudo systemctl daemon-reload
 	sudo systemctl unmask daemon.service 2>/dev/null || true
 	sudo systemctl enable daemon.service
+	@if command -v nft >/dev/null 2>&1 || test -x /usr/sbin/nft; then sudo systemctl enable --now millennium-firewall.service; else echo "ERROR: nftables is required for the production firewall"; exit 1; fi
+	sudo systemctl enable --now millennium-monitor.timer
+	sudo systemctl enable --now millennium-hil-smoke.timer
+	@if test -s /etc/millennium/backup.env; then sudo systemctl enable --now millennium-backup.timer; else echo "Backup timer not enabled: configure /etc/millennium/backup.env"; fi
 	sudo systemctl start daemon.service
 
 uninstall:
 	sudo systemctl stop daemon.service
 	sudo systemctl disable daemon.service
 	sudo rm -f /usr/local/bin/millennium-daemon
+	sudo rm -f /usr/local/libexec/millennium-monitor
+	sudo rm -f /usr/local/libexec/millennium-backup
+	sudo rm -f /usr/local/libexec/millennium-hil-smoke
+	sudo rm -f /usr/local/libexec/millennium-content /usr/local/libexec/storytool.py
+	sudo rm -f /etc/systemd/system/millennium-monitor.service /etc/systemd/system/millennium-monitor.timer
+	sudo rm -f /etc/systemd/system/millennium-backup.service /etc/systemd/system/millennium-backup.timer
+	sudo rm -f /etc/systemd/system/millennium-hil-smoke.service /etc/systemd/system/millennium-hil-smoke.timer
 	sudo rm -rf /usr/local/share/millennium
 	sudo rm -rf /etc/systemd/system/daemon.service.d
 	sudo rm -f /etc/systemd/system/daemon.service
+	sudo rm -f /etc/systemd/system/millennium-firewall.service
+	sudo rm -f /etc/millennium/millennium.nft
 	sudo systemctl daemon-reload
 
 # API integration test (requires live daemon)
-# Usage: make api-test [HOST=localhost]  e.g. make api-test HOST=192.168.86.145
+# Usage: make api-test [HOST=localhost]
 HOST ?= localhost
 api-test:
 	@chmod +x tests/api_test.sh
 	@HOST=$(HOST) ./tests/api_test.sh $(HOST)
 
-# Run API test against the remote device (matzen@192.168.86.145)
+# Run API test against the configured remote device.
 # Override: make device-test HOST=other-ip
+DEVICE_HOST ?= millennium-phone.local
 device-test:
-	$(MAKE) api-test HOST=192.168.86.145
+	$(MAKE) api-test HOST=$(DEVICE_HOST)
 
 # Break/fuzz tests - verify JSON injection resistance, invalid input handling
 break-test:
@@ -290,7 +358,7 @@ break-test:
 # paradox+repair). Does NOT cover audio/coins/card/hook — those need the physical
 # phone; see host/OPERATOR_PLAYTEST.md. Usage: make operator-smoke [OP_HOST=<ip>]
 # [RUN_DRIFT=1] (default host = the Pi).
-OP_HOST ?= 192.168.86.152
+OP_HOST ?= millennium-phone.local
 operator-smoke:
 	@chmod +x tests/operator_smoke.sh
 	@RUN_DRIFT=$(RUN_DRIFT) ./tests/operator_smoke.sh $(OP_HOST)

@@ -221,18 +221,22 @@ systemctl --user disable audio-mux.service
    through the handset earpiece. If no audio, verify the ALSA config and USB
    audio card detection.
 
-4. **Web dashboard**: Open `http://<pi-ip>:80` in a browser. You should see
-   the phone state, active plugin, and health status.
+4. **Web dashboard**: In production, open the authenticated maintenance domain
+   provided by the Cloudflare tunnel. For local diagnosis on the Pi, use
+   `http://127.0.0.1:8081`; the administrative listener is intentionally not
+   reachable from the physical LAN.
 
-5. **API integration test**: From the Pi (or any machine that can reach it):
+5. **API integration test**: Run locally on the Pi or through the authenticated
+   maintenance path:
    ```bash
    cd ~/millennium/host && make api-test
    # Or from another machine: HOST=<pi-ip> ./tests/api_test.sh
    ```
 
-## Updating
+## Development-only source deployment
 
-To update the daemon after pulling new code:
+The following workflow is only for a developer-controlled lab phone. Never use
+it to maintain an unattended production appliance:
 
 ```bash
 cd ~/millennium/host
@@ -241,9 +245,9 @@ make clean && make daemon
 sudo make install
 ```
 
-Or use the OTA update feature from the web dashboard if the `system.source_dir`
-config points to the local repo. If using the dev service (systemctl --user),
-use `systemctl --user restart daemon.service` instead.
+Production phones accept only signed releases through the workflow in
+`docs/UNATTENDED_APPLIANCE.md`. If using the development service
+(`systemctl --user`), restart it with `systemctl --user restart daemon.service`.
 
 ## Troubleshooting
 

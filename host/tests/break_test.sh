@@ -3,7 +3,7 @@
 # Usage: ./break_test.sh [HOST]
 # Verifies: daemon doesn't crash, JSON responses stay valid
 set -e
-HOST="${HOST:-${1:-192.168.86.145}}"
+HOST="${HOST:-${1:-millennium-phone.local}}"
 BASE="http://${HOST}:80"
 FAILED=0
 

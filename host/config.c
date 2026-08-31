@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <arpa/inet.h>
 
 /* Global config instance */
 config_data_t* g_config = NULL;
@@ -183,6 +184,29 @@ static int config_str_eq_ci(const char* a, const char* b) {
     return *a == '\0' && *b == '\0';
 }
 
+static int config_baud_is_supported(int baud) {
+    return baud == 1200 || baud == 2400 || baud == 4800 || baud == 9600 ||
+           baud == 19200 || baud == 38400 || baud == 57600 || baud == 115200;
+}
+
+static int config_token_list_is_valid(const char* list) {
+    const char* p;
+    if (!list || !list[0]) return 1;
+    p = list;
+    while (*p) {
+        int digits = 0;
+        while (*p == ' ' || *p == '\t') p++;
+        while (*p >= '0' && *p <= '9') { digits++; p++; }
+        while (*p == ' ' || *p == '\t') p++;
+        if (digits != 16 || (*p != ',' && *p != '\0')) return 0;
+        if (*p == ',') {
+            p++;
+            if (!*p) return 0;
+        }
+    }
+    return 1;
+}
+
 static int config_is_valid_log_level(const char* level) {
     return config_str_eq_ci(level, "VERBOSE") ||
            config_str_eq_ci(level, "DEBUG") ||
@@ -203,6 +227,7 @@ static int config_is_valid_log_level(const char* level) {
 int config_validate_ex(const config_data_t* config, char* err, size_t err_size) {
     int web_enabled, metrics_enabled, web_port, metrics_port;
     const char* transport;
+    struct in_addr bind_addr;
 
     if (err != NULL && err_size > 0) {
         err[0] = '\0';
@@ -223,10 +248,16 @@ int config_validate_ex(const config_data_t* config, char* err, size_t err_size) 
     }
 
     /* Hardware */
-    if (config_get_baud_rate(config) <= 0) {
-        CONFIG_FAIL("hardware.baud_rate must be > 0 (got %d)",
+    if (!config_baud_is_supported(config_get_baud_rate(config))) {
+        CONFIG_FAIL("hardware.baud_rate is unsupported (got %d)",
                     config_get_baud_rate(config));
     }
+    if (!config_get_display_device(config)[0])
+        CONFIG_FAIL("hardware.display_device must not be empty");
+
+    if (!config_token_list_is_valid(config_get_card_free_cards(config)) ||
+        !config_token_list_is_valid(config_get_card_admin_cards(config)))
+        CONFIG_FAIL("card tokens must be comma-separated random 16-digit identifiers");
 
     /* System loop */
     if (config_get_update_interval_ms(config) <= 0) {
@@ -265,6 +296,14 @@ int config_validate_ex(const config_data_t* config, char* err, size_t err_size) 
     }
     web_enabled = config_get_web_server_enabled(config);
     metrics_enabled = config_get_metrics_server_enabled(config);
+    if (inet_pton(AF_INET, config_get_web_server_bind_address(config),
+                  &bind_addr) != 1) {
+        CONFIG_FAIL("web_server.bind_address '%s' is not a valid IPv4 address",
+                    config_get_web_server_bind_address(config));
+    }
+    if (web_enabled && !config_get_web_server_admin_token_file(config)[0]) {
+        CONFIG_FAIL("web_server.admin_token_file must not be empty when enabled");
+    }
     if (web_enabled && metrics_enabled && web_port == metrics_port) {
         CONFIG_FAIL("web_server.port and metrics_server.port both set to %d "
                     "while both servers are enabled", web_port);
@@ -310,6 +349,11 @@ void config_set_default_values(config_data_t* config) {
     
     config_set_value(config, "metrics_server.enabled", "false");
     config_set_value(config, "metrics_server.port", "8080");
+    config_set_value(config, "web_server.enabled", "true");
+    config_set_value(config, "web_server.bind_address", "127.0.0.1");
+    config_set_value(config, "web_server.port", "8081");
+    config_set_value(config, "web_server.admin_token_file", "/etc/millennium/admin-token");
+    config_set_value(config, "web_server.allowed_origin", "");
 }
 
 char* config_trim(const char* str, char* result, size_t result_size) {
@@ -462,11 +506,11 @@ int config_get_card_enabled(const config_data_t* config) {
 }
 
 const char* config_get_card_free_cards(const config_data_t* config) {
-    return config_get_string(config, "card.free_cards", "");
+    return config_get_string(config, "card.free_tokens", "");
 }
 
 const char* config_get_card_admin_cards(const config_data_t* config) {
-    return config_get_string(config, "card.admin_cards", "");
+    return config_get_string(config, "card.admin_tokens", "");
 }
 
 static int config_card_in_list(const char *list, const char *card_number) {
@@ -549,6 +593,18 @@ int config_get_web_server_enabled(const config_data_t* config) {
 }
 
 int config_get_web_server_port(const config_data_t* config) {
-    /* Privileged port 80; the systemd unit grants CAP_NET_BIND_SERVICE. */
-    return config_get_int(config, "web_server.port", 80);
+    return config_get_int(config, "web_server.port", 8081);
+}
+
+const char* config_get_web_server_bind_address(const config_data_t* config) {
+    return config_get_string(config, "web_server.bind_address", "127.0.0.1");
+}
+
+const char* config_get_web_server_admin_token_file(const config_data_t* config) {
+    return config_get_string(config, "web_server.admin_token_file",
+                             "/etc/millennium/admin-token");
+}
+
+const char* config_get_web_server_allowed_origin(const config_data_t* config) {
+    return config_get_string(config, "web_server.allowed_origin", "");
 }

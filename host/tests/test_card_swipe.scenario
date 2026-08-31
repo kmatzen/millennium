@@ -3,7 +3,7 @@
 # without inserting coins.
 
 # Configure a free calling card
-config card.free_cards 1234567890123456
+config card.free_tokens 1234567890123456
 
 # Lift the handset
 hook_up

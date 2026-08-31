@@ -1,0 +1,73 @@
+MSTORY	1	last-line	1.1.0	invitation
+ACCESS	*	12	80	1	1
+VAR	choice	0
+VAR	coin_found	0
+VAR	token_found	0
+VAR	visits	0
+SCENE	bridge	THE LAST LINE	WAIT FOR THE TONE	connecting_line.wav		15	configured
+TRANS	bridge	call_connected	past	choice	1
+TRANS	bridge	call_connected	future	choice	2
+TRANS	bridge	call_ended	past	choice	1
+TRANS	bridge	call_ended	future	choice	2
+TRANS	bridge	timeout	past	choice	1
+TRANS	bridge	timeout	future	choice	2
+TRANS	bridge	hook_down	interrupted
+SCENE	coin_secret	THE COIN REMEMBERS	#=RETURN	coin_secret.wav		12
+TRANS	coin_secret	key:#	operator
+TRANS	coin_secret	timeout	operator
+TRANS	coin_secret	hook_down	interrupted
+SCENE	future	MESSAGE SEALED	RETURN TOMORROW	future_sealed.wav	future-sealed	12
+TRANS	future	hook_down	invitation
+SCENE	future_choice	FUTURE SELECTED	CONNECTING...	future_selected.wav		12
+TRANS	future_choice	timeout	bridge
+TRANS	future_choice	hook_down	interrupted
+SCENE	future_coda	THE FUTURE HEARD	YOUR WORDS REMAIN	future_coda.wav	future-return-coda	12
+TRANS	future_coda	hook_down	invitation
+SCENE	interrupted	CALL SAVED	LIFT TO RESUME	call_saved.wav		12
+TRANS	interrupted	resume	operator
+TRANS	interrupted	hook_up	operator
+TRANS	interrupted	timeout	return_later
+SCENE	invitation	A LINE IS RINGING	LIFT TO ANSWER	incoming_line.wav		30
+TRANS	invitation	hook_up	operator	visits	0			visits	1
+TRANS	invitation	hook_up	returning	visits	1			visits	1
+TRANS	invitation	hook_up	veteran					visits	1
+TRANS	invitation	timeout	return_later
+SCENE	operator	SAVE ONE MESSAGE	1=PAST  2=FUTURE	choose_message.wav		24
+TRANS	operator	key:1	past_choice			choice	1
+TRANS	operator	key:2	future_choice			choice	2
+TRANS	operator	coin	coin_secret			coin_found	1
+TRANS	operator	card	token_secret			token_found	1
+TRANS	operator	hook_down	interrupted
+TRANS	operator	timeout	repeat
+TRANS	operator	default	repeat
+SCENE	past	MESSAGE DELIVERED	RETURN TOMORROW	past_delivered.wav	past-kept	12
+TRANS	past	hook_down	invitation
+SCENE	past_choice	PAST SELECTED	CONNECTING...	past_selected.wav		12
+TRANS	past_choice	timeout	bridge
+TRANS	past_choice	hook_down	interrupted
+SCENE	past_coda	THE PAST ANSWERED	YOUR WORDS REMAIN	past_coda.wav	past-return-coda	12
+TRANS	past_coda	hook_down	invitation
+SCENE	repeat	PRESS 1 OR 2	*=REPEAT	repeat_choice.wav		12
+TRANS	repeat	key:1	past_choice			choice	1
+TRANS	repeat	key:2	future_choice			choice	2
+TRANS	repeat	coin	coin_secret			coin_found	1
+TRANS	repeat	card	token_secret			token_found	1
+TRANS	repeat	hook_down	interrupted
+TRANS	repeat	timeout	return_later
+SCENE	return_later	THE LINE REMEMBERS	COME BACK SOON	come_back.wav	return-invitation	12
+SCENE	returning	YOU CAME BACK	THE LINE REMEMBERS	welcome_back.wav		12
+TRANS	returning	timeout	past_coda	choice	1
+TRANS	returning	timeout	future_coda	choice	2
+TRANS	returning	timeout	operator
+TRANS	returning	hook_down	invitation
+SCENE	token_secret	A HIDDEN LINE OPENS	#=RETURN	token_secret.wav		12
+TRANS	token_secret	key:#	operator
+TRANS	token_secret	timeout	operator
+TRANS	token_secret	hook_down	interrupted
+SCENE	veteran	THE LINE KNOWS YOU	1=PAST  2=FUTURE	veteran_line.wav		12
+TRANS	veteran	key:1	past_choice			choice	1
+TRANS	veteran	key:2	future_choice			choice	2
+TRANS	veteran	coin	coin_secret			coin_found	1
+TRANS	veteran	card	token_secret			token_found	1
+TRANS	veteran	hook_down	invitation
+TRANS	veteran	timeout	return_later

@@ -68,6 +68,9 @@ int config_get_metrics_server_disable_during_audio(const config_data_t* config);
 /* Web Server Configuration */
 int config_get_web_server_enabled(const config_data_t* config);
 int config_get_web_server_port(const config_data_t* config);
+const char* config_get_web_server_bind_address(const config_data_t* config);
+const char* config_get_web_server_admin_token_file(const config_data_t* config);
+const char* config_get_web_server_allowed_origin(const config_data_t* config);
 
 /* Internal functions */
 void config_set_default_values(config_data_t* config);

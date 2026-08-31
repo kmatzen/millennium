@@ -58,6 +58,8 @@ char keypad_event_get_key(keypad_event_t *event) {
 
 /* Card event functions */
 static void card_event_destroy(void *event) {
+    card_event_t *card = (card_event_t *)event;
+    if (card) memset(card->card_number, 0, sizeof(card->card_number));
     free(event);
 }
 
@@ -67,8 +69,8 @@ static const char *card_event_get_name(void *event) {
 }
 
 static char *card_event_get_repr(void *event) {
-    card_event_t *ce = (card_event_t *)event;
-    return strdup_safe(ce->card_number);
+    (void)event;
+    return strdup_safe("[credential redacted]");
 }
 
 card_event_t *card_event_create(const char *card_number) {
@@ -413,5 +415,29 @@ int event_diag_parse(const char *payload, const char **source, long *count) {
     }
 
     *count = n;
+    return 1;
+}
+
+/* Decode reset diagnostics: K/D (keypad/display) plus decimal MCUSR bitmask. */
+int event_reset_parse(const char *payload, const char **role, long *cause) {
+    long n;
+    int i;
+
+    if (!payload || !role || !cause) return 0;
+    if (strlen(payload) < EVENT_DIAG_PAYLOAD_LEN) return 0;
+    if (payload[0] == 'K') {
+        *role = "keypad";
+    } else if (payload[0] == 'D') {
+        *role = "display";
+    } else {
+        return 0;
+    }
+    n = 0;
+    for (i = 1; i < EVENT_DIAG_PAYLOAD_LEN; i++) {
+        if (payload[i] < '0' || payload[i] > '9') return 0;
+        n = n * 10 + (payload[i] - '0');
+    }
+    if (n < 0 || n > 255) return 0;
+    *cause = n;
     return 1;
 }

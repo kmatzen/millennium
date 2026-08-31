@@ -1,0 +1,164 @@
+{
+  "id": "last-line",
+  "version": "1.1.0",
+  "title": "The Last Line",
+  "entry": "invitation",
+  "offline_entry": "invitation",
+  "initial_state": {"visits": 0, "choice": 0, "coin_found": 0, "token_found": 0},
+  "scenes": {
+    "invitation": {
+      "display": ["A LINE IS RINGING", "LIFT TO ANSWER"],
+      "audio": "incoming_line.wav",
+      "timeout_seconds": 30,
+      "transitions": [
+        {"event": "hook_up", "target": "operator", "when": {"var": "visits", "equals": 0}, "increment": {"visits": 1}},
+        {"event": "hook_up", "target": "returning", "when": {"var": "visits", "equals": 1}, "increment": {"visits": 1}},
+        {"event": "hook_up", "target": "veteran", "increment": {"visits": 1}},
+        {"event": "timeout", "target": "return_later"}
+      ]
+    },
+    "operator": {
+      "display": ["SAVE ONE MESSAGE", "1=PAST  2=FUTURE"],
+      "audio": "choose_message.wav",
+      "timeout_seconds": 24,
+      "transitions": [
+        {"event": "key:1", "target": "past_choice", "set": {"choice": 1}},
+        {"event": "key:2", "target": "future_choice", "set": {"choice": 2}},
+        {"event": "coin", "target": "coin_secret", "set": {"coin_found": 1}},
+        {"event": "card", "target": "token_secret", "set": {"token_found": 1}},
+        {"event": "hook_down", "target": "interrupted"},
+        {"event": "timeout", "target": "repeat"},
+        {"event": "default", "target": "repeat"}
+      ]
+    },
+    "repeat": {
+      "display": ["PRESS 1 OR 2", "*=REPEAT"],
+      "audio": "repeat_choice.wav",
+      "transitions": [
+        {"event": "key:1", "target": "past_choice", "set": {"choice": 1}},
+        {"event": "key:2", "target": "future_choice", "set": {"choice": 2}},
+        {"event": "coin", "target": "coin_secret", "set": {"coin_found": 1}},
+        {"event": "card", "target": "token_secret", "set": {"token_found": 1}},
+        {"event": "hook_down", "target": "interrupted"},
+        {"event": "timeout", "target": "return_later"}
+      ]
+    },
+    "coin_secret": {
+      "display": ["THE COIN REMEMBERS", "#=RETURN"],
+      "audio": "coin_secret.wav",
+      "transitions": [
+        {"event": "key:#", "target": "operator"},
+        {"event": "timeout", "target": "operator"},
+        {"event": "hook_down", "target": "interrupted"}
+      ]
+    },
+    "token_secret": {
+      "display": ["A HIDDEN LINE OPENS", "#=RETURN"],
+      "audio": "token_secret.wav",
+      "transitions": [
+        {"event": "key:#", "target": "operator"},
+        {"event": "timeout", "target": "operator"},
+        {"event": "hook_down", "target": "interrupted"}
+      ]
+    },
+    "past_choice": {
+      "display": ["PAST SELECTED", "CONNECTING..."],
+      "audio": "past_selected.wav",
+      "transitions": [
+        {"event": "timeout", "target": "bridge"},
+        {"event": "hook_down", "target": "interrupted"}
+      ]
+    },
+    "future_choice": {
+      "display": ["FUTURE SELECTED", "CONNECTING..."],
+      "audio": "future_selected.wav",
+      "transitions": [
+        {"event": "timeout", "target": "bridge"},
+        {"event": "hook_down", "target": "interrupted"}
+      ]
+    },
+    "bridge": {
+      "display": ["THE LAST LINE", "WAIT FOR THE TONE"],
+      "audio": "connecting_line.wav",
+      "call": "configured",
+      "timeout_seconds": 15,
+      "transitions": [
+        {"event": "call_connected", "target": "past", "when": {"var": "choice", "equals": 1}},
+        {"event": "call_connected", "target": "future", "when": {"var": "choice", "equals": 2}},
+        {"event": "call_ended", "target": "past", "when": {"var": "choice", "equals": 1}},
+        {"event": "call_ended", "target": "future", "when": {"var": "choice", "equals": 2}},
+        {"event": "timeout", "target": "past", "when": {"var": "choice", "equals": 1}},
+        {"event": "timeout", "target": "future", "when": {"var": "choice", "equals": 2}},
+        {"event": "hook_down", "target": "interrupted"}
+      ]
+    },
+    "past": {
+      "display": ["MESSAGE DELIVERED", "RETURN TOMORROW"],
+      "audio": "past_delivered.wav",
+      "ending": "past-kept",
+      "transitions": [{"event": "hook_down", "target": "invitation"}]
+    },
+    "future": {
+      "display": ["MESSAGE SEALED", "RETURN TOMORROW"],
+      "audio": "future_sealed.wav",
+      "ending": "future-sealed",
+      "transitions": [{"event": "hook_down", "target": "invitation"}]
+    },
+    "interrupted": {
+      "display": ["CALL SAVED", "LIFT TO RESUME"],
+      "audio": "call_saved.wav",
+      "transitions": [
+        {"event": "resume", "target": "operator"},
+        {"event": "hook_up", "target": "operator"},
+        {"event": "timeout", "target": "return_later"}
+      ]
+    },
+    "return_later": {
+      "display": ["THE LINE REMEMBERS", "COME BACK SOON"],
+      "audio": "come_back.wav",
+      "ending": "return-invitation",
+      "transitions": []
+    },
+    "returning": {
+      "display": ["YOU CAME BACK", "THE LINE REMEMBERS"],
+      "audio": "welcome_back.wav",
+      "transitions": [
+        {"event": "timeout", "target": "past_coda", "when": {"var": "choice", "equals": 1}},
+        {"event": "timeout", "target": "future_coda", "when": {"var": "choice", "equals": 2}},
+        {"event": "timeout", "target": "operator"},
+        {"event": "hook_down", "target": "invitation"}
+      ]
+    },
+    "past_coda": {
+      "display": ["THE PAST ANSWERED", "YOUR WORDS REMAIN"],
+      "audio": "past_coda.wav",
+      "ending": "past-return-coda",
+      "transitions": [{"event": "hook_down", "target": "invitation"}]
+    },
+    "future_coda": {
+      "display": ["THE FUTURE HEARD", "YOUR WORDS REMAIN"],
+      "audio": "future_coda.wav",
+      "ending": "future-return-coda",
+      "transitions": [{"event": "hook_down", "target": "invitation"}]
+    },
+    "veteran": {
+      "display": ["THE LINE KNOWS YOU", "1=PAST  2=FUTURE"],
+      "audio": "veteran_line.wav",
+      "transitions": [
+        {"event": "key:1", "target": "past_choice", "set": {"choice": 1}},
+        {"event": "key:2", "target": "future_choice", "set": {"choice": 2}},
+        {"event": "coin", "target": "coin_secret", "set": {"coin_found": 1}},
+        {"event": "card", "target": "token_secret", "set": {"token_found": 1}},
+        {"event": "hook_down", "target": "invitation"},
+        {"event": "timeout", "target": "return_later"}
+      ]
+    }
+  },
+  "accessibility": {
+    "repeat_key": "*",
+    "minimum_response_seconds": 12,
+    "spoken_instructions": true,
+    "volume_percent": 80,
+    "high_contrast_display": true
+  }
+}

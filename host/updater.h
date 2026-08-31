@@ -4,8 +4,7 @@
 #include <stddef.h>   /* size_t */
 
 /*
- * OTA update checker.
- * Compares the running version against the latest GitHub release tag.
+ * Signed production OTA adapter. There is deliberately no Git/build fallback.
  */
 
 /* Semantic version comparison.
@@ -14,7 +13,7 @@
 int updater_compare_versions(const char *a, const char *b);
 
 /*
- * Check GitHub for the latest release tag (blocking; blocks up to 10s).
+ * Ask the signed OTA service to check for the latest release.
  * Prefer updater_check_async() for HTTP handlers.
  */
 int updater_check(void);
@@ -36,11 +35,10 @@ int updater_get_latest_version(char *out, size_t out_size);
 int updater_is_update_available(void);
 
 /*
- * Apply an update: git pull, rebuild, then restart the daemon via
- * systemd.  Blocks for minutes. Prefer updater_apply_async for HTTP handlers.
+ * Dispatch a verified update through the root-owned OTA systemd service.
  *
  * Returns  0 on success (successful restart kills the process).
- * Returns -1 if git pull or build fails.
+ * Returns -1 if the signed worker or trust anchor is unavailable.
  */
 int updater_apply(const char *source_dir);
 

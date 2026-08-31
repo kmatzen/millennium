@@ -9,6 +9,8 @@
 #include "metrics.h"
 #include "coin_gate.h"
 #include "serial_recovery.h"
+#include "serial_settings.h"
+#include "mcu_protocol.h"
 #include <errno.h>
 #include <fcntl.h>
 /* #include <linux/serial.h> */ /* Linux-specific, not available on macOS */
@@ -32,6 +34,10 @@ static char *string_duplicate(const char *src);
 static void string_buffer_append(struct millennium_client *client, const char *data, size_t len);
 static void string_buffer_ensure_capacity(struct millennium_client *client, size_t needed);
 static int open_serial_port(struct millennium_client *client, const char *device);
+static speed_t serial_speed_from_baud(int baud_rate);
+static int serial_write_all(struct millennium_client *client, const uint8_t *data,
+                            size_t length);
+static void process_mcu_frame(struct millennium_client *client, const mcu_frame_t *frame);
 
 /* SIP registration state: 0=unknown, 1=ok, -1=fail */
 static int g_sip_registered = 0;
@@ -219,9 +225,35 @@ void millennium_sdk_get_sip_status(int *registered, char *last_error, size_t las
 }
 
 /* Open (or reopen) the serial port, configuring termios. Returns 0 on success. */
+static speed_t serial_speed_from_baud(int baud_rate) {
+    switch (baud_rate) {
+        case 1200: return B1200;
+        case 2400: return B2400;
+        case 4800: return B4800;
+        case 9600: return B9600;
+        case 19200: return B19200;
+        case 38400: return B38400;
+#ifdef B57600
+        case 57600: return B57600;
+#endif
+#ifdef B115200
+        case 115200: return B115200;
+#endif
+        default: return (speed_t)0;
+    }
+}
+
 static int open_serial_port(struct millennium_client *client, const char *device) {
     int flags;
     struct termios options;
+    speed_t speed;
+
+    speed = serial_speed_from_baud(client->serial_baud_rate);
+    if (speed == (speed_t)0) {
+        logger_errorf_with_category("SDK", "Unsupported serial baud rate: %d",
+                                    client->serial_baud_rate);
+        return -1;
+    }
 
     if (client->display_fd != -1) {
         close(client->display_fd);
@@ -243,8 +275,8 @@ static int open_serial_port(struct millennium_client *client, const char *device
     }
 
     tcgetattr(client->display_fd, &options);
-    cfsetispeed(&options, BAUD_RATE);
-    cfsetospeed(&options, BAUD_RATE);
+    cfsetispeed(&options, speed);
+    cfsetospeed(&options, speed);
     options.c_cflag |= (CS8 | CLOCAL | CREAD);
     options.c_cflag &= ~(PARENB | CSTOPB);
 #ifdef CRTSCTS
@@ -256,6 +288,25 @@ static int open_serial_port(struct millennium_client *client, const char *device
     clock_gettime(CLOCK_MONOTONIC, &client->last_serial_activity);
     client->serial_healthy = 1;
     client->reconnect_attempts = 0;
+
+    {
+        uint8_t hello[2] = {MCU_PROTOCOL_VERSION, MCU_PROTOCOL_VERSION};
+        uint8_t frame[MCU_PROTOCOL_MAX_FRAME];
+        size_t length = mcu_protocol_encode(MCU_MSG_HELLO,
+            client->mcu_tx_sequence++, hello, sizeof(hello), frame, sizeof(frame));
+        mcu_decoder_init(&client->mcu_decoder);
+        memset(&client->mcu_event_replay, 0, sizeof(client->mcu_event_replay));
+        client->mcu_protocol_ready = 0;
+        clock_gettime(CLOCK_MONOTONIC, &client->mcu_protocol_started_at);
+        client->pending_frame_length = 0;
+        if (!length || serial_write_all(client, frame, length) != 0) {
+            logger_error_with_category("SDK", "Failed to begin MCU protocol negotiation");
+            close(client->display_fd);
+            client->display_fd = -1;
+            client->serial_healthy = 0;
+            return -1;
+        }
+    }
 
     return 0;
 }
@@ -287,6 +338,7 @@ struct millennium_client *millennium_client_create(void) {
     client->display_message = NULL;
     client->display_dirty = 0;
     client->ua = NULL;
+    mcu_decoder_init(&client->mcu_decoder);
     
     /* Set function pointers */
     client->create_and_queue_event_char = millennium_client_create_and_queue_event_char;
@@ -296,9 +348,15 @@ struct millennium_client *millennium_client_create(void) {
     clock_gettime(CLOCK_MONOTONIC, &client->last_update_time);
     
     {
-        const char *display_device = "/dev/serial/by-id/usb-Arduino_LLC_Millennium_Beta-if00";
-        strncpy(client->serial_device_path, display_device, sizeof(client->serial_device_path) - 1);
-        client->serial_device_path[sizeof(client->serial_device_path) - 1] = '\0';
+        config_data_t *cfg = config_get_instance();
+        serial_settings_t settings;
+        if (serial_settings_load(cfg, &settings) != 0) {
+            millennium_client_destroy(client);
+            logger_error_with_category("SDK", "Invalid serial configuration");
+            return NULL;
+        }
+        strcpy(client->serial_device_path, settings.device_path);
+        client->serial_baud_rate = settings.baud_rate;
 
         if (open_serial_port(client, client->serial_device_path) != 0) {
             millennium_client_destroy(client);
@@ -464,6 +522,7 @@ void millennium_client_check_serial(struct millennium_client *client) {
             logger_warn_with_category("SDK", "Serial fd is closed, marking link dead");
         }
         client->serial_healthy = 0;
+        metrics_increment_counter("serial_disconnects", 1);
         client->reconnect_attempts = 0;
         client->next_reconnect_time = now;
 
@@ -487,6 +546,7 @@ void millennium_client_check_serial(struct millennium_client *client) {
 
         if (open_serial_port(client, client->serial_device_path) == 0) {
             logger_info_with_category("SDK", "Serial port reopened successfully");
+            metrics_increment_counter("serial_reconnects", 1);
 
             /* (#239) Put the coin gate back where the daemon last asked for
              * it, replaying that call site's exact byte sequence -- the same
@@ -532,8 +592,19 @@ void millennium_client_update(struct millennium_client *client) {
 
     /* Read directly from the file descriptor */
     while ((bytes_read = read(client->display_fd, buffer, sizeof(buffer))) > 0) {
+        ssize_t index;
         millennium_client_serial_activity(client);
-        string_buffer_append(client, buffer, bytes_read);
+        for (index = 0; index < bytes_read; index++) {
+            uint8_t byte = (uint8_t)buffer[index];
+            if (client->mcu_decoder.used || byte == MCU_PROTOCOL_SOF) {
+                mcu_frame_t frame;
+                int decoded = mcu_decoder_feed(&client->mcu_decoder, byte, &frame);
+                if (decoded == 1) process_mcu_frame(client, &frame);
+                else if (decoded < 0) metrics_increment_counter("mcu_crc_or_frame_errors", 1);
+            } else {
+                string_buffer_append(client, (const char *)&byte, 1);
+            }
+        }
         millennium_client_process_event_buffer(client);
     }
 
@@ -542,6 +613,33 @@ void millennium_client_update(struct millennium_client *client) {
     }
 
     clock_gettime(CLOCK_MONOTONIC, &current_time);
+
+    if (!client->mcu_protocol_ready && client->serial_healthy &&
+            current_time.tv_sec - client->mcu_protocol_started_at.tv_sec >= 3) {
+        logger_error_with_category("SDK", "MCU protocol negotiation timed out");
+        metrics_increment_counter("mcu_protocol_negotiation_failures", 1);
+        client->serial_healthy = 0;
+    }
+
+    if (client->pending_frame_length > 0) {
+        long pending_ms = (current_time.tv_sec - client->pending_sent_at.tv_sec) * 1000 +
+            (current_time.tv_nsec - client->pending_sent_at.tv_nsec) / 1000000;
+        if (pending_ms >= 500) {
+            if (client->pending_retries >= 3) {
+                logger_errorf_with_category("SDK",
+                    "MCU command sequence %u was not acknowledged",
+                    (unsigned int)client->pending_sequence);
+                metrics_increment_counter("mcu_command_timeouts", 1);
+                client->pending_frame_length = 0;
+                client->serial_healthy = 0;
+            } else if (serial_write_all(client, client->pending_frame,
+                                        client->pending_frame_length) == 0) {
+                client->pending_retries++;
+                client->pending_sent_at = current_time;
+                metrics_increment_counter("mcu_command_retries", 1);
+            }
+        }
+    }
 
     elapsed_ms = (current_time.tv_sec - client->last_update_time.tv_sec) * 1000 +
                      (current_time.tv_nsec - client->last_update_time.tv_nsec) / 1000000;
@@ -724,13 +822,87 @@ void millennium_client_create_and_queue_event_char(struct millennium_client *cli
                 last_logged[idx] = count;
             }
         } else {
-            logger_warn_with_category("SDK", "Malformed Arduino diagnostic payload");
+            const char *role;
+            long cause;
+            if (event_reset_parse(payload, &role, &cause)) {
+                char metric[64];
+                snprintf(metric, sizeof(metric), "mcu_reset_cause_%s", role);
+                metrics_set_gauge(metric, (double)cause);
+                snprintf(metric, sizeof(metric), "mcu_resets_%s", role);
+                metrics_increment_counter(metric, 1);
+                logger_infof_with_category("SDK",
+                    "Arduino %s previous reset cause bitmask: %ld", role, cause);
+            } else {
+                logger_warn_with_category("SDK", "Malformed Arduino diagnostic payload");
+            }
         }
     } else if (event_type == EVENT_TYPE_HEARTBEAT) {
         /* Silently consumed; serial_activity was already updated on read */
     } else {
         logger_warnf_with_category("SDK", "Unknown event type: %c", event_type);
     }
+}
+
+static void process_mcu_frame(struct millennium_client *client, const mcu_frame_t *frame) {
+    char payload[MCU_PROTOCOL_MAX_PAYLOAD + 1];
+    char legacy_type = 0;
+    if (!client || !frame) return;
+    if (frame->type == MCU_MSG_ACK) {
+        if (frame->length >= 2 && frame->payload[1] == 0 &&
+                client->pending_frame_length > 0 &&
+                frame->payload[0] == client->pending_sequence) {
+            client->pending_frame_length = 0;
+            client->pending_retries = 0;
+        } else if (frame->length >= 2 && frame->payload[1] != 0) {
+            metrics_increment_counter("mcu_command_busy", 1);
+        }
+        return;
+    }
+    if (frame->type == MCU_MSG_HELLO) {
+        if (frame->length >= 2 && frame->payload[0] <= MCU_PROTOCOL_VERSION &&
+                frame->payload[1] >= MCU_PROTOCOL_VERSION) {
+            client->mcu_protocol_ready = 1;
+            metrics_set_gauge("mcu_protocol_version", MCU_PROTOCOL_VERSION);
+        } else {
+            client->serial_healthy = 0;
+            logger_error_with_category("SDK", "MCU protocol versions are incompatible");
+        }
+        return;
+    }
+    /* Alpha and Beta have independent event sequence spaces, and Alpha frames
+     * are transparently forwarded by Beta. Command replay is guarded on Beta;
+     * do not apply one combined replay window to the interleaved event stream. */
+    if (frame->length > MCU_PROTOCOL_MAX_PAYLOAD) return;
+    memcpy(payload, frame->payload, frame->length);
+    payload[frame->length] = '\0';
+    switch (frame->type) {
+    case MCU_EVT_KEY: legacy_type = EVENT_TYPE_KEYPAD; break;
+    case MCU_EVT_HOOK: legacy_type = EVENT_TYPE_HOOK; break;
+    case MCU_EVT_CARD: legacy_type = EVENT_TYPE_CARD; break;
+    case MCU_EVT_COIN: legacy_type = EVENT_TYPE_COIN; break;
+    case MCU_EVT_DIAGNOSTIC: legacy_type = EVENT_TYPE_DIAG; break;
+    case MCU_EVT_HEARTBEAT: legacy_type = EVENT_TYPE_HEARTBEAT; break;
+    case MCU_EVT_OPERATION:
+        if (frame->length < 2) return;
+        legacy_type = (char)frame->payload[0];
+        metrics_set_gauge("mcu_last_operation_transaction", frame->payload[1]);
+        if (legacy_type == 'R') {
+            metrics_increment_counter("mcu_operations_completed", 1);
+            return;
+        }
+        if (legacy_type == 'X') {
+            metrics_increment_counter("mcu_operation_deadlines", 1);
+            logger_errorf_with_category("SDK", "MCU operation %u exceeded its deadline",
+                                        (unsigned int)frame->payload[1]);
+            return;
+        }
+        memmove(payload, payload + 2, frame->length - 1);
+        break;
+    default:
+        metrics_increment_counter("mcu_unknown_frames", 1);
+        return;
+    }
+    millennium_client_create_and_queue_event_char(client, legacy_type, payload);
 }
 
 void millennium_client_set_display(struct millennium_client *client, const char *message) {
@@ -752,21 +924,12 @@ void millennium_client_set_display(struct millennium_client *client, const char 
 }
 
 void millennium_client_write_to_display(struct millennium_client *client, const char *message) {
-    uint8_t cmd_data;
-    size_t total_bytes_written = 0;
     size_t message_length;
     if (!message) return;
 
     logger_debugf_with_category("SDK", "Writing message to display: %s", message);
 
-    /* The declared length and the number of bytes actually written must agree
-     * (#229). The old code narrowed strlen() to uint8_t for the header but then
-     * wrote the full strlen() in the body, so any message of 256 bytes or more
-     * declared the wrong size -- and since the framing has no resync, every
-     * byte past the declared length was consumed as a command opcode.
-     *
-     * Computing the length ONCE and clamping it makes the two agree by
-     * construction rather than by the caller happening to stay short. */
+    /* Clamp once so the framed length and CRC cover exactly the sent bytes. */
     message_length = millennium_display_payload_len(message);
     if (strlen(message) > message_length) {
         logger_warnf_with_category("SDK",
@@ -774,36 +937,8 @@ void millennium_client_write_to_display(struct millennium_client *client, const 
                 (unsigned long)strlen(message), DISPLAY_MAX_PAYLOAD);
     }
 
-    /* Step 1: Write the command */
-    cmd_data = (uint8_t)message_length;
-    millennium_client_write_command(client, 0x02, &cmd_data, 1);
-
-    /* Step 2: Write the message in a loop to ensure all bytes are written */
-
-    while (total_bytes_written < message_length) {
-        ssize_t bytes_written = write(client->display_fd, message + total_bytes_written,
-                                      message_length - total_bytes_written);
-
-        if (bytes_written > 0) {
-            total_bytes_written += bytes_written;
-        } else if (bytes_written == -1) {
-            if (errno == EINTR) {
-                /* Interrupted by a signal, retry */
-                continue;
-            } else if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                /* Non-blocking mode: handle or wait before retrying */
-                struct timespec sleep_time = {0, 200000}; /* 200 microseconds */
-                nanosleep(&sleep_time, NULL);
-                continue;
-            } else {
-                /* Log other errors and exit */
-                logger_errorf_with_category("SDK", "Error writing to display: %s", strerror(errno));
-                return;
-            }
-        }
-    }
-
-    logger_debugf_with_category("SDK", "Successfully wrote %lu bytes to display.", (unsigned long)total_bytes_written);
+    millennium_client_write_command(client, 0x02, (const uint8_t *)message,
+                                    message_length);
 }
 
 void millennium_client_write_to_coin_validator(struct millennium_client *client, uint8_t data) {
@@ -837,60 +972,71 @@ void millennium_client_set_ua(struct millennium_client *client, void *ua) {
     logger_debugf_with_category("SDK", "UA set to: %p", client->ua);
 }
 
-void millennium_client_write_command(struct millennium_client *client, uint8_t command, const uint8_t *data, size_t data_size) {
-    logger_debugf_with_category("SDK", "Writing command to display: %d", command);
-
-    if (!client) return;
-
-    /* Step 1: Write the command */
-    while (1) {
-        ssize_t bytes_written = write(client->display_fd, &command, 1);
-        if (bytes_written == 1) {
-            break;
-        } else if (bytes_written == -1) {
-            if (errno == EINTR) {
-                continue;
-            } else if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                struct timespec sleep_time = {0, 200000}; /* 200 microseconds */
-                nanosleep(&sleep_time, NULL);
-                continue;
-            } else {
-                logger_errorf_with_category("SDK", "Failed to write command: %d, error: %s", 
-                        command, strerror(errno));
-                return;
-            }
+static int serial_write_all(struct millennium_client *client, const uint8_t *data,
+                            size_t length) {
+    size_t written = 0;
+    struct timespec start;
+    struct timespec now;
+    if (!client || client->display_fd < 0 || (!data && length)) return -1;
+    clock_gettime(CLOCK_MONOTONIC, &start);
+    while (written < length) {
+        ssize_t result = write(client->display_fd, data + written, length - written);
+        if (result > 0) {
+            written += (size_t)result;
+            continue;
+        }
+        if (result < 0 && errno != EINTR && errno != EAGAIN && errno != EWOULDBLOCK) {
+            logger_errorf_with_category("SDK", "Serial write failed: %s", strerror(errno));
+            return -1;
+        }
+        clock_gettime(CLOCK_MONOTONIC, &now);
+        if (now.tv_sec - start.tv_sec >= 2) {
+            logger_error_with_category("SDK", "Serial write deadline exceeded");
+            metrics_increment_counter("mcu_write_deadlines", 1);
+            return -1;
+        }
+        {
+            struct timespec pause_time = {0, 200000};
+            nanosleep(&pause_time, NULL);
         }
     }
-
-    /* Step 2: Write the data if it exists */
-    if (data && data_size > 0) {
-        size_t total_bytes_written = 0;
-
-        while (total_bytes_written < data_size) {
-            ssize_t result = write(client->display_fd, data + total_bytes_written,
-                                 data_size - total_bytes_written);
-
-            if (result > 0) {
-                total_bytes_written += result;
-            } else if (result == -1) {
-                if (errno == EINTR) {
-                    /* Interrupted by a signal, retry */
-                    continue;
-                } else if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                    /* Non-blocking mode: handle or log and retry */
-                    struct timespec sleep_time = {0, 200000}; /* 200 microseconds */
-                    nanosleep(&sleep_time, NULL);
-                    continue;
-                } else {
-                    logger_errorf_with_category("SDK", "Error writing data to display, error: %s", strerror(errno));
-                    return;
-                }
-            }
-        }
-
-        logger_debugf_with_category("SDK", "Successfully wrote %lu bytes of data to display.", (unsigned long)total_bytes_written);
-    }
-
-    /* Any successful write counts as serial activity for the watchdog */
     millennium_client_serial_activity(client);
+    return 0;
+}
+
+void millennium_client_write_command(struct millennium_client *client, uint8_t command,
+                                     const uint8_t *data, size_t data_size) {
+    uint8_t type;
+    uint8_t frame[MCU_PROTOCOL_MAX_FRAME];
+    uint8_t sequence;
+    size_t frame_length;
+    struct timespec now;
+    if (!client) return;
+    switch (command) {
+    case 0x02: type = MCU_CMD_DISPLAY; break;
+    case 0x03: type = MCU_CMD_COIN_CONTROL; break;
+    case 0x04: type = MCU_CMD_COIN_PROGRAM; break;
+    case 0x05: type = MCU_CMD_COIN_VERIFY; break;
+    case 0x06: type = MCU_CMD_KEEPALIVE; break;
+    case 0x07: type = MCU_CMD_IDENTITY; break;
+    default:
+        logger_errorf_with_category("SDK", "Unsupported MCU command: %u", command);
+        return;
+    }
+    sequence = client->mcu_tx_sequence++;
+    frame_length = mcu_protocol_encode(type, sequence, data, data_size,
+                                       frame, sizeof(frame));
+    if (!frame_length) {
+        logger_error_with_category("SDK", "MCU command payload is invalid or oversized");
+        return;
+    }
+    if (serial_write_all(client, frame, frame_length) != 0) return;
+    if (mcu_message_is_critical(type)) {
+        memcpy(client->pending_frame, frame, frame_length);
+        client->pending_frame_length = frame_length;
+        client->pending_sequence = sequence;
+        client->pending_retries = 0;
+        clock_gettime(CLOCK_MONOTONIC, &now);
+        client->pending_sent_at = now;
+    }
 }

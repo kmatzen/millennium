@@ -5,6 +5,7 @@
 #include <string.h>   /* strlen, for millennium_display_payload_len */
 #include <stdint.h>
 #include <time.h>
+#include "mcu_protocol.h"
 
 /* Forward declarations */
 struct millennium_client;
@@ -56,10 +57,24 @@ typedef struct millennium_client {
     int reconnect_attempts;
     struct timespec next_reconnect_time;
     char serial_device_path[256];
+    int serial_baud_rate;
 
     /* (#239) Last coin-gate command sent to the validator, replayed after a
      * serial reconnect.  0 until the daemon gates the validator once. */
     uint8_t coin_gate_cmd;
+
+    /* Version-2 framed MCU transport. Critical commands remain pending until
+     * the display MCU acknowledges their sequence number. */
+    mcu_decoder_t mcu_decoder;
+    mcu_replay_guard_t mcu_event_replay;
+    uint8_t mcu_tx_sequence;
+    uint8_t mcu_protocol_ready;
+    struct timespec mcu_protocol_started_at;
+    uint8_t pending_frame[MCU_PROTOCOL_MAX_FRAME];
+    size_t pending_frame_length;
+    uint8_t pending_sequence;
+    int pending_retries;
+    struct timespec pending_sent_at;
 } millennium_client_t;
 
 /* Function declarations */
@@ -116,18 +131,16 @@ void millennium_sdk_get_sip_status(int *registered, char *last_error, size_t las
 #define SERIAL_KEEPALIVE_INTERVAL 30   /* (#59) send keepalive when idle this long */
 #define SERIAL_MAX_BACKOFF_SECONDS 60
 #define SERIAL_WATCHDOG_ENABLED 1
-#define CMD_KEEPALIVE 0x06  /* Pi->Arduino: no-op, resets watchdog activity timer */
+#define CMD_KEEPALIVE 0x06  /* Internal API value mapped to framed keepalive 0x14 */
 
-/* Largest display payload the 0x02 frame can carry (#229).
+/* Largest display payload the protocol-v2 display frame can carry.
  *
  * MUST match `byte buf[100]` in Arduino/sketches/display/display.ino, which
  * rejects any frame declaring more than that (`num_bytes > sizeof(buf)`).
  * The length is also carried in a single byte, so it could never exceed 255
  * regardless.
  *
- * The framing has no resynchronisation: the receiver consumes exactly the
- * number of bytes the header declares, so if the header and the body ever
- * disagree the remainder of the message is read as command opcodes. */
+ * Length and CRC cover exactly this body and the receiver resynchronizes at SOF. */
 #define DISPLAY_MAX_PAYLOAD 100
 
 /* Number of bytes millennium_client_write_to_display will actually send for

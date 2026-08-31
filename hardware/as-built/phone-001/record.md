@@ -1,0 +1,89 @@
+# As-built record — phone-001
+
+Status: **INCOMPLETE — do not accept for handoff**
+Record opened: 2026-08-31 by automated maintenance inventory
+
+## Identity
+
+- Device ID: `phone-001` (provisional; owner must confirm asset label)
+- Stable LAN address observed: `192.168.86.152`
+- Maintenance endpoint: `maintenance.kmatzen.com:2223`, reverse port `22022`
+- Hostname observed: `raspberrypi` (stable hostname still required)
+- Enclosure/asset serial: **REQUIRED — physical inspection**
+- Raspberry Pi serial: `0000000001ba6844`
+- Machine-ID SHA-256: `38d4ed85c0bf94de95b54f59285b25ef647b6a882600f419e00aac9d527a0612`
+- Keypad MCU identity: USB product `Millennium Alpha`; no unique USB serial
+- Display MCU identity: USB product `Millennium Beta`; no unique USB serial
+- Owner/location: **REQUIRED — private inventory reference**
+
+## Installed provenance
+
+Production bootstrap sequence 2 committed on 2026-08-31 after direct identity
+attestation of both MCUs, protocol-v2 negotiation, SIP registration, daemon
+health, and an independent HIL smoke test. The bootstrap was an explicitly
+approved, local maintenance installation; it was not a signed release fetched
+through the scheduled production timer.
+
+- Release: sequence 2, version `0.4.0`, `armv7l`
+- Host: `millennium-daemon 0.4.0 (git unknown, built 2026-08-31T15:34:55Z)`
+- Host SHA-256: `f3cb0766e5834260d4bc80432f8c2ccd7329be1a5edbcabae8424d7483c58039`
+- OTA worker SHA-256: `a0e3b580938c0350ec277c606628870af8f77278e02ac02e30372018f98fd515`
+- Keypad HEX SHA-256: `f1692bb35d07b759428723cd3ec4257eaa3520f6eb91f9aeec5cd3bc472de273`
+- Display HEX SHA-256: `5dab000d8408ed497432fd52248c8671156ef764d4f7426e56df3d31e9b4b0a2`
+- Keypad identity: role `keypad`, version `0.4.0`, protocol 2, build `e0fe59960549`
+- Display identity: role `display`, version `0.4.0`, protocol 2, build `e0fe59960549`
+- Content release: `last-line-1.1.0`
+- HIL result: passed all eight gates at `2026-08-31T16:07:19Z`
+
+### Superseded sequence 1 provenance
+
+- Release: sequence 1, version `0.4.0`, `armv7l`
+- Host: `millennium-daemon 0.4.0 (git 9960d29-dirty, built 2026-08-31T04:32:56Z)`
+- Host SHA-256: `7b8f90288311afdbb6b4576600f5a2efd9453666b4e03ead1faa47d758380253`
+- Keypad HEX SHA-256: `0a4615ec9a2cb9d79f528e362f32686084f63dfc5970782ccbf6b01a297bb64d`
+- Display HEX SHA-256: `463948677ebba266bee744a31e7edaa9867510a2ce240d681a49d692c1528e79`
+- OTA public-key DER SHA-256: `46d4ea8e2e8cf261816953b5c64f907840a5da84f50c3127011d4bbe1d77c946`
+- Content release: absent before rollout
+- Reported MCU identities: unavailable in legacy firmware; protocol-v2
+  attestation is required after the approved coordinated rollout.
+
+## Fabrication provenance awaiting physical revision confirmation
+
+The repository's current `phonev6` fabrication set has these hashes, but it
+must not be claimed as installed until the board marking or assembly record is
+checked:
+
+- Schematic: `2480518e75281b795a437cdba24fe009741dfdf52aa6fc7f2b1179401b806601`
+- PCB layout: `b4325fb27b8b2bf12a40f7dc6bf17a41936c0d802424ff9b3ba59439d76b733e`
+- BOM: `b67ab8f81a35e23550cb3d6d4e703cf0bbbb6f6aaef89800a26ff9a871e761a9`
+- Gerber archive: `29a7e7eb6e1090f657f7638b71fb50d656755ee47833b3bf5203e4e561c17fd0`
+- Installed PCB revision: **REQUIRED — physical inspection**
+
+## Physical construction
+
+- Wiring deviations/bodge wires: **REQUIRED — physical inspection**
+- Audio interface: USB `CARD=Device`; playback profile `out_right_solo`
+- Power supplies and ratings: **REQUIRED — physical inspection**
+- Assembly photographs and hashes: **REQUIRED**
+
+## Electrical and recovery validation
+
+No row below may be inferred from software tests.
+
+| Test | Instrument/load | Minimum voltage | Result | Evidence/date |
+| --- | --- | ---: | --- | --- |
+| Cold boot | REQUIRED | REQUIRED | REQUIRED | REQUIRED |
+| Ringer/audio peak | REQUIRED | REQUIRED | REQUIRED | REQUIRED |
+| Coin validator operation | REQUIRED | REQUIRED | REQUIRED | REQUIRED |
+| Controlled brownout | REQUIRED | REQUIRED | REQUIRED | REQUIRED |
+| Arbitrary idle power loss | REQUIRED | REQUIRED | REQUIRED | REQUIRED |
+| OTA download interruption | REQUIRED | REQUIRED | REQUIRED | REQUIRED |
+| MCU flash interruption/recovery | REQUIRED | REQUIRED | REQUIRED | REQUIRED |
+| Host activation interruption/rollback | Software activation journal | N/A | PASS (three automatic restorations during rollout debugging) | 2026-08-31 system journal |
+
+## Remote-maintenance evidence
+
+On 2026-08-31, a YubiKey-authenticated session reached this host through
+`maintenance.kmatzen.com` and `anima`'s loopback reverse port, without using the
+phone's inbound LAN SSH address. A separate test from a genuinely external
+network remains required for release acceptance.

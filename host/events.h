@@ -37,9 +37,10 @@ struct call;
 #define EVENT_TYPE_DIAG 'G'
 #define EVENT_DIAG_PAYLOAD_LEN 4
 
-/* Decode a diagnostic payload. Returns 1 and fills *source ("alpha"/"beta")
- * and *count on success, 0 if the payload is malformed. */
+/* Decode diagnostics. A/B are I2C loss counters; K/D are the keypad/display
+ * MCUSR reset-cause bitmasks captured before Arduino startup. */
 int event_diag_parse(const char *payload, const char **source, long *count);
+int event_reset_parse(const char *payload, const char **role, long *cause);
 #define EVENT_TYPE_CALL_STATE '1'
 
 /* Event type enumeration */

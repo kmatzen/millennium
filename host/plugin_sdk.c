@@ -82,6 +82,29 @@ void sdk_play_clip(const char *name) {
     audio_tones_play_clip(path);
 }
 
+void sdk_play_content_clip(const char *filename) {
+    char path[512];
+    static const char prefix[] = "/var/lib/millennium/content/current/media/";
+    size_t i, length;
+
+    if (!filename || !filename[0]) return;
+    length = strlen(filename);
+    if (length < 5 || strcmp(filename + length - 4, ".wav") != 0) return;
+    for (i = 0; i < length - 4; i++) {
+        char ch = filename[i];
+        if (!((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
+              (ch >= '0' && ch <= '9') || ch == '_' || ch == '-')) return;
+    }
+    if (sizeof(prefix) - 1 + length + 1 > sizeof(path)) return;
+    memcpy(path, prefix, sizeof(prefix) - 1);
+    memcpy(path + sizeof(prefix) - 1, filename, length + 1);
+    audio_tones_play_clip(path);
+}
+
+void sdk_set_volume_percent(int percent) {
+    audio_tones_set_volume_percent(percent);
+}
+
 /* ── Calls ───────────────────────────────────────────────────────────── */
 
 void sdk_call(const char *number) {
@@ -184,6 +207,14 @@ void sdk_logf(const char *category, const char *fmt, ...) {
     vsnprintf(buf, sizeof(buf), fmt, ap);
     va_end(ap);
     logger_info_with_category(category ? category : "Plugin", buf);
+}
+
+void sdk_metric_increment(const char *name) {
+    if (name) metrics_increment_counter(name, 1);
+}
+
+void sdk_metric_observe(const char *name, double value) {
+    if (name) metrics_observe_histogram(name, value);
 }
 
 /* ── Randomness ──────────────────────────────────────────────────────── */

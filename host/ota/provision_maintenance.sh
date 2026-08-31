@@ -56,6 +56,9 @@ case "$KEY_LINE" in
 esac
 
 umask 077
+install -d -m 0755 /etc/millennium
+printf '%s\n' "$KEY_LINE" > /etc/millennium/maintainer-authorized-key.pub
+chmod 0644 /etc/millennium/maintainer-authorized-key.pub
 install -d -m 0700 /etc/wireguard
 if [ ! -s /etc/wireguard/millennium.key ]; then
     wg genkey > /etc/wireguard/millennium.key

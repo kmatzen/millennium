@@ -4,9 +4,9 @@ The deployed phone is an appliance. Its owner should only need to provide power
 and Wi-Fi; software updates and maintenance must not require access to the
 owner's router or knowledge of Linux.
 
-This document defines the production design. The current `updater.c` GitHub
-`git pull` flow is a developer convenience and is not the production OTA trust
-path.
+This document defines the production implementation. The daemon deliberately
+has no `git pull` fallback: a missing worker or trust key causes a closed,
+reported failure.
 
 ## Goals
 
@@ -45,12 +45,13 @@ https://updates.kmatzen.com/millennium/stable/manifest.json.sig
 {
   "schema": 1,
   "channel": "stable",
+  "key_id": "release-2026",
   "version": "0.4.0",
   "sequence": 4,
   "published_at": "2026-09-01T00:00:00Z",
   "minimum_sequence": 0,
   "bundle": {
-    "url": "https://updates.kmatzen.com/millennium/releases/0.4.0/millennium-0.4.0.tar.gz",
+    "url": "https://updates.kmatzen.com/millennium/releases/00000004-0.4.0/millennium-00000004-0.4.0.tar.gz",
     "sha256": "<64 lowercase hex characters>",
     "size": 1234567
   }
@@ -58,9 +59,9 @@ https://updates.kmatzen.com/millennium/stable/manifest.json.sig
 ```
 
 The detached signature is Ed25519. The offline release private key signs the
-exact bytes of `manifest.json`; the corresponding public key is provisioned at
-`/etc/millennium/update-signing-key.pem`. TLS protects privacy and availability,
-while this pinned key determines whether code is trusted.
+exact bytes of `manifest.json`; `key_id` selects one of the overlapping public
+keys configured in `trusted_keys`. TLS protects privacy and availability,
+while those pinned keys determine whether code is trusted.
 
 `sequence` is monotonically increasing and is persisted by the device. The
 updater rejects a lower sequence even if the release has a plausible version
@@ -89,10 +90,10 @@ service. Cross-builds pass `--architecture` explicitly to the release builder.
 Mutable data is never stored in a release directory:
 
 ```text
-/opt/millennium/releases/0.3.0/
-/opt/millennium/releases/0.4.0/
-/opt/millennium/current -> /opt/millennium/releases/0.4.0
-/opt/millennium/previous -> /opt/millennium/releases/0.3.0
+/opt/millennium/releases/00000003-0.3.0/
+/opt/millennium/releases/00000004-0.4.0/
+/opt/millennium/current -> /opt/millennium/releases/00000004-0.4.0
+/opt/millennium/previous -> /opt/millennium/releases/00000003-0.3.0
 /etc/millennium/                 configuration and public keys
 /var/lib/millennium/             state, installed sequence, firmware digests
 /var/log/millennium/             logs
@@ -107,9 +108,9 @@ On first boot of a new release, a health-check service requires all of the
 following within a bounded interval:
 
 - `daemon.service` remains active;
-- `GET http://127.0.0.1/api/version` reports the expected version;
-- `GET http://127.0.0.1/api/health` returns valid JSON;
-- the Beta serial device reconnects.
+- `GET http://127.0.0.1:8081/api/version` reports the expected version;
+- `GET http://127.0.0.1:8081/api/health` returns valid JSON;
+- both MCU serial devices reconnect and report the signed identities.
 
 Until that succeeds, the release is *pending*. Failure atomically restores the
 previous symlink and restarts the daemon. Success marks the sequence committed
@@ -236,7 +237,7 @@ a release from the repository root:
 
 ```bash
 python3 tools/build_ota_release.py \
-  --version 0.4.0 --sequence 4 \
+  --sequence 4 --key-id release-2026 \
   --base-url https://updates.kmatzen.com/millennium \
   --private-key /offline/path/millennium-release-private.pem \
   --output-dir /tmp/millennium-0.4.0
@@ -261,7 +262,9 @@ cd host
 make daemon
 sudo ./ota/install_ota.sh
 sudo install -m 0644 /path/to/update-signing-key.pem \
-  /etc/millennium/update-signing-key.pem
+  /etc/millennium/update-signing-key-release-2026.pem
+# Add release-2026:/etc/millennium/update-signing-key-release-2026.pem
+# to trusted_keys in /etc/millennium/ota.conf before publishing with that ID.
 sudo systemctl start millennium-update-check.service
 ```
 

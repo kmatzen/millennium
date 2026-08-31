@@ -12,10 +12,10 @@ SIGNATURE="$SOURCE/manifest.json.sig"
 META="$(python3 - "$MANIFEST" <<'PY'
 import json, pathlib, sys
 d = json.loads(pathlib.Path(sys.argv[1]).read_text())
-print(d["version"] + " " + pathlib.PurePosixPath(d["bundle"]["url"]).name)
+print(("%08d-%s" % (d["sequence"], d["version"])) + " " + pathlib.PurePosixPath(d["bundle"]["url"]).name)
 PY
 )"
-VERSION="${META%% *}"
+RELEASE_ID="${META%% *}"
 BUNDLE_NAME="${META#* }"
 BUNDLE="$SOURCE/$BUNDLE_NAME"
 [ -s "$BUNDLE" ] || { echo "bundle not found: $BUNDLE" >&2; exit 1; }
@@ -30,10 +30,10 @@ PY
 
 # The bundle and signature become visible before the manifest. Renaming the
 # manifest is the publication commit point observed by clients.
-install -d -m 0755 "$WEB_ROOT/releases/$VERSION" "$WEB_ROOT/stable"
-install -m 0644 "$BUNDLE" "$WEB_ROOT/releases/$VERSION/$BUNDLE_NAME"
+install -d -m 0755 "$WEB_ROOT/releases/$RELEASE_ID" "$WEB_ROOT/stable"
+install -m 0644 "$BUNDLE" "$WEB_ROOT/releases/$RELEASE_ID/$BUNDLE_NAME"
 install -m 0644 "$SIGNATURE" "$WEB_ROOT/stable/manifest.json.sig.new"
 mv "$WEB_ROOT/stable/manifest.json.sig.new" "$WEB_ROOT/stable/manifest.json.sig"
 install -m 0644 "$MANIFEST" "$WEB_ROOT/stable/manifest.json.new"
 mv "$WEB_ROOT/stable/manifest.json.new" "$WEB_ROOT/stable/manifest.json"
-echo "Published Millennium $VERSION"
+echo "Published Millennium $RELEASE_ID"

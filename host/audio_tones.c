@@ -42,6 +42,7 @@ static pthread_t      tone_thread;
 static int            tone_thread_running = 0;
 static volatile int   tone_stop_flag = 0;
 static pthread_mutex_t tone_mutex = PTHREAD_MUTEX_INITIALIZER;
+static int volume_percent = 100;
 
 /* ── DTMF frequency table ─────────────────────────────────────── */
 
@@ -159,6 +160,8 @@ static void start_tone(const tone_spec_t *spec) {
     *arg = *spec;
 
     pthread_mutex_lock(&tone_mutex);
+    arg->amplitude = ((arg->amplitude > 0 ? arg->amplitude : AMPLITUDE) *
+                      volume_percent) / 100;
     tone_stop_flag = 0;
     tone_thread_running = 1;
     pthread_mutex_unlock(&tone_mutex);
@@ -344,6 +347,8 @@ void audio_tones_play_clip(const char *path) {
     unsigned char *buf;
     clip_arg_t *arg;
     wav_info_t info;
+    int clip_volume;
+    size_t sample_offset;
 
     if (!path) return;
 
@@ -373,6 +378,19 @@ void audio_tones_play_clip(const char *path) {
         return;
     }
 
+    pthread_mutex_lock(&tone_mutex);
+    clip_volume = volume_percent;
+    pthread_mutex_unlock(&tone_mutex);
+    for (sample_offset = info.data_offset;
+         sample_offset + 1 < info.data_offset + info.data_len;
+         sample_offset += 2) {
+        int sample = (int)(int16_t)((uint16_t)buf[sample_offset] |
+                                    ((uint16_t)buf[sample_offset + 1] << 8));
+        sample = (sample * clip_volume) / 100;
+        buf[sample_offset] = (unsigned char)(sample & 0xff);
+        buf[sample_offset + 1] = (unsigned char)((sample >> 8) & 0xff);
+    }
+
     audio_tones_stop();   /* one sound at a time */
 
     arg = (clip_arg_t *)malloc(sizeof(clip_arg_t));
@@ -400,6 +418,14 @@ void audio_tones_play_clip(const char *path) {
 void audio_tones_play_clip(const char *path) { (void)path; }
 
 #endif /* HAVE_ALSA */
+
+void audio_tones_set_volume_percent(int percent) {
+    if (percent < 10) percent = 10;
+    if (percent > 100) percent = 100;
+    pthread_mutex_lock(&tone_mutex);
+    volume_percent = percent;
+    pthread_mutex_unlock(&tone_mutex);
+}
 
 void audio_tones_stop(void) {
     pthread_mutex_lock(&tone_mutex);

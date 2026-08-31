@@ -11,7 +11,7 @@ This project modernizes a Nortel Millennium public payphone by replacing its ori
 Development happens on a Mac laptop. Claude Code cannot run directly on the Raspberry Pi Zero 2 W (ARMv6l architecture is unsupported), so all code editing and local testing runs on the Mac. Deployment and hardware testing require SSH-ing into the Pi.
 
 ```bash
-ssh matzen@192.168.86.145   # Pi fixed address on local network
+ssh matzen@millennium-phone.local
 ```
 
 `make test` (unit + scenario tests) runs locally on the Mac. `make daemon` and `sudo make install` must be run on the Pi over SSH.
@@ -37,7 +37,7 @@ make simulator && ./simulator tests/<scenario>.scenario
 sudo make install
 
 # Run API tests against the live device
-make device-test                        # fixed Pi address (192.168.86.145)
+make device-test                        # defaults to millennium-phone.local
 make api-test HOST=<ip>                 # arbitrary host
 
 # Run break/fuzzing tests
@@ -62,8 +62,8 @@ make deploy           # flash both (keypad first, then display)
 make deploy_display   # flash Beta using GPIO27 reset
 make deploy_keypad    # flash Alpha using GPIO17 reset
 # or run the scripts directly:
-./Arduino/deploy_display.sh [matzen@192.168.86.145]
-./Arduino/deploy_keypad.sh  [matzen@192.168.86.145]
+./Arduino/deploy_display.sh [matzen@millennium-phone.local]
+./Arduino/deploy_keypad.sh  [matzen@millennium-phone.local]
 ```
 
 The deploy scripts assert reset via GPIO (open-drain: drive low, release to input), wait for the stock Arduino Micro bootloader to enumerate at `/dev/serial/by-id/usb-Arduino_LLC_Arduino_Micro-if00`, then flash with `avrdude`. Requires `raspi-gpio` and `avrdude` on the Pi.

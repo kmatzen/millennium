@@ -130,6 +130,8 @@ struct web_server* web_server_create(int port) {
 
     memset(server, 0, sizeof(struct web_server));
     server->port = port;
+    web_server_strcpy_safe(server->bind_address, "127.0.0.1",
+                           sizeof(server->bind_address));
     server->running = 0;
     server->should_stop = 0;
     server->paused = 0;
@@ -158,6 +160,24 @@ struct web_server* web_server_create(int port) {
     }
 
     return server;
+}
+
+void web_server_set_bind_address(struct web_server* server, const char* address) {
+    if (!server || !address || !address[0]) return;
+    web_server_strcpy_safe(server->bind_address, address,
+                           sizeof(server->bind_address));
+}
+
+void web_server_set_admin_token(struct web_server* server, const char* token) {
+    if (!server) return;
+    web_server_strcpy_safe(server->admin_token, token ? token : "",
+                           sizeof(server->admin_token));
+}
+
+void web_server_set_allowed_origin(struct web_server* server, const char* origin) {
+    if (!server) return;
+    web_server_strcpy_safe(server->allowed_origin, origin ? origin : "",
+                           sizeof(server->allowed_origin));
 }
 
 void web_server_destroy(struct web_server* server) {
@@ -535,7 +555,13 @@ void web_server_init_socket(struct web_server* server) {
     setsockopt(server->server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
 
     address.sin_family = AF_INET;
-    address.sin_addr.s_addr = INADDR_ANY;
+    if (inet_pton(AF_INET, server->bind_address, &address.sin_addr) != 1) {
+        logger_errorf_with_category("WebServer", "Invalid IPv4 bind address: %s",
+                                    server->bind_address);
+        close(server->server_fd);
+        server->server_fd = -1;
+        return;
+    }
     address.sin_port = htons(server->port);
     
     if (bind(server->server_fd, (struct sockaddr*)&address, sizeof(address)) < 0) {
@@ -558,7 +584,8 @@ void web_server_init_socket(struct web_server* server) {
     flags = fcntl(server->server_fd, F_GETFL, 0);
     fcntl(server->server_fd, F_SETFL, flags | O_NONBLOCK);
 
-    snprintf(start_msg, sizeof(start_msg), "Web server started on port %d", server->port);
+    snprintf(start_msg, sizeof(start_msg), "Web server started on %s:%d",
+             server->bind_address, server->port);
     logger_info_with_category("WebServer", start_msg);
 }
 
@@ -790,6 +817,30 @@ struct http_response web_server_process_request(struct web_server* server, const
             return web_server_create_rate_limit_response();
         }
     }
+
+    /* State-changing operations are never available anonymously, even on a
+     * trusted LAN. The default listener is loopback-only, and this second
+     * boundary protects requests arriving through the maintenance tunnel. */
+    if (strcmp(request->method, "POST") == 0 &&
+        (strcmp(request->path, "/api/control") == 0 ||
+         strcmp(request->path, "/api/update") == 0)) {
+        if (!web_server_request_is_admin_authorized(server, request)) {
+            response.status_code = 401;
+            web_server_strcpy_safe(response.content_type, "application/json",
+                                   sizeof(response.content_type));
+            web_server_strcpy_safe(response.body,
+                "{\"error\":\"Administrative authorization required\"}",
+                sizeof(response.body));
+            web_server_strcpy_safe(response.header_keys[response.header_count],
+                                   "WWW-Authenticate",
+                                   sizeof(response.header_keys[response.header_count]));
+            web_server_strcpy_safe(response.header_values[response.header_count],
+                                   "Bearer realm=\"millennium-admin\"",
+                                   sizeof(response.header_values[response.header_count]));
+            response.header_count++;
+            return response;
+        }
+    }
     
     /* Check for WebSocket upgrade */
     if (web_server_is_websocket_upgrade(request)) {
@@ -860,6 +911,66 @@ struct http_response web_server_process_request(struct web_server* server, const
     return web_server_handle_not_found(request);
 }
 
+static const char* web_server_get_header(const struct http_request* request,
+                                         const char* name) {
+    int i;
+    if (!request || !name) return NULL;
+    for (i = 0; i < request->header_count; i++) {
+        if (web_server_strcasecmp(request->header_keys[i], name) == 0)
+            return request->header_values[i];
+    }
+    return NULL;
+}
+
+/* Compare secrets without leaking the first mismatching byte through timing. */
+static int web_server_secret_equal(const char* a, const char* b) {
+    size_t i, alen, blen, maxlen;
+    unsigned char diff, av, bv;
+    if (!a || !b) return 0;
+    alen = strlen(a);
+    blen = strlen(b);
+    maxlen = alen > blen ? alen : blen;
+    diff = (unsigned char)(alen ^ blen);
+    for (i = 0; i < maxlen; i++) {
+        av = i < alen ? (unsigned char)a[i] : 0;
+        bv = i < blen ? (unsigned char)b[i] : 0;
+        diff |= (unsigned char)(av ^ bv);
+    }
+    return diff == 0;
+}
+
+int web_server_request_is_admin_authorized(const struct web_server* server,
+                                           const struct http_request* request) {
+    const char* authorization;
+    const char* origin;
+    const char* origin_host;
+    const char* host;
+    const char* supplied;
+    if (!server || !request || !server->admin_token[0]) return 0;
+
+    origin = web_server_get_header(request, "Origin");
+    if (origin) {
+        if (server->allowed_origin[0]) {
+            if (strcmp(origin, server->allowed_origin) != 0) return 0;
+        } else {
+            /* With no explicit public origin, accept only a same-host browser
+             * request. Authorization remains mandatory; this check prevents a
+             * captured token being driven cross-site. */
+            host = web_server_get_header(request, "Host");
+            origin_host = strstr(origin, "://");
+            origin_host = origin_host ? origin_host + 3 : NULL;
+            if (!host || !origin_host || strcmp(origin_host, host) != 0)
+                return 0;
+        }
+    }
+
+    authorization = web_server_get_header(request, "Authorization");
+    if (!authorization || strncmp(authorization, "Bearer ", 7) != 0)
+        return 0;
+    supplied = authorization + 7;
+    return web_server_secret_equal(supplied, server->admin_token);
+}
+
 int web_server_is_websocket_upgrade(const struct http_request* request) {
     int i;
     int has_upgrade = 0, has_connection = 0;
@@ -906,6 +1017,10 @@ char* web_server_serialize_response(const struct http_response* response) {
     /* Status line */
     switch (response->status_code) {
         case 200: status_text = "OK"; break;
+        case 202: status_text = "Accepted"; break;
+        case 401: status_text = "Unauthorized"; break;
+        case 403: status_text = "Forbidden"; break;
+        case 409: status_text = "Conflict"; break;
         case 404: status_text = "Not Found"; break;
         case 500: status_text = "Internal Server Error"; break;
         case 101: status_text = "Switching Protocols"; break;
@@ -1034,9 +1149,9 @@ struct http_response web_server_handle_api_status(const struct http_request* req
         "{"
         "\"status\":\"running\","
         "\"uptime\":%ld,"
-        "\"version\":\"1.0.0\","
+        "\"version\":\"%s\","
         "\"timestamp\":%ld"
-        "}", uptime_seconds, now);
+        "}", uptime_seconds, version_get_string(), now);
     
     web_server_strcpy_safe(response.body, json, sizeof(response.body));
     return response;
@@ -1812,7 +1927,8 @@ struct http_response web_server_handle_dashboard(const struct http_request* requ
 
         "<script>"
         "function api(u){return fetch(u).then(r=>r.json())}"
-        "function post(u,b){return fetch(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)}).then(r=>r.json())}"
+        "function ah(){let t=sessionStorage.getItem('millenniumAdminToken');if(!t){t=prompt('Administrator token');if(t)sessionStorage.setItem('millenniumAdminToken',t)}return{'Content-Type':'application/json','Authorization':'Bearer '+(t||'')}}"
+        "function post(u,b){return fetch(u,{method:'POST',headers:ah(),body:JSON.stringify(b)}).then(r=>{if(r.status===401)sessionStorage.removeItem('millenniumAdminToken');return r.json()})}"
         "function k(x){post('/api/control',{action:'keypad_press',key:x})}"
         "function coin(c){post('/api/control',{action:'coin_insert',cents:c})}"
         "function hook(u){post('/api/control',{action:u?'handset_up':'handset_down'})}"
@@ -1894,10 +2010,13 @@ int web_server_check_rate_limit(struct web_server* server, const char* client_ip
     char key[128];
     int i;
     int found_idx = -1;
+    int limit;
     if (!server || !client_ip || !endpoint) return 1;
 
     now = time(NULL);
     snprintf(key, sizeof(key), "%s:%s", client_ip, endpoint);
+    limit = (strcmp(endpoint, "/api/control") == 0 ||
+             strcmp(endpoint, "/api/update") == 0) ? 30 : 120;
 
     /* The rate-limit table is shared across worker threads. */
     pthread_mutex_lock(&server->state_mutex);
@@ -1934,8 +2053,17 @@ int web_server_check_rate_limit(struct web_server* server, const char* client_ip
             server->rate_limit_infos[found_idx].request_count = 0;
             server->rate_limit_count++;
         } else {
-            pthread_mutex_unlock(&server->state_mutex);
-            return 1; /* Rate limit table full, allow request */
+            /* Bounded table: replace the least-recently-used entry instead of
+             * failing open when an attacker sprays source/endpoint keys. */
+            int oldest = 0;
+            for (i = 1; i < server->rate_limit_count; i++) {
+                if (server->rate_limit_infos[i].last_request <
+                    server->rate_limit_infos[oldest].last_request) oldest = i;
+            }
+            found_idx = oldest;
+            web_server_strcpy_safe(server->rate_limit_keys[found_idx], key,
+                                   sizeof(server->rate_limit_keys[found_idx]));
+            server->rate_limit_infos[found_idx].request_count = 0;
         }
     }
 
@@ -1943,8 +2071,9 @@ int web_server_check_rate_limit(struct web_server* server, const char* client_ip
     server->rate_limit_infos[found_idx].request_count++;
     server->rate_limit_infos[found_idx].last_request = now;
 
+    i = server->rate_limit_infos[found_idx].request_count <= limit;
     pthread_mutex_unlock(&server->state_mutex);
-    return 1; /* Allowed - simplified rate limiting for C89 */
+    return i;
 }
 
 struct http_response web_server_create_rate_limit_response(void) {
@@ -1954,7 +2083,7 @@ struct http_response web_server_create_rate_limit_response(void) {
     response.status_code = 429; /* Too Many Requests */
     
     web_server_strcpy_safe(response.header_keys[response.header_count], "Retry-After", sizeof(response.header_keys[response.header_count]));
-    web_server_strcpy_safe(response.header_values[response.header_count], "10", sizeof(response.header_values[response.header_count]));
+    web_server_strcpy_safe(response.header_values[response.header_count], "60", sizeof(response.header_values[response.header_count]));
     response.header_count++;
     
     web_server_strcpy_safe(response.content_type, "application/json", sizeof(response.content_type));
@@ -1963,7 +2092,7 @@ struct http_response web_server_create_rate_limit_response(void) {
         "{"
         "\"error\": \"Rate limit exceeded\","
         "\"message\": \"Too many requests. Please slow down, especially during calls.\","
-        "\"retry_after\": 10"
+        "\"retry_after\": 60"
         "}";
     
     web_server_strcpy_safe(response.body, json, sizeof(response.body));

@@ -47,12 +47,12 @@ sip.snd_playback=out_right_solo
 # harmless no-op, so clips are optional.
 audio.clip_dir=/usr/local/share/millennium/audio
 
-# Card Configuration (magstripe reader)
+# Credential-card configuration. Provision random identifiers on dedicated
+# cards; never place payment-card PANs in this file.
 card.enabled=true
-# Comma-separated 16-digit card numbers that grant free calling
-card.free_cards=
-# Comma-separated 16-digit card numbers that grant admin access
-card.admin_cards=
+# Comma-separated random 16-digit tokens that grant access.
+card.free_tokens=
+card.admin_tokens=
 
 # Logging Configuration - BALANCED for audio performance
 logging.level=INFO
@@ -62,9 +62,14 @@ logging.to_file=true
 # System Configuration
 system.update_interval_ms=33
 system.max_retries=3
-# Source directory for OTA updates (git pull + rebuild)
-system.source_dir=/home/matzen/millennium
 
+# Signed narrative content. `story.path` points at the atomically activated
+# compiled story inside the content release; story state survives restarts.
+story.path=/var/lib/millennium/content/current/story.mst
+# Optional outbound destination used by story scenes whose call target is
+# "configured". Leave blank for the offline timeout path.
+story.call_target=
+story.state_path=/var/lib/millennium/story-state
 # State Persistence
 persistence.state_file=/var/lib/millennium/state
 
@@ -76,9 +81,16 @@ metrics_server.enabled=true
 metrics_server.port=8080
 
 # Web Server Configuration
-# Port 80 (privileged) — granted via CAP_NET_BIND_SERVICE in the systemd unit.
+# The administrative portal is loopback-only. Reach it through the authenticated
+# maintenance tunnel; do not expose it directly to the LAN or Internet.
 web_server.enabled=true
-web_server.port=80
+web_server.bind_address=127.0.0.1
+web_server.port=8081
+# Root-readable file containing a high-entropy bearer token on one line.
+web_server.admin_token_file=/etc/millennium/admin-token
+# If browser requests carry an Origin header, it must exactly match this value.
+# Set this to the HTTPS maintenance origin when using the browser dashboard.
+web_server.allowed_origin=
 
 # Plugin Configuration
 # Each plugin can read its own keys from this file. Built-in game plugins:

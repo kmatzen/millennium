@@ -7,18 +7,26 @@
 #include <MagStripe.h>
 #include <Wire.h>
 #include <avr/wdt.h>
+#include <MillenniumProtocol.h>
 
+#ifndef MILLENNIUM_FIRMWARE_VERSION
+#define MILLENNIUM_FIRMWARE_VERSION "0.0.0-development"
+#endif
+#ifndef MILLENNIUM_FIRMWARE_BUILD
+#define MILLENNIUM_FIRMWARE_BUILD "unknown"
+#endif
 #define I2C_DISPLAY_ADDR 8
 
-/* I2C event prefixes sent to display Arduino */
-#define EVT_KEY        'K'
-#define EVT_HOOK_UP    "HU"
-#define EVT_HOOK_DOWN  "HD"
-#define EVT_CARD       'C'
-#define EVT_DIAG       'G'   /* (#230) diagnostics: 'G' + 'A' + 3 ASCII digits.
-                                * Not 'X' -- display.ino uses that for a serial
-                                * timeout, and a marker collision makes the host
-                                * eat the events behind it (#259). */
+/* Preserve the reset flags before setup() and disable a watchdog inherited
+ * from a watchdog reset; otherwise the two-second startup delay can loop. */
+uint8_t previousResetCause __attribute__((section(".noinit")));
+void captureResetCause(void) __attribute__((naked, section(".init3")));
+void captureResetCause(void) {
+  previousResetCause = MCUSR;
+  MCUSR = 0;
+  wdt_disable();
+}
+bool resetCauseReported = false;
 
 const int hookUpPin = 5;
 const int hookDownPin = 4;
@@ -28,11 +36,7 @@ bool hookUpState = true;
 unsigned long lastHookChange = 0;
 const unsigned long DEBOUNCE_MS = 50;
 
-/* (#230) Retry budget for an I2C message to Beta.  Deliberately short: it
- * comfortably covers a VFD repaint (~180 ms, display.ino:199-207) but NOT the
- * ~2 s coin-validator reset (display.ino:213-216).  Blocking the keypad scan
- * for two seconds would lose more keypresses than it saved, and the watchdog
- * is only 4 s. */
+/* Bounded retry budget for transient I2C ISR/USB scheduling jitter. */
 const uint8_t I2C_SEND_ATTEMPTS = 8;
 const unsigned long I2C_RETRY_DELAY_MS = 25;
 
@@ -41,6 +45,7 @@ const unsigned long I2C_RETRY_DELAY_MS = 25;
 unsigned int i2cDropped = 0;
 unsigned int i2cDroppedReported = 0;
 unsigned long lastDropReport = 0;
+uint8_t protocolSequence = 0;
 
 /* Re-announce the drop count this often, zero included.
  *
@@ -110,6 +115,19 @@ bool i2cSend(const uint8_t *payload, uint8_t len) {
   return false;
 }
 
+bool i2cTrySendFrame(uint8_t type, const uint8_t *payload, uint8_t len) {
+  uint8_t frame[32];
+  size_t frameLen = millenniumEncode(type, protocolSequence++, payload, len,
+                                     frame, sizeof(frame));
+  return frameLen > 0 && i2cTrySend(frame, (uint8_t)frameLen);
+}
+
+bool i2cSendFrame(uint8_t type, const uint8_t *payload, uint8_t len) {
+  if (i2cTrySendFrame(type, payload, len)) return true;
+  i2cDropped++;
+  return false;
+}
+
 /*
  * (#230 item 2) Tell the host how many messages we lost.
  *
@@ -130,16 +148,27 @@ void reportDropsIfChanged() {
   if (!changed && !due) return;
 
   n = (i2cDropped > 999) ? 999 : i2cDropped;
-  msg[0] = EVT_DIAG;
-  msg[1] = 'A';
-  msg[2] = '0' + (n / 100) % 10;
-  msg[3] = '0' + (n / 10) % 10;
-  msg[4] = '0' + n % 10;
+  msg[0] = 'A';
+  msg[1] = '0' + (n / 100) % 10;
+  msg[2] = '0' + (n / 10) % 10;
+  msg[3] = '0' + n % 10;
 
-  if (i2cTrySend(msg, sizeof(msg))) {
+  if (i2cTrySendFrame(MCU_EVT_DIAGNOSTIC, msg, 4)) {
     i2cDroppedReported = i2cDropped;
     lastDropReport = now;
   }
+}
+
+void reportResetCause() {
+  uint8_t msg[5];
+  unsigned int n;
+  if (resetCauseReported) return;
+  n = previousResetCause;
+  msg[0] = 'K';
+  msg[1] = '0' + (n / 100) % 10;
+  msg[2] = '0' + (n / 10) % 10;
+  msg[3] = '0' + n % 10;
+  if (i2cTrySendFrame(MCU_EVT_DIAGNOSTIC, msg, 4)) resetCauseReported = true;
 }
 
 /*
@@ -190,10 +219,10 @@ void setup() {
   bootHookReported = false;
   lastHookChange = millis();
   {
-    const uint8_t *msg = (const uint8_t *)(hookUpState ? EVT_HOOK_UP : EVT_HOOK_DOWN);
+    uint8_t hook = hookUpState ? 'U' : 'D';
     uint8_t attempt;
     for (attempt = 0; attempt < 3; attempt++) {
-      if (i2cSend(msg, 2)) { bootHookReported = true; break; }
+      if (i2cSendFrame(MCU_EVT_HOOK, &hook, 1)) { bootHookReported = true; break; }
       delay(100);
     }
   }
@@ -293,6 +322,10 @@ void serviceStatusQuery() {
   if (!Serial.available()) return;
   while (Serial.available()) Serial.read();
 
+  Serial.println(F("MILLENNIUM role=keypad version=" MILLENNIUM_FIRMWARE_VERSION
+                   " protocol=" MILLENNIUM_PROTOCOL_VERSION_STRING
+                   " build=" MILLENNIUM_FIRMWARE_BUILD " selftest=ok"));
+
   Serial.print(F("boot_hook="));
   Serial.print(bootHookUp ? F("UP") : F("DOWN"));
   Serial.print(F(" boot_reported="));
@@ -302,22 +335,21 @@ void serviceStatusQuery() {
   Serial.print(F(" i2c_drops="));
   Serial.print(i2cDropped);
   Serial.print(F(" reported="));
-  Serial.println(i2cDroppedReported);
+  Serial.print(i2cDroppedReported);
+  Serial.print(F(" reset_cause="));
+  Serial.println(previousResetCause);
 }
 
 void loop() {
-  wdt_reset();
-
   serviceStatusQuery();
+  reportResetCause();
   reportDropsIfChanged();
 
   char key = keypad.getKey();
 
   if (key != NO_KEY) {
-    uint8_t msg[2];
-    msg[0] = EVT_KEY;
-    msg[1] = (uint8_t)key;
-    i2cSend(msg, sizeof(msg));
+    uint8_t value = (uint8_t)key;
+    i2cSendFrame(MCU_EVT_KEY, &value, 1);
   }
 
   if (card.available()) {
@@ -333,12 +365,13 @@ void loop() {
          * truncated -- clamp explicitly so the limit is visible here rather
          * than being discovered as a mangled PAN. */
         uint8_t pan_len = parsedData.pan_len;
-        uint8_t msg[1 + 31];
-        if (pan_len > sizeof(msg) - 1) pan_len = sizeof(msg) - 1;
-        msg[0] = EVT_CARD;
-        memcpy(msg + 1, parsedData.pan, pan_len);
-        i2cSend(msg, 1 + pan_len);
+        uint8_t msg[24];
+        if (pan_len > sizeof(msg)) pan_len = sizeof(msg);
+        memcpy(msg, parsedData.pan, pan_len);
+        i2cSendFrame(MCU_EVT_CARD, msg, pan_len);
+        memset(msg, 0, sizeof(msg));
       }
+      memset(data, 0, sizeof(data));
     }
   }
 
@@ -350,16 +383,20 @@ void loop() {
       if (hookDownNow) {
         hookUpState = false;
         lastHookChange = now;
-        i2cSend((const uint8_t *)EVT_HOOK_DOWN, 2);
+        uint8_t hook = 'D';
+        i2cSendFrame(MCU_EVT_HOOK, &hook, 1);
       }
     } else {
       bool hookUpNow = !digitalRead(hookUpPin) && digitalRead(hookDownPin);
       if (hookUpNow) {
         hookUpState = true;
         lastHookChange = now;
-        i2cSend((const uint8_t *)EVT_HOOK_UP, 2);
+        uint8_t hook = 'U';
+        i2cSendFrame(MCU_EVT_HOOK, &hook, 1);
       }
     }
   }
   digitalWrite(hookCommonPin, HIGH);
+  /* Pet only after a full scan/dispatch pass returned successfully. */
+  wdt_reset();
 }

@@ -1,17 +1,22 @@
 channel=stable
+device_group=production
 manifest_url=https://updates.kmatzen.com/millennium/stable/manifest.json
 public_key=/etc/millennium/update-signing-key.pem
+# Comma-separated key-id:path entries permit an overlap period during rotation.
+trusted_keys=primary:/etc/millennium/update-signing-key.pem
 state_dir=/var/lib/millennium/ota
 release_dir=/opt/millennium/releases
 current_link=/opt/millennium/current
 previous_link=/opt/millennium/previous
 service=daemon.service
-phone_state_url=http://127.0.0.1/api/state
+phone_state_url=http://127.0.0.1:8081/api/state
 keypad_device=/dev/serial/by-id/usb-Arduino_LLC_Millennium_Alpha-if00
 display_device=/dev/serial/by-id/usb-Arduino_LLC_Millennium_Beta-if00
-version_url=http://127.0.0.1/api/version
-health_url=http://127.0.0.1/api/health
+version_url=http://127.0.0.1:8081/api/version
+health_url=http://127.0.0.1:8081/api/health
 health_timeout_seconds=150
+max_failure_attempts=3
+failure_backoff_seconds=3600
 automatic=true
 architecture=auto
 install_window_start=02:00

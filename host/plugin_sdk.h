@@ -85,6 +85,9 @@ int  sdk_audio_is_playing(void);  /* 1 if a tone is currently sounding */
  * harmless no-op that leaves the current sound untouched, so it can be layered
  * after a fallback tone. See host/AUDIO_CLIPS.md. */
 void sdk_play_clip(const char *name);
+/* Play an exact .wav filename from the atomically selected story bundle. */
+void sdk_play_content_clip(const char *filename);
+void sdk_set_volume_percent(int percent);
 
 /* ── Calls (VoIP) ────────────────────────────────────────────────────────
  * Place/answer/end calls and send in-call DTMF. No-ops if SIP isn't ready. */
@@ -126,6 +129,11 @@ void sdk_clear_balance(void);      /* zero the balance (e.g. coin return) */
 
 void sdk_log(const char *category, const char *msg);
 void sdk_logf(const char *category, const char *fmt, ...);
+
+/* Privacy-preserving aggregate experience measurements. Metric names are
+ * fixed by code/content review; values never contain caller input. */
+void sdk_metric_increment(const char *name);
+void sdk_metric_observe(const char *name, double value);
 
 /* ── Randomness ──────────────────────────────────────────────────────────
  * Seeded once automatically on first use. */

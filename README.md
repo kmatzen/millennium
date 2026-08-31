@@ -35,7 +35,7 @@ This project reimagines the functionality of the Nortel Millennium telephone by 
 ┌────────────────────────── Raspberry Pi Zero 2 W ───────────────────────────┐
 │                                                                            │
 │  ┌──────────────┐     ┌──────────────┐      ┌──────────────────────────┐   │
-│  │ Daemon       │────▶│ PJSIP (VoIP) │      │ Web Dashboard :80        │   │
+│  │ Daemon       │────▶│ PJSIP (VoIP) │      │ Web Dashboard :8081      │   │
 │  │              │     └──────────────┘      │                          │   │
 │  │ Plugins:     │                           │ - phone state            │   │
 │  │ - Phone      │     ┌──────────────┐      │ - plugin switching       │   │
@@ -69,9 +69,9 @@ This project reimagines the functionality of the Nortel Millennium telephone by 
 - **Pay phone operation**: Insert coins, dial numbers, make VoIP calls — authentic payphone experience
 - **Plugin system**: Swap modes live — Classic Phone, Fortune Teller, Jukebox, plus games (Number Guess, Simon, Dial-A-Joke, Trivia). Write your own against the [plugin SDK](host/PLUGIN_AUTHORING.md); new plugins appear in the dashboard automatically
 - **Emergency calls**: Dial 911, 311, or 0 without coins (configurable free numbers)
-- **Magstripe card support**: Swipe a registered card for free calling or admin access
+- **Dedicated credential-card support**: Swipe a random-token card for free calling or administration; payment cards are prohibited
 - **Web dashboard**: Real-time phone state, plugin switching, health monitoring via WebSocket
-- **Developer OTA updates**: Check for and apply source updates from the web dashboard (git pull, build, restart). The signed unattended production design is documented in [host/docs/UNATTENDED_APPLIANCE.md](host/docs/UNATTENDED_APPLIANCE.md).
+- **Signed OTA updates**: Check, install, attest, and roll back immutable host and firmware releases. The unattended production design is documented in [host/docs/UNATTENDED_APPLIANCE.md](host/docs/UNATTENDED_APPLIANCE.md).
 - **Audio tones**: DTMF, dial tone, busy tone, coin tone, ringback via ALSA
 - **Idle timeout**: Automatically resets phone state after configurable inactivity period
 - **State persistence**: Saves and restores coin balance and plugin state across restarts
@@ -148,8 +148,8 @@ The daemon reads configuration from `/etc/millennium/daemon.conf`. See `host/dae
 | `call.free_numbers` | `911,311,0` | Comma-separated numbers that bypass coin requirement |
 | `call.idle_timeout_seconds` | `60` | Seconds of inactivity before phone resets |
 | `card.enabled` | `true` | Enable magstripe card support |
-| `card.free_cards` | *(empty)* | Comma-separated card numbers for free calling |
-| `card.admin_cards` | *(empty)* | Comma-separated card numbers for admin access |
+| `card.free_tokens` | *(empty)* | Random 16-digit dedicated-card tokens for free calling |
+| `card.admin_tokens` | *(empty)* | Random 16-digit dedicated-card tokens for administration |
 | `web_server.enabled` | `true` | Enable the web dashboard |
 | `web_server.port` | `80` | Web dashboard port |
 | `system.source_dir` | `/home/matzen/millennium` | Source directory for OTA updates |

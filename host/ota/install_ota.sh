@@ -32,15 +32,8 @@ install -m 0755 "$SCRIPT_DIR/millennium_ota.py" "$BOOTSTRAP/ota/millennium-ota"
 ln -sfn "$BOOTSTRAP" /opt/millennium/current
 ln -sfn /opt/millennium/current/ota/millennium-ota /usr/local/libexec/millennium-ota
 install -d -m 0755 /etc/systemd/system/daemon.service.d
-cat > /etc/systemd/system/daemon.service.d/20-ota-release.conf <<'EOF'
-[Unit]
-Wants=millennium-update-recover.service
-After=millennium-update-recover.service
-
-[Service]
-ExecStart=
-ExecStart=/bin/sh -c 'exec 0</dev/null; exec /opt/millennium/current/host/millennium-daemon --config /etc/millennium/daemon.conf'
-EOF
+install -m 0644 "$HOST_DIR/systemd/20-ota-release.conf" \
+    /etc/systemd/system/daemon.service.d/20-ota-release.conf
 
 for unit in millennium-update-check.service millennium-update-check.timer \
             millennium-update-apply.service millennium-update-auto-apply.service \

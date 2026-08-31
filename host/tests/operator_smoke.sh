@@ -9,12 +9,12 @@
 # It does NOT verify audio playback or a real magstripe swipe (the API can't do
 # those) — use OPERATOR_PLAYTEST.md to check clips/coins/card/hook by hand.
 #
-# Usage:  ./operator_smoke.sh [HOST]          # default 192.168.86.152
+# Usage:  ./operator_smoke.sh [HOST]          # default millennium-phone.local
 #         RUN_DRIFT=1 ./operator_smoke.sh     # also run the slow ~32s drift test
 #
 set -uo pipefail
 
-HOST="${1:-192.168.86.152}"
+HOST="${1:-millennium-phone.local}"
 BASE="http://${HOST}"
 PASS=0; FAIL=0
 
