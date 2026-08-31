@@ -3,6 +3,7 @@ Arduino/build/**/*.o
 *.so
 *.o
 *.dSYM/
+__pycache__/
 host/build/
 host/daemon
 host/daemon_c89

@@ -86,6 +86,7 @@ run "GET /api/plugins returns valid JSON" "curl -s $BASE/api/plugins" "json"
 run "GET /api/version returns valid JSON" "curl -s $BASE/api/version" "json"
 run "GET /api/metrics returns valid JSON" "curl -s $BASE/api/metrics" "json"
 run "GET /api/check-update returns valid JSON" "curl -s $BASE/api/check-update" "json"
+run "GET /api/update-status returns valid JSON" "curl -s $BASE/api/update-status" "json"
 
 # coin_insert validation (#129): reject invalid cents, accept valid
 run "POST coin_insert invalid cents (negative)" \

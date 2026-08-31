@@ -979,6 +979,7 @@ void web_server_setup_api_routes(struct web_server* server) {
     web_server_add_route(server, "GET", "/api/plugins", web_server_handle_api_plugins);
     web_server_add_route(server, "GET", "/api/version", web_server_handle_api_version);
     web_server_add_route(server, "GET", "/api/check-update", web_server_handle_api_check_update);
+    web_server_add_route(server, "GET", "/api/update-status", web_server_handle_api_update_status);
     web_server_add_route(server, "POST", "/api/update", web_server_handle_api_update);
     web_server_add_route(server, "GET", "/", web_server_handle_dashboard);
 }
@@ -1633,6 +1634,26 @@ struct http_response web_server_handle_api_check_update(const struct http_reques
         updater_is_update_available() ? "true" : "false",
         updater_is_checking() ? "true" : "false",
         version_get_git_hash());
+    web_server_strcpy_safe(response.body, json, sizeof(response.body));
+    return response;
+}
+
+struct http_response web_server_handle_api_update_status(const struct http_request* request) {
+    struct http_response response;
+    char json[512];
+    char latest[64];
+    int have_latest;
+    (void)request;
+    memset(&response, 0, sizeof(response));
+    web_server_strcpy_safe(response.content_type, "application/json", sizeof(response.content_type));
+    response.status_code = 200;
+    have_latest = updater_get_latest_version(latest, sizeof(latest));
+    snprintf(json, sizeof(json),
+        "{\"current_version\":\"%s\",\"latest_version\":\"%s\","
+        "\"update_available\":%s,\"checking\":%s,\"git_hash\":\"%s\"}",
+        version_get_string(), have_latest ? latest : "unknown",
+        updater_is_update_available() ? "true" : "false",
+        updater_is_checking() ? "true" : "false", version_get_git_hash());
     web_server_strcpy_safe(response.body, json, sizeof(response.body));
     return response;
 }

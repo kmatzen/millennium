@@ -22,6 +22,7 @@
 # Env:    BOTH_RESET=1        reset both Arduinos first (default; 0 = target only)
 #         RETRIES=4           flash attempts before giving up
 #         AVRDUDE_TIMEOUT=25  hard cap (s) per avrdude run, so it can't wedge
+#         MANAGE_DAEMON=1     stop/start daemon around a standalone flash
 #
 set -u
 
@@ -30,6 +31,7 @@ HEX="${2:-}"
 RETRIES="${RETRIES:-4}"
 AVRDUDE_TIMEOUT="${AVRDUDE_TIMEOUT:-25}"
 BOTH_RESET="${BOTH_RESET:-0}"
+MANAGE_DAEMON="${MANAGE_DAEMON:-1}"
 
 [ -n "$TARGET" ] && [ -n "$HEX" ] || { echo "usage: pi_flash.sh <keypad|display> <hex-path>"; exit 2; }
 [ -f "$HEX" ] || { echo "hex not found: $HEX"; exit 2; }
@@ -53,11 +55,13 @@ case "$TARGET" in
 esac
 OTHER_GPIO=$([ "$GPIO" = 17 ] && echo 27 || echo 17)
 
-cleanup() { sudo systemctl start daemon.service >/dev/null 2>&1 || true; }
+cleanup() {
+    [ "$MANAGE_DAEMON" = 1 ] && sudo systemctl start daemon.service >/dev/null 2>&1 || true
+}
 trap cleanup EXIT
 
 echo "pi_flash: target=$TARGET hex=$HEX gpio=$GPIO both_reset=$BOTH_RESET"
-sudo systemctl stop daemon.service >/dev/null 2>&1 || true
+[ "$MANAGE_DAEMON" = 1 ] && sudo systemctl stop daemon.service >/dev/null 2>&1 || true
 sleep 0.3
 
 flash_once() {

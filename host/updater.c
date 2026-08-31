@@ -7,10 +7,46 @@
 #include <string.h>
 #include <ctype.h>
 #include <pthread.h>
+#include <unistd.h>
 
 static char latest_version[64] = {0};
+static int latest_sequence_available = 0;
 static int  check_state = 0;  /* 0=idle, 1=checking, 2=checked */
 static pthread_mutex_t check_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+static int production_ota_available(void) {
+    return access("/usr/local/libexec/millennium-ota", X_OK) == 0 &&
+           access("/etc/millennium/update-signing-key.pem", R_OK) == 0;
+}
+
+static int read_production_status(void) {
+    FILE *fp;
+    char buf[1024];
+    char *version;
+    char *end;
+    size_t len;
+
+    fp = popen("/usr/local/libexec/millennium-ota status 2>/dev/null", "r");
+    if (!fp) return -1;
+    len = fread(buf, 1, sizeof(buf) - 1, fp);
+    pclose(fp);
+    if (len == 0) return -1;
+    buf[len] = '\0';
+    version = strstr(buf, "\"version\":");
+    if (!version) return -1;
+    version = strchr(version + 10, '"');
+    if (!version) return -1;
+    version++;
+    end = strchr(version, '"');
+    if (!end || (size_t)(end - version) >= sizeof(latest_version)) return -1;
+    pthread_mutex_lock(&check_mutex);
+    memcpy(latest_version, version, (size_t)(end - version));
+    latest_version[end - version] = '\0';
+    latest_sequence_available = strstr(buf, "\"available\": true") != NULL ||
+                                strstr(buf, "\"available\":true") != NULL;
+    pthread_mutex_unlock(&check_mutex);
+    return 0;
+}
 
 static int parse_version(const char *s, int *major, int *minor, int *patch) {
     if (!s) return -1;
@@ -37,6 +73,14 @@ static int do_check(void) {
     char buf[4096];
     const char *tag;
     size_t len;
+
+    if (production_ota_available()) {
+        if (system("sudo -n /bin/systemctl start millennium-update-check.service") != 0) {
+            logger_warn_with_category("Updater", "Signed OTA check service failed");
+            return -1;
+        }
+        return read_production_status();
+    }
 
     fp = popen("curl -s -m 10 "
                "https://api.github.com/repos/kmatzen/millennium/releases/latest"
@@ -90,7 +134,10 @@ static void *check_thread_func(void *arg) {
     rc = do_check();
     pthread_mutex_lock(&check_mutex);
     check_state = 2;  /* checked */
-    if (rc != 0) latest_version[0] = '\0';
+    if (rc != 0) {
+        latest_version[0] = '\0';
+        latest_sequence_available = 0;
+    }
     pthread_mutex_unlock(&check_mutex);
     return NULL;
 }
@@ -138,7 +185,10 @@ int updater_check(void) {
     int rc = do_check();
     pthread_mutex_lock(&check_mutex);
     check_state = 2;
-    if (rc != 0) latest_version[0] = '\0';
+    if (rc != 0) {
+        latest_version[0] = '\0';
+        latest_sequence_available = 0;
+    }
     pthread_mutex_unlock(&check_mutex);
     return rc;
 }
@@ -161,6 +211,13 @@ int updater_get_latest_version(char *out, size_t out_size) {
 
 int updater_is_update_available(void) {
     char lv[64];
+    int available;
+    if (production_ota_available()) {
+        pthread_mutex_lock(&check_mutex);
+        available = latest_sequence_available;
+        pthread_mutex_unlock(&check_mutex);
+        return available;
+    }
     /* Compare against a copy, not the shared buffer: holding the pointer past
      * the unlock had the same race as the getters (#227). */
     if (!updater_get_latest_version(lv, sizeof(lv))) return 0;
@@ -200,15 +257,14 @@ void updater_get_apply_status(char *out, size_t out_size) {
 
 /* #118: Run apply in background; returns immediately. */
 static void *apply_thread_func(void *arg) {
-    int rc;
     (void)arg;
-    rc = updater_apply(apply_source_dir);
-    if (rc != 0) {
-        pthread_mutex_lock(&apply_mutex);
-        apply_state = 0;
-        pthread_mutex_unlock(&apply_mutex);
-    }
-    /* On success, systemctl restart kills us before we get here */
+    updater_apply(apply_source_dir);
+    /* Legacy success restarts and kills this process. The production worker is
+     * a separate systemd unit and returns after dispatch, so reaching here is
+     * also normal and must make a later dashboard request possible. */
+    pthread_mutex_lock(&apply_mutex);
+    apply_state = 0;
+    pthread_mutex_unlock(&apply_mutex);
     return NULL;
 }
 
@@ -314,6 +370,22 @@ int updater_apply(const char *source_dir) {
         snprintf(apply_status, sizeof(apply_status), "Error: no source directory specified");
         pthread_mutex_unlock(&apply_mutex);
         return -1;
+    }
+
+    if (production_ota_available()) {
+        pthread_mutex_lock(&apply_mutex);
+        snprintf(apply_status, sizeof(apply_status), "Starting signed OTA worker...");
+        pthread_mutex_unlock(&apply_mutex);
+        if (run_command("sudo -n /bin/systemctl start --no-block millennium-update-apply.service") != 0) {
+            pthread_mutex_lock(&apply_mutex);
+            snprintf(apply_status, sizeof(apply_status), "Error: could not start signed OTA worker");
+            pthread_mutex_unlock(&apply_mutex);
+            return -1;
+        }
+        pthread_mutex_lock(&apply_mutex);
+        snprintf(apply_status, sizeof(apply_status), "Signed OTA accepted; installation continues in systemd");
+        pthread_mutex_unlock(&apply_mutex);
+        return 0;
     }
 
     /* Record where we are BEFORE touching anything, so a later step can undo

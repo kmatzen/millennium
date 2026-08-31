@@ -1,0 +1,14 @@
+[Unit]
+Description=Roll back an interrupted Millennium update activation
+DefaultDependencies=no
+After=local-fs.target
+Before=daemon.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'if [ -x /opt/millennium/previous/ota/millennium-ota ]; then exec /opt/millennium/previous/ota/millennium-ota recover; fi'
+User=root
+Group=root
+
+[Install]
+WantedBy=multi-user.target

@@ -211,6 +211,7 @@ test: simulator unit_tests
 	@echo ""
 	@echo "Running scenario tests..."
 	@./simulator tests/*.scenario
+	@python3 tests/test_ota.py
 	@echo ""
 
 # Compile-check every daemon translation unit EXCEPT pjsip_interface.o (the only

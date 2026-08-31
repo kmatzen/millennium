@@ -71,7 +71,7 @@ This project reimagines the functionality of the Nortel Millennium telephone by 
 - **Emergency calls**: Dial 911, 311, or 0 without coins (configurable free numbers)
 - **Magstripe card support**: Swipe a registered card for free calling or admin access
 - **Web dashboard**: Real-time phone state, plugin switching, health monitoring via WebSocket
-- **OTA updates**: Check for and apply updates from the web dashboard (git pull, build, restart)
+- **Developer OTA updates**: Check for and apply source updates from the web dashboard (git pull, build, restart). The signed unattended production design is documented in [host/docs/UNATTENDED_APPLIANCE.md](host/docs/UNATTENDED_APPLIANCE.md).
 - **Audio tones**: DTMF, dial tone, busy tone, coin tone, ringback via ALSA
 - **Idle timeout**: Automatically resets phone state after configurable inactivity period
 - **State persistence**: Saves and restores coin balance and plugin state across restarts
@@ -88,6 +88,7 @@ This project reimagines the functionality of the Nortel Millennium telephone by 
 - **`case/`**: 3D model files (`.blend` and `.stl`) for a custom enclosure. See [case/README.md](case/README.md) for dimensions and print settings.
 - **`pcb/`**: KiCad schematic, PCB layout, BOM, and Gerber files for the custom PCB (phonev6).
 - **`HARDWARE.md`**: Physical assembly reference — USB topology, cable routing, power budget, and component list.
+- **`host/docs/UNATTENDED_APPLIANCE.md`**: Production design for signed full-device OTA and outbound remote maintenance.
 - **`host/`**: Raspberry Pi software:
   - `daemon.c` — Main daemon loop and event routing
   - `plugins/` — Plugin implementations (classic_phone, fortune_teller, jukebox, number_guess, simon, dial_a_joke, trivia)
