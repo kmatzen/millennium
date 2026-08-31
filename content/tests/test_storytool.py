@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 import copy
+import contextlib
 import importlib.util
+import io
 import json
 from pathlib import Path
 import tempfile
@@ -56,6 +58,28 @@ class StoryToolTests(unittest.TestCase):
             import tarfile
             with tarfile.open(archive_a) as bundle:
                 self.assertIn("story.mst", bundle.getnames())
+
+    def test_explore_is_unique_and_honors_persistent_conditions(self):
+        paths = TOOL.explore_paths(self.story)
+        self.assertEqual(len(paths), len(set(paths)))
+        self.assertEqual(
+            {ending for ending, unused_path in paths},
+            {"missed-call", "mara-left-the-house", "mara-answered-herself",
+             "call-held", "the-loop-is-closed", "the-voice-crossed"})
+        for ending, path in paths:
+            if "send_leave" in path and ending != "call-held":
+                self.assertEqual(ending, "mara-left-the-house")
+            if "send_answer" in path and ending != "call-held":
+                self.assertEqual(ending, "mara-answered-herself")
+
+    def test_explore_prints_one_representative_per_ending(self):
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            TOOL.explore(self.story)
+        lines = output.getvalue().splitlines()
+        self.assertEqual(len(lines), 7)
+        self.assertEqual(sum(" variant(s)): " in line for line in lines), 6)
+        self.assertIn("1325 unique acyclic path(s) reach 6 ending(s)", lines[-1])
 
 
 if __name__ == "__main__":

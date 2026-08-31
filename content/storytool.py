@@ -4,6 +4,7 @@
 import argparse
 import gzip
 import hashlib
+import itertools
 import json
 from pathlib import Path
 import re
@@ -261,24 +262,68 @@ def preview(story):
             print("Invalid choice; try again.")
 
 
-def explore(story):
-    paths = []
+def explore_paths(story):
+    """Return unique, condition-aware simple paths through a story.
 
-    def walk(name, path):
+    Persistent condition variables are seeded with every value referenced by
+    a transition so return-visit entries are represented without enumerating
+    an unbounded number of sessions. State mutations are then applied along
+    each path. Keeping paths scene-simple makes authoring output finite even
+    when repeat/resume transitions form intentional loops.
+    """
+    initial = dict(story.get("initial_state", {}))
+    condition_values = {}
+    for scene in story["scenes"].values():
+        for item in scene.get("transitions", []):
+            condition = item.get("when", {})
+            variable = condition.get("var")
+            if variable:
+                condition_values.setdefault(variable, {initial.get(variable, 0)}).add(
+                    condition.get("equals"))
+    variables = sorted(condition_values)
+    seeds = [initial]
+    if variables:
+        seeds = []
+        for values in itertools.product(*(sorted(condition_values[name]) for name in variables)):
+            state = dict(initial)
+            state.update(zip(variables, values))
+            seeds.append(state)
+
+    paths = set()
+
+    def walk(name, path, state):
         scene = story["scenes"][name]
         next_path = path + [name]
         if scene.get("ending"):
-            paths.append((scene["ending"], next_path))
+            paths.add((scene["ending"], tuple(next_path)))
             return
         for item in scene.get("transitions", []):
             if item["target"] in next_path:
                 continue
-            walk(item["target"], next_path)
+            condition = item.get("when", {})
+            if condition and state.get(condition.get("var"), 0) != condition.get("equals"):
+                continue
+            next_state = dict(state)
+            next_state.update(item.get("set", {}))
+            for variable, amount in item.get("increment", {}).items():
+                next_state[variable] = next_state.get(variable, 0) + amount
+            walk(item["target"], next_path, next_state)
 
-    walk(story["entry"], [])
+    for seed in seeds:
+        walk(story["entry"], [], seed)
+    return sorted(paths)
+
+
+def explore(story):
+    paths = explore_paths(story)
+    by_ending = {}
     for ending, path in paths:
-        print(f"{ending}: {' -> '.join(path)}")
-    print(f"{len(paths)} acyclic path(s) reach {len(set(item[0] for item in paths))} ending(s)")
+        by_ending.setdefault(ending, []).append(path)
+    for ending in sorted(by_ending):
+        variants = by_ending[ending]
+        representative = min(variants, key=lambda item: (len(item), item))
+        print(f"{ending} ({len(variants)} variant(s)): {' -> '.join(representative)}")
+    print(f"{len(paths)} unique acyclic path(s) reach {len(by_ending)} ending(s)")
 
 
 def package(story_path, output, private_key=None, key_id="primary"):
