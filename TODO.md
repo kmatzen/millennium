@@ -93,7 +93,7 @@ as an unattended appliance. Items are ordered by priority.
 - [ ] Validate the full unattended workflow on real hardware.
   - [x] Install a release from `kmatzen.com` using the normal timer path.
   - [x] Confirm both MCUs, the host daemon, audio, SIP, and controls after activation.
-  - [ ] Force a failed health check and verify automatic rollback.
+  - [x] Force a failed health check and verify automatic rollback.
   - [ ] Test loss of power and network during download, flash, and activation.
   - [ ] Confirm remote maintenance works from outside the home network.
 
@@ -164,7 +164,7 @@ A release is ready for an inexperienced end user only when:
 - [x] Administrative controls are inaccessible without authentication.
 - [x] The host and both MCU images are authenticated and attested.
 - [x] A successful OTA has completed through the scheduled production path.
-- [ ] A deliberately bad OTA has rolled back without manual intervention.
+- [x] A deliberately bad OTA has rolled back without manual intervention.
 - [x] Failed releases stop retrying automatically.
 - [ ] Power and network interruption tests recover safely.
 - [x] Remote maintenance works through the known domain without inbound home-network access.

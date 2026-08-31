@@ -69,6 +69,29 @@ maintenance tunnel, serial stability, and all eight HIL gates.
 - Latest encrypted off-device backup observed during this work: Restic snapshot
   `2fbf5133`; phone acknowledgement and monitoring freshness verified.
 
+Signed sequence 6 was manually started with explicit owner authorization after
+the configured `02:00`–`05:00` automatic window deferred its daytime timer run.
+It committed at 2026-08-31 16:03 PDT with daemon commit `16d759e`, the corrected
+content installer, unchanged attested MCU images, healthy SIP/serial status,
+and all eight HIL gates passing at `2026-08-31T23:03:25Z`.
+
+A deliberately unhealthy, signed, `phone-001`-only sequence 7 was then applied
+to prove the production rollback path. Its daemon exposed the correct package
+version to the release builder but deliberately exited on normal startup. The
+OTA worker waited the full 150-second health window, rejected the release at
+2026-08-31 16:07 PDT, restored `current` to sequence 6, restarted the known-good
+daemon, cleared the activation journal, and left `installed-sequence` at 6.
+No manual rollback action was taken, and unchanged firmware digests avoided MCU
+reflashing. Signed recovery sequence 8 subsequently committed at 16:10 PDT.
+
+- Active release: sequence 8, version `0.4.0`, `armv7l`
+- Rollback release: sequence 6, version `0.4.0`, `armv7l`
+- Host: `millennium-daemon 0.4.0 (git 16d759e, built 2026-08-31T21:36:17Z)`
+- Host SHA-256: `72f56cc610f2fc56afebf0f5d8724b753e9a68ae8ee7d86eaa8343562659358e`
+- Keypad HEX SHA-256: `f1692bb35d07b759428723cd3ec4257eaa3520f6eb91f9aeec5cd3bc472de273`
+- Display HEX SHA-256: `5dab000d8408ed497432fd52248c8671156ef764d4f7426e56df3d31e9b4b0a2`
+- Recovery HIL: all eight gates passed at `2026-08-31T23:10:56Z`
+
 ### Superseded sequence 1 provenance
 
 - Release: sequence 1, version `0.4.0`, `armv7l`
