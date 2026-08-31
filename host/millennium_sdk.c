@@ -34,6 +34,7 @@ static char *string_duplicate(const char *src);
 static void string_buffer_append(struct millennium_client *client, const char *data, size_t len);
 static void string_buffer_ensure_capacity(struct millennium_client *client, size_t needed);
 static int open_serial_port(struct millennium_client *client, const char *device);
+static int send_mcu_hello(struct millennium_client *client);
 static speed_t serial_speed_from_baud(int baud_rate);
 static int serial_write_all(struct millennium_client *client, const uint8_t *data,
                             size_t length);
@@ -289,25 +290,33 @@ static int open_serial_port(struct millennium_client *client, const char *device
     client->serial_healthy = 1;
     client->reconnect_attempts = 0;
 
-    {
-        uint8_t hello[2] = {MCU_PROTOCOL_VERSION, MCU_PROTOCOL_VERSION};
-        uint8_t frame[MCU_PROTOCOL_MAX_FRAME];
-        size_t length = mcu_protocol_encode(MCU_MSG_HELLO,
-            client->mcu_tx_sequence++, hello, sizeof(hello), frame, sizeof(frame));
-        mcu_decoder_init(&client->mcu_decoder);
-        memset(&client->mcu_event_replay, 0, sizeof(client->mcu_event_replay));
-        client->mcu_protocol_ready = 0;
-        clock_gettime(CLOCK_MONOTONIC, &client->mcu_protocol_started_at);
-        client->pending_frame_length = 0;
-        if (!length || serial_write_all(client, frame, length) != 0) {
-            logger_error_with_category("SDK", "Failed to begin MCU protocol negotiation");
-            close(client->display_fd);
-            client->display_fd = -1;
-            client->serial_healthy = 0;
-            return -1;
-        }
+    mcu_decoder_init(&client->mcu_decoder);
+    memset(&client->mcu_event_replay, 0, sizeof(client->mcu_event_replay));
+    client->mcu_protocol_ready = 0;
+    client->serial_replay_pending = 1;
+    clock_gettime(CLOCK_MONOTONIC, &client->mcu_protocol_started_at);
+    client->mcu_protocol_last_hello_at = client->mcu_protocol_started_at;
+    client->pending_frame_length = 0;
+    if (send_mcu_hello(client) != 0) {
+        logger_error_with_category("SDK", "Failed to begin MCU protocol negotiation");
+        close(client->display_fd);
+        client->display_fd = -1;
+        client->serial_healthy = 0;
+        return -1;
     }
 
+    return 0;
+}
+
+static int send_mcu_hello(struct millennium_client *client) {
+    uint8_t hello[2] = {MCU_PROTOCOL_VERSION, MCU_PROTOCOL_VERSION};
+    uint8_t frame[MCU_PROTOCOL_MAX_FRAME];
+    size_t length;
+    if (!client) return -1;
+    length = mcu_protocol_encode(MCU_MSG_HELLO, client->mcu_tx_sequence++, hello,
+                                 sizeof(hello), frame, sizeof(frame));
+    if (!length || serial_write_all(client, frame, length) != 0) return -1;
+    clock_gettime(CLOCK_MONOTONIC, &client->mcu_protocol_last_hello_at);
     return 0;
 }
 
@@ -548,27 +557,8 @@ void millennium_client_check_serial(struct millennium_client *client) {
             logger_info_with_category("SDK", "Serial port reopened successfully");
             metrics_increment_counter("serial_reconnects", 1);
 
-            /* (#239) Put the coin gate back where the daemon last asked for
-             * it, replaying that call site's exact byte sequence -- the same
-             * idea as the display refresh below.  This used to send a bare
-             * 'f': it dropped the 'z' every other 'f' call site pairs with,
-             * and it armed the validator even with the handset on the hook,
-             * where handle_coin_event() drops the coin uncredited.
-             * See docs/COIN_VALIDATOR.md (#110). */
-            {
-                uint8_t coin_seq[COIN_GATE_RESYNC_MAX];
-                size_t coin_len = millennium_coin_gate_resync(
-                        client->coin_gate_cmd, coin_seq, sizeof(coin_seq));
-                size_t i;
-                for (i = 0; i < coin_len; i++) {
-                    millennium_client_write_to_coin_validator(client, coin_seq[i]);
-                }
-            }
-
-            /* Refresh display */
-            if (client->display_message) {
-                client->display_dirty = 1;
-            }
+            /* Opening an Arduino Micro resets it. State replay is deferred
+             * until the MCU completes protocol negotiation. */
         } else {
             client->reconnect_attempts++;
             backoff = serial_recovery_backoff_seconds(client->reconnect_attempts);
@@ -614,11 +604,29 @@ void millennium_client_update(struct millennium_client *client) {
 
     clock_gettime(CLOCK_MONOTONIC, &current_time);
 
-    if (!client->mcu_protocol_ready && client->serial_healthy &&
-            current_time.tv_sec - client->mcu_protocol_started_at.tv_sec >= 3) {
-        logger_error_with_category("SDK", "MCU protocol negotiation timed out");
-        metrics_increment_counter("mcu_protocol_negotiation_failures", 1);
-        client->serial_healthy = 0;
+    if (!client->mcu_protocol_ready && client->serial_healthy) {
+        serial_ready_action_t ready_action = serial_recovery_readiness_action(
+            current_time.tv_sec - client->mcu_protocol_started_at.tv_sec,
+            current_time.tv_sec - client->mcu_protocol_last_hello_at.tv_sec);
+        if (ready_action == SERIAL_READY_SEND_HELLO) {
+            if (send_mcu_hello(client) == 0)
+                metrics_increment_counter("mcu_protocol_hello_retries", 1);
+        } else if (ready_action == SERIAL_READY_FAIL) {
+            logger_error_with_category("SDK", "MCU protocol negotiation timed out");
+            metrics_increment_counter("mcu_protocol_negotiation_failures", 1);
+            client->serial_healthy = 0;
+        }
+    }
+
+    if (client->mcu_protocol_ready && client->serial_replay_pending) {
+        uint8_t coin_seq[COIN_GATE_RESYNC_MAX];
+        size_t coin_len = millennium_coin_gate_resync(
+                client->coin_gate_cmd, coin_seq, sizeof(coin_seq));
+        size_t i;
+        client->serial_replay_pending = 0;
+        for (i = 0; i < coin_len; i++)
+            millennium_client_write_to_coin_validator(client, coin_seq[i]);
+        if (client->display_message) client->display_dirty = 1;
     }
 
     if (client->pending_frame_length > 0) {
@@ -644,7 +652,7 @@ void millennium_client_update(struct millennium_client *client) {
     elapsed_ms = (current_time.tv_sec - client->last_update_time.tv_sec) * 1000 +
                      (current_time.tv_nsec - client->last_update_time.tv_nsec) / 1000000;
     
-    if (client->display_dirty && elapsed_ms > 33) {
+    if (client->mcu_protocol_ready && client->display_dirty && elapsed_ms > 33) {
         millennium_client_write_to_display(client, client->display_message);
         client->last_update_time = current_time;
         client->display_dirty = 0;
@@ -1023,6 +1031,9 @@ void millennium_client_write_command(struct millennium_client *client, uint8_t c
         logger_errorf_with_category("SDK", "Unsupported MCU command: %u", command);
         return;
     }
+    /* Calls made during Arduino boot update their desired state, but no
+     * command may reach the validator/display until HELLO confirms readiness. */
+    if (!client->mcu_protocol_ready) return;
     sequence = client->mcu_tx_sequence++;
     frame_length = mcu_protocol_encode(type, sequence, data, data_size,
                                        frame, sizeof(frame));

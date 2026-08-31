@@ -54,3 +54,10 @@ int serial_recovery_backoff_seconds(int reconnect_attempts) {
     }
     return backoff;
 }
+
+serial_ready_action_t serial_recovery_readiness_action(long elapsed_seconds,
+                                                       long since_hello_seconds) {
+    if (elapsed_seconds >= 10) return SERIAL_READY_FAIL;
+    if (since_hello_seconds >= 1) return SERIAL_READY_SEND_HELLO;
+    return SERIAL_READY_WAIT;
+}

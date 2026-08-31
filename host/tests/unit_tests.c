@@ -2432,6 +2432,15 @@ static void test_serial_backoff_survives_a_long_outage(void) {
     TEST_ASSERT_EQ_INT(serial_recovery_backoff_seconds(-1), 1);
 }
 
+static void test_serial_readiness_holds_port_open_through_mcu_boot(void) {
+    TEST_ASSERT_EQ_INT(serial_recovery_readiness_action(0, 0), SERIAL_READY_WAIT);
+    TEST_ASSERT_EQ_INT(serial_recovery_readiness_action(1, 1), SERIAL_READY_SEND_HELLO);
+    TEST_ASSERT_EQ_INT(serial_recovery_readiness_action(5, 1), SERIAL_READY_SEND_HELLO);
+    TEST_ASSERT_EQ_INT(serial_recovery_readiness_action(9, 0), SERIAL_READY_WAIT);
+    TEST_ASSERT_EQ_INT(serial_recovery_readiness_action(10, 1), SERIAL_READY_FAIL);
+    TEST_ASSERT_EQ_INT(serial_recovery_readiness_action(30, 30), SERIAL_READY_FAIL);
+}
+
 /* ── Arduino diagnostics (#230) ─────────────────────────────────── */
 
 static void test_diag_parse_alpha_and_beta(void) {
@@ -2769,6 +2778,7 @@ int main(void) {
     TEST_SUITE_RUN(test_serial_null_state);
     TEST_SUITE_RUN(test_serial_backoff_doubles_then_caps);
     TEST_SUITE_RUN(test_serial_backoff_survives_a_long_outage);
+    TEST_SUITE_RUN(test_serial_readiness_holds_port_open_through_mcu_boot);
 
     TEST_SUITE_BEGIN("SIP Text Safety");
     TEST_SUITE_RUN(test_sip_text_respects_length_without_source_nul);

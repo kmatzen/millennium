@@ -22,6 +22,12 @@ typedef enum {
     SERIAL_ACTION_RECONNECT    /* backoff elapsed; try to reopen the port */
 } serial_action_t;
 
+typedef enum {
+    SERIAL_READY_WAIT = 0,
+    SERIAL_READY_SEND_HELLO,
+    SERIAL_READY_FAIL
+} serial_ready_action_t;
+
 typedef struct {
     int  fd_open;              /* client->display_fd != -1 */
     int  link_healthy;         /* client->serial_healthy */
@@ -36,5 +42,11 @@ serial_action_t serial_recovery_next_action(const serial_link_state_t *state);
  * count after the failure has been tallied).  Doubles per attempt, capped at
  * SERIAL_MAX_BACKOFF_SECONDS. */
 int serial_recovery_backoff_seconds(int reconnect_attempts);
+
+/* Opening an Arduino Micro resets it. Keep the descriptor open while its
+ * bootloader/sketch starts, periodically retrying protocol negotiation instead
+ * of closing and resetting it again. */
+serial_ready_action_t serial_recovery_readiness_action(long elapsed_seconds,
+                                                       long since_hello_seconds);
 
 #endif /* SERIAL_RECOVERY_H */

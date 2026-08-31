@@ -70,6 +70,8 @@ typedef struct millennium_client {
     uint8_t mcu_tx_sequence;
     uint8_t mcu_protocol_ready;
     struct timespec mcu_protocol_started_at;
+    struct timespec mcu_protocol_last_hello_at;
+    int serial_replay_pending;
     uint8_t pending_frame[MCU_PROTOCOL_MAX_FRAME];
     size_t pending_frame_length;
     uint8_t pending_sequence;

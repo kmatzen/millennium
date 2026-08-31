@@ -176,7 +176,8 @@ class OtaTests(unittest.TestCase):
             inputs = root / "inputs"
             inputs.mkdir()
             paths = {}
-            for filename in ("daemon", "portal", "keypad", "display", "flash"):
+            for filename in ("daemon", "portal", "keypad", "display", "flash",
+                             "content_installer", "storytool"):
                 paths[filename] = inputs / filename
                 paths[filename].write_bytes((filename + "\n").encode())
             paths["daemon"].write_text("#!/bin/sh\necho 'millennium-daemon 0.4.0 (test)'\n")
@@ -195,6 +196,8 @@ class OtaTests(unittest.TestCase):
                 "--portal", str(paths["portal"]), "--keypad", str(paths["keypad"]),
                 "--display", str(paths["display"]), "--flash-script", str(paths["flash"]),
                 "--ota-worker", str(WORKER_PATH),
+                "--content-installer", str(paths["content_installer"]),
+                "--storytool", str(paths["storytool"]),
                 "--private-key", str(private),
             ]
             subprocess.run(base + ["--output-dir", str(output_a)], check=True, stdout=subprocess.PIPE)
