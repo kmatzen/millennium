@@ -132,6 +132,9 @@ def main():
     parser.add_argument("--display", type=Path, default=Path("Arduino/build/display/display.ino.hex"))
     parser.add_argument("--flash-script", type=Path, default=Path("Arduino/pi_flash.sh"))
     parser.add_argument("--ota-worker", type=Path, default=Path("host/ota/millennium_ota.py"))
+    parser.add_argument("--content-installer", type=Path,
+                        default=Path("content/install_content.py"))
+    parser.add_argument("--storytool", type=Path, default=Path("content/storytool.py"))
     parser.add_argument("--private-key", type=Path)
     parser.add_argument("--key-id", default="primary")
     parser.add_argument("--channel", default="stable")
@@ -182,6 +185,8 @@ def main():
             "arduino/display.hex": (args.display, 0o644),
             "arduino/pi_flash.sh": (args.flash_script, 0o755),
             "ota/millennium-ota": (args.ota_worker, 0o755),
+            "content/millennium-content": (args.content_installer, 0o755),
+            "content/storytool.py": (args.storytool, 0o644),
         }
         for relative, (source, mode) in payloads.items():
             copy_payload(source, root / relative, mode)

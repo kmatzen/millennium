@@ -28,6 +28,10 @@ signature. Content versions are independent of the daemon version.
 On the phone, `install_content.py install` requires that signature and a
 matching trusted key ID, revalidates the author and runtime forms, installs an
 immutable release, and atomically moves `current` while retaining `previous`.
+The full-device OTA bundle carries the matching content verifier and compiler
+under `/opt/millennium/current/content`, so a story compiler-format change is
+promoted with the daemon that reads it. Production content activation should
+invoke that release-owned verifier rather than an older fixed-path copy.
 `install_content.py rollback` swaps those links without changing the host
 daemon or MCU firmware. Configure `story.path` to
 `/var/lib/millennium/content/current/story.mst`.

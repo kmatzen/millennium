@@ -29,6 +29,8 @@ REQUIRED_FILES = (
     "arduino/display.hex",
     "arduino/pi_flash.sh",
     "ota/millennium-ota",
+    "content/millennium-content",
+    "content/storytool.py",
 )
 
 
@@ -375,6 +377,7 @@ def verify_release(release_dir, manifest, architecture=None):
     os.chmod(release_dir / "host/millennium-daemon", 0o755)
     os.chmod(release_dir / "arduino/pi_flash.sh", 0o755)
     os.chmod(release_dir / "ota/millennium-ota", 0o755)
+    os.chmod(release_dir / "content/millennium-content", 0o755)
 
 
 def get_json(url, timeout=5, parse_http_error=False):
