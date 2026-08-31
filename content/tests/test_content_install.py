@@ -4,6 +4,7 @@ import io
 import os
 from pathlib import Path
 import shutil
+import stat
 import subprocess
 import sys
 import tarfile
@@ -54,6 +55,8 @@ class ContentInstallTests(unittest.TestCase):
         first, first_sig = self.build(packages)
         install(first, first_sig, {"test": self.public}, self.root / "installed")
         self.assertTrue((self.root / "installed/current/story.mst").is_file())
+        release = (self.root / "installed/current").resolve()
+        self.assertEqual(stat.S_IMODE(release.stat().st_mode), 0o755)
         second, second_sig = self.build(packages, "1.2.0")
         install(second, second_sig, {"test": self.public}, self.root / "installed")
         self.assertIn("1.2.0", os.readlink(self.root / "installed/current"))

@@ -47,7 +47,7 @@ def service_active(name):
 
 def recent_filesystem_errors():
     result = subprocess.run(
-        ["journalctl", "--quiet", "--kernel", "--priority=err",
+        ["journalctl", "--quiet", "-k", "--priority=err",
          "--since=-15 minutes", "--output=cat"],
         stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True,
         timeout=10, check=False)

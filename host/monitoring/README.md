@@ -43,3 +43,19 @@ record; losing both copies makes the backup intentionally unrecoverable.
 Quarterly, restore the newest snapshot into an empty temporary directory on a
 different machine and record the snapshot ID, date, and verification result.
 An untested repository is not considered a backup.
+
+### Pull-based backup host
+
+For a phone reachable only through its reverse maintenance tunnel, install
+`millennium_backup_pull.sh` on the backup host. The phone's authorized key must
+be restricted to `millennium-backup-export`. The pull script can request only
+`backup` and `ack`: it streams the fixed archive into Restic, applies retention,
+and acknowledges the phone only after both operations succeed. That acknowledgement
+updates `/var/lib/millennium/backup/last-success`, which is the freshness stamp
+consumed by `millennium-monitor`.
+
+Install `millennium_metrics_pull.sh` and its user timer on the same host to pull
+the monitor's fixed Prometheus textfile through that restricted key. The export
+command cannot read arbitrary files, and the pull validates the check-in metric
+before atomically replacing anima's node-exporter textfile. This avoids a stale
+LAN address and continues working wherever the phone's reverse tunnel connects.

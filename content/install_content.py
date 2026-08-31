@@ -132,6 +132,12 @@ def install(manifest_path, signature_path, keys, root):
         if runtime_path.read_bytes() != compile_runtime(story):
             raise InstallError("compiled story does not match reviewed story JSON")
         shutil.copytree(stage, target)
+        # TemporaryDirectory is deliberately 0700. copytree preserves that
+        # mode on the destination root, which would make an otherwise valid
+        # release unreadable by the unprivileged daemon. Story payloads are
+        # immutable public appliance data; the archive retains file/subdir
+        # modes, while the release root must always be traversable.
+        os.chmod(target, 0o755)
     current = root / "current"
     if current.is_symlink():
         atomic_link(root, "previous", os.readlink(current))

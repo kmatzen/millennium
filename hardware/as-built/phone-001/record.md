@@ -47,6 +47,28 @@ The post-update HIL run passed all eight gates at `2026-08-31T16:57:53Z`.
   on 2026-08-31; nightly timer enabled with 14 daily, 8 weekly, and 12 monthly
   retention points.
 
+Signed sequence 5 committed through the normal production worker on 2026-08-31
+after sequence 4 upgraded the worker's accepted payload format. The release was
+scoped to the unique `phone-001` device group. Independent post-commit checks
+confirmed the exact host build, both MCU/protocol gates, SIP registration,
+maintenance tunnel, serial stability, and all eight HIL gates.
+
+- Installed release: sequence 5, version `0.4.0`, `armv7l`
+- Host: `millennium-daemon 0.4.0 (git d227cd0, built 2026-08-31T20:21:55Z)`
+- Host SHA-256: `b420a3cc100ae96b1d0e9cc31c38526a1bacc167226b562304d9485dcc3de724`
+- Content installer SHA-256: `f5a4b6ce0bdf2a04ec86378f762d99f1ce924cd1e8e00437cbea5910196326d3`
+- Story compiler SHA-256: `e2da3cef20ab1fe1cc4ac34f9b3c66ef660286c9409dc6c2f0229d705cc80c45`
+- MCU identities: keypad/display version `0.4.0`, protocol 2, build `e0fe59960549`
+- HIL result: all eight gates passed at `2026-08-31T21:06:30Z`
+- Content release: `last-line-2.0.1`, manifest SHA-256
+  `a4d95ec05a9bdf6636b0ca3f202d01f73b17819bf548c4f6cab19b88d3fe944a`
+- Live experience check: Story Mode loaded the signed runtime, rendered its
+  invitation/missed-call display, and opened its 8 kHz PCM narration inside the
+  hardened daemon sandbox; Classic Phone was restored afterward.
+- Audio profile: stable ALSA card ID `Device`; systemd permits `char-alsa`.
+- Latest encrypted off-device backup observed during this work: Restic snapshot
+  `2fbf5133`; phone acknowledgement and monitoring freshness verified.
+
 ### Superseded sequence 1 provenance
 
 - Release: sequence 1, version `0.4.0`, `armv7l`

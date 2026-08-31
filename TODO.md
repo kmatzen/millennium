@@ -84,7 +84,7 @@ as an unattended appliance. Items are ordered by priority.
   - [x] Run PCB checks with a pinned KiCad environment.
   - [x] Publish checksums, source commit, tool versions, and an SBOM with releases.
 
-- [ ] Add operational monitoring and alerts.
+- [x] Add operational monitoring and alerts.
   - [x] Monitor last check-in, SIP registration, and maintenance-tunnel availability.
   - [x] Alert on OTA failure or rollback, serial drops, and MCU resets.
   - [x] Monitor disk space, filesystem errors, certificate expiry, and reboot frequency.
@@ -92,7 +92,7 @@ as an unattended appliance. Items are ordered by priority.
 
 - [ ] Validate the full unattended workflow on real hardware.
   - [x] Install a release from `kmatzen.com` using the normal timer path.
-  - [ ] Confirm both MCUs, the host daemon, audio, SIP, and controls after activation.
+  - [x] Confirm both MCUs, the host daemon, audio, SIP, and controls after activation.
   - [ ] Force a failed health check and verify automatic rollback.
   - [ ] Test loss of power and network during download, flash, and activation.
   - [ ] Confirm remote maintenance works from outside the home network.
@@ -116,8 +116,8 @@ as an unattended appliance. Items are ordered by priority.
   - [x] Document the intended tone, characters, world rules, interaction vocabulary, and content-review standards.
   - Done when a non-developer can author and preview a branching experience, a first-time caller can complete it without coaching, interrupted sessions recover coherently, and content can be safely deployed or rolled back independently.
 
-- [ ] Create an initial story and interaction roadmap.
-  - [ ] Ship one polished short experience that demonstrates calls, keypad choices, audio, display feedback, and persistent consequences.
+- [x] Create an initial story and interaction roadmap.
+  - [x] Ship one polished short experience that demonstrates calls, keypad choices, audio, display feedback, and persistent consequences.
   - [x] Add at least one experience that rewards a return visit or changes over real-world time.
   - [x] Add optional discoveries that use the physical phone hardware without blocking the main story.
   - [x] Establish a small library of reusable voices, sound cues, transitions, and interaction patterns.
@@ -162,13 +162,13 @@ as an unattended appliance. Items are ordered by priority.
 A release is ready for an inexperienced end user only when:
 
 - [x] Administrative controls are inaccessible without authentication.
-- [ ] The host and both MCU images are authenticated and attested.
+- [x] The host and both MCU images are authenticated and attested.
 - [x] A successful OTA has completed through the scheduled production path.
 - [ ] A deliberately bad OTA has rolled back without manual intervention.
 - [x] Failed releases stop retrying automatically.
 - [ ] Power and network interruption tests recover safely.
 - [x] Remote maintenance works through the known domain without inbound home-network access.
-- [ ] Monitoring reports the phone's health and alerts on loss of contact.
+- [x] Monitoring reports the phone's health and alerts on loss of contact.
 - [ ] Signing keys, server state, and recovery instructions have tested backups.
 - [ ] A first-time caller can discover and complete the primary experience without instruction from the owner.
 - [ ] Story interruption, timeout, repeat-play, offline, and return-visit paths have been playtested.

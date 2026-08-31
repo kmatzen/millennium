@@ -3,8 +3,10 @@
 
 import importlib.util
 from pathlib import Path
+import subprocess
 import tempfile
 import unittest
+from unittest import mock
 
 
 MODULE_PATH = Path(__file__).parents[1] / "monitoring" / "millennium_monitor.py"
@@ -36,6 +38,14 @@ class MonitorTests(unittest.TestCase):
             MONITOR.atomic_write(target, "first\n")
             MONITOR.atomic_write(target, "second\n")
             self.assertEqual(target.read_text(), "second\n")
+
+    def test_filesystem_errors_uses_portable_kernel_journal_flag(self):
+        completed = subprocess.CompletedProcess([], 0, stdout="EXT4-fs error\nquiet\n")
+        with mock.patch.object(MONITOR.subprocess, "run", return_value=completed) as run:
+            self.assertEqual(MONITOR.recent_filesystem_errors(), 1)
+        command = run.call_args.args[0]
+        self.assertIn("-k", command)
+        self.assertNotIn("--kernel", command)
 
     def test_hil_evaluate_requires_every_physical_gate(self):
         healthy = {"overall_status": "HEALTHY"}

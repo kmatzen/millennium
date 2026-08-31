@@ -1,4 +1,4 @@
-MSTORY	1	last-line	2.0.0	invitation
+MSTORY	1	last-line	2.0.1	invitation
 ACCESS	*	12	80	1	1
 VAR	choice	0
 VAR	coin_found	0

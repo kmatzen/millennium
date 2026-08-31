@@ -1,5 +1,5 @@
 {
-  "id": "last-line", "version": "2.0.0",
+  "id": "last-line", "version": "2.0.1",
   "title": "The House at the End of the Line",
   "entry": "invitation", "offline_entry": "invitation",
   "initial_state": {"visits": 0, "choice": 0, "route": 0, "coin_found": 0, "token_found": 0},
