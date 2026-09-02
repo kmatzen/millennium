@@ -119,6 +119,19 @@ class AcceptanceEvidenceTests(unittest.TestCase):
             self.assertIn("sha256", key["copy_evidence"])
             self.assertIn("sha256", key["recovery_evidence"])
 
+    def test_external_record_rejects_unproven_narrative(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            record = root / "handoff.json"
+            evidence = root / "external.json"
+            record.write_text(json.dumps({"schema": 1, "device_id": "phone-001"}),
+                              encoding="utf-8")
+            evidence.write_text(json.dumps({"passed": True}), encoding="utf-8")
+            args = Namespace(record=record, result="pass", date="2026-09-02",
+                             network_description="cellular", evidence_file=evidence)
+            with self.assertRaises(SystemExit):
+                handoff.record_external(args)
+
     def test_measured_test_command_requires_measurement(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

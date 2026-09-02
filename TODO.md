@@ -142,6 +142,8 @@ as an unattended appliance. Items are ordered by priority.
       restricted backup pull remain operational through anima.
     - [x] Verify an approved hardware-backed administrator key through the
       reverse tunnel; the explicit FIDO identity succeeded without phone changes.
+    - [x] Provide a privacy-preserving external-vantage audit that rejects the
+      home source network and verifies hardware-backed login and phone health.
     - [ ] Complete an interactive maintenance session from a genuinely
       external network and retain the dated audit evidence.
   - [x] Provide a machine-validated final handoff record that binds the real

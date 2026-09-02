@@ -137,6 +137,21 @@ def add_key_copy(args):
 
 def record_external(args):
     def change(value):
+        try:
+            audit = json.loads(args.evidence_file.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise SystemExit("invalid external-maintenance audit: %s" % exc)
+        required_checks = audit.get("checks", {})
+        if (audit.get("schema") != 1
+                or audit.get("operation") != "external-maintenance-audit"
+                or audit.get("passed") is not True
+                or audit.get("source_network_differs_from_home") is not True
+                or audit.get("raw_source_address_stored") is not False
+                or audit.get("hardware_backed_authentication") is not True
+                or not required_checks or not all(required_checks.values())
+                or audit.get("device_id") != value.get("device_id")
+                or audit.get("network_description") != args.network_description):
+            raise SystemExit("external-maintenance audit does not prove the requested gate")
         value["external_maintenance"] = {
             "passed": args.result == "pass",
             "date": args.date,

@@ -1,0 +1,9 @@
+{
+  "captured_at": "2026-09-02T05:11:08+00:00",
+  "operation": "home-network-baseline",
+  "raw_source_address_stored": false,
+  "schema": 1,
+  "secret_sha256": "7d00e546bf4eabc49ea8042ed9deb8e4a5eaf3fd26dcbfd73a2dcbf2f02be65d",
+  "server_id": "anima",
+  "source_address_hmac_sha256": "098c39b462919244595c4f3417ac3375b542ada1787ff81a8b34a0c09bf9ebe1"
+}

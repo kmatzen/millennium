@@ -72,7 +72,7 @@ python3 tools/handoff_acceptance.py add-key-copy \
 python3 tools/handoff_acceptance.py record-external \
   hardware/as-built/phone-001/handoff.json --result pass --date 2026-09-02 \
   --network-description "cellular hotspot, not home ISP" \
-  --evidence-file evidence/external-maintenance.txt
+  --evidence-file evidence/external-maintenance.json
 
 python3 tools/handoff_acceptance.py validate \
   hardware/as-built/phone-001/handoff.json

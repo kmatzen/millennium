@@ -28,7 +28,9 @@
   },
   "external_vantage_gate": {
     "passed": false,
-    "reason": "The route traversed anima, but the administrative client was still located on the phone's home network. Repeat from a genuinely external client network."
+    "reason": "The route traversed anima, but the administrative client was still located on the phone's home network. Repeat from a genuinely external client network.",
+    "home_network_baseline": "home-network-baseline.json",
+    "live_same_network_rejection_verified": true
   },
   "schema": 1
 }

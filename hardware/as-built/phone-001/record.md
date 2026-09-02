@@ -200,3 +200,10 @@ The daemon remained healthy with serial, SIP, and both MCU links healthy.
 A fresh restricted encrypted backup pull completed on anima immediately after
 deployment as Restic snapshot `40316409` at `2026-09-02T04:51:06Z`; the normal
 retention policy completed successfully.
+
+A privacy-preserving home-network baseline was captured through anima at
+`2026-09-02T05:11:08Z`. It stores only an HMAC of the source address; its random
+secret remains in restricted local configuration. A live audit from the same
+network was rejected before producing acceptance evidence. The outstanding
+external test can use the public maintenance hostname while binding it to the
+same stable anima server identity.

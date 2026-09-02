@@ -298,6 +298,40 @@ the maintainer's Ed25519 key, validates the effective sshd configuration, and
 disables root, password, and keyboard-interactive SSH login before the phone is
 handed over.
 
+Before leaving the home network, create a private HMAC secret and capture the
+source address observed by the maintenance server. Raw addresses are never
+written to the baseline:
+
+```bash
+python3 tools/external_maintenance_audit.py init-secret \
+  --output ~/.config/millennium-ota/network-audit-secret
+SSH_SK_HELPER=/path/to/ssh-sk-helper \
+python3 tools/external_maintenance_audit.py baseline \
+  --secret ~/.config/millennium-ota/network-audit-secret \
+  --ssh /path/to/fido-capable/ssh --identity ~/.ssh/maintainer-key \
+  --jump-host anima --server-id anima \
+  --output private-operations/home-network-baseline.json
+```
+
+From a cellular hotspot or another network outside the home, run:
+
+```bash
+SSH_SK_HELPER=/path/to/ssh-sk-helper \
+python3 tools/external_maintenance_audit.py audit \
+  --secret ~/.config/millennium-ota/network-audit-secret \
+  --baseline private-operations/home-network-baseline.json \
+  --ssh /path/to/fido-capable/ssh --identity ~/.ssh/maintainer-key \
+  --jump-host maintenance.kmatzen.com --jump-user kmatzen --jump-port 2223 \
+  --server-id anima --phone-user matzen --phone-port 22022 \
+  --device-id phone-001 --network-description "cellular hotspot" \
+  --output private-operations/external-maintenance.json
+```
+
+The audit fails if anima observes the home-baseline source address, the FIDO
+key is not present in SSH's authentication trace, the reverse tunnel is down,
+or daemon, serial, or SIP health is bad. The final handoff recorder parses this
+JSON and will not accept a hand-written narrative in its place.
+
 If monitoring and restricted backups still traverse the reverse tunnel but all
 administrator keys are rejected, use the phone's local console. Put only the
 approved public key on removable media, record its fingerprint on a separate

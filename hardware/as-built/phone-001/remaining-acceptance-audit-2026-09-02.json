@@ -46,6 +46,8 @@
     "external_maintenance_vantage": {
       "status": "requires-external-client-network",
       "reverse_tunnel_previously_verified": true,
+      "home_network_baseline_captured": true,
+      "same_network_rejection_verified": true,
       "audit_attempt": "Hardware-backed SSH succeeded through anima's loopback reverse port after selecting the installed OpenSSH security-key helper; no phone or server configuration changed.",
       "evidence": "maintenance-access-audit-2026-09-02.json"
     },
