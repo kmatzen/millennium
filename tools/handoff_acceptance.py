@@ -78,7 +78,8 @@ def template(args):
         "as_built_record": args.as_built_record,
         "playtest_record": args.playtest_record,
         "wifi_clients": {
-            platform: {"passed": None, "date": None, "evidence": None}
+            platform: {"passed": None, "date": None,
+                       "portal_evidence": None, "outcome_evidence": None}
             for platform in WIFI_PLATFORMS
         },
         "offline_signing_key_copies": [],
@@ -105,10 +106,30 @@ def update_record(args, change):
 
 def record_wifi(args):
     def change(value):
+        try:
+            observation = json.loads(args.portal_evidence_file.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise SystemExit("invalid physical Wi-Fi observation: %s" % exc)
+        expected = {
+            "ios": {"/hotspot-detect.html"},
+            "android": {"/generate_204", "/gen_204"},
+            "macos": {"/hotspot-detect.html"},
+            "windows": {"/ncsi.txt"},
+        }
+        if (observation.get("schema") != 1
+                or observation.get("operation") != "physical-wifi-client-observation"
+                or observation.get("platform") != args.platform
+                or observation.get("passed") is not True
+                or observation.get("captive_probe_path") not in expected[args.platform]
+                or observation.get("portal_rendered") is not True
+                or observation.get("client_address_stored") is not False
+                or observation.get("user_agent_stored") is not False):
+            raise SystemExit("Wi-Fi observation does not prove this physical client")
         value.setdefault("wifi_clients", {})[args.platform] = {
             "passed": args.result == "pass",
             "date": args.date,
-            "evidence": file_evidence(args.evidence_file),
+            "portal_evidence": file_evidence(args.portal_evidence_file),
+            "outcome_evidence": file_evidence(args.outcome_evidence_file),
         }
     update_record(args, change)
 
@@ -169,7 +190,8 @@ def omissions(value, record_path, check_linked=True):
     for platform in WIFI_PLATFORMS:
         item = wifi.get(platform, {})
         if (item.get("passed") is not True or not item.get("date")
-                or not valid_evidence(item.get("evidence"), record_path, check_linked)):
+                or not valid_evidence(item.get("portal_evidence"), record_path, check_linked)
+                or not valid_evidence(item.get("outcome_evidence"), record_path, check_linked)):
             missing.append("wifi_clients." + platform)
     copies = value.get("offline_signing_key_copies", [])
     usable = [item for item in copies
@@ -238,7 +260,8 @@ def main():
     wifi.add_argument("--platform", choices=WIFI_PLATFORMS, required=True)
     wifi.add_argument("--result", choices=("pass", "fail"), required=True)
     wifi.add_argument("--date", required=True)
-    wifi.add_argument("--evidence-file", type=Path, required=True)
+    wifi.add_argument("--portal-evidence-file", type=Path, required=True)
+    wifi.add_argument("--outcome-evidence-file", type=Path, required=True)
     wifi.set_defaults(function=record_wifi)
     key = commands.add_parser("add-key-copy")
     key.add_argument("record", type=Path)

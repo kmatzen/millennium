@@ -85,7 +85,8 @@ class AcceptanceEvidenceTests(unittest.TestCase):
             "schema": 1, "device_id": "phone-001",
             "as_built_record": "as-built.json", "playtest_record": "playtest.json",
             "wifi_clients": {name: {"passed": True, "date": "2026-09-02",
-                                     "evidence": {"path": "notes", "sha256": "a" * 64}}
+                                     "portal_evidence": {"path": "portal", "sha256": "a" * 64},
+                                     "outcome_evidence": {"path": "outcome", "sha256": "d" * 64}}
                              for name in handoff.WIFI_PLATFORMS},
             "offline_signing_key_copies": [dict(key), dict(key)],
             "external_maintenance": {"passed": True, "date": "2026-09-02",
@@ -101,20 +102,27 @@ class AcceptanceEvidenceTests(unittest.TestCase):
             record = root / "handoff.json"
             evidence = root / "notes.txt"
             ciphertext = root / "key.aes256"
-            evidence.write_text("observed", encoding="utf-8")
+            evidence.write_text(json.dumps({
+                "schema": 1, "operation": "physical-wifi-client-observation",
+                "platform": "ios", "passed": True,
+                "captive_probe_path": "/hotspot-detect.html",
+                "portal_rendered": True, "client_address_stored": False,
+                "user_agent_stored": False,
+            }), encoding="utf-8")
             ciphertext.write_bytes(b"encrypted")
             record.write_text(json.dumps({"schema": 1, "wifi_clients": {},
                                           "offline_signing_key_copies": []}),
                               encoding="utf-8")
             handoff.record_wifi(Namespace(
                 record=record, platform="ios", result="pass", date="2026-09-02",
-                evidence_file=evidence))
+                portal_evidence_file=evidence, outcome_evidence_file=evidence))
             handoff.add_key_copy(Namespace(
                 record=record, media_label="USB-A", ciphertext=ciphertext,
                 verified_at="2026-09-02", recovery_tested_at="2026-09-02",
                 copy_evidence_file=evidence, recovery_evidence_file=evidence))
             saved = json.loads(record.read_text(encoding="utf-8"))
-            self.assertIn("sha256", saved["wifi_clients"]["ios"]["evidence"])
+            self.assertIn("sha256", saved["wifi_clients"]["ios"]["portal_evidence"])
+            self.assertIn("sha256", saved["wifi_clients"]["ios"]["outcome_evidence"])
             key = saved["offline_signing_key_copies"][0]
             self.assertIn("sha256", key["copy_evidence"])
             self.assertIn("sha256", key["recovery_evidence"])

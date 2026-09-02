@@ -34,6 +34,8 @@ as an unattended appliance. Items are ordered by priority.
     with local console access before enabling it on a deployed phone.
     - [x] Automated fault tests cover wrong credentials, hidden profiles,
       atomic-save interruption, radio errors, and platform probe routes.
+    - [x] Export privacy-preserving physical-client evidence only after the
+      browser family matches a recently observed native captive probe.
     - [ ] Repeat the matrix with physical radios, each named client platform,
       and a local console on the production phone.
   - Done when a first-time owner can connect the phone to a new home network

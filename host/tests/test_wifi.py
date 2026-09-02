@@ -1,4 +1,5 @@
 import json
+import io
 import os
 import stat
 import sys
@@ -143,6 +144,7 @@ class WifiTests(unittest.TestCase):
             handler = object.__new__(portal_module.Portal)
             handler.path = path
             handler.headers = {"Host": "10.42.0.1"}
+            handler.client_address = ("10.42.0.2", 12345)
             handler.send_response = mock.Mock()
             handler.send_header = mock.Mock()
             handler.end_headers = mock.Mock()
@@ -153,6 +155,36 @@ class WifiTests(unittest.TestCase):
             else:
                 handler.send_response.assert_called_once_with(302)
                 handler.send_header.assert_any_call("Location", "/")
+
+    def test_physical_client_evidence_requires_matching_browser_and_probe(self):
+        portal_module.PROBE_OBSERVATIONS.clear()
+        portal_module.record_probe("10.42.0.2", "/generate_204")
+        handler = object.__new__(portal_module.Portal)
+        handler.path = "/acceptance.json?platform=android"
+        handler.headers = {"Host": "10.42.0.1", "User-Agent": "Mozilla/5.0 Android 14"}
+        handler.client_address = ("10.42.0.2", 12345)
+        handler.wfile = io.BytesIO()
+        handler.send_response = mock.Mock()
+        handler.send_header = mock.Mock()
+        handler.end_headers = mock.Mock()
+        handler.send_error = mock.Mock()
+        portal_module.Portal.do_GET(handler)
+        value = json.loads(handler.wfile.getvalue())
+        self.assertEqual(value["platform"], "android")
+        self.assertEqual(value["captive_probe_path"], "/generate_204")
+        self.assertFalse(value["client_address_stored"])
+        self.assertFalse(value["user_agent_stored"])
+
+    def test_physical_client_evidence_rejects_claimed_platform_mismatch(self):
+        portal_module.PROBE_OBSERVATIONS.clear()
+        portal_module.record_probe("10.42.0.2", "/generate_204")
+        handler = object.__new__(portal_module.Portal)
+        handler.path = "/acceptance.json?platform=ios"
+        handler.headers = {"Host": "10.42.0.1", "User-Agent": "Mozilla/5.0 Android 14"}
+        handler.client_address = ("10.42.0.2", 12345)
+        handler.send_error = mock.Mock()
+        portal_module.Portal.do_GET(handler)
+        handler.send_error.assert_called_once()
 
 
 if __name__ == "__main__":

@@ -60,7 +60,9 @@ python3 tools/handoff_acceptance.py template --device-id phone-001 \
 
 python3 tools/handoff_acceptance.py record-wifi \
   hardware/as-built/phone-001/handoff.json --platform ios --result pass \
-  --date 2026-09-02 --evidence-file evidence/wifi-ios.txt
+  --date 2026-09-02 \
+  --portal-evidence-file evidence/millennium-wifi-ios.json \
+  --outcome-evidence-file evidence/wifi-ios-outcome.txt
 
 python3 tools/handoff_acceptance.py add-key-copy \
   hardware/as-built/phone-001/handoff.json --media-label "USB-A" \

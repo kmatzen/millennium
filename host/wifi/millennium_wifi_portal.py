@@ -5,8 +5,10 @@ import html
 import json
 import secrets
 import socket
+import threading
 import time
 import urllib.parse
+from datetime import datetime, timezone
 from http import cookies
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -14,6 +16,15 @@ SOCKET_PATH = "/run/millennium-wifi/helper.sock"
 MAX_BODY = 4096
 SESSIONS = set()
 ATTEMPTS = {}
+PROBE_OBSERVATIONS = {}
+PROBE_LOCK = threading.Lock()
+PROBE_WINDOW_SECONDS = 900
+PLATFORM_PROBES = {
+    "ios": {"/hotspot-detect.html"},
+    "android": {"/generate_204", "/gen_204"},
+    "macos": {"/hotspot-detect.html"},
+    "windows": {"/ncsi.txt"},
+}
 
 PAGE = """<!doctype html><html><head><meta charset=utf-8>
 <meta name=viewport content="width=device-width,initial-scale=1">
@@ -32,6 +43,39 @@ button{background:#f2c94c;border:0;font-weight:700}.note{color:#bbb;font-size:.9
 <label><input style="width:auto" type=checkbox name=hidden value=1> Hidden network</label>
 <button type=submit>Connect phone</button></form>
 <p class=note>Your password stays on this phone and is never sent to kmatzen.com.</p></div></body></html>"""
+
+
+def classify_platform(user_agent):
+    value = user_agent.lower()
+    if "android" in value:
+        return "android"
+    if "iphone" in value or "ipad" in value or ("macintosh" in value and "mobile/" in value):
+        return "ios"
+    if "windows" in value:
+        return "windows"
+    if "macintosh" in value or "mac os x" in value:
+        return "macos"
+    return None
+
+
+def record_probe(address, path, timestamp=None):
+    timestamp = time.monotonic() if timestamp is None else timestamp
+    with PROBE_LOCK:
+        stale = [key for key, item in PROBE_OBSERVATIONS.items()
+                 if timestamp - item[0] > PROBE_WINDOW_SECONDS]
+        for key in stale:
+            del PROBE_OBSERVATIONS[key]
+        observed = PROBE_OBSERVATIONS.setdefault(address, (timestamp, set()))
+        observed[1].add(path)
+
+
+def observed_probe(address, platform):
+    with PROBE_LOCK:
+        item = PROBE_OBSERVATIONS.get(address)
+        if not item or time.monotonic() - item[0] > PROBE_WINDOW_SECONDS:
+            return None
+        matches = sorted(item[1] & PLATFORM_PROBES[platform])
+        return matches[0] if matches else None
 
 
 def helper_request(message):
@@ -88,6 +132,17 @@ class Portal(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def send_json(self, value, filename):
+        body = (json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n").encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Disposition", 'attachment; filename="%s"' % filename)
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.end_headers()
+        self.wfile.write(body)
+
     def do_GET(self):
         if not self.trusted_host():
             self.send_response(302)
@@ -96,11 +151,31 @@ class Portal(BaseHTTPRequestHandler):
             return
         path = urllib.parse.urlsplit(self.path).path
         if path in ("/generate_204", "/gen_204"):
+            record_probe(self.client_address[0], path)
             self.send_response(302); self.send_header("Location", "/"); self.end_headers(); return
         if path == "/hotspot-detect.html":
+            record_probe(self.client_address[0], path)
             self.send_page(); return
         if path == "/ncsi.txt":
+            record_probe(self.client_address[0], path)
             self.send_response(302); self.send_header("Location", "/"); self.end_headers(); return
+        if path == "/acceptance.json":
+            query = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+            requested = query.get("platform", [""])[0].lower()
+            detected = classify_platform(self.headers.get("User-Agent", ""))
+            if requested not in PLATFORM_PROBES or detected != requested:
+                self.send_error(400, "platform does not match this browser"); return
+            probe = observed_probe(self.client_address[0], requested)
+            if not probe:
+                self.send_error(409, "no recent captive-portal probe observed"); return
+            self.send_json({
+                "schema": 1, "operation": "physical-wifi-client-observation",
+                "platform": requested, "passed": True,
+                "captured_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+                "captive_probe_path": probe, "portal_rendered": True,
+                "client_address_stored": False, "user_agent_stored": False,
+            }, "millennium-wifi-%s.json" % requested)
+            return
         if path != "/":
             self.send_response(302); self.send_header("Location", "/"); self.end_headers(); return
         self.send_page()

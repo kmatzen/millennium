@@ -13,9 +13,9 @@
   "schema": 1,
   "status": "incomplete",
   "wifi_clients": {
-    "android": {"date": null, "evidence": null, "passed": null},
-    "ios": {"date": null, "evidence": null, "passed": null},
-    "macos": {"date": null, "evidence": null, "passed": null},
-    "windows": {"date": null, "evidence": null, "passed": null}
+    "android": {"date": null, "outcome_evidence": null, "passed": null, "portal_evidence": null},
+    "ios": {"date": null, "outcome_evidence": null, "passed": null, "portal_evidence": null},
+    "macos": {"date": null, "outcome_evidence": null, "passed": null, "portal_evidence": null},
+    "windows": {"date": null, "outcome_evidence": null, "passed": null, "portal_evidence": null}
   }
 }

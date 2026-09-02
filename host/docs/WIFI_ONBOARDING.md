@@ -102,6 +102,25 @@ will take `wlan0` away from station mode and start the setup AP.
 5. Enable it on the production phone only during a local maintenance session,
    then prove remote maintenance returns after reprovisioning.
 
+For each real client, let the operating system detect and open the captive
+portal, then use that same device to download its privacy-preserving evidence
+artifact:
+
+```text
+http://setup.millennium/acceptance.json?platform=ios
+http://setup.millennium/acceptance.json?platform=android
+http://setup.millennium/acceptance.json?platform=macos
+http://setup.millennium/acceptance.json?platform=windows
+```
+
+The portal accepts an artifact only when the selected platform matches the
+browser family and the same client recently hit that platform's native captive
+probe route. The artifact contains neither the client address nor User-Agent.
+Keep the downloaded JSON with the private acceptance evidence and add it with
+`tools/handoff_acceptance.py record-wifi`, together with a separate outcome
+record covering credential entry, AP shutdown, station reconnection, and
+maintenance recovery. The final gate requires and hashes both artifacts.
+
 ## Acceptance evidence
 
 - Two uncoached owners complete first-time setup from a phone.
