@@ -59,5 +59,11 @@
     "ota_apply_timer_active": true,
     "ota_check_timer_active": true
   },
+  "physical_interruption_harness": {
+    "installed": true,
+    "reconcile_service_enabled": true,
+    "state": "idle",
+    "installed_at": "2026-09-02T05:22:00Z"
+  },
   "schema": 1
 }

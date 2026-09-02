@@ -207,3 +207,9 @@ secret remains in restricted local configuration. A live audit from the same
 network was rejected before producing acceptance evidence. The outstanding
 external test can use the public maintenance hostname while binding it to the
 same stable anima server identity.
+
+The durable physical-interruption harness and boot reconciler were installed
+on phone-001 on 2026-09-01. `systemd-analyze verify` accepted the unit, the
+reconcile service is enabled, and the harness reported `idle`; no destructive
+test was armed. It is ready to capture before/after evidence when a physical
+operator performs the remaining power and network interruptions.
