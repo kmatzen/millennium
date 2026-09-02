@@ -79,6 +79,9 @@ This project reimagines the functionality of the Nortel Millennium telephone by 
 - **Metrics collection**: Counters for calls, coins, keypresses, card swipes
 - **Version tracking**: Build version and git hash displayed on dashboard
 - **Scenario testing**: Simulator-based integration tests with simulated time
+- **Full ARM appliance VM**: A Debian/QEMU lab runs the real daemon under
+  systemd against a protocol-faithful virtual phone controller. See
+  [tools/qemu/README.md](tools/qemu/README.md).
 
 ---
 
@@ -101,6 +104,8 @@ This project reimagines the functionality of the Nortel Millennium telephone by 
   - `systemd/` — Service file for the daemon
   - `daemon.conf.example` — Example configuration file
   - `asoundrc.example` — ALSA audio configuration for mono channel splitting
+- **`tools/qemu/`**: Reproducible ARM VM, cloud-init provisioning, virtual MCU,
+  lifecycle commands, and end-to-end smoke test.
 
 ---
 

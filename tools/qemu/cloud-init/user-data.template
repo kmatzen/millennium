@@ -1,0 +1,29 @@
+#cloud-config
+users:
+  - default
+  - name: millennium
+    gecos: Millennium QEMU
+    groups: [adm, audio, dialout, sudo]
+    shell: /bin/bash
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    ssh_authorized_keys:
+      - __SSH_PUBLIC_KEY__
+ssh_pwauth: false
+package_update: true
+packages:
+  - alsa-utils
+  - build-essential
+  - curl
+  - git
+  - libasound2-dev
+  - libsamplerate0-dev
+  - libspeex-dev
+  - libspeexdsp-dev
+  - libssl-dev
+  - pkg-config
+  - rsync
+  - socat
+  - zstd
+runcmd:
+  - [touch, /var/lib/cloud/millennium-ready]
+final_message: "Millennium QEMU cloud-init complete"

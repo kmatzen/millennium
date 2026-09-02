@@ -36,6 +36,9 @@ jobs:
         working-directory: host
         run: make test
 
+      - name: Test QEMU virtual MCU protocol
+        run: python3 tools/qemu/test_virtual_mcu.py
+
   # Second opinion from clang (#237). The two compilers implement different
   # warning sets, and the build treats warnings as errors: GCC has
   # -Wstringop-truncation and -Wmaybe-uninitialized, clang has its own
