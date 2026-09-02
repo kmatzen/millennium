@@ -1,21 +1,23 @@
 {
   "active_release": {
     "display_hex_sha256": "5dab000d8408ed497432fd52248c8671156ef764d4f7426e56df3d31e9b4b0a2",
-    "host_binary_sha256": "72f56cc610f2fc56afebf0f5d8724b753e9a68ae8ee7d86eaa8343562659358e",
+    "host_binary_sha256": "e07eaab73dfa273b93df46b17ec8b1dd9ef1e3fb2d0fa6ee556e0b7be96276c8",
     "keypad_hex_sha256": "f1692bb35d07b759428723cd3ec4257eaa3520f6eb91f9aeec5cd3bc472de273",
-    "path": "/opt/millennium/releases/00000008-0.4.0",
-    "previous_path": "/opt/millennium/releases/00000006-0.4.0",
-    "sequence": 8,
+    "path": "/opt/millennium/releases/00000009-0.4.0",
+    "previous_path": "/opt/millennium/releases/00000008-0.4.0",
+    "sequence": 9,
     "version": "0.4.0",
-    "source_commit": "16d759e",
-    "build_time": "2026-08-31T21:36:17Z"
+    "source_commit": "unknown",
+    "build_time": "2026-09-02T00:32:23Z"
   },
-  "captured_at": "2026-09-02T04:08:08Z",
+  "captured_at": "2026-09-02T04:47:13Z",
   "capture_path": "hardware-backed SSH via anima ProxyJump and loopback reverse port 22022",
   "content": {
-    "identity": "last-line-2.0.1",
-    "story_json_sha256": "7cccba856d368d17443d94f415628383744a304a547e7f61e2fca7f74421a93b",
-    "story_mst_sha256": "79af164cd99a7498476278fb9a06f4680cbf13a1ccc509ee82c55b5c835ef73e"
+    "identity": "last-line-2.1.0",
+    "manifest_sha256": "4b17f99760f2ab6db0f5315812a2ee579bb8c5732f9fc4bed8275a92d5d58cfa",
+    "story_json_sha256": "77e8cc750c1cee36d03a97079cef18c2ad7546a7b94ac49ad76d8ae836bc546d",
+    "story_mst_sha256": "0ad71cb2590684f3b730fc9c0129e20bfc38a1091a908a45c01efded67af6b27",
+    "rollback_drill": "passed; atomically selected 2.0.1 and restored 2.1.0"
   },
   "device_id": "phone-001",
   "host": {
@@ -25,19 +27,19 @@
     "raspberry_pi_serial": "0000000001ba6844"
   },
   "health": {
-    "overall": "WARNING",
+    "overall": "HEALTHY",
     "serial": "HEALTHY",
     "sip": "HEALTHY",
-    "warning_reason": "No event activity; the phone is idle"
+    "hil_smoke": "8/8 passed at 2026-09-02T04:47:13Z"
   },
-  "pending_release": {
+  "applied_release": {
     "bundle_sha256": "262dbf316ae484a92c893fcde384f1444a35c1e6695f835829816d224519989e",
     "device_groups": ["phone-001"],
     "hold": false,
     "key_id": "release-2026-08",
     "published_at": "2026-09-02T00:36:04Z",
     "sequence": 9,
-    "state": "available",
+    "state": "committed",
     "version": "0.4.0",
     "withdrawn": false
   },

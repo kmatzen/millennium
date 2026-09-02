@@ -8,6 +8,12 @@
     "evidence": "tools/qemu/state/artifacts/full-20260902T035429Z/full-test-result.json",
     "physical_hardware_claimed": false
   },
+  "remote_production_work": {
+    "ota_sequence_9": "committed and passed all eight HIL gates",
+    "content": "signed last-line-2.1.0 installed",
+    "content_rollback_drill": "passed and restored 2.1.0",
+    "completed_at": "2026-09-02T04:47:13Z"
+  },
   "remaining_gates": {
     "signing_key_offline_media": {
       "status": "requires-two-removable-media",

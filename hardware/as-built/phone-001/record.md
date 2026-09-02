@@ -181,3 +181,19 @@ installation window. Exact evidence is in `live-inventory-2026-09-02.json` and
 `maintenance-access-audit-2026-09-02.json`. Because the administrative client
 was still physically on the home network, this does not close the genuinely
 external-vantage requirement.
+
+Signed sequence 9 was explicitly applied outside the maintenance window on
+2026-09-01 and committed at 21:41 PDT. The active release is now sequence 9,
+with sequence 8 retained as its rollback release. The deployed host SHA-256 is
+`e07eaab73dfa273b93df46b17ec8b1dd9ef1e3fb2d0fa6ee556e0b7be96276c8`;
+both MCU images remain the attested protocol-v2 builds above. Independent HIL
+checks passed all eight gates at `2026-09-02T04:42:22Z` and again after content
+activation at `2026-09-02T04:47:13Z`.
+
+The replacement signed experience `last-line-2.1.0` was then installed through
+the sequence-9-owned content verifier. Its signature, archive digest, author
+JSON, and compiled runtime were verified before activation. A live atomic
+rollback selected `last-line-2.0.1`, and a second rollback restored 2.1.0;
+the final runtime SHA-256 is
+`0ad71cb2590684f3b730fc9c0129e20bfc38a1091a908a45c01efded67af6b27`.
+The daemon remained healthy with serial, SIP, and both MCU links healthy.
