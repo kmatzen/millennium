@@ -1,0 +1,43 @@
+{
+  "accepted_for_handoff": null,
+  "content_version": "last-line-2.1.0",
+  "created_at": "2026-09-02T04:04:35Z",
+  "device_as_built_record": "phone-001",
+  "open_defects": [],
+  "participants": [
+    {
+      "anonymous_id": "P1",
+      "audio_clear": null,
+      "completed_primary_ending": null,
+      "confusion_or_disengagement": [],
+      "display_legible": null,
+      "first_time_caller": true,
+      "optional_interaction_discovered": null,
+      "started_without_coaching": null,
+      "time_to_first_action_seconds": null,
+      "total_duration_seconds": null
+    },
+    {
+      "anonymous_id": "P2",
+      "audio_clear": null,
+      "completed_primary_ending": null,
+      "confusion_or_disengagement": [],
+      "display_legible": null,
+      "first_time_caller": true,
+      "optional_interaction_discovered": null,
+      "started_without_coaching": null,
+      "time_to_first_action_seconds": null,
+      "total_duration_seconds": null
+    }
+  ],
+  "physical_scenarios": {
+    "interruption": {"evidence": null, "passed": null},
+    "invalid_input": {"evidence": null, "passed": null},
+    "offline": {"evidence": null, "passed": null},
+    "optional_input": {"evidence": null, "passed": null},
+    "repeat": {"evidence": null, "passed": null},
+    "return_visit": {"evidence": null, "passed": null},
+    "timeout": {"evidence": null, "passed": null}
+  },
+  "schema": 1
+}

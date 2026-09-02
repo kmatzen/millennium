@@ -3,6 +3,16 @@
 Status: **INCOMPLETE — do not accept for handoff**
 Record opened: 2026-08-31 by automated maintenance inventory
 
+The machine-readable remaining-gate audit was refreshed on 2026-09-02 in
+`remaining-acceptance-audit-2026-09-02.json`. The complete QEMU software lab
+passed at commit `c16c576`, including signed OTA, fault recovery, onboarding,
+story traversal, and abrupt-power checkpoint recovery. That result explicitly
+claims no physical-hardware coverage. No removable volume was mounted during
+the audit, so the two-offline-media key requirement remains open. A prepared
+privacy-preserving playtest record for signed content `last-line-2.1.0` is in
+`playtest-last-line-2.1.0.json` and intentionally fails validation until two
+real first-time callers and every physical resilience scenario are observed.
+
 ## Identity
 
 - Device ID: `phone-001` (provisional; owner must confirm asset label)
