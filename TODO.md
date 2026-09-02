@@ -32,6 +32,10 @@ as an unattended appliance. Items are ordered by priority.
   - [ ] Test wrong passwords, hidden networks, power loss during save, radio
     failure, captive-portal detection on iOS/Android/macOS/Windows, and recovery
     with local console access before enabling it on a deployed phone.
+    - [x] Automated fault tests cover wrong credentials, hidden profiles,
+      atomic-save interruption, radio errors, and platform probe routes.
+    - [ ] Repeat the matrix with physical radios, each named client platform,
+      and a local console on the production phone.
   - Done when a first-time owner can connect the phone to a new home network
     from a mobile browser without maintainer help, while an untrusted setup
     client cannot reach administrative services or recover stored credentials.
@@ -99,10 +103,10 @@ as an unattended appliance. Items are ordered by priority.
   - [x] Never fall back from signed OTA when the worker or trust key is unavailable.
   - [x] Replace remaining shell-interpolated commands with argument-vector execution.
 
-- [ ] Add signing-key lifecycle support.
+- [x] Add signing-key lifecycle support.
   - [x] Support key IDs and multiple trusted public keys during rotation.
   - [x] Document revocation and emergency recovery.
-  - [ ] Maintain an encrypted offline backup of the private signing key.
+  - [x] Maintain an encrypted offline backup of the private signing key.
   - [x] Perform and document a recovery drill.
 
 - [x] Expand CI into a reproducible release pipeline.
@@ -126,6 +130,10 @@ as an unattended appliance. Items are ordered by priority.
   - [x] Confirm both MCUs, the host daemon, audio, SIP, and controls after activation.
   - [x] Force a failed health check and verify automatic rollback.
   - [ ] Test loss of power and network during download, flash, and activation.
+    - [x] Automated fault injection proves atomic download, selective MCU-flash
+      recovery, and activation-journal rollback.
+    - [ ] Repeat the interruptions by physically removing power/network on the
+      production phone and attach journal and measurement evidence.
   - [ ] Confirm remote maintenance works from outside the home network.
 
 ## P2 — Reliability and maintainability
@@ -200,7 +208,7 @@ A release is ready for an inexperienced end user only when:
 - [ ] Power and network interruption tests recover safely.
 - [x] Remote maintenance works through the known domain without inbound home-network access.
 - [x] Monitoring reports the phone's health and alerts on loss of contact.
-- [ ] Signing keys, server state, and recovery instructions have tested backups.
+- [x] Signing keys, server state, and recovery instructions have tested backups.
 - [ ] A first-time caller can discover and complete the primary experience without instruction from the owner.
 - [ ] Story interruption, timeout, repeat-play, offline, and return-visit paths have been playtested.
 - [x] Narrative content can be previewed, validated, deployed, and rolled back independently of daemon code.

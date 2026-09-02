@@ -52,6 +52,16 @@ Do not mark a failed scenario complete merely because the simulator covers it.
 
 ## Participant record
 
+Create the structured record before the session. It contains no names, audio,
+video, speech, or contact information and its validator will not accept fewer
+than two first-time callers or a missing physical resilience scenario:
+
+```bash
+python3 content/playtest_record.py template --content-version VERSION \
+  --as-built-record phone-001 --output playtest-VERSION.json
+python3 content/playtest_record.py validate playtest-VERSION.json
+```
+
 Create one copy of this section per participant.
 
 - Date and content version:

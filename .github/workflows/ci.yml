@@ -39,6 +39,9 @@ jobs:
       - name: Test QEMU virtual MCU protocol
         run: python3 tools/qemu/test_virtual_mcu.py
 
+      - name: Test acceptance evidence gates
+        run: python3 tools/tests/test_acceptance_evidence.py
+
   # Second opinion from clang (#237). The two compilers implement different
   # warning sets, and the build treats warnings as errors: GCC has
   # -Wstringop-truncation and -Wmaybe-uninitialized, clang has its own
