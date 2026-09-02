@@ -38,16 +38,16 @@ Acceptance: `python3 tools/qemu/test_virtual_mcu.py` and
 
 ## Signed OTA rehearsal
 
-- [ ] Install the production OTA worker, recovery service, timers, and immutable
+- [x] Install the production OTA worker, recovery service, timers, and immutable
   release layout in the guest.
-- [ ] Generate an ephemeral lab-only signing key and HTTP update origin; never
+- [x] Generate an ephemeral lab-only signing key and HTTPS update origin; never
   reuse or import the production private key.
-- [ ] Build, sign, publish, download, activate, health-check, and commit a full
+- [x] Build, sign, publish, download, activate, health-check, and commit a full
   host/content/dual-MCU release through the production worker.
-- [ ] Rehearse manifest loss, bundle loss, corrupt signature/hash, withdrawn and
+- [x] Rehearse manifest loss, bundle loss, corrupt signature/hash, withdrawn and
   quarantined releases, power loss during download/MCU flash/host activation,
   automatic recovery, and rollback to the previous signed release.
-- [ ] Prove an interrupted update never destroys `current` or `previous` and a
+- [x] Prove an interrupted update never destroys `current` or `previous` and a
   recovered guest returns to a healthy daemon with independently attested MCU
   identities.
 
@@ -56,12 +56,12 @@ Acceptance: `tools/qemu/qemu.sh ota-test` and
 
 ## Networking and onboarding
 
-- [ ] Provide a simulated NetworkManager/radio boundary for first boot, hidden
+- [x] Provide a simulated NetworkManager/radio boundary for first boot, hidden
   SSIDs, WPA transition/open-network policy, wrong credentials, radio loss,
   atomic-save interruption, AP rollback, timeout, and recovery gesture.
-- [ ] Exercise captive-portal probe behavior for iOS, Android, macOS, and
+- [x] Exercise captive-portal probe behavior for iOS, Android, macOS, and
   Windows HTTP probes from isolated test clients.
-- [ ] Prove setup clients cannot reach SSH, admin API, forwarding, or stored
+- [x] Prove setup clients cannot reach SSH, admin API, forwarding, or stored
   credentials while update and maintenance endpoints recover after success.
 
 Acceptance: `tools/qemu/qemu.sh wifi-test`.
@@ -73,7 +73,7 @@ Acceptance: `tools/qemu/qemu.sh wifi-test`.
   offline, optional-input, and return-visit story paths through the VM boundary.
 - [x] Export display/audio selection, peripheral state, story state, daemon
   journal, metrics, and fault timeline as one timestamped test artifact.
-- [ ] Provide a single noninteractive full-lab command that starts or reuses the
+- [x] Provide a single noninteractive full-lab command that starts or reuses the
   VM, provisions current source, runs every software acceptance layer, and emits
   a machine-readable summary with no false physical-hardware claims.
 

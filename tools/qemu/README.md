@@ -83,6 +83,9 @@ tools/qemu/qemu.sh pause
 tools/qemu/qemu.sh resume
 tools/qemu/qemu.sh power-cut
 tools/qemu/qemu.sh collect-artifacts my-test-run
+tools/qemu/qemu.sh ota-test
+tools/qemu/qemu.sh ota-fault-test
+tools/qemu/qemu.sh wifi-test
 tools/qemu/qemu.sh experience-test
 tools/qemu/qemu.sh full-test
 tools/qemu/qemu.sh stop
@@ -125,8 +128,24 @@ ACK, and CRC matrix.
 
 `collect-artifacts NAME` creates `tools/qemu/state/artifacts/NAME/` with the
 daemon journal, health JSON, Prometheus metrics, console/provision logs, VFD and
-peripheral state, deterministic fault trace, and a SHA-256 summary explicitly
+peripheral state, OTA status/recovery/flash evidence, deterministic fault trace,
+and a SHA-256 summary explicitly
 marked `physical_hardware_claimed: false`.
+
+Provisioning also installs the production OTA worker, timers, recovery unit,
+immutable release layout, a guest-local HTTPS origin, and two independent MCU
+identity endpoints. The lab creates its own disposable signing and TLS keys in
+`/var/lib/millennium/qemu-ota`; these keys never leave the ignored VM overlay
+and are not production credentials. `ota-test` signs and commits a release
+through the real worker and attests both virtual MCU roles. `ota-fault-test`
+exercises loss, corruption, withdrawal, quarantine, interrupted activation,
+rollback, and active-link invariants.
+
+`wifi-test` exercises the NetworkManager boundary through deterministic radio
+faults, validates captive-portal behavior for the major platform probes, and
+checks the setup firewall, service sandbox, atomic credential storage, rollback,
+recovery gesture, timeout, and private factory handoff. RF behavior and real
+client association remain physical gates.
 
 ## Reset and recovery
 
@@ -152,6 +171,11 @@ already provisioned guest. `qemu.sh recovery-test` saves a named cold
 checkpoint, boots it, cuts power without a guest shutdown, restores the
 checkpoint, and requires a healthy daemon after reboot. The complete remaining objective ledger and exact
 acceptance commands are in `OBJECTIVES.md`.
+
+`qemu.sh full-test` reprovisions the current tree and runs every software layer
+in dependency-safe order, including the production-paced offline story. It
+emits a timestamped `full-test-result.json` whose
+`physical_hardware_claimed` field is always false.
 
 The QEMU lab complements rather than replaces these release gates:
 

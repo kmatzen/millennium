@@ -13,7 +13,7 @@ BASE_IMAGE="$STATE_DIR/debian-12-arm64.qcow2"
 DISK_IMAGE="$STATE_DIR/millennium.qcow2"
 SSH_PORT=${MILLENNIUM_QEMU_SSH_PORT:-2222}
 SSH_KEY="$STATE_DIR/id_ed25519"
-SSH=(ssh -i "$SSH_KEY" -p "$SSH_PORT" -o BatchMode=yes -o ConnectTimeout=5 \
+SSH=(ssh -i "$SSH_KEY" -p "$SSH_PORT" -o BatchMode=yes -o ConnectTimeout=15 \
     -o ConnectionAttempts=1 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 \
     -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR \
     millennium@127.0.0.1)
@@ -51,6 +51,33 @@ power_cut() {
     printf 'VM power cut; disk was not gracefully shut down\n'
 }
 
+virtual_firmware_identity() {
+    python3 - "$REPO_DIR" <<'PY'
+import importlib.util, pathlib, sys
+root = pathlib.Path(sys.argv[1])
+spec = importlib.util.spec_from_file_location("ota_builder", root / "tools/build_ota_release.py")
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+version = (root / "VERSION").read_text().strip()
+keypad = module.firmware_identity(root / "Arduino/build/keypad/keypad.ino.hex", "keypad", version)
+display = module.firmware_identity(root / "Arduino/build/display/display.ino.hex", "display", version)
+if keypad["build"] != display["build"]:
+    raise SystemExit("keypad/display firmware build identities differ")
+print(version, keypad["build"])
+PY
+}
+
+start_virtual_mcu() {
+    local identity firmware_version firmware_build
+    identity=$(virtual_firmware_identity)
+    read -r firmware_version firmware_build <<<"$identity"
+    python3 "$SCRIPT_DIR/virtual_mcu.py" serve --daemonize \
+        --pid-file "$STATE_DIR/mcu.pid" --log-file "$STATE_DIR/mcu.log" \
+        --serial "$STATE_DIR/mcu.sock" --control "$STATE_DIR/control.sock" \
+        --display "$STATE_DIR/display.json" \
+        --firmware-version "$firmware_version" --firmware-build "$firmware_build"
+}
+
 restart_virtual_mcu() {
     running || die "VM is not running"
     if test -f "$STATE_DIR/mcu.pid"; then
@@ -61,10 +88,7 @@ restart_virtual_mcu() {
         done
     fi
     rm -f "$STATE_DIR/mcu.pid" "$STATE_DIR/control.sock"
-    python3 "$SCRIPT_DIR/virtual_mcu.py" serve --daemonize \
-        --pid-file "$STATE_DIR/mcu.pid" --log-file "$STATE_DIR/mcu.log" \
-        --serial "$STATE_DIR/mcu.sock" --control "$STATE_DIR/control.sock" \
-        --display "$STATE_DIR/display.json"
+    start_virtual_mcu
     for _ in {1..50}; do test -S "$STATE_DIR/control.sock" && break; sleep 0.1; done
     test -S "$STATE_DIR/control.sock" || die "virtual MCU control socket did not return"
     printf 'virtual MCU restarted\n'
@@ -122,8 +146,14 @@ recovery_test() {
     start_vm
     wait_ready
     "${SSH[@]}" systemctl is-active --quiet daemon.service
-    "${SSH[@]}" curl --fail --silent http://127.0.0.1:8081/api/health >/dev/null
-    printf 'PASS: abrupt power cut and named-checkpoint restore recovered a healthy appliance\n'
+    for _ in {1..30}; do
+        if "${SSH[@]}" 'curl --fail --silent http://127.0.0.1:8081/api/version >/dev/null && curl --fail --silent http://127.0.0.1:8081/api/metrics | grep -Fq '\''"mcu_protocol_version": 2'\''' 2>/dev/null; then
+            printf 'PASS: abrupt power cut and named-checkpoint restore recovered a healthy appliance\n'
+            return
+        fi
+        sleep 1
+    done
+    die "restored guest did not regain daemon API and MCU protocol health"
 }
 
 collect_artifacts() {
@@ -143,6 +173,9 @@ collect_artifacts() {
     python3 "$SCRIPT_DIR/virtual_mcu.py" send --control "$STATE_DIR/control.sock" status > "$output/peripherals.json"
     "${SSH[@]}" sudo cat /var/lib/millennium/state > "$output/daemon-state.txt" 2>/dev/null || true
     "${SSH[@]}" sudo cat /var/lib/millennium/story-state > "$output/story-state.txt" 2>/dev/null || true
+    "${SSH[@]}" sudo cat /var/lib/millennium/ota/status.json > "$output/ota-status.json" 2>/dev/null || true
+    "${SSH[@]}" sudo cat /var/log/millennium/qemu-flash.log > "$output/ota-flash.log" 2>/dev/null || true
+    "${SSH[@]}" sudo journalctl -u millennium-update-recover.service --no-pager > "$output/ota-recovery-journal.log" 2>/dev/null || true
     "${SSH[@]}" sha256sum /var/lib/millennium/content/current/story.mst \
         /var/lib/millennium/content/current/story.json > "$output/content-sha256.txt" 2>/dev/null || true
     python3 - "$output" <<'PY'
@@ -228,6 +261,21 @@ experience_test() {
     printf 'PASS: offline story activation, recovery, optional inputs, ending, and return visit\n'
 }
 
+ota_test() {
+    running || die "start and provision the VM before ota-test"
+    "${SSH[@]}" sudo /tmp/millennium-src/tools/qemu/ota-test-guest.sh /tmp/millennium-src
+}
+
+ota_fault_test() {
+    running || die "start and provision the VM before ota-fault-test"
+    "${SSH[@]}" sudo /tmp/millennium-src/tools/qemu/ota-fault-test-guest.sh /tmp/millennium-src
+}
+
+wifi_test() {
+    running || die "start and provision the VM before wifi-test"
+    "${SSH[@]}" sudo /tmp/millennium-src/tools/qemu/wifi-test-guest.sh /tmp/millennium-src
+}
+
 full_test() {
     local run="full-$(date -u +%Y%m%dT%H%M%SZ)"
     if ! running; then
@@ -237,17 +285,22 @@ full_test() {
     provision
     python3 "$SCRIPT_DIR/test_virtual_mcu.py"
     "$SCRIPT_DIR/smoke-test.sh"
-    lifecycle_test
     "$SCRIPT_DIR/peripheral-fault-test.sh"
+    ota_test
+    ota_fault_test
+    wifi_test
     experience_test
     local artifact
     artifact=$(collect_artifacts "$run")
+    lifecycle_test
+    recovery_test
     python3 - "$artifact/full-test-result.json" <<'PY'
 import datetime, json, pathlib, sys
 result = {"schema": 1, "passed": True, "physical_hardware_claimed": False,
           "completed_at": datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat(),
-          "acceptance": ["virtual-mcu-unit", "appliance-smoke", "lifecycle",
-                         "peripheral-faults", "offline-experience", "evidence-export"]}
+          "acceptance": ["virtual-mcu-unit", "appliance-smoke", "lifecycle", "power-recovery",
+                         "peripheral-faults", "signed-ota", "ota-faults", "wifi-onboarding", "offline-experience",
+                         "evidence-export"]}
 pathlib.Path(sys.argv[1]).write_text(json.dumps(result, indent=2, sort_keys=True) + "\n")
 PY
     printf 'PASS: full QEMU software lab\n%s\n' "$artifact"
@@ -324,10 +377,7 @@ start_vm() {
     init_disk
     running && die "VM is already running"
     rm -f "$STATE_DIR/mcu.sock" "$STATE_DIR/control.sock" "$STATE_DIR/monitor.sock"
-    python3 "$SCRIPT_DIR/virtual_mcu.py" serve --daemonize \
-        --pid-file "$STATE_DIR/mcu.pid" --log-file "$STATE_DIR/mcu.log" \
-        --serial "$STATE_DIR/mcu.sock" --control "$STATE_DIR/control.sock" \
-        --display "$STATE_DIR/display.json"
+    start_virtual_mcu
     local accel=${MILLENNIUM_QEMU_ACCEL:-tcg} cpu=cortex-a72
     local qemu_binary
     qemu_binary=$(command -v qemu-system-aarch64)
@@ -410,6 +460,9 @@ case ${1:-help} in
     lifecycle-test) lifecycle_test ;;
     recovery-test) recovery_test ;;
     peripheral-fault-test) "$SCRIPT_DIR/peripheral-fault-test.sh" ;;
+    ota-test) ota_test ;;
+    ota-fault-test) ota_fault_test ;;
+    wifi-test) wifi_test ;;
     experience-test) experience_test ;;
     full-test) full_test ;;
     collect-artifacts) collect_artifacts "${2:-}" ;;
@@ -433,6 +486,6 @@ case ${1:-help} in
         printf 'fresh overlay created; previous disk retained as a timestamped backup\n'
         ;;
     help|*)
-        printf 'usage: %s {fetch|init|start|wait|provision|stop|power-cut|pause|resume|restart-virtual-mcu|network|checkpoint|lifecycle-test|recovery-test|peripheral-fault-test|experience-test|full-test|collect-artifacts|status|ssh|logs|token|tunnel|display|peripherals|key|hook|coin|card|fault|reset-mcu|smoke|reset}\n' "$0"
+        printf 'usage: %s {fetch|init|start|wait|provision|stop|power-cut|pause|resume|restart-virtual-mcu|network|checkpoint|lifecycle-test|recovery-test|peripheral-fault-test|ota-test|ota-fault-test|wifi-test|experience-test|full-test|collect-artifacts|status|ssh|logs|token|tunnel|display|peripherals|key|hook|coin|card|fault|reset-mcu|smoke|reset}\n' "$0"
         ;;
 esac

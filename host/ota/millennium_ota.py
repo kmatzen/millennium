@@ -3,6 +3,7 @@
 
 import argparse
 import contextlib
+import errno
 import fcntl
 import hashlib
 import json
@@ -448,15 +449,22 @@ IDENTITY_PATTERN = re.compile(
 def read_firmware_identity(device, target, timeout=5):
     descriptor = os.open(device, os.O_RDWR | os.O_NOCTTY | os.O_NONBLOCK)
     try:
-        attributes = termios.tcgetattr(descriptor)
-        attributes[0] = 0
-        attributes[1] = 0
-        attributes[2] = termios.CS8 | termios.CLOCAL | termios.CREAD
-        attributes[3] = 0
-        attributes[4] = termios.B9600
-        attributes[5] = termios.B9600
-        termios.tcsetattr(descriptor, termios.TCSANOW, attributes)
-        termios.tcflush(descriptor, termios.TCIFLUSH)
+        try:
+            attributes = termios.tcgetattr(descriptor)
+            attributes[0] = 0
+            attributes[1] = 0
+            attributes[2] = termios.CS8 | termios.CLOCAL | termios.CREAD
+            attributes[3] = 0
+            attributes[4] = termios.B9600
+            attributes[5] = termios.B9600
+            termios.tcsetattr(descriptor, termios.TCSANOW, attributes)
+            termios.tcflush(descriptor, termios.TCIFLUSH)
+        except termios.error as error:
+            # Linux virtio-console and some production USB relay devices are
+            # raw character streams rather than tty devices. They require no
+            # baud setup but otherwise support the same identity exchange.
+            if not error.args or error.args[0] != errno.ENOTTY:
+                raise
         query = b"I" if target == "keypad" else b"\x07"
         os.write(descriptor, query)
         deadline = time.monotonic() + timeout

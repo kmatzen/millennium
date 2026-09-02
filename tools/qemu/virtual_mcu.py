@@ -20,8 +20,10 @@ CRITICAL = {DISPLAY, COIN_CONTROL, COIN_PROGRAM, COIN_VERIFY}
 class PhoneHardware:
     """Behavioral Alpha/Beta and peripheral topology around the real wire protocol."""
 
-    def __init__(self, display_file):
+    def __init__(self, display_file, firmware_version="virtual", firmware_build="qemu"):
         self.display_file = display_file
+        self.firmware_version = firmware_version
+        self.firmware_build = firmware_build
         self.alpha_resets = 0
         self.beta_resets = 0
         self.i2c_available = True
@@ -49,11 +51,11 @@ class PhoneHardware:
             "arduinos": {
                 "alpha": {"role": "keypad", "resets": self.alpha_resets,
                           "i2c_drops": self.i2c_drops, "protocol": VERSION,
-                          "firmware": "virtual-alpha", "build": "qemu",
+                          "firmware": self.firmware_version, "build": self.firmware_build,
                           "last_reset_cause": self.last_reset_cause["alpha"]},
                 "beta": {"role": "display", "resets": self.beta_resets,
                          "i2c_available": self.i2c_available, "protocol": VERSION,
-                         "firmware": "virtual-beta", "build": "qemu",
+                         "firmware": self.firmware_version, "build": self.firmware_build,
                          "last_reset_cause": self.last_reset_cause["beta"]},
             },
             "peripherals": {
@@ -72,6 +74,10 @@ class PhoneHardware:
     def persist(self):
         with open(self.display_file, "w", encoding="utf-8") as output:
             json.dump(self.snapshot(), output, indent=2, sort_keys=True)
+
+    def identity(self, role):
+        return ("MILLENNIUM role=%s version=%s protocol=%d build=%s selftest=ok\n" %
+                (role, self.firmware_version, VERSION, self.firmware_build)).encode()
 
     def alpha_event(self, command, argument):
         """Model physical input -> Alpha scan/decode -> I2C -> Beta forwarding."""
@@ -220,14 +226,15 @@ class Decoder:
 
 
 class VirtualMCU:
-    def __init__(self, serial_socket, control_socket, display_file):
+    def __init__(self, serial_socket, control_socket, display_file,
+                 firmware_version="virtual", firmware_build="qemu"):
         self.serial_socket = serial_socket
         self.control_socket = control_socket
         self.display_file = display_file
         self.writer = None
         self.sequence = 0
         self.connected = asyncio.Event()
-        self.hardware = PhoneHardware(display_file)
+        self.hardware = PhoneHardware(display_file, firmware_version, firmware_build)
         self.serial_enabled = True
         self.drop_next_ack = False
         self.ack_delay_ms = 0
@@ -247,6 +254,8 @@ class VirtualMCU:
         return value
 
     async def send(self, message_type, payload=b""):
+        if not self.serial_enabled:
+            raise ConnectionError("virtual serial link is down")
         await self.connected.wait()
         frame = bytearray(encode(message_type, self.sequence, payload))
         if self.corrupt_next_frame:
@@ -258,17 +267,27 @@ class VirtualMCU:
         await self.writer.drain()
 
     async def serial_loop(self):
-        decoder = Decoder()
         while True:
             try:
                 if not self.serial_enabled:
                     await asyncio.sleep(0.1)
                     continue
                 reader, writer = await asyncio.open_unix_connection(self.serial_socket)
+                decoder = Decoder()
                 self.writer = writer
                 self.connected.set()
                 print("virtual MCU connected", flush=True)
                 while data := await reader.read(4096):
+                    if not self.serial_enabled:
+                        continue
+                    if data == b"I":
+                        writer.write(self.hardware.identity("keypad"))
+                        await writer.drain()
+                        continue
+                    if data == b"\x07":
+                        writer.write(self.hardware.identity("display"))
+                        await writer.drain()
+                        continue
                     for message_type, sequence, payload in decoder.feed(data):
                         if message_type == HELLO:
                             writer.write(encode(HELLO, self.sequence, bytes((VERSION, VERSION))))
@@ -322,8 +341,6 @@ class VirtualMCU:
                         writer.write(b"ok\n")
                     elif command == "fault" and argument.lower() == "serial down":
                         self.serial_enabled = False
-                        if self.writer:
-                            self.writer.close()
                         self.hardware.record("serial-down")
                         self.hardware.persist()
                         writer.write(b"ok\n")
@@ -385,6 +402,8 @@ def main():
     serve.add_argument("--serial", required=True)
     serve.add_argument("--control", required=True)
     serve.add_argument("--display", required=True)
+    serve.add_argument("--firmware-version", default="virtual")
+    serve.add_argument("--firmware-build", default="qemu")
     serve.add_argument("--daemonize", action="store_true")
     serve.add_argument("--pid-file")
     serve.add_argument("--log-file")
@@ -418,7 +437,8 @@ def main():
             with open(args.pid_file, "w", encoding="ascii") as output:
                 output.write(str(os.getpid()))
     try:
-        asyncio.run(VirtualMCU(args.serial, args.control, args.display).run())
+        asyncio.run(VirtualMCU(args.serial, args.control, args.display,
+                               args.firmware_version, args.firmware_build).run())
     except KeyboardInterrupt:
         pass
     return 0

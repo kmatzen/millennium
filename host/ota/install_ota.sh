@@ -29,6 +29,27 @@ install -m 0755 "$HOST_DIR/../Arduino/pi_flash.sh" "$BOOTSTRAP/arduino/pi_flash.
 install -m 0644 "$HOST_DIR/../Arduino/build/keypad/keypad.ino.hex" "$BOOTSTRAP/arduino/keypad.hex"
 install -m 0644 "$HOST_DIR/../Arduino/build/display/display.ino.hex" "$BOOTSTRAP/arduino/display.hex"
 install -m 0755 "$SCRIPT_DIR/millennium_ota.py" "$BOOTSTRAP/ota/millennium-ota"
+python3 - "$BOOTSTRAP/arduino/keypad.hex" "$BOOTSTRAP/arduino/display.hex" \
+    "$BOOTSTRAP/release.json" <<'PY'
+import json, pathlib, re, sys
+pattern = re.compile(rb"MILLENNIUM role=(keypad|display) version=([^ ]+) protocol=([0-9]+) build=([^ ]+) selftest=ok")
+firmware = {}
+for name in sys.argv[1:3]:
+    raw = bytearray()
+    for line in pathlib.Path(name).read_text().splitlines():
+        record = bytes.fromhex(line[1:])
+        if record[3] == 0:
+            raw.extend(record[4:4 + record[0]])
+    match = pattern.search(raw)
+    if not match:
+        raise SystemExit("firmware identity missing from " + name)
+    role = match.group(1).decode()
+    firmware[role] = {"role": role, "version": match.group(2).decode(),
+                      "protocol": int(match.group(3)), "build": match.group(4).decode()}
+if set(firmware) != {"keypad", "display"}:
+    raise SystemExit("bootstrap firmware identities are incomplete")
+pathlib.Path(sys.argv[3]).write_text(json.dumps({"firmware": firmware}, sort_keys=True) + "\n")
+PY
 ln -sfn "$BOOTSTRAP" /opt/millennium/current
 ln -sfn /opt/millennium/current/ota/millennium-ota /usr/local/libexec/millennium-ota
 install -d -m 0755 /etc/systemd/system/daemon.service.d

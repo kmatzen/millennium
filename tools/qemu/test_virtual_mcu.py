@@ -14,6 +14,16 @@ class ProtocolTest(unittest.TestCase):
     def test_known_crc(self):
         self.assertEqual(MCU.crc16(bytes((2, 2, 2, 0, 2, 2))), 0x6A9B)
 
+    def test_ota_identity_matches_configured_firmware(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as directory:
+            hardware = MCU.PhoneHardware(str(pathlib.Path(directory) / "state.json"),
+                                         "0.4.0", "abcdef123456")
+            self.assertEqual(
+                hardware.identity("keypad"),
+                b"MILLENNIUM role=keypad version=0.4.0 protocol=2 "
+                b"build=abcdef123456 selftest=ok\n")
+
     def test_round_trip_and_fragmentation(self):
         encoded = MCU.encode(MCU.KEY, 9, b"5")
         decoder = MCU.Decoder()
