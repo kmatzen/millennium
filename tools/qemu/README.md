@@ -84,6 +84,7 @@ tools/qemu/qemu.sh resume
 tools/qemu/qemu.sh power-cut
 tools/qemu/qemu.sh collect-artifacts my-test-run
 tools/qemu/qemu.sh experience-test
+tools/qemu/qemu.sh full-test
 tools/qemu/qemu.sh stop
 ```
 

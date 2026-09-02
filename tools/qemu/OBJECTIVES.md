@@ -69,7 +69,7 @@ Acceptance: `tools/qemu/qemu.sh wifi-test`.
 ## Experiences and observability
 
 - [x] Run the real story engine and physical input vocabulary through the VM.
-- [ ] Automatically traverse primary, interruption, timeout, repeat, invalid,
+- [x] Automatically traverse primary, interruption, timeout, repeat, invalid,
   offline, optional-input, and return-visit story paths through the VM boundary.
 - [x] Export display/audio selection, peripheral state, story state, daemon
   journal, metrics, and fault timeline as one timestamped test artifact.

@@ -228,6 +228,31 @@ experience_test() {
     printf 'PASS: offline story activation, recovery, optional inputs, ending, and return visit\n'
 }
 
+full_test() {
+    local run="full-$(date -u +%Y%m%dT%H%M%SZ)"
+    if ! running; then
+        start_vm
+    fi
+    wait_ready
+    provision
+    python3 "$SCRIPT_DIR/test_virtual_mcu.py"
+    "$SCRIPT_DIR/smoke-test.sh"
+    lifecycle_test
+    "$SCRIPT_DIR/peripheral-fault-test.sh"
+    experience_test
+    local artifact
+    artifact=$(collect_artifacts "$run")
+    python3 - "$artifact/full-test-result.json" <<'PY'
+import datetime, json, pathlib, sys
+result = {"schema": 1, "passed": True, "physical_hardware_claimed": False,
+          "completed_at": datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat(),
+          "acceptance": ["virtual-mcu-unit", "appliance-smoke", "lifecycle",
+                         "peripheral-faults", "offline-experience", "evidence-export"]}
+pathlib.Path(sys.argv[1]).write_text(json.dumps(result, indent=2, sort_keys=True) + "\n")
+PY
+    printf 'PASS: full QEMU software lab\n%s\n' "$artifact"
+}
+
 firmware_path() {
     local candidate
     for candidate in \
@@ -386,6 +411,7 @@ case ${1:-help} in
     recovery-test) recovery_test ;;
     peripheral-fault-test) "$SCRIPT_DIR/peripheral-fault-test.sh" ;;
     experience-test) experience_test ;;
+    full-test) full_test ;;
     collect-artifacts) collect_artifacts "${2:-}" ;;
     status) running && printf 'running (pid %s)\n' "$(cat "$STATE_DIR/qemu.pid")" || { printf 'stopped\n'; exit 1; } ;;
     ssh) shift; "${SSH[@]}" "$@" ;;
@@ -407,6 +433,6 @@ case ${1:-help} in
         printf 'fresh overlay created; previous disk retained as a timestamped backup\n'
         ;;
     help|*)
-        printf 'usage: %s {fetch|init|start|wait|provision|stop|power-cut|pause|resume|restart-virtual-mcu|network|checkpoint|lifecycle-test|recovery-test|peripheral-fault-test|experience-test|collect-artifacts|status|ssh|logs|token|tunnel|display|peripherals|key|hook|coin|card|fault|reset-mcu|smoke|reset}\n' "$0"
+        printf 'usage: %s {fetch|init|start|wait|provision|stop|power-cut|pause|resume|restart-virtual-mcu|network|checkpoint|lifecycle-test|recovery-test|peripheral-fault-test|experience-test|full-test|collect-artifacts|status|ssh|logs|token|tunnel|display|peripherals|key|hook|coin|card|fault|reset-mcu|smoke|reset}\n' "$0"
         ;;
 esac
