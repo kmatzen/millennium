@@ -1,5 +1,5 @@
 {
-  "id": "last-line", "version": "2.0.1",
+  "id": "last-line", "version": "2.1.0",
   "title": "The House at the End of the Line",
   "entry": "invitation", "offline_entry": "invitation",
   "initial_state": {"visits": 0, "choice": 0, "route": 0, "coin_found": 0, "token_found": 0},
@@ -63,8 +63,23 @@
       {"event": "call_ended", "target": "answer_result", "when": {"var": "choice", "equals": 2}},
       {"event": "timeout", "target": "leave_result", "when": {"var": "choice", "equals": 1}},
       {"event": "timeout", "target": "answer_result", "when": {"var": "choice", "equals": 2}}, {"event": "hook_down", "target": "interrupted"}]},
-    "leave_result": {"display": ["A DOOR SLAMS", "FOOTSTEPS RUN FREE"], "audio": "leave_result.wav", "ending": "mara-left-the-house", "transitions": [{"event": "hook_down", "target": "invitation"}]},
-    "answer_result": {"display": ["TWO VOICES SPEAK", "BOTH VOICES ARE MARA"], "audio": "answer_result.wav", "ending": "mara-answered-herself", "transitions": [{"event": "hook_down", "target": "invitation"}]},
+    "leave_result": {"display": ["A DOOR SLAMS", "FOOTSTEPS RUN FREE"], "audio": "leave_result.wav", "ending": "mara-left-the-house", "callback": {"after_seconds": 86400, "target": "operator_callback"}, "transitions": [{"event": "hook_down", "target": "invitation"}]},
+    "answer_result": {"display": ["TWO VOICES SPEAK", "BOTH VOICES ARE MARA"], "audio": "answer_result.wav", "ending": "mara-answered-herself", "callback": {"after_seconds": 86400, "target": "operator_callback"}, "transitions": [{"event": "hook_down", "target": "invitation"}]},
+    "operator_callback": {"display": ["INCOMING CALL", "OPERATOR 17"], "ring": true, "timeout_seconds": 35, "transitions": [
+      {"event": "hook_up", "target": "voicemail_leave", "when": {"var": "choice", "equals": 1}},
+      {"event": "hook_up", "target": "voicemail_answer", "when": {"var": "choice", "equals": 2}},
+      {"event": "timeout", "target": "callback_missed"}]},
+    "callback_missed": {"display": ["1 NEW MESSAGE", "LIFT TO PLAY"], "audio": "missed.wav", "ending": "operator-message-waiting", "transitions": [
+      {"event": "hook_up", "target": "voicemail_leave", "when": {"var": "choice", "equals": 1}},
+      {"event": "hook_up", "target": "voicemail_answer", "when": {"var": "choice", "equals": 2}}]},
+    "voicemail_leave": {"display": ["OPERATOR MESSAGE", "1=PLAY  *=REPEAT"], "audio": "return_leave.wav", "timeout_seconds": 30, "transitions": [
+      {"event": "key:1", "target": "voicemail_leave_play"}, {"event": "timeout", "target": "callback_missed"},
+      {"event": "hook_down", "target": "callback_missed"}, {"event": "default", "target": "voicemail_leave"}]},
+    "voicemail_answer": {"display": ["OPERATOR MESSAGE", "1=PLAY  *=REPEAT"], "audio": "return_answer.wav", "timeout_seconds": 30, "transitions": [
+      {"event": "key:1", "target": "voicemail_answer_play"}, {"event": "timeout", "target": "callback_missed"},
+      {"event": "hook_down", "target": "callback_missed"}, {"event": "default", "target": "voicemail_answer"}]},
+    "voicemail_leave_play": {"display": ["SHE LEFT IN 1989", "BUT CALLED IN 2019"], "audio": "leave_coda.wav", "ending": "operator-voicemail-leave", "transitions": [{"event": "hook_down", "target": "invitation"}]},
+    "voicemail_answer_play": {"display": ["TWO MARAS ANSWERED", "OPERATOR HEARD BOTH"], "audio": "answer_coda.wav", "ending": "operator-voicemail-answer", "transitions": [{"event": "hook_down", "target": "invitation"}]},
     "interrupted": {"display": ["THE LINE HOLDS", "LIFT TO CONTINUE"], "audio": "interrupted.wav", "timeout_seconds": 30, "transitions": [
       {"event": "resume", "target": "decision"}, {"event": "hook_up", "target": "decision"}, {"event": "timeout", "target": "held_for_return"}]},
     "held_for_return": {"display": ["CALL HELD OVERNIGHT", "IT REMEMBERS YOU"], "audio": "held_for_return.wav", "ending": "call-held", "transitions": []},

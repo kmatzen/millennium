@@ -95,6 +95,7 @@ void audio_tones_set_volume_percent(int percent) { (void)percent; }
 void audio_tones_play_dial_tone(void) {}
 void audio_tones_play_dtmf(char k) { (void)k; }
 void audio_tones_play_ringback(void) {}
+void audio_tones_play_ring(void) {}
 void audio_tones_play_busy_tone(void) {}
 void audio_tones_play_coin_tone(void) {}
 void audio_tones_play_clip(const char *p) { (void)p; }
@@ -237,6 +238,16 @@ static void test_config_validate_ranges(void) {
     cfg.count = 0;
     config_set_default_values(&cfg);
     config_set_value(&cfg, "logging.max_files", "0");
+    TEST_ASSERT_EQ_INT(config_validate(&cfg), 0);
+
+    cfg.count = 0;
+    config_set_default_values(&cfg);
+    config_set_value(&cfg, "story.callback_quiet_start", "24");
+    TEST_ASSERT_EQ_INT(config_validate(&cfg), 0);
+
+    cfg.count = 0;
+    config_set_default_values(&cfg);
+    config_set_value(&cfg, "story.callback_quiet_end", "-1");
     TEST_ASSERT_EQ_INT(config_validate(&cfg), 0);
 }
 

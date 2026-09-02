@@ -65,11 +65,15 @@ class StoryToolTests(unittest.TestCase):
         self.assertEqual(
             {ending for ending, unused_path in paths},
             {"missed-call", "mara-left-the-house", "mara-answered-herself",
-             "call-held", "the-loop-is-closed", "the-voice-crossed"})
+             "call-held", "the-loop-is-closed", "the-voice-crossed",
+             "operator-message-waiting", "operator-voicemail-leave",
+             "operator-voicemail-answer"})
         for ending, path in paths:
-            if "send_leave" in path and ending != "call-held":
+            if "send_leave" in path and ending in {
+                    "mara-left-the-house", "mara-answered-herself"}:
                 self.assertEqual(ending, "mara-left-the-house")
-            if "send_answer" in path and ending != "call-held":
+            if "send_answer" in path and ending in {
+                    "mara-left-the-house", "mara-answered-herself"}:
                 self.assertEqual(ending, "mara-answered-herself")
 
     def test_explore_prints_one_representative_per_ending(self):
@@ -77,9 +81,38 @@ class StoryToolTests(unittest.TestCase):
         with contextlib.redirect_stdout(output):
             TOOL.explore(self.story)
         lines = output.getvalue().splitlines()
-        self.assertEqual(len(lines), 7)
-        self.assertEqual(sum(" variant(s)): " in line for line in lines), 6)
-        self.assertIn("1325 unique acyclic path(s) reach 6 ending(s)", lines[-1])
+        self.assertEqual(len(lines), 10)
+        self.assertEqual(sum(" variant(s)): " in line for line in lines), 9)
+        self.assertIn("2981 unique acyclic path(s) reach 9 ending(s)", lines[-1])
+
+    def test_callback_is_validated_compiled_and_explored(self):
+        story = copy.deepcopy(self.story)
+        story["scenes"]["leave_result"]["callback"] = {
+            "after_seconds": 60, "target": "return_leave"}
+        self.assertEqual(TOOL.validate(story, STORY_PATH.parent), [])
+        runtime = TOOL.compile_runtime(story).decode()
+        self.assertTrue(runtime.startswith("MSTORY\t2\t"))
+        self.assertIn("CALLBACK\tleave_result\t60\treturn_leave\n", runtime)
+        self.assertTrue(any("return_leave" in path for unused_ending, path
+                            in TOOL.explore_paths(story)))
+
+    def test_callback_rejects_bad_delay_or_target(self):
+        story = copy.deepcopy(self.story)
+        story["scenes"]["leave_result"]["callback"] = {
+            "after_seconds": 0, "target": "absent"}
+        errors = TOOL.validate(story, STORY_PATH.parent)
+        self.assertTrue(any("callback must name a target" in item for item in errors))
+
+    def test_ring_scene_is_compiled_and_must_be_boolean(self):
+        story = copy.deepcopy(self.story)
+        story["scenes"]["invitation"]["ring"] = True
+        self.assertEqual(TOOL.validate(story, STORY_PATH.parent), [])
+        self.assertIn("SCENE\tinvitation\tTHIS CALL IS FOR\tYOU. LIFT TO ANSWER\t"
+                      "invitation.wav\t-\t35\t-\t1\n",
+                      TOOL.compile_runtime(story).decode())
+        story["scenes"]["invitation"]["ring"] = 1
+        self.assertTrue(any("ring must be true or false" in item
+                            for item in TOOL.validate(story, STORY_PATH.parent)))
 
 
 if __name__ == "__main__":

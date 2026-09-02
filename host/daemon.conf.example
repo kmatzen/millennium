@@ -70,6 +70,12 @@ story.path=/var/lib/millennium/content/current/story.mst
 # "configured". Leave blank for the offline timeout path.
 story.call_target=
 story.state_path=/var/lib/millennium/story-state
+# Permit story-authored return calls. Due calls wait until the receiver is down
+# and the local hour falls outside this half-open quiet interval. Setting both
+# hours equal disables quiet hours; use callbacks_enabled=false for a kill switch.
+story.callbacks_enabled=true
+story.callback_quiet_start=22
+story.callback_quiet_end=8
 # State Persistence
 persistence.state_file=/var/lib/millennium/state
 

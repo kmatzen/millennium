@@ -37,10 +37,36 @@ call_active
 assert_display A DOOR SLAMS
 assert_display FOOTSTEPS RUN FREE
 
+# The ending schedules a persistent Operator 17 callback. It survives the
+# return to idle, arrives a day later, and exposes consequence-specific
+# voicemail without requiring the network.
+hook_down
+assert_display THIS CALL IS FOR
+activate_plugin Classic Phone
+activate_plugin Story Mode
+assert_display THIS CALL IS FOR
+config story.callbacks_enabled false
+wait 86400
+assert_display MISSED CALL
+config story.callbacks_enabled true
+config story.callback_quiet_start 0
+config story.callback_quiet_end 23
+wait 1
+assert_display MISSED CALL
+config story.callback_quiet_end 0
+wait 1
+assert_display INCOMING CALL
+assert_display OPERATOR 17
+hook_up
+assert_display OPERATOR MESSAGE
+key 1
+assert_display SHE LEFT IN 1989
+assert_display BUT CALLED IN 2019
+
 # Reloading preserves the content-version-scoped consequence.
 activate_plugin Classic Phone
 activate_plugin Story Mode
-assert_display A DOOR SLAMS
+assert_display SHE LEFT IN 1989
 hook_down
 assert_display THIS CALL IS FOR
 hook_up

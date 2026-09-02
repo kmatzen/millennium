@@ -68,6 +68,9 @@ def closed_cycles(story, reachable):
         changed = False
         for name in reachable - escapable:
             targets = {item["target"] for item in scenes[name].get("transitions", [])}
+            callback = scenes[name].get("callback")
+            if isinstance(callback, dict) and callback.get("target") in scenes:
+                targets.add(callback["target"])
             if targets & escapable:
                 escapable.add(name)
                 changed = True
@@ -123,13 +126,17 @@ def validate(story, root):
         elif any("\t" in line or "\n" in line or "\r" in line for line in display):
             errors.append(f"scene {name}: display text cannot contain tabs or newlines")
         audio = scene.get("audio")
+        ring = scene.get("ring", False)
+        if not isinstance(ring, bool):
+            errors.append(f"scene {name}: ring must be true or false")
         if audio is not None:
             if (not isinstance(audio, str) or Path(audio).name != audio or
                     not re.fullmatch(r"[A-Za-z0-9_-]+\.wav", audio)):
                 errors.append(f"scene {name}: audio must be a safe .wav media filename")
             else:
                 referenced_media.add(audio)
-        if accessibility.get("spoken_instructions", False) and not audio and not scene.get("ending"):
+        if (accessibility.get("spoken_instructions", False) and not audio and
+                not ring and not scene.get("ending")):
             errors.append(f"scene {name}: spoken instructions require audio for actionable scenes")
         scene_timeout = scene.get("timeout_seconds", response_seconds)
         if not isinstance(scene_timeout, int) or not 1 <= scene_timeout <= 3600:
@@ -139,6 +146,15 @@ def validate(story, root):
                                  (call != "configured" and
                                   not re.fullmatch(r"[0-9+*#]{1,31}", call))):
             errors.append(f"scene {name}: call must be 'configured' or a dialable number")
+        callback = scene.get("callback")
+        if callback is not None:
+            if (not isinstance(callback, dict) or
+                    set(callback) != {"after_seconds", "target"} or
+                    not isinstance(callback.get("after_seconds"), int) or
+                    not 1 <= callback.get("after_seconds", 0) <= 604800 or
+                    callback.get("target") not in scenes):
+                errors.append(
+                    f"scene {name}: callback must name a target and delay of 1..604800 seconds")
         transitions = scene.get("transitions", [])
         if not isinstance(transitions, list):
             errors.append(f"scene {name}: transitions must be a list")
@@ -191,6 +207,9 @@ def validate(story, root):
             reachable.add(name)
             pending.extend(item.get("target") for item in scenes[name].get("transitions", [])
                            if item.get("target") in scenes)
+            callback = scenes[name].get("callback")
+            if isinstance(callback, dict) and callback.get("target") in scenes:
+                pending.append(callback["target"])
         for name in sorted(set(scenes) - reachable):
             errors.append(f"unreachable scene: {name}")
         trapped = closed_cycles(story, reachable)
@@ -204,7 +223,7 @@ def compile_runtime(story):
     def field(value):
         return "-" if value == "" else str(value)
 
-    lines = [f"MSTORY\t1\t{story['id']}\t{story['version']}\t{story['entry']}"]
+    lines = [f"MSTORY\t2\t{story['id']}\t{story['version']}\t{story['entry']}"]
     accessibility = story.get("accessibility", {})
     lines.append("\t".join(str(value) for value in (
         "ACCESS", accessibility.get("repeat_key", "*"),
@@ -220,8 +239,12 @@ def compile_runtime(story):
         fields = ["SCENE", name, scene["display"][0], scene["display"][1],
                   scene.get("audio", ""), scene.get("ending", ""),
                   str(scene.get("timeout_seconds", timeout)),
-                  scene.get("call", "")]
+                  scene.get("call", ""), int(bool(scene.get("ring", False)))]
         lines.append("\t".join(field(value) for value in fields))
+        callback = scene.get("callback")
+        if callback:
+            lines.append("\t".join(("CALLBACK", name,
+                                     str(callback["after_seconds"]), callback["target"])))
         for item in scene.get("transitions", []):
             condition = item.get("when", {})
             setting = next(iter(item.get("set", {}).items()), ("", ""))
@@ -296,6 +319,9 @@ def explore_paths(story):
         next_path = path + [name]
         if scene.get("ending"):
             paths.add((scene["ending"], tuple(next_path)))
+            callback = scene.get("callback")
+            if callback and callback["target"] not in next_path:
+                walk(callback["target"], next_path, dict(state))
             return
         for item in scene.get("transitions", []):
             if item["target"] in next_path:
@@ -308,6 +334,9 @@ def explore_paths(story):
             for variable, amount in item.get("increment", {}).items():
                 next_state[variable] = next_state.get(variable, 0) + amount
             walk(item["target"], next_path, next_state)
+        callback = scene.get("callback")
+        if callback and callback["target"] not in next_path:
+            walk(callback["target"], next_path, dict(state))
 
     for seed in seeds:
         walk(story["entry"], [], seed)

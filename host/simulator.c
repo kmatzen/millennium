@@ -235,6 +235,7 @@ void audio_tones_set_volume_percent(int percent) { (void)percent; }
 void audio_tones_play_dial_tone(void) { fprintf(stderr, "[TONE] Dial tone\n"); }
 void audio_tones_play_dtmf(char key) { fprintf(stderr, "[TONE] DTMF %c\n", key); }
 void audio_tones_play_ringback(void) { fprintf(stderr, "[TONE] Ringback\n"); }
+void audio_tones_play_ring(void) { fprintf(stderr, "[TONE] Incoming ring\n"); }
 void audio_tones_play_busy_tone(void) { fprintf(stderr, "[TONE] Busy\n"); }
 void audio_tones_play_coin_tone(void) { fprintf(stderr, "[TONE] Coin\n"); }
 void audio_tones_stop(void) { fprintf(stderr, "[TONE] Stop\n"); }

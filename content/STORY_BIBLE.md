@@ -33,8 +33,13 @@ instructions and provide audio for every actionable scene.
 
 ## Characters and continuity
 
-- **The Operator** is patient, precise, and quietly invested in completing lost
-  connections. The Operator offers progressively clearer help without judgment.
+- **Operator 17** is patient, precise, and quietly invested in completing lost
+  connections. They remember only choices the line actually observed, never
+  flatter the caller with invented familiarity, and leave concise voicemails
+  when a promised callback is missed. Their private conflict is whether every
+  lost connection deserves to be completed; some calls were hidden for a
+  reason. Help becomes progressively clearer without judgment, while certainty
+  becomes progressively less trustworthy.
 - **The Caller on the line** changes by episode. Their wants must be concrete,
   emotionally legible, and resolvable within one short session.
 - Returning callers may be recognized only through anonymous local story state.

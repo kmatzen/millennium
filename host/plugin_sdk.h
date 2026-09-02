@@ -73,6 +73,7 @@ void sdk_beep(char key);          /* DTMF tone for a keypad key (~150ms) */
 void sdk_coin_chime(void);        /* coin-accepted chime (~200ms) */
 void sdk_dial_tone(void);         /* continuous dial tone */
 void sdk_ringback(void);          /* continuous ringback cadence */
+void sdk_ring(void);              /* physical incoming-call ringer cadence */
 void sdk_busy_tone(void);         /* continuous busy cadence */
 void sdk_stop_audio(void);        /* stop any continuous tone */
 int  sdk_audio_is_playing(void);  /* 1 if a tone is currently sounding */

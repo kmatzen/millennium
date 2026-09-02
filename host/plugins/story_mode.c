@@ -11,6 +11,7 @@
 #define STORY_MAX_SCENES 128
 #define STORY_MAX_TRANSITIONS 768
 #define STORY_MAX_VARIABLES 32
+#define STORY_MAX_CALLBACKS 128
 #define STORY_TEXT 81
 
 typedef struct {
@@ -21,6 +22,7 @@ typedef struct {
     char ending[65];
     int timeout_seconds;
     char call[32];
+    int ring;
 } story_scene_t;
 
 typedef struct {
@@ -42,21 +44,31 @@ typedef struct {
 } story_variable_t;
 
 typedef struct {
+    char scene[65];
+    int after_seconds;
+    char target[65];
+} story_callback_t;
+
+typedef struct {
     char id[65];
     char version[32];
     char entry[65];
     story_scene_t scenes[STORY_MAX_SCENES];
     story_transition_t transitions[STORY_MAX_TRANSITIONS];
     story_variable_t variables[STORY_MAX_VARIABLES];
+    story_callback_t callbacks[STORY_MAX_CALLBACKS];
     int scene_count;
     int transition_count;
     int variable_count;
+    int callback_count;
     int current;
     time_t entered_at;
     int loaded;
     time_t session_started_at;
     char repeat_key;
     int volume_percent;
+    time_t callback_due_at;
+    char callback_target[65];
 } story_runtime_t;
 
 static story_runtime_t runtime;
@@ -131,6 +143,34 @@ static const char *state_path(void) {
                              "/var/lib/millennium/story-state");
 }
 
+static int callback_delivery_allowed(void) {
+    config_data_t *config = config_get_instance();
+    int start;
+    int end;
+    int hour;
+    time_t now;
+    struct tm *local;
+    if (!config_get_bool(config, "story.callbacks_enabled", 1)) return 0;
+    start = config_get_int(config, "story.callback_quiet_start", 22);
+    end = config_get_int(config, "story.callback_quiet_end", 8);
+    if (start < 0 || start > 23 || end < 0 || end > 23) return 0;
+    if (start == end) return 1;
+    now = sdk_now();
+    local = localtime(&now);
+    if (!local) return 0;
+    hour = local->tm_hour;
+    if (start < end) return !(hour >= start && hour < end);
+    return !(hour >= start || hour < end);
+}
+
+static story_callback_t *callback_for_scene(const char *name) {
+    int i;
+    for (i = 0; i < runtime.callback_count; i++) {
+        if (strcmp(runtime.callbacks[i].scene, name) == 0) return &runtime.callbacks[i];
+    }
+    return NULL;
+}
+
 static void save_state(void) {
     char temporary[512];
     FILE *stream;
@@ -145,6 +185,10 @@ static void save_state(void) {
         fprintf(stream, "VAR\t%s\t%d\n", runtime.variables[i].name,
                 runtime.variables[i].value);
     }
+    if (runtime.callback_due_at > 0 && runtime.callback_target[0]) {
+        fprintf(stream, "CALLBACK\t%lld\t%s\n",
+                (long long)runtime.callback_due_at, runtime.callback_target);
+    }
     if (fclose(stream) != 0 || rename(temporary, state_path()) != 0) {
         remove(temporary);
     }
@@ -152,10 +196,12 @@ static void save_state(void) {
 
 static void show_current(void) {
     story_scene_t *scene;
+    story_callback_t *callback;
     if (!runtime.loaded || runtime.current < 0) return;
     scene = &runtime.scenes[runtime.current];
     sdk_display(scene->line1, scene->line2);
-    if (scene->audio[0]) sdk_play_content_clip(scene->audio);
+    if (scene->ring) sdk_ring();
+    else if (scene->audio[0]) sdk_play_content_clip(scene->audio);
     if (scene->call[0]) {
         const char *target = scene->call;
         if (strcmp(target, "configured") == 0)
@@ -163,6 +209,14 @@ static void show_current(void) {
         if (target[0]) sdk_call(target);
     }
     runtime.entered_at = sdk_now();
+    callback = callback_for_scene(scene->name);
+    if (callback && runtime.callback_due_at == 0) {
+        runtime.callback_due_at = sdk_now() + callback->after_seconds;
+        memcpy(runtime.callback_target, callback->target,
+               sizeof(runtime.callback_target));
+        runtime.callback_target[sizeof(runtime.callback_target) - 1] = '\0';
+        sdk_metric_increment("story_callbacks_scheduled");
+    }
     save_state();
     sdk_logf("Story", "Entered %s/%s scene %s", runtime.id, runtime.version,
              scene->name);
@@ -184,7 +238,7 @@ static int load_story(void) {
     while (fgets(line, sizeof(line), stream)) {
         field_count = split_tabs(line, fields, 10);
         if (field_count == 5 && strcmp(fields[0], "MSTORY") == 0 &&
-                strcmp(fields[1], "1") == 0) {
+                (strcmp(fields[1], "1") == 0 || strcmp(fields[1], "2") == 0)) {
             copy_field(runtime.id, sizeof(runtime.id), fields[2]);
             copy_field(runtime.version, sizeof(runtime.version), fields[3]);
             copy_field(runtime.entry, sizeof(runtime.entry), fields[4]);
@@ -196,7 +250,8 @@ static int load_story(void) {
                    runtime.variable_count < STORY_MAX_VARIABLES) {
             int index = find_variable(fields[1], 1);
             runtime.variables[index].value = atoi(fields[2]);
-        } else if (field_count == 8 && strcmp(fields[0], "SCENE") == 0 &&
+        } else if ((field_count == 8 || field_count == 9) &&
+                   strcmp(fields[0], "SCENE") == 0 &&
                    runtime.scene_count < STORY_MAX_SCENES) {
             story_scene_t *scene = &runtime.scenes[runtime.scene_count++];
             copy_field(scene->name, sizeof(scene->name), fields[1]);
@@ -206,6 +261,7 @@ static int load_story(void) {
             copy_field(scene->ending, sizeof(scene->ending), optional_field(fields[5]));
             scene->timeout_seconds = atoi(fields[6]);
             copy_field(scene->call, sizeof(scene->call), optional_field(fields[7]));
+            scene->ring = field_count == 9 ? atoi(fields[8]) != 0 : 0;
         } else if (field_count == 10 && strcmp(fields[0], "TRANS") == 0 &&
                    runtime.transition_count < STORY_MAX_TRANSITIONS) {
             story_transition_t *transition = &runtime.transitions[runtime.transition_count++];
@@ -219,6 +275,17 @@ static int load_story(void) {
             transition->set_value = atoi(fields[7]);
             copy_field(transition->increment_var, sizeof(transition->increment_var), optional_field(fields[8]));
             transition->increment_value = atoi(fields[9]);
+        } else if (field_count == 4 && strcmp(fields[0], "CALLBACK") == 0 &&
+                   runtime.callback_count < STORY_MAX_CALLBACKS) {
+            story_callback_t *callback = &runtime.callbacks[runtime.callback_count++];
+            copy_field(callback->scene, sizeof(callback->scene), fields[1]);
+            callback->after_seconds = atoi(fields[2]);
+            copy_field(callback->target, sizeof(callback->target), fields[3]);
+            if (callback->after_seconds <= 0) {
+                fclose(stream);
+                sdk_log("Story", "Invalid callback delay");
+                return -1;
+            }
         } else {
             fclose(stream);
             sdk_log("Story", "Invalid or oversized compiled story");
@@ -259,9 +326,16 @@ static void restore_state(void) {
     while (fgets(line, sizeof(line), stream)) {
         int index;
         count = split_tabs(line, fields, 6);
-        if (count != 3 || strcmp(fields[0], "VAR") != 0) continue;
-        index = find_variable(fields[1], 0);
-        if (index >= 0) runtime.variables[index].value = atoi(fields[2]);
+        if (count == 3 && strcmp(fields[0], "VAR") == 0) {
+            index = find_variable(fields[1], 0);
+            if (index >= 0) runtime.variables[index].value = atoi(fields[2]);
+        } else if (count == 3 && strcmp(fields[0], "CALLBACK") == 0) {
+            long long due = strtoll(fields[1], NULL, 10);
+            if (due > 0 && find_scene(fields[2]) >= 0) {
+                runtime.callback_due_at = (time_t)due;
+                copy_field(runtime.callback_target, sizeof(runtime.callback_target), fields[2]);
+            }
+        }
     }
     fclose(stream);
 }
@@ -372,6 +446,18 @@ static void story_activate(void) {
 static void story_tick(void) {
     story_scene_t *scene;
     if (!runtime.loaded || runtime.current < 0) return;
+    if (runtime.callback_due_at > 0 && sdk_now() >= runtime.callback_due_at &&
+            !sdk_receiver_is_up() && callback_delivery_allowed()) {
+        int target = find_scene(runtime.callback_target);
+        runtime.callback_due_at = 0;
+        runtime.callback_target[0] = '\0';
+        if (target >= 0) {
+            runtime.current = target;
+            sdk_metric_increment("story_callbacks_delivered");
+            show_current();
+            return;
+        }
+    }
     scene = &runtime.scenes[runtime.current];
     if (scene->timeout_seconds > 0 && sdk_elapsed(runtime.entered_at) >= scene->timeout_seconds) {
         dispatch_event("timeout");

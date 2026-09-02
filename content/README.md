@@ -51,7 +51,25 @@ caller. Never place personal data in story state or analytics.
 The runtime supports conditional transitions over persistent integer variables,
 `set` and `increment` actions, the special `$hour` and `$weekday` variables,
 outgoing calls and call-state transitions, per-scene `timeout_seconds`, and
-events for every physical input. Accessibility metadata configures output
+events for every physical input. A scene may also schedule one persistent local
+callback after a bounded wall-clock delay:
+
+```json
+"callback": {"after_seconds": 86400, "target": "operator_callback"}
+```
+
+The due timestamp survives daemon restarts. Story Mode delivers the callback
+only while the handset is down, records it as consumed before entering the
+target, and can route a timeout into an ordinary message-waiting scene. This is
+a narrative callback, not permission to call a real telephone number; external
+calls still use the separately configured `call` field.
+
+Operators may set `story.callbacks_enabled=false` as an immediate kill switch.
+`story.callback_quiet_start` and `story.callback_quiet_end` are local hours
+(defaults `22` and `8`); a due callback remains pending until the handset is
+down, callbacks are enabled, and the current hour is outside that interval.
+
+Accessibility metadata configures output
 volume, a global repeat key, minimum response time, high-contrast copy, and a
 spoken-instruction mode that requires audio for every actionable scene.
 Audio values are safe `.wav` filenames stored in the story's `media/`

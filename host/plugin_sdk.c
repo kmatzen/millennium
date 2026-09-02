@@ -57,6 +57,7 @@ void sdk_beep(char key) { audio_tones_play_dtmf(key); }
 void sdk_coin_chime(void) { audio_tones_play_coin_tone(); }
 void sdk_dial_tone(void) { audio_tones_play_dial_tone(); }
 void sdk_ringback(void) { audio_tones_play_ringback(); }
+void sdk_ring(void) { audio_tones_play_ring(); }
 void sdk_busy_tone(void) { audio_tones_play_busy_tone(); }
 void sdk_stop_audio(void) { audio_tones_stop(); }
 int sdk_audio_is_playing(void) { return audio_tones_is_playing(); }

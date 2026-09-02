@@ -226,6 +226,7 @@ static int config_is_valid_log_level(const char* level) {
 
 int config_validate_ex(const config_data_t* config, char* err, size_t err_size) {
     int web_enabled, metrics_enabled, web_port, metrics_port;
+    int callback_quiet_start, callback_quiet_end;
     const char* transport;
     struct in_addr bind_addr;
 
@@ -267,6 +268,18 @@ int config_validate_ex(const config_data_t* config, char* err, size_t err_size) 
     if (config_get_max_retries(config) < 0) {
         CONFIG_FAIL("system.max_retries must be >= 0 (got %d)",
                     config_get_max_retries(config));
+    }
+
+    /* Scheduled story callbacks */
+    callback_quiet_start = config_get_int(config, "story.callback_quiet_start", 22);
+    callback_quiet_end = config_get_int(config, "story.callback_quiet_end", 8);
+    if (callback_quiet_start < 0 || callback_quiet_start > 23) {
+        CONFIG_FAIL("story.callback_quiet_start %d out of range 0..23",
+                    callback_quiet_start);
+    }
+    if (callback_quiet_end < 0 || callback_quiet_end > 23) {
+        CONFIG_FAIL("story.callback_quiet_end %d out of range 0..23",
+                    callback_quiet_end);
     }
 
     /* Logging */
