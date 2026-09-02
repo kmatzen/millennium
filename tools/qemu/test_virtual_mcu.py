@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import importlib.util
 import pathlib
+from unittest import mock
 import unittest
 
 MODULE_PATH = pathlib.Path(__file__).with_name("virtual_mcu.py")
@@ -46,6 +47,30 @@ class ProtocolTest(unittest.TestCase):
             hardware.manage("fault", "coin jam")
             with self.assertRaisesRegex(ValueError, "jammed"):
                 hardware.alpha_event("coin", "25")
+
+    def test_control_status_json_is_a_success_response(self):
+        import asyncio
+
+        class Reader:
+            async def readline(self):
+                return b'{"arduinos": {}}\n'
+
+        class Writer:
+            def write(self, unused):
+                pass
+
+            async def drain(self):
+                pass
+
+            def close(self):
+                pass
+
+            async def wait_closed(self):
+                pass
+
+        with mock.patch.object(MCU.asyncio, "open_unix_connection",
+                               return_value=(Reader(), Writer())):
+            self.assertEqual(asyncio.run(MCU.send_control("unused", "status")), 0)
 
 
 if __name__ == "__main__":

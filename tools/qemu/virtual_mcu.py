@@ -282,7 +282,7 @@ async def send_control(path, command):
     writer.close()
     await writer.wait_closed()
     print(response.decode().strip())
-    return 0 if response == b"ok\n" else 1
+    return 1 if response.startswith(b"error:") or not response else 0
 
 
 def main():

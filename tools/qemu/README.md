@@ -67,8 +67,28 @@ tools/qemu/qemu.sh fault coin jam
 tools/qemu/qemu.sh fault coin clear
 tools/qemu/qemu.sh reset-mcu alpha
 tools/qemu/qemu.sh reset-mcu beta
+tools/qemu/qemu.sh restart-virtual-mcu
+tools/qemu/qemu.sh network down
+tools/qemu/qemu.sh network up
+tools/qemu/qemu.sh pause
+tools/qemu/qemu.sh resume
+tools/qemu/qemu.sh power-cut
 tools/qemu/qemu.sh stop
 ```
+
+Cold disk checkpoints are available while the VM is stopped:
+
+```sh
+tools/qemu/qemu.sh checkpoint save known-good
+tools/qemu/qemu.sh checkpoint list
+tools/qemu/qemu.sh checkpoint load known-good
+tools/qemu/qemu.sh checkpoint delete known-good
+```
+
+`power-cut` terminates QEMU without a guest shutdown specifically for recovery
+testing. `reset` and checkpoint loading are recoverable but intentionally alter
+the overlay selected for the next boot; do not keep irreplaceable data only in
+the lab VM.
 
 To use the loopback-only dashboard and metrics endpoints, open an SSH tunnel:
 
@@ -106,6 +126,11 @@ daemon fails, use `qemu.sh logs` and `qemu.sh ssh systemctl status daemon`.
 `python3 tools/qemu/test_virtual_mcu.py` runs without QEMU and checks protocol
 framing. `qemu.sh smoke` checks the running guest, systemd service, virtio MCU
 device, health API, metrics endpoint, input injection, and display response.
+`qemu.sh lifecycle-test` verifies pause/resume and network isolation against an
+already provisioned guest. `qemu.sh recovery-test` saves a named cold
+checkpoint, boots it, cuts power without a guest shutdown, restores the
+checkpoint, and requires a healthy daemon after reboot. The complete remaining objective ledger and exact
+acceptance commands are in `OBJECTIVES.md`.
 
 The QEMU lab complements rather than replaces these release gates:
 

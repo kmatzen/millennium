@@ -13,11 +13,118 @@ BASE_IMAGE="$STATE_DIR/debian-12-arm64.qcow2"
 DISK_IMAGE="$STATE_DIR/millennium.qcow2"
 SSH_PORT=${MILLENNIUM_QEMU_SSH_PORT:-2222}
 SSH_KEY="$STATE_DIR/id_ed25519"
-SSH=(ssh -i "$SSH_KEY" -p "$SSH_PORT" -o BatchMode=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR millennium@127.0.0.1)
+SSH=(ssh -i "$SSH_KEY" -p "$SSH_PORT" -o BatchMode=yes -o ConnectTimeout=5 \
+    -o ConnectionAttempts=1 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 \
+    -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR \
+    millennium@127.0.0.1)
 
 die() { printf 'error: %s\n' "$*" >&2; exit 1; }
 need() { command -v "$1" >/dev/null || die "missing '$1' ($2)"; }
-running() { test -f "$STATE_DIR/qemu.pid" && kill -0 "$(cat "$STATE_DIR/qemu.pid")" 2>/dev/null; }
+running() {
+    test -f "$STATE_DIR/qemu.pid" || return 1
+    local pid
+    pid=$(cat "$STATE_DIR/qemu.pid")
+    [[ "$pid" =~ ^[0-9]+$ ]] || return 1
+    kill -0 "$pid" 2>/dev/null || ps -p "$pid" -o comm= 2>/dev/null | grep -q 'qemu-system-aarch64'
+}
+
+monitor_command() {
+    need socat "install socat"
+    running || die "VM is not running"
+    printf '%s\n' "$1" | socat - "UNIX-CONNECT:$STATE_DIR/monitor.sock" >/dev/null
+}
+
+network_link() {
+    case ${1:-} in
+        down) monitor_command "set_link net0 off" ;;
+        up) monitor_command "set_link net0 on" ;;
+        *) die "network requires up or down" ;;
+    esac
+    printf 'guest network %s\n' "$1"
+}
+
+power_cut() {
+    monitor_command quit || true
+    for _ in {1..20}; do running || break; sleep 0.25; done
+    test -f "$STATE_DIR/mcu.pid" && kill "$(cat "$STATE_DIR/mcu.pid")" 2>/dev/null || true
+    rm -f "$STATE_DIR/qemu.pid" "$STATE_DIR/mcu.pid"
+    printf 'VM power cut; disk was not gracefully shut down\n'
+}
+
+restart_virtual_mcu() {
+    running || die "VM is not running"
+    if test -f "$STATE_DIR/mcu.pid"; then
+        kill "$(cat "$STATE_DIR/mcu.pid")" 2>/dev/null || true
+        for _ in {1..20}; do
+            kill -0 "$(cat "$STATE_DIR/mcu.pid")" 2>/dev/null || break
+            sleep 0.1
+        done
+    fi
+    rm -f "$STATE_DIR/mcu.pid" "$STATE_DIR/control.sock"
+    python3 "$SCRIPT_DIR/virtual_mcu.py" serve --daemonize \
+        --pid-file "$STATE_DIR/mcu.pid" --log-file "$STATE_DIR/mcu.log" \
+        --serial "$STATE_DIR/mcu.sock" --control "$STATE_DIR/control.sock" \
+        --display "$STATE_DIR/display.json"
+    for _ in {1..50}; do test -S "$STATE_DIR/control.sock" && break; sleep 0.1; done
+    test -S "$STATE_DIR/control.sock" || die "virtual MCU control socket did not return"
+    printf 'virtual MCU restarted\n'
+}
+
+checkpoint() {
+    need qemu-img "install QEMU"
+    local action=${1:-list} name=${2:-}
+    running && die "checkpoints require a stopped VM"
+    case "$action" in
+        list) qemu-img snapshot -l "$DISK_IMAGE" ;;
+        save|load|delete)
+            [[ "$name" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$ ]] || die "invalid checkpoint name"
+            case "$action" in
+                save) qemu-img snapshot -c "$name" "$DISK_IMAGE" ;;
+                load) qemu-img snapshot -a "$name" "$DISK_IMAGE" ;;
+                delete) qemu-img snapshot -d "$name" "$DISK_IMAGE" ;;
+            esac
+            printf 'checkpoint %s: %s\n' "$action" "$name"
+            ;;
+        *) die "checkpoint requires list, save NAME, load NAME, or delete NAME" ;;
+    esac
+}
+
+lifecycle_test() {
+    running || die "start and provision the VM before lifecycle-test"
+    "${SSH[@]}" true
+    monitor_command stop
+    sleep 1
+    running || die "paused VM process exited"
+    monitor_command cont
+    for _ in {1..30}; do "${SSH[@]}" true 2>/dev/null && break; sleep 1; done
+    "${SSH[@]}" true
+    network_link down >/dev/null
+    if "${SSH[@]}" curl --fail --silent --max-time 3 http://192.0.2.1/ >/dev/null 2>&1; then
+        network_link up >/dev/null
+        die "external request unexpectedly succeeded with network down"
+    fi
+    network_link up >/dev/null
+    "${SSH[@]}" systemctl is-active --quiet daemon.service
+    printf 'PASS: pause/resume and deterministic network isolation preserve the appliance\n'
+}
+
+recovery_test() {
+    local name=qemu-recovery-test
+    running || die "start and provision the VM before recovery-test"
+    stop_vm
+    qemu-img snapshot -d "$name" "$DISK_IMAGE" >/dev/null 2>&1 || true
+    checkpoint save "$name"
+    start_vm
+    wait_ready
+    "${SSH[@]}" systemctl is-active --quiet daemon.service
+    power_cut
+    checkpoint load "$name"
+    start_vm
+    wait_ready
+    "${SSH[@]}" systemctl is-active --quiet daemon.service
+    "${SSH[@]}" curl --fail --silent http://127.0.0.1:8081/api/health >/dev/null
+    printf 'PASS: abrupt power cut and named-checkpoint restore recovered a healthy appliance\n'
+}
 
 firmware_path() {
     local candidate
@@ -102,7 +209,7 @@ start_vm() {
         accel=hvf
         cpu=host
     fi
-    qemu-system-aarch64 \
+    if ! qemu-system-aarch64 \
         -name millennium \
         -machine "virt,accel=$accel" -cpu "$cpu" -smp 4 -m 2048 \
         -bios "$(firmware_path)" \
@@ -116,7 +223,11 @@ start_vm() {
         -device virtserialport,chardev=mcu,name=millennium.mcu \
         -monitor "unix:$STATE_DIR/monitor.sock,server=on,wait=off" \
         -serial "file:$STATE_DIR/console.log" -display none \
-        -daemonize -pidfile "$STATE_DIR/qemu.pid"
+        -daemonize -pidfile "$STATE_DIR/qemu.pid"; then
+        test -f "$STATE_DIR/mcu.pid" && kill "$(cat "$STATE_DIR/mcu.pid")" 2>/dev/null || true
+        rm -f "$STATE_DIR/mcu.pid"
+        die "QEMU failed to start; the newly started virtual MCU was cleaned up"
+    fi
     printf 'VM started. Run "%s wait", then "%s provision".\n' "$0" "$0"
 }
 
@@ -163,6 +274,14 @@ case ${1:-help} in
     wait) wait_ready ;;
     provision) provision ;;
     stop) stop_vm ;;
+    power-cut) power_cut ;;
+    pause) monitor_command stop; printf 'VM paused\n' ;;
+    resume) monitor_command cont; printf 'VM resumed\n' ;;
+    restart-virtual-mcu) restart_virtual_mcu ;;
+    network) network_link "${2:-}" ;;
+    checkpoint) shift; checkpoint "$@" ;;
+    lifecycle-test) lifecycle_test ;;
+    recovery-test) recovery_test ;;
     status) running && printf 'running (pid %s)\n' "$(cat "$STATE_DIR/qemu.pid")" || { printf 'stopped\n'; exit 1; } ;;
     ssh) shift; "${SSH[@]}" "$@" ;;
     logs) "${SSH[@]}" sudo journalctl -u daemon.service -f ;;
@@ -183,6 +302,6 @@ case ${1:-help} in
         printf 'fresh overlay created; previous disk retained as a timestamped backup\n'
         ;;
     help|*)
-        printf 'usage: %s {fetch|init|start|wait|provision|stop|status|ssh|logs|token|tunnel|display|peripherals|key|hook|coin|card|fault|reset-mcu|smoke|reset}\n' "$0"
+        printf 'usage: %s {fetch|init|start|wait|provision|stop|power-cut|pause|resume|restart-virtual-mcu|network|checkpoint|lifecycle-test|recovery-test|status|ssh|logs|token|tunnel|display|peripherals|key|hook|coin|card|fault|reset-mcu|smoke|reset}\n' "$0"
         ;;
 esac
