@@ -137,6 +137,8 @@ as an unattended appliance. Items are ordered by priority.
   - [ ] Test loss of power and network during download, flash, and activation.
     - [x] Automated fault injection proves atomic download, selective MCU-flash
       recovery, and activation-journal rollback.
+    - [x] Provide a durable physical-interruption harness that captures the
+      before/after boot, release, content, firmware, OTA, service, and HIL state.
     - [ ] Repeat the interruptions by physically removing power/network on the
       production phone and attach journal and measurement evidence.
   - [ ] Confirm remote maintenance works from outside the home network.

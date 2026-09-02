@@ -10,6 +10,22 @@ save, OTA download, MCU flash, and host activation. Brownout testing records
 the supply, load, minimum voltage, duration, observed reset causes, and safe
 recovery result. A narrative note without measurements is not evidence.
 
+On an installed phone, arm each scenario immediately before the physical
+action. Reboot-required cases reconcile automatically; run `reconcile`
+manually after network-only or measured-load cases:
+
+```bash
+sudo millennium-physical-interruption arm --scenario idle_power_loss
+# remove and restore power
+sudo millennium-physical-interruption status
+sudo millennium-physical-interruption reconcile  # harmless if already complete
+```
+
+Copy the resulting JSON from
+`/var/lib/millennium/physical-tests/evidence/` into the private evidence
+directory, add the human observation and measurements, then pass that file to
+`as_built_record.py record-test`.
+
 Generate a machine-readable starting record on the actual phone, then fill it
 with observations and exact installed-artifact identities:
 

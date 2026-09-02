@@ -1,0 +1,23 @@
+[Unit]
+Description=Reconcile an armed Millennium physical interruption test
+After=daemon.service millennium-maintenance-tunnel.service
+Wants=daemon.service millennium-maintenance-tunnel.service
+ConditionPathExists=/var/lib/millennium/physical-tests/armed.json
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/libexec/millennium-physical-interruption reconcile
+User=root
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/millennium/physical-tests /var/lib/millennium/hil
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictSUIDSGID=true
+LockPersonality=true
+Restart=on-failure
+RestartSec=15
+
+[Install]
+WantedBy=multi-user.target

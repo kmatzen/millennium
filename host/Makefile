@@ -304,10 +304,13 @@ install: daemon
 	sudo install -m 0755 monitoring/millennium_backup.sh /usr/local/libexec/millennium-backup
 	sudo install -m 0755 monitoring/millennium_backup_export.sh /usr/local/libexec/millennium-backup-export
 	sudo install -m 0755 monitoring/millennium_hil_smoke.py /usr/local/libexec/millennium-hil-smoke
+	sudo install -m 0755 monitoring/millennium_physical_interruption.py /usr/local/libexec/millennium-physical-interruption
 	sudo install -d -m 0755 /var/lib/millennium/hil
+	sudo install -d -m 0700 /var/lib/millennium/physical-tests
 	sudo cp systemd/millennium-monitor.service systemd/millennium-monitor.timer /etc/systemd/system/
 	sudo cp systemd/millennium-backup.service systemd/millennium-backup.timer /etc/systemd/system/
 	sudo cp systemd/millennium-hil-smoke.service systemd/millennium-hil-smoke.timer /etc/systemd/system/
+	sudo cp systemd/millennium-physical-interruption-reconcile.service /etc/systemd/system/
 	sudo mkdir -p /etc/systemd/system/daemon.service.d
 	@printf '[Service]\nUser=%s\n' "$$(logname 2>/dev/null || whoami)" > daemon-override.conf.tmp && sudo cp daemon-override.conf.tmp /etc/systemd/system/daemon.service.d/override.conf; rm -f daemon-override.conf.tmp
 	sudo systemctl daemon-reload
@@ -316,6 +319,7 @@ install: daemon
 	@if command -v nft >/dev/null 2>&1 || test -x /usr/sbin/nft; then sudo systemctl enable --now millennium-firewall.service; else echo "ERROR: nftables is required for the production firewall"; exit 1; fi
 	sudo systemctl enable --now millennium-monitor.timer
 	sudo systemctl enable --now millennium-hil-smoke.timer
+	sudo systemctl enable millennium-physical-interruption-reconcile.service
 	@if test -s /etc/millennium/backup.env; then sudo systemctl enable --now millennium-backup.timer; else echo "Backup timer not enabled: configure /etc/millennium/backup.env"; fi
 	sudo systemctl start daemon.service
 

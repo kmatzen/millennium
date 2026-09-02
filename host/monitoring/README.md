@@ -19,6 +19,33 @@ non-failed OTA state. Its atomic JSON result is monitored for failure and
 staleness. The test is intentionally non-destructive: it does not place calls,
 accept coins, or rewrite story state.
 
+## Physical interruption evidence
+
+`millennium-physical-interruption` creates a durable checkpoint before an
+operator deliberately interrupts power or networking. It records boot ID,
+active host/content links, installed sequence, firmware digests, OTA state,
+service state, and the full HIL result. Only one scenario can be armed at once:
+
+```bash
+sudo millennium-physical-interruption arm --scenario idle_power_loss
+# Perform exactly the printed physical action, then restore power.
+sudo millennium-physical-interruption status
+```
+
+The boot service automatically reconciles reboot-required scenarios. For
+network-only and measured-load scenarios, run
+`sudo millennium-physical-interruption reconcile` after restoring the normal
+condition. Evidence is retained under
+`/var/lib/millennium/physical-tests/evidence/` and failed attempts never
+overwrite one another.
+
+The harness does not mark a physical test accepted. It records
+`physical_observation_required: true`; the operator must still document the
+instrument/load, minimum voltage where applicable, observed behavior, and use
+`tools/as_built_record.py record-test`. An expected OTA rollback counts as
+system recovery only when the prior host release is restored and, for an MCU
+flash interruption, both prior firmware digests are restored.
+
 ## Encrypted backup
 
 Install `restic`, copy `backup.env.example` to
