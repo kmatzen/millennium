@@ -298,6 +298,23 @@ the maintainer's Ed25519 key, validates the effective sshd configuration, and
 disables root, password, and keyboard-interactive SSH login before the phone is
 handed over.
 
+If monitoring and restricted backups still traverse the reverse tunnel but all
+administrator keys are rejected, use the phone's local console. Put only the
+approved public key on removable media, record its fingerprint on a separate
+trusted display, and run:
+
+```bash
+sudo python3 /path/to/repair_maintenance_access.py \
+  --user matzen --key-file /media/KEY.pub \
+  --fingerprint SHA256:EXPECTED_FINGERPRINT
+```
+
+The repair refuses non-Ed25519 keys, multi-line input, and fingerprint
+mismatches. It atomically appends rather than replacing existing keys, validates
+`sshd`, and records evidence without storing the public-key body. Copy the
+evidence into the phone's as-built record only after setting
+`remote_login_verified` to true based on an actual external-network login.
+
 The implemented device commands are `millennium-ota check`, `apply`,
 `auto-apply`, `recover`, and `status`. The dashboard calls the same signed worker through
 restricted systemd units; it cannot choose an alternate artifact or key.

@@ -40,7 +40,9 @@ jobs:
         run: python3 tools/qemu/test_virtual_mcu.py
 
       - name: Test acceptance evidence gates
-        run: python3 tools/tests/test_acceptance_evidence.py
+        run: |
+          python3 tools/tests/test_acceptance_evidence.py
+          python3 host/tests/test_maintenance_repair.py
 
   # Second opinion from clang (#237). The two compilers implement different
   # warning sets, and the build treats warnings as errors: GCC has
