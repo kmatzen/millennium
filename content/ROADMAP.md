@@ -57,6 +57,11 @@ session, an optional physical discovery, and a later payoff.
 
 ## Authoring and operations
 
+- Add a guided first-boot Wi-Fi portal: the phone advertises a temporary,
+  device-specific setup network; the owner scans a printed QR code, selects
+  their home Wi-Fi, and receives handset/display confirmation when remote
+  maintenance and updates are reachable. Reopening it later requires a
+  protected physical gesture and expires automatically.
 - Add an authenticated browser console for branch preview, media-in-context,
   callback inspection, anonymous state reset, signed content deployment, and
   rollback.
