@@ -170,3 +170,14 @@ explicit anima no-touch FIDO identity succeeded through the reverse port; no
 phone configuration or key repair was necessary. Exact live release, MCU path,
 content, and daemon evidence is recorded in `live-inventory-2026-09-01.json`.
 The required external-network vantage-point test is still outstanding.
+
+A fresh read-only audit on 2026-09-02 restored the local OpenSSH FIDO helper,
+proved the hardware key with a disposable local signature, and reached the
+phone through anima's loopback reverse port `22022`. The phone remained on
+signed sequence 8 with healthy serial and SIP checks, zero daemon restarts,
+and active maintenance/update services. Signed sequence 9 was verified as
+pending for `phone-001` and was correctly deferred outside the automatic
+installation window. Exact evidence is in `live-inventory-2026-09-02.json` and
+`maintenance-access-audit-2026-09-02.json`. Because the administrative client
+was still physically on the home network, this does not close the genuinely
+external-vantage requirement.

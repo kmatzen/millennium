@@ -1,0 +1,34 @@
+{
+  "audit_at": "2026-09-02T04:08:08Z",
+  "device_id": "phone-001",
+  "authentication": {
+    "hardware_backed": true,
+    "local_disposable_challenge_signed": true,
+    "phone_configuration_changed": false,
+    "server_configuration_changed": false
+  },
+  "path": {
+    "destination": "anima loopback reverse port 22022",
+    "jump_host": "anima:2223",
+    "result": "success",
+    "target_hostname": "raspberrypi",
+    "target_user": "matzen"
+  },
+  "reverse_tunnel": {
+    "anima_listener": "127.0.0.1:22022",
+    "phone_service_active": true,
+    "phone_service_restart_count": 1
+  },
+  "operational_checks": {
+    "daemon_active": true,
+    "ota_apply_timer_active": true,
+    "ota_check_timer_active": true,
+    "serial_health": "HEALTHY",
+    "sip_health": "HEALTHY"
+  },
+  "external_vantage_gate": {
+    "passed": false,
+    "reason": "The route traversed anima, but the administrative client was still located on the phone's home network. Repeat from a genuinely external client network."
+  },
+  "schema": 1
+}

@@ -1,0 +1,55 @@
+{
+  "active_release": {
+    "display_hex_sha256": "5dab000d8408ed497432fd52248c8671156ef764d4f7426e56df3d31e9b4b0a2",
+    "host_binary_sha256": "72f56cc610f2fc56afebf0f5d8724b753e9a68ae8ee7d86eaa8343562659358e",
+    "keypad_hex_sha256": "f1692bb35d07b759428723cd3ec4257eaa3520f6eb91f9aeec5cd3bc472de273",
+    "path": "/opt/millennium/releases/00000008-0.4.0",
+    "previous_path": "/opt/millennium/releases/00000006-0.4.0",
+    "sequence": 8,
+    "version": "0.4.0",
+    "source_commit": "16d759e",
+    "build_time": "2026-08-31T21:36:17Z"
+  },
+  "captured_at": "2026-09-02T04:08:08Z",
+  "capture_path": "hardware-backed SSH via anima ProxyJump and loopback reverse port 22022",
+  "content": {
+    "identity": "last-line-2.0.1",
+    "story_json_sha256": "7cccba856d368d17443d94f415628383744a304a547e7f61e2fca7f74421a93b",
+    "story_mst_sha256": "79af164cd99a7498476278fb9a06f4680cbf13a1ccc509ee82c55b5c835ef73e"
+  },
+  "device_id": "phone-001",
+  "host": {
+    "architecture": "armv7l",
+    "hostname": "raspberrypi",
+    "model": "Raspberry Pi Zero 2 W Rev 1.0",
+    "raspberry_pi_serial": "0000000001ba6844"
+  },
+  "health": {
+    "overall": "WARNING",
+    "serial": "HEALTHY",
+    "sip": "HEALTHY",
+    "warning_reason": "No event activity; the phone is idle"
+  },
+  "pending_release": {
+    "bundle_sha256": "262dbf316ae484a92c893fcde384f1444a35c1e6695f835829816d224519989e",
+    "device_groups": ["phone-001"],
+    "hold": false,
+    "key_id": "release-2026-08",
+    "published_at": "2026-09-02T00:36:04Z",
+    "sequence": 9,
+    "state": "available",
+    "version": "0.4.0",
+    "withdrawn": false
+  },
+  "services": {
+    "daemon": {
+      "active": true,
+      "enabled": true,
+      "restart_count": 0
+    },
+    "maintenance_tunnel_active": true,
+    "ota_apply_timer_active": true,
+    "ota_check_timer_active": true
+  },
+  "schema": 1
+}

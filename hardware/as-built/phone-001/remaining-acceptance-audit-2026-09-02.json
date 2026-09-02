@@ -38,10 +38,10 @@
       "software_fault_model_passed": true
     },
     "external_maintenance_vantage": {
-      "status": "requires-external-network-and-working-local-FIDO-provider",
+      "status": "requires-external-client-network",
       "reverse_tunnel_previously_verified": true,
-      "audit_attempt": "Local OpenSSH in the automation environment could not load security-key support; authentication policy was not weakened.",
-      "evidence": "maintenance-access-audit-2026-09-01.json"
+      "audit_attempt": "Hardware-backed SSH succeeded through anima's loopback reverse port after selecting the installed OpenSSH security-key helper; no phone or server configuration changed.",
+      "evidence": "maintenance-access-audit-2026-09-02.json"
     },
     "physical_as_built_observations": {
       "status": "requires-physical-inspection",
