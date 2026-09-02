@@ -72,6 +72,26 @@ class ProtocolTest(unittest.TestCase):
                                return_value=(Reader(), Writer())):
             self.assertEqual(asyncio.run(MCU.send_control("unused", "status")), 0)
 
+    def test_trace_is_deterministic_and_records_reset_cause(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as directory:
+            hardware = MCU.PhoneHardware(str(pathlib.Path(directory) / "state.json"))
+            hardware.alpha_event("hook", "up")
+            hardware.manage("reset", "watchdog-alpha")
+            snapshot = hardware.snapshot()
+            self.assertEqual(snapshot["tick"], 2)
+            self.assertEqual([item["tick"] for item in snapshot["trace"]], [1, 2])
+            self.assertEqual(snapshot["arduinos"]["alpha"]["last_reset_cause"], "watchdog")
+
+    def test_validator_verify_failure_and_clear_are_visible(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as directory:
+            hardware = MCU.PhoneHardware(str(pathlib.Path(directory) / "state.json"))
+            hardware.manage("fault", "validator verify-fail")
+            self.assertTrue(hardware.snapshot()["peripherals"]["coin_validator"]["verify_failed"])
+            hardware.manage("fault", "validator verify-clear")
+            self.assertFalse(hardware.snapshot()["peripherals"]["coin_validator"]["verify_failed"])
+
 
 if __name__ == "__main__":
     unittest.main()

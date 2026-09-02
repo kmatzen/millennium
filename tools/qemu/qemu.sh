@@ -126,6 +126,108 @@ recovery_test() {
     printf 'PASS: abrupt power cut and named-checkpoint restore recovered a healthy appliance\n'
 }
 
+collect_artifacts() {
+    running || die "VM is not running"
+    local name=${1:-$(date -u +%Y%m%dT%H%M%SZ)}
+    [[ "$name" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$ ]] || die "invalid artifact name"
+    local output="$STATE_DIR/artifacts/$name"
+    mkdir -p "$output"
+    for file in display.json mcu.log console.log provision.log; do
+        test -f "$STATE_DIR/$file" && cp "$STATE_DIR/$file" "$output/$file"
+    done
+    "${SSH[@]}" sudo journalctl -u daemon.service --no-pager > "$output/daemon-journal.log"
+    "${SSH[@]}" curl --silent --show-error http://127.0.0.1:8080/metrics > "$output/metrics.prom" || true
+    "${SSH[@]}" curl --silent --show-error http://127.0.0.1:8081/api/health > "$output/health.json" || true
+    "${SSH[@]}" curl --silent --output /dev/null --write-out '%{http_code}' \
+        http://127.0.0.1:8081/api/health > "$output/health-http-status.txt" || true
+    python3 "$SCRIPT_DIR/virtual_mcu.py" send --control "$STATE_DIR/control.sock" status > "$output/peripherals.json"
+    "${SSH[@]}" sudo cat /var/lib/millennium/state > "$output/daemon-state.txt" 2>/dev/null || true
+    "${SSH[@]}" sudo cat /var/lib/millennium/story-state > "$output/story-state.txt" 2>/dev/null || true
+    "${SSH[@]}" sha256sum /var/lib/millennium/content/current/story.mst \
+        /var/lib/millennium/content/current/story.json > "$output/content-sha256.txt" 2>/dev/null || true
+    python3 - "$output" <<'PY'
+import datetime, hashlib, json, pathlib, sys
+root = pathlib.Path(sys.argv[1])
+files = {}
+for path in sorted(root.iterdir()):
+    if path.name != "summary.json" and path.is_file():
+        files[path.name] = hashlib.sha256(path.read_bytes()).hexdigest()
+summary = {"schema": 1, "kind": "qemu-software-evidence",
+           "physical_hardware_claimed": False,
+           "created_at": datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat(),
+           "files": files}
+(root / "summary.json").write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n")
+PY
+    printf '%s\n' "$output"
+}
+
+wait_display() {
+    local wanted=$1
+    for _ in {1..200}; do
+        if test -f "$STATE_DIR/display.json" && grep -Fq "$wanted" "$STATE_DIR/display.json"; then
+            return 0
+        fi
+        sleep 0.2
+    done
+    die "display did not reach: $wanted"
+}
+
+experience_test() {
+    running || die "start and provision the VM before experience-test"
+    python3 "$SCRIPT_DIR/virtual_mcu.py" send --control "$STATE_DIR/control.sock" hook down >/dev/null
+    "${SSH[@]}" sudo rm -f /var/lib/millennium/story-state
+    "${SSH[@]}" 'token=$(sudo cat /etc/millennium/admin-token); curl --fail --silent --request POST --header "Content-Type: application/json" --header "Authorization: Bearer $token" --data '\''{"action":"activate_plugin","plugin":"Story Mode"}'\'' http://127.0.0.1:8081/api/control >/dev/null'
+    wait_display "THIS CALL IS FOR"
+    network_link down >/dev/null
+    trap 'network_link up >/dev/null 2>&1 || true' EXIT
+    python3 "$SCRIPT_DIR/virtual_mcu.py" send --control "$STATE_DIR/control.sock" hook up >/dev/null
+    wait_display "OPERATOR 17"
+    python3 "$SCRIPT_DIR/virtual_mcu.py" send --control "$STATE_DIR/control.sock" key 9 >/dev/null
+    wait_display "A CHILD IS WAITING"
+    sleep 12
+    python3 "$SCRIPT_DIR/virtual_mcu.py" send --control "$STATE_DIR/control.sock" key '*' >/dev/null
+    wait_display "A CHILD IS WAITING"
+    sleep 12
+    python3 "$SCRIPT_DIR/virtual_mcu.py" send --control "$STATE_DIR/control.sock" key '#' >/dev/null
+    wait_display "MARA, AGE 9"
+    sleep 12
+    python3 "$SCRIPT_DIR/virtual_mcu.py" send --control "$STATE_DIR/control.sock" key 1 >/dev/null
+    wait_display "DO NOT HANG UP"
+    python3 "$SCRIPT_DIR/virtual_mcu.py" send --control "$STATE_DIR/control.sock" hook down >/dev/null
+    wait_display "THE LINE HOLDS"
+    sleep 12
+    python3 "$SCRIPT_DIR/virtual_mcu.py" send --control "$STATE_DIR/control.sock" hook up >/dev/null
+    wait_display "YOUR WORDS CROSS"
+    sleep 12
+    python3 "$SCRIPT_DIR/virtual_mcu.py" send --control "$STATE_DIR/control.sock" coin 25 >/dev/null
+    wait_display "A LOST VOICEMAIL"
+    sleep 12
+    python3 "$SCRIPT_DIR/virtual_mcu.py" send --control "$STATE_DIR/control.sock" key '#' >/dev/null
+    wait_display "YOUR WORDS CROSS"
+    sleep 12
+    python3 "$SCRIPT_DIR/virtual_mcu.py" send --control "$STATE_DIR/control.sock" card qemu-purpose-token >/dev/null
+    wait_display "A DEED FROM 2019"
+    sleep 12
+    python3 "$SCRIPT_DIR/virtual_mcu.py" send --control "$STATE_DIR/control.sock" key '#' >/dev/null
+    wait_display "YOUR WORDS CROSS"
+    sleep 12
+    python3 "$SCRIPT_DIR/virtual_mcu.py" send --control "$STATE_DIR/control.sock" key '*' >/dev/null
+    wait_display "WHAT SHOULD SHE DO?"
+    python3 "$SCRIPT_DIR/virtual_mcu.py" send --control "$STATE_DIR/control.sock" key 1 >/dev/null
+    wait_display "MESSAGE: LEAVE NOW"
+    wait_display "A DOOR SLAMS"
+    python3 "$SCRIPT_DIR/virtual_mcu.py" send --control "$STATE_DIR/control.sock" hook down >/dev/null
+    wait_display "THIS CALL IS FOR"
+    python3 "$SCRIPT_DIR/virtual_mcu.py" send --control "$STATE_DIR/control.sock" hook up >/dev/null
+    wait_display "MARA VALE, 2019"
+    sleep 12
+    python3 "$SCRIPT_DIR/virtual_mcu.py" send --control "$STATE_DIR/control.sock" key '#' >/dev/null
+    wait_display "I BUILT THIS PHONE"
+    network_link up >/dev/null
+    trap - EXIT
+    printf 'PASS: offline story activation, recovery, optional inputs, ending, and return visit\n'
+}
+
 firmware_path() {
     local candidate
     for candidate in \
@@ -282,6 +384,9 @@ case ${1:-help} in
     checkpoint) shift; checkpoint "$@" ;;
     lifecycle-test) lifecycle_test ;;
     recovery-test) recovery_test ;;
+    peripheral-fault-test) "$SCRIPT_DIR/peripheral-fault-test.sh" ;;
+    experience-test) experience_test ;;
+    collect-artifacts) collect_artifacts "${2:-}" ;;
     status) running && printf 'running (pid %s)\n' "$(cat "$STATE_DIR/qemu.pid")" || { printf 'stopped\n'; exit 1; } ;;
     ssh) shift; "${SSH[@]}" "$@" ;;
     logs) "${SSH[@]}" sudo journalctl -u daemon.service -f ;;
@@ -302,6 +407,6 @@ case ${1:-help} in
         printf 'fresh overlay created; previous disk retained as a timestamped backup\n'
         ;;
     help|*)
-        printf 'usage: %s {fetch|init|start|wait|provision|stop|power-cut|pause|resume|restart-virtual-mcu|network|checkpoint|lifecycle-test|recovery-test|status|ssh|logs|token|tunnel|display|peripherals|key|hook|coin|card|fault|reset-mcu|smoke|reset}\n' "$0"
+        printf 'usage: %s {fetch|init|start|wait|provision|stop|power-cut|pause|resume|restart-virtual-mcu|network|checkpoint|lifecycle-test|recovery-test|peripheral-fault-test|experience-test|collect-artifacts|status|ssh|logs|token|tunnel|display|peripherals|key|hook|coin|card|fault|reset-mcu|smoke|reset}\n' "$0"
         ;;
 esac

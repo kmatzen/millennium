@@ -37,9 +37,22 @@ fi
 chown millennium:millennium /etc/millennium/admin-token
 chmod 0600 /etc/millennium/admin-token
 install -d -o millennium -g millennium -m 0750 /var/lib/millennium/content
-if [ -d "$SOURCE/content/build/current" ]; then
-    cp -R "$SOURCE/content/build/current" /var/lib/millennium/content/
-fi
+CONTENT_ID=$(python3 - "$SOURCE/content/stories/last_line/story.json" <<'PY'
+import json, sys
+value = json.load(open(sys.argv[1], encoding="utf-8"))
+print("%s-%s" % (value["id"], value["version"]))
+PY
+)
+CONTENT_RELEASE="/var/lib/millennium/content/releases/$CONTENT_ID"
+install -d -o millennium -g millennium -m 0750 "$CONTENT_RELEASE/media"
+python3 "$SOURCE/content/storytool.py" compile \
+    "$SOURCE/content/stories/last_line/story.json" --output "$CONTENT_RELEASE/story.mst"
+install -m 0640 -o millennium -g millennium \
+    "$SOURCE/content/stories/last_line/story.json" "$CONTENT_RELEASE/story.json"
+find "$SOURCE/content/stories/last_line/media" -type f -name '*.wav' -exec \
+    install -m 0640 -o millennium -g millennium {} "$CONTENT_RELEASE/media/" \;
+ln -sfn "releases/$CONTENT_ID" /var/lib/millennium/content/current
+chown -h millennium:millennium /var/lib/millennium/content/current
 cat >/etc/asound.conf <<'EOF'
 pcm.!default { type null }
 ctl.!default { type hw card 0 }

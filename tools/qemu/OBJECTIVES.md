@@ -26,11 +26,11 @@ Acceptance: `tools/qemu/qemu.sh lifecycle-test` and
 - [x] Model keypad, hook, token reader, VFD, and coin acceptance/gate behavior.
 - [x] Frame the host link with protocol version, length, type, sequence, CRC,
   negotiation, critical ACKs, fragmentation, and resynchronization.
-- [ ] Model serial-link loss/reconnect independently from I2C loss, delayed and
+- [x] Model serial-link loss/reconnect independently from I2C loss, delayed and
   dropped ACKs, CRC corruption, duplicate/replayed critical commands, MCU boot
   identity/reset diagnostics, watchdog resets, and validator program/verify
   failure.
-- [ ] Make virtual time and injected faults deterministic and persist a complete
+- [x] Make virtual time and injected faults deterministic and persist a complete
   event trace suitable for CI diagnosis.
 
 Acceptance: `python3 tools/qemu/test_virtual_mcu.py` and
@@ -71,7 +71,7 @@ Acceptance: `tools/qemu/qemu.sh wifi-test`.
 - [x] Run the real story engine and physical input vocabulary through the VM.
 - [ ] Automatically traverse primary, interruption, timeout, repeat, invalid,
   offline, optional-input, and return-visit story paths through the VM boundary.
-- [ ] Export display/audio selection, peripheral state, story state, daemon
+- [x] Export display/audio selection, peripheral state, story state, daemon
   journal, metrics, and fault timeline as one timestamped test artifact.
 - [ ] Provide a single noninteractive full-lab command that starts or reuses the
   VM, provisions current source, runs every software acceptance layer, and emits

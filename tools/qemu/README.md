@@ -65,14 +65,25 @@ tools/qemu/qemu.sh fault i2c down
 tools/qemu/qemu.sh fault i2c up
 tools/qemu/qemu.sh fault coin jam
 tools/qemu/qemu.sh fault coin clear
+tools/qemu/qemu.sh fault serial down
+tools/qemu/qemu.sh fault serial up
+tools/qemu/qemu.sh fault ack drop
+tools/qemu/qemu.sh fault ack delay 250
+tools/qemu/qemu.sh fault crc next
+tools/qemu/qemu.sh fault validator verify-fail
+tools/qemu/qemu.sh fault validator verify-clear
 tools/qemu/qemu.sh reset-mcu alpha
 tools/qemu/qemu.sh reset-mcu beta
+tools/qemu/qemu.sh reset-mcu watchdog-alpha
+tools/qemu/qemu.sh reset-mcu watchdog-beta
 tools/qemu/qemu.sh restart-virtual-mcu
 tools/qemu/qemu.sh network down
 tools/qemu/qemu.sh network up
 tools/qemu/qemu.sh pause
 tools/qemu/qemu.sh resume
 tools/qemu/qemu.sh power-cut
+tools/qemu/qemu.sh collect-artifacts my-test-run
+tools/qemu/qemu.sh experience-test
 tools/qemu/qemu.sh stop
 ```
 
@@ -106,6 +117,15 @@ card reader, bounded I2C delivery, resets, and drop accounting. Beta models I2C
 forwarding, USB framing, VFD writes, validator gate/reset/program state, resets,
 and heartbeats. The shared link implements CRC-16/CCITT, HELLO negotiation,
 critical-command ACKs, fragmented input, resynchronization, and sequences.
+The status snapshot also carries a deterministic ticked trace, MCU firmware and
+reset-cause identities, and every injected fault. Run
+`qemu.sh peripheral-fault-test` for the live I2C, serial, validator, watchdog,
+ACK, and CRC matrix.
+
+`collect-artifacts NAME` creates `tools/qemu/state/artifacts/NAME/` with the
+daemon journal, health JSON, Prometheus metrics, console/provision logs, VFD and
+peripheral state, deterministic fault trace, and a SHA-256 summary explicitly
+marked `physical_hardware_claimed: false`.
 
 ## Reset and recovery
 

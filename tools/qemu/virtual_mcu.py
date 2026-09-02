@@ -7,7 +7,7 @@ import contextlib
 import json
 import os
 import sys
-import time
+from collections import deque
 
 SOF, VERSION, MAX_PAYLOAD = 0x7E, 2, 240
 ACK, HELLO = 0x01, 0x02
@@ -35,14 +35,26 @@ class PhoneHardware:
         self.coin_jammed = False
         self.coin_eeprom = bytearray(256)
         self.coin_programmed = False
+        self.coin_verify_failed = False
+        self.tick = 0
+        self.trace = deque(maxlen=256)
+        self.last_reset_cause = {"alpha": "power-on", "beta": "power-on"}
+
+    def record(self, event, **details):
+        self.tick += 1
+        self.trace.append({"tick": self.tick, "event": event, **details})
 
     def snapshot(self):
         return {
             "arduinos": {
                 "alpha": {"role": "keypad", "resets": self.alpha_resets,
-                          "i2c_drops": self.i2c_drops},
+                          "i2c_drops": self.i2c_drops, "protocol": VERSION,
+                          "firmware": "virtual-alpha", "build": "qemu",
+                          "last_reset_cause": self.last_reset_cause["alpha"]},
                 "beta": {"role": "display", "resets": self.beta_resets,
-                         "i2c_available": self.i2c_available},
+                         "i2c_available": self.i2c_available, "protocol": VERSION,
+                         "firmware": "virtual-beta", "build": "qemu",
+                         "last_reset_cause": self.last_reset_cause["beta"]},
             },
             "peripherals": {
                 "hook": self.hook,
@@ -50,9 +62,11 @@ class PhoneHardware:
                 "card_reader_last_token": self.last_card,
                 "vfd": {"display": self.vfd_text, "control": self.vfd_control},
                 "coin_validator": {"gate": self.coin_gate, "jammed": self.coin_jammed,
-                                   "programmed": self.coin_programmed},
+                                   "programmed": self.coin_programmed,
+                                   "verify_failed": self.coin_verify_failed},
             },
-            "updated": time.time(),
+            "tick": self.tick,
+            "trace": list(self.trace),
         }
 
     def persist(self):
@@ -86,8 +100,10 @@ class PhoneHardware:
             raise ValueError("unknown peripheral")
         if not self.i2c_available and command != "coin":
             self.i2c_drops += 1
+            self.record("i2c-drop", peripheral=command)
             self.persist()
             raise ValueError("Alpha-to-Beta I2C link is down; event counted as dropped")
+        self.record("alpha-event", peripheral=command, value=argument)
         self.persist()
         return event
 
@@ -111,6 +127,8 @@ class PhoneHardware:
             self.persist()
         elif message_type == COIN_VERIFY:
             self.persist()
+        self.record("beta-command", message_type=message_type, payload_hex=payload.hex())
+        self.persist()
 
     def manage(self, command, argument):
         if command == "fault":
@@ -123,20 +141,33 @@ class PhoneHardware:
                 self.coin_jammed = True
             elif fields == ["coin", "clear"]:
                 self.coin_jammed = False
+            elif fields == ["validator", "verify-fail"]:
+                self.coin_verify_failed = True
+            elif fields == ["validator", "verify-clear"]:
+                self.coin_verify_failed = False
             else:
-                raise ValueError("fault: i2c <up|down> | coin <jam|clear>")
+                raise ValueError("fault: i2c <up|down> | coin <jam|clear> | validator <verify-fail|verify-clear>")
         elif command == "reset":
             if argument.lower() == "alpha":
                 self.alpha_resets += 1
                 self.i2c_drops = 0
+                self.last_reset_cause["alpha"] = "external"
             elif argument.lower() == "beta":
                 self.beta_resets += 1
                 self.vfd_text = ""
                 self.coin_gate = "closed"
+                self.last_reset_cause["beta"] = "external"
+            elif argument.lower() == "watchdog-alpha":
+                self.alpha_resets += 1
+                self.last_reset_cause["alpha"] = "watchdog"
+            elif argument.lower() == "watchdog-beta":
+                self.beta_resets += 1
+                self.last_reset_cause["beta"] = "watchdog"
             else:
-                raise ValueError("reset must target alpha or beta")
+                raise ValueError("reset must target alpha, beta, watchdog-alpha, or watchdog-beta")
         else:
             raise ValueError("unknown management command")
+        self.record(command, value=argument)
         self.persist()
 
 
@@ -197,11 +228,32 @@ class VirtualMCU:
         self.sequence = 0
         self.connected = asyncio.Event()
         self.hardware = PhoneHardware(display_file)
+        self.serial_enabled = True
+        self.drop_next_ack = False
+        self.ack_delay_ms = 0
+        self.corrupt_next_frame = False
+        self.critical_seen = deque(maxlen=64)
         self.hardware.persist()
+
+    def snapshot(self):
+        value = self.hardware.snapshot()
+        value["host_link"] = {
+            "connected": self.connected.is_set(),
+            "enabled": self.serial_enabled,
+            "ack_delay_ms": self.ack_delay_ms,
+            "drop_next_ack": self.drop_next_ack,
+            "corrupt_next_frame": self.corrupt_next_frame,
+        }
+        return value
 
     async def send(self, message_type, payload=b""):
         await self.connected.wait()
-        self.writer.write(encode(message_type, self.sequence, payload))
+        frame = bytearray(encode(message_type, self.sequence, payload))
+        if self.corrupt_next_frame:
+            frame[-1] ^= 1
+            self.corrupt_next_frame = False
+            self.hardware.record("crc-corruption", message_type=message_type)
+        self.writer.write(frame)
         self.sequence = (self.sequence + 1) & 0xFF
         await self.writer.drain()
 
@@ -209,6 +261,9 @@ class VirtualMCU:
         decoder = Decoder()
         while True:
             try:
+                if not self.serial_enabled:
+                    await asyncio.sleep(0.1)
+                    continue
                 reader, writer = await asyncio.open_unix_connection(self.serial_socket)
                 self.writer = writer
                 self.connected.set()
@@ -219,8 +274,22 @@ class VirtualMCU:
                             writer.write(encode(HELLO, self.sequence, bytes((VERSION, VERSION))))
                             self.sequence = (self.sequence + 1) & 0xFF
                         elif message_type in CRITICAL:
-                            writer.write(encode(ACK, self.sequence, bytes((sequence, 0))))
-                            self.sequence = (self.sequence + 1) & 0xFF
+                            status = 1 if message_type == COIN_VERIFY and self.hardware.coin_verify_failed else 0
+                            if self.ack_delay_ms:
+                                await asyncio.sleep(self.ack_delay_ms / 1000)
+                            if self.drop_next_ack:
+                                self.drop_next_ack = False
+                                self.hardware.record("ack-drop", sequence=sequence)
+                            else:
+                                writer.write(encode(ACK, self.sequence, bytes((sequence, status))))
+                                self.sequence = (self.sequence + 1) & 0xFF
+                            identity = (message_type, sequence)
+                            if identity in self.critical_seen:
+                                self.hardware.record("critical-replay", message_type=message_type,
+                                                     sequence=sequence)
+                                await writer.drain()
+                                continue
+                            self.critical_seen.append(identity)
                         self.hardware.beta_command(message_type, payload)
                         await writer.drain()
             except (FileNotFoundError, ConnectionRefusedError, ConnectionResetError, BrokenPipeError):
@@ -251,11 +320,35 @@ class VirtualMCU:
                     if command in ("key", "hook", "card", "coin"):
                         await self.send(*self.hardware.alpha_event(command, argument))
                         writer.write(b"ok\n")
+                    elif command == "fault" and argument.lower() == "serial down":
+                        self.serial_enabled = False
+                        if self.writer:
+                            self.writer.close()
+                        self.hardware.record("serial-down")
+                        self.hardware.persist()
+                        writer.write(b"ok\n")
+                    elif command == "fault" and argument.lower() == "serial up":
+                        self.serial_enabled = True
+                        self.hardware.record("serial-up")
+                        self.hardware.persist()
+                        writer.write(b"ok\n")
+                    elif command == "fault" and argument.lower() == "ack drop":
+                        self.drop_next_ack = True
+                        writer.write(b"ok\n")
+                    elif command == "fault" and argument.lower().startswith("ack delay "):
+                        delay = int(argument.split()[2])
+                        if not 0 <= delay <= 10000:
+                            raise ValueError("ACK delay must be 0..10000 ms")
+                        self.ack_delay_ms = delay
+                        writer.write(b"ok\n")
+                    elif command == "fault" and argument.lower() == "crc next":
+                        self.corrupt_next_frame = True
+                        writer.write(b"ok\n")
                     elif command in ("fault", "reset"):
                         self.hardware.manage(command, argument)
                         writer.write(b"ok\n")
                     elif command == "status":
-                        writer.write((json.dumps(self.hardware.snapshot(), sort_keys=True) + "\n").encode())
+                        writer.write((json.dumps(self.snapshot(), sort_keys=True) + "\n").encode())
                     else:
                         raise ValueError("use: key|hook|coin|card|fault|reset|status")
                 except Exception as error:
