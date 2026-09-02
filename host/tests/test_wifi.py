@@ -3,6 +3,7 @@ import os
 import stat
 import sys
 import tempfile
+import urllib.error
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -11,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "wifi"))
 import millennium_wifi as wifi
 import millennium_wifi_helper as helper_module
 import provision_wifi
+import millennium_wifi_portal as portal_module
 
 
 class Result:
@@ -96,6 +98,61 @@ class WifiTests(unittest.TestCase):
         second = wifi.generate_setup_password()
         self.assertRegex(first, r"^[A-Z2-9]{4}(?:-[A-Z2-9]{4}){3}$")
         self.assertNotEqual(first, second)
+
+    def test_hidden_network_profile_is_explicit(self):
+        profile = wifi.owner_keyfile({"ssid": "not broadcast", "security": "wpa-psk",
+                                      "passphrase": "hidden-secret", "hidden": True})
+        self.assertIn("hidden=true", profile)
+        self.assertIn("ssid=110;111;116;32;98;114;111;97;100;99;97;115;116;", profile)
+
+    def test_atomic_profile_save_preserves_old_file_if_replace_is_interrupted(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "owner.nmconnection"
+            path.write_text("known-good", encoding="utf-8")
+            with mock.patch.object(wifi.os, "replace", side_effect=OSError("simulated power loss")):
+                with self.assertRaisesRegex(OSError, "simulated power loss"):
+                    wifi.write_secret(path, "candidate")
+            self.assertEqual(path.read_text(encoding="utf-8"), "known-good")
+            self.assertEqual(list(Path(directory).glob("owner.nmconnection.*")), [])
+
+    def test_wrong_password_rolls_back_and_restores_setup_ap(self):
+        manager = mock.Mock()
+        manager.apply_owner.return_value = False
+        with tempfile.TemporaryDirectory() as directory:
+            helper = helper_module.Helper(manager, directory)
+            helper.lock.acquire()
+            helper._apply({"ssid": "home", "security": "wpa-psk",
+                           "passphrase": "wrong-password", "hidden": False})
+            status = json.loads((Path(directory) / "status.json").read_text())
+        self.assertEqual(status["state"], "failed")
+        self.assertIn("rejected", status["message"])
+        manager.restore_owner.assert_called_once_with()
+        manager.restore_setup.assert_called_once_with()
+        self.assertFalse(helper.lock.locked())
+
+    def test_radio_failure_is_reported_without_credentials(self):
+        def failed_radio(arguments, **unused):
+            raise wifi.subprocess.CalledProcessError(10, arguments, stderr="radio unavailable")
+        manager = wifi.NetworkManager(run=failed_radio)
+        with self.assertRaises(wifi.subprocess.CalledProcessError) as raised:
+            manager.scan()
+        self.assertNotIn("password", str(raised.exception).lower())
+
+    def test_captive_portal_probe_routes_cover_major_platforms(self):
+        for path in ("/generate_204", "/gen_204", "/ncsi.txt", "/hotspot-detect.html"):
+            handler = object.__new__(portal_module.Portal)
+            handler.path = path
+            handler.headers = {"Host": "10.42.0.1"}
+            handler.send_response = mock.Mock()
+            handler.send_header = mock.Mock()
+            handler.end_headers = mock.Mock()
+            handler.send_page = mock.Mock()
+            portal_module.Portal.do_GET(handler)
+            if path == "/hotspot-detect.html":
+                handler.send_page.assert_called_once_with()
+            else:
+                handler.send_response.assert_called_once_with(302)
+                handler.send_header.assert_any_call("Location", "/")
 
 
 if __name__ == "__main__":

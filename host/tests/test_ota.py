@@ -36,6 +36,90 @@ def write_identity_hex(path, role, version="0.4.0", build="test-build"):
 
 
 class OtaTests(unittest.TestCase):
+    def test_network_loss_during_manifest_download_preserves_pending_release(self):
+        with tempfile.TemporaryDirectory() as name:
+            state = Path(name)
+            pending = state / "pending"
+            pending.mkdir()
+            (pending / "manifest.json").write_text('{"previous":true}\n')
+            (pending / "manifest.json.sig").write_bytes(b"previous-signature")
+            config = {"state_dir": str(state), "manifest_url": "https://updates.example/manifest.json",
+                      "channel": "stable"}
+
+            def interrupted_download(unused_url, destination, maximum):
+                destination.write_bytes(b"partial")
+                raise OSError("simulated network loss")
+
+            with mock.patch.object(ota, "download", side_effect=interrupted_download):
+                with self.assertRaisesRegex(OSError, "network loss"):
+                    ota.command_check(config)
+            self.assertEqual((pending / "manifest.json").read_text(), '{"previous":true}\n')
+            self.assertEqual((pending / "manifest.json.sig").read_bytes(), b"previous-signature")
+            self.assertEqual(list(state.glob("ota-check-*")), [])
+
+    def test_network_loss_during_bundle_download_never_activates_candidate(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            state = root / "state"
+            pending = state / "pending"
+            pending.mkdir(parents=True)
+            manifest = {"schema": 1, "channel": "stable", "version": "0.4.0",
+                        "sequence": 12, "key_id": "test", "minimum_sequence": 0,
+                        "bundle": {"url": "https://updates.example/release.tar.gz",
+                                   "sha256": "a" * 64, "size": 100}}
+            (pending / "manifest.json").write_text(json.dumps(manifest))
+            (pending / "manifest.json.sig").write_bytes(b"signature")
+            old = root / "releases/bootstrap"
+            (old / "host").mkdir(parents=True)
+            (old / "host/millennium-daemon").write_text("known good")
+            current = root / "current"
+            current.symlink_to(old)
+            config = {"state_dir": str(state), "channel": "stable",
+                      "release_dir": str(root / "releases"), "current_link": str(current),
+                      "previous_link": str(root / "previous"), "service": "daemon.service"}
+
+            def interrupted_download(unused_url, destination, maximum):
+                destination.write_bytes(b"half a bundle")
+                raise OSError("simulated network loss")
+
+            with mock.patch.object(ota.os, "geteuid", return_value=0), \
+                    mock.patch.object(ota, "phone_is_idle", return_value=True), \
+                    mock.patch.object(ota, "validate_manifest"), \
+                    mock.patch.object(ota, "trusted_public_key"), \
+                    mock.patch.object(ota, "verify_signature"), \
+                    mock.patch.object(ota, "download", side_effect=interrupted_download):
+                with self.assertRaisesRegex(OSError, "network loss"):
+                    ota.command_apply(config)
+            self.assertEqual(current.resolve(), old.resolve())
+            self.assertFalse(ota.activation_path(state).exists())
+            self.assertFalse((root / "previous").exists())
+
+    def test_recovery_after_power_loss_mid_flash_restores_only_attempted_mcu(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            state = root / "state"
+            releases = root / "releases"
+            old = releases / "old"
+            new = releases / "new"
+            for release in (old, new):
+                (release / "arduino").mkdir(parents=True)
+                (release / "host").mkdir()
+                (release / "host/millennium-daemon").write_text("daemon")
+                (release / "arduino/keypad.hex").write_text("keypad")
+                (release / "arduino/display.hex").write_text("display")
+            current = root / "current"
+            current.symlink_to(new)
+            ota.write_activation(state, old, new, ["keypad"])
+            config = {"state_dir": str(state), "release_dir": str(releases),
+                      "current_link": str(current)}
+            flashed = mock.Mock(return_value=True)
+            with mock.patch.object(ota.os, "geteuid", return_value=0), \
+                    mock.patch.object(ota, "flash_image", flashed):
+                ota.command_recover(config)
+            self.assertEqual(current.resolve(), old.resolve())
+            self.assertEqual([call.args[-1] for call in flashed.call_args_list], ["keypad"])
+            self.assertFalse(ota.activation_path(state).exists())
+
     def test_release_identity_includes_sequence(self):
         self.assertEqual(ota.release_identity({"sequence": 7, "version": "0.4.0"}),
                          "00000007-0.4.0")
