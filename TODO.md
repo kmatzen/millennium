@@ -136,6 +136,12 @@ as an unattended appliance. Items are ordered by priority.
     - [ ] Repeat the interruptions by physically removing power/network on the
       production phone and attach journal and measurement evidence.
   - [ ] Confirm remote maintenance works from outside the home network.
+    - [x] Confirm the reverse tunnel, one-minute metrics pull, and nightly
+      restricted backup pull remain operational through anima.
+    - [ ] Restore an approved hardware-backed administrator key using local
+      console access; the 2026-09-01 audit found all current admin keys rejected.
+    - [ ] Complete an interactive maintenance session from a genuinely
+      external network and retain the dated audit evidence.
 
 ## P2 — Reliability and maintainability
 

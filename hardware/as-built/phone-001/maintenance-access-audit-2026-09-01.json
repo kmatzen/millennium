@@ -1,0 +1,26 @@
+{
+  "audit_at": "2026-09-01T19:48:07-07:00",
+  "device_id": "phone-001",
+  "interactive_admin_access": {
+    "attempted_paths": [
+      "direct LAN SSH",
+      "anima loopback reverse port 22022 through ProxyJump",
+      "anima host through reverse port 22022"
+    ],
+    "identities_tried": 4,
+    "result": "failed-public-key-authentication"
+  },
+  "monitoring_path": {
+    "last_success_utc": "2026-09-02T02:48:07Z",
+    "service": "millennium-metrics-pull.service",
+    "status": "success"
+  },
+  "backup_path": {
+    "latest_snapshot": "15515b87",
+    "snapshot_time_utc": "2026-09-01T03:31:44Z",
+    "last_service_result": "success",
+    "next_timer_utc": "2026-09-02T03:37:14Z"
+  },
+  "required_action": "Use local console access to restore an approved hardware-backed administrator public key, then prove interactive access through the maintenance domain from a genuinely external network.",
+  "schema": 1
+}

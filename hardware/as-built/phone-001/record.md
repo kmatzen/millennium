@@ -73,6 +73,9 @@ maintenance tunnel, serial stability, and all eight HIL gates.
 - Audio profile: stable ALSA card ID `Device`; systemd permits `char-alsa`.
 - Latest encrypted off-device backup observed during this work: Restic snapshot
   `2fbf5133`; phone acknowledgement and monitoring freshness verified.
+- Newer encrypted off-device backup: Restic snapshot `15515b87`, created
+  `2026-09-01T03:31:44Z`; the anima pull service reports success and remains
+  scheduled nightly.
 
 Signed sequence 6 was manually started with explicit owner authorization after
 the configured `02:00`–`05:00` automatic window deferred its daytime timer run.
@@ -149,3 +152,10 @@ On 2026-08-31, a YubiKey-authenticated session reached this host through
 `maintenance.kmatzen.com` and `anima`'s loopback reverse port, without using the
 phone's inbound LAN SSH address. A separate test from a genuinely external
 network remains required for release acceptance.
+
+The live audit in `maintenance-access-audit-2026-09-01.json` found that the
+restricted metrics tunnel remains healthy, but interactive administration now
+rejects all four approved local hardware-backed identities both directly and
+through anima. This reopens maintenance acceptance: restore an approved public
+key with local console access before attempting the required external-network
+test.
