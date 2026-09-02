@@ -138,8 +138,8 @@ as an unattended appliance. Items are ordered by priority.
   - [ ] Confirm remote maintenance works from outside the home network.
     - [x] Confirm the reverse tunnel, one-minute metrics pull, and nightly
       restricted backup pull remain operational through anima.
-    - [ ] Restore an approved hardware-backed administrator key using local
-      console access; the 2026-09-01 audit found all current admin keys rejected.
+    - [x] Verify an approved hardware-backed administrator key through the
+      reverse tunnel; the explicit FIDO identity succeeded without phone changes.
     - [ ] Complete an interactive maintenance session from a genuinely
       external network and retain the dated audit evidence.
 

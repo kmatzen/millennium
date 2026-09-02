@@ -8,7 +8,10 @@
       "anima host through reverse port 22022"
     ],
     "identities_tried": 4,
-    "result": "failed-public-key-authentication"
+    "initial_result": "failed-public-key-authentication",
+    "later_result": "success-through-anima-reverse-port",
+    "successful_identity_fingerprint": "SHA256:hFZMtUQujYx00TkQck/4hFQuk8ZeasFz/JLIoLGjZ2Y",
+    "phone_configuration_changed": false
   },
   "monitoring_path": {
     "last_success_utc": "2026-09-02T02:48:07Z",
@@ -21,6 +24,6 @@
     "last_service_result": "success",
     "next_timer_utc": "2026-09-02T03:37:14Z"
   },
-  "required_action": "Use local console access to restore an approved hardware-backed administrator public key, then prove interactive access through the maintenance domain from a genuinely external network.",
+  "required_action": "Repeat the successful interactive maintenance session from a genuinely external network and retain evidence of the network vantage point.",
   "schema": 1
 }

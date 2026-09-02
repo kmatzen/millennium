@@ -1,0 +1,37 @@
+{
+  "active_release": {
+    "display_hex_sha256": "5dab000d8408ed497432fd52248c8671156ef764d4f7426e56df3d31e9b4b0a2",
+    "host_binary_sha256": "72f56cc610f2fc56afebf0f5d8724b753e9a68ae8ee7d86eaa8343562659358e",
+    "keypad_hex_sha256": "f1692bb35d07b759428723cd3ec4257eaa3520f6eb91f9aeec5cd3bc472de273",
+    "path": "/opt/millennium/releases/00000008-0.4.0",
+    "sequence": 8,
+    "version": "0.4.0"
+  },
+  "captured_at": "2026-09-01T19:52:16-07:00",
+  "content": {
+    "identity": "last-line-2.0.1",
+    "manifest_sha256": "a4d95ec05a9bdf6636b0ca3f202d01f73b17819bf548c4f6cab19b88d3fe944a"
+  },
+  "device_id": "phone-001",
+  "host": {
+    "architecture": "armv7l",
+    "hostname": "raspberrypi",
+    "raspberry_pi_serial": "0000000001ba6844"
+  },
+  "mcu_devices": {
+    "display": "/dev/serial/by-id/usb-Arduino_LLC_Millennium_Beta-if00",
+    "keypad": "/dev/serial/by-id/usb-Arduino_LLC_Millennium_Alpha-if00"
+  },
+  "services": {
+    "daemon": {
+      "active": true,
+      "enabled": true,
+      "health_endpoint": "ok",
+      "name": "daemon.service",
+      "restart_count": 0
+    },
+    "maintenance_tunnel_active": true,
+    "ota_check_timer_active": true
+  },
+  "schema": 1
+}

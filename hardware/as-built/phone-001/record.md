@@ -155,7 +155,8 @@ network remains required for release acceptance.
 
 The live audit in `maintenance-access-audit-2026-09-01.json` found that the
 restricted metrics tunnel remains healthy, but interactive administration now
-rejects all four approved local hardware-backed identities both directly and
-through anima. This reopens maintenance acceptance: restore an approved public
-key with local console access before attempting the required external-network
-test.
+initially rejected the local hardware-backed identities. A later retry with the
+explicit anima no-touch FIDO identity succeeded through the reverse port; no
+phone configuration or key repair was necessary. Exact live release, MCU path,
+content, and daemon evidence is recorded in `live-inventory-2026-09-01.json`.
+The required external-network vantage-point test is still outstanding.
