@@ -17,6 +17,129 @@ KEY, HOOK, CARD, COIN, DIAGNOSTIC, HEARTBEAT, OPERATION = range(0x20, 0x27)
 CRITICAL = {DISPLAY, COIN_CONTROL, COIN_PROGRAM, COIN_VERIFY}
 
 
+class PhoneHardware:
+    """Behavioral Alpha/Beta and peripheral topology around the real wire protocol."""
+
+    def __init__(self, display_file):
+        self.display_file = display_file
+        self.alpha_resets = 0
+        self.beta_resets = 0
+        self.i2c_available = True
+        self.i2c_drops = 0
+        self.hook = "down"
+        self.last_key = None
+        self.last_card = None
+        self.vfd_text = ""
+        self.vfd_control = 0
+        self.coin_gate = "closed"
+        self.coin_jammed = False
+        self.coin_eeprom = bytearray(256)
+        self.coin_programmed = False
+
+    def snapshot(self):
+        return {
+            "arduinos": {
+                "alpha": {"role": "keypad", "resets": self.alpha_resets,
+                          "i2c_drops": self.i2c_drops},
+                "beta": {"role": "display", "resets": self.beta_resets,
+                         "i2c_available": self.i2c_available},
+            },
+            "peripherals": {
+                "hook": self.hook,
+                "keypad_last_key": self.last_key,
+                "card_reader_last_token": self.last_card,
+                "vfd": {"display": self.vfd_text, "control": self.vfd_control},
+                "coin_validator": {"gate": self.coin_gate, "jammed": self.coin_jammed,
+                                   "programmed": self.coin_programmed},
+            },
+            "updated": time.time(),
+        }
+
+    def persist(self):
+        with open(self.display_file, "w", encoding="utf-8") as output:
+            json.dump(self.snapshot(), output, indent=2, sort_keys=True)
+
+    def alpha_event(self, command, argument):
+        """Model physical input -> Alpha scan/decode -> I2C -> Beta forwarding."""
+        if command == "key":
+            if len(argument) != 1 or argument not in "0123456789*#ABCDEFGHIJKLMNOP":
+                raise ValueError("key must be one key from the 4x7 matrix")
+            self.last_key = argument
+            event = (KEY, argument.encode())
+        elif command == "hook":
+            if argument.lower() not in ("up", "u", "down", "d"):
+                raise ValueError("hook must be up or down")
+            self.hook = "up" if argument.lower() in ("up", "u") else "down"
+            event = (HOOK, b"U" if self.hook == "up" else b"D")
+        elif command == "card":
+            if not argument or len(argument) > 107:
+                raise ValueError("card token must contain 1..107 characters")
+            self.last_card = argument
+            event = (CARD, argument.encode())
+        elif command == "coin":
+            if argument not in ("5", "10", "25"):
+                raise ValueError("coin must be 5, 10, or 25 cents")
+            if self.coin_jammed:
+                raise ValueError("coin validator is jammed")
+            event = (COIN, {"5": b"6", "10": b"7", "25": b"8"}[argument])
+        else:
+            raise ValueError("unknown peripheral")
+        if not self.i2c_available and command != "coin":
+            self.i2c_drops += 1
+            self.persist()
+            raise ValueError("Alpha-to-Beta I2C link is down; event counted as dropped")
+        self.persist()
+        return event
+
+    def beta_command(self, message_type, payload):
+        """Model Beta command routing to the VFD and coin validator."""
+        if message_type == DISPLAY:
+            self.vfd_text = payload.decode("utf-8", "replace")
+            self.persist()
+            print(f"VFD {self.vfd_text}", flush=True)
+        elif message_type == COIN_CONTROL and payload:
+            if payload[0] == ord("c"):
+                self.coin_gate = "closed"
+            elif payload[0] == ord("z"):
+                self.coin_gate = "open"
+            elif payload[0] == ord("@"):
+                self.coin_jammed = False
+            self.persist()
+            print(f"COIN VALIDATOR control={payload.hex()}", flush=True)
+        elif message_type == COIN_PROGRAM:
+            self.coin_programmed = True
+            self.persist()
+        elif message_type == COIN_VERIFY:
+            self.persist()
+
+    def manage(self, command, argument):
+        if command == "fault":
+            fields = argument.lower().split()
+            if fields == ["i2c", "down"]:
+                self.i2c_available = False
+            elif fields == ["i2c", "up"]:
+                self.i2c_available = True
+            elif fields == ["coin", "jam"]:
+                self.coin_jammed = True
+            elif fields == ["coin", "clear"]:
+                self.coin_jammed = False
+            else:
+                raise ValueError("fault: i2c <up|down> | coin <jam|clear>")
+        elif command == "reset":
+            if argument.lower() == "alpha":
+                self.alpha_resets += 1
+                self.i2c_drops = 0
+            elif argument.lower() == "beta":
+                self.beta_resets += 1
+                self.vfd_text = ""
+                self.coin_gate = "closed"
+            else:
+                raise ValueError("reset must target alpha or beta")
+        else:
+            raise ValueError("unknown management command")
+        self.persist()
+
+
 def crc16(data):
     crc = 0xFFFF
     for byte in data:
@@ -73,6 +196,8 @@ class VirtualMCU:
         self.writer = None
         self.sequence = 0
         self.connected = asyncio.Event()
+        self.hardware = PhoneHardware(display_file)
+        self.hardware.persist()
 
     async def send(self, message_type, payload=b""):
         await self.connected.wait()
@@ -96,13 +221,7 @@ class VirtualMCU:
                         elif message_type in CRITICAL:
                             writer.write(encode(ACK, self.sequence, bytes((sequence, 0))))
                             self.sequence = (self.sequence + 1) & 0xFF
-                        if message_type == DISPLAY:
-                            text = payload.decode("utf-8", "replace")
-                            print(f"DISPLAY {text}", flush=True)
-                            with open(self.display_file, "w", encoding="utf-8") as output:
-                                json.dump({"display": text, "updated": time.time()}, output)
-                        elif message_type == COIN_CONTROL:
-                            print(f"COIN CONTROL {payload.hex()}", flush=True)
+                        self.hardware.beta_command(message_type, payload)
                         await writer.drain()
             except (FileNotFoundError, ConnectionRefusedError, ConnectionResetError, BrokenPipeError):
                 pass
@@ -129,16 +248,16 @@ class VirtualMCU:
                     fields = line.decode().strip().split(maxsplit=1)
                     command = fields[0].lower()
                     argument = fields[1] if len(fields) == 2 else ""
-                    mapping = {
-                        "key": (KEY, argument.encode()),
-                        "hook": (HOOK, b"U" if argument.lower() in ("up", "u") else b"D"),
-                        "card": (CARD, argument.encode()),
-                        "coin": (COIN, {"5": b"6", "10": b"7", "25": b"8"}.get(argument, argument.encode())),
-                    }
-                    if command not in mapping or not mapping[command][1]:
-                        raise ValueError("use: key <0-9*#> | hook <up|down> | coin <5|10|25> | card <token>")
-                    await self.send(*mapping[command])
-                    writer.write(b"ok\n")
+                    if command in ("key", "hook", "card", "coin"):
+                        await self.send(*self.hardware.alpha_event(command, argument))
+                        writer.write(b"ok\n")
+                    elif command in ("fault", "reset"):
+                        self.hardware.manage(command, argument)
+                        writer.write(b"ok\n")
+                    elif command == "status":
+                        writer.write((json.dumps(self.hardware.snapshot(), sort_keys=True) + "\n").encode())
+                    else:
+                        raise ValueError("use: key|hook|coin|card|fault|reset|status")
                 except Exception as error:
                     writer.write(f"error: {error}\n".encode())
                 await writer.drain()

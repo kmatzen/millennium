@@ -1,11 +1,18 @@
 # Millennium QEMU appliance lab
 
 This setup boots a complete Debian 12 ARM appliance, builds and runs the real
-Millennium daemon under systemd, and connects it to a protocol-faithful virtual
-display/keypad/card/hook/coin controller. It is intended for development,
+Millennium daemon under systemd, and connects it to separate behavioral models
+of the Alpha and Beta Arduinos plus their display, keypad, card, hook, and coin
+peripherals. It is intended for development,
 integration tests, admin-dashboard work, release rehearsal, and failure testing.
 
-It deliberately does **not** claim to emulate a Raspberry Pi Zero 2 W board.
+It deliberately does **not** claim to emulate a Raspberry Pi Zero 2 W board or
+execute the AVR instructions. QEMU has no ATmega32U4 machine, and the physical
+Beta link uses native USB CDC. The co-simulation instead preserves the real
+Alpha → I2C → Beta → USB protocol boundary and Beta → peripheral routing. The
+actual firmware ELFs remain covered by the reproducible Arduino build and must
+pass the hardware release gate.
+
 QEMU's stable `virt` machine is used instead. USB enumeration, ALSA channel
 routing, Wi-Fi radio/AP behavior, Arduino flashing, coin-validator electrical
 timing, and the physical display still require a real-phone hardware test.
@@ -53,6 +60,13 @@ tools/qemu/qemu.sh hook up
 tools/qemu/qemu.sh key 1
 tools/qemu/qemu.sh coin 25
 tools/qemu/qemu.sh card TEST-OWNER-TOKEN
+tools/qemu/qemu.sh peripherals
+tools/qemu/qemu.sh fault i2c down
+tools/qemu/qemu.sh fault i2c up
+tools/qemu/qemu.sh fault coin jam
+tools/qemu/qemu.sh fault coin clear
+tools/qemu/qemu.sh reset-mcu alpha
+tools/qemu/qemu.sh reset-mcu beta
 tools/qemu/qemu.sh stop
 ```
 
@@ -65,10 +79,13 @@ tools/qemu/qemu.sh tunnel
 Then visit `http://127.0.0.1:8081`. Obtain its bearer token with
 `tools/qemu/qemu.sh token`. Metrics are at `http://127.0.0.1:8080`.
 
-The virtual MCU writes each display update to `tools/qemu/state/display.json`
-and logs all display and coin-control traffic in `tools/qemu/state/mcu.log`.
-It implements framing, CRC-16/CCITT, HELLO negotiation, command ACKs, fragmented
-input, resynchronization, sequence numbers, and periodic heartbeats.
+The co-simulator writes the complete Arduino/peripheral state to
+`tools/qemu/state/display.json` and logs VFD and validator traffic in
+`tools/qemu/state/mcu.log`. Alpha models the 4x7 keypad, hook debounce boundary,
+card reader, bounded I2C delivery, resets, and drop accounting. Beta models I2C
+forwarding, USB framing, VFD writes, validator gate/reset/program state, resets,
+and heartbeats. The shared link implements CRC-16/CCITT, HELLO negotiation,
+critical-command ACKs, fragmented input, resynchronization, and sequences.
 
 ## Reset and recovery
 

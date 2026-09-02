@@ -23,4 +23,9 @@ test -n "$("$QEMU" ssh curl --fail --silent http://127.0.0.1:8080/metrics)"
 "$QEMU" key 2 >/dev/null
 sleep 1
 "$QEMU" display | grep -q '"display"'
-printf 'PASS: VM, systemd daemon, virtual MCU, admin API, metrics, and input/display loop\n'
+peripherals=$("$QEMU" peripherals)
+printf '%s' "$peripherals" | grep -q '"alpha"'
+printf '%s' "$peripherals" | grep -q '"beta"'
+printf '%s' "$peripherals" | grep -q '"coin_validator"'
+printf '%s' "$peripherals" | grep -q '"vfd"'
+printf 'PASS: VM, systemd daemon, Arduino/peripheral co-simulation, APIs, and input/display loop\n'

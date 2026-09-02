@@ -169,7 +169,12 @@ case ${1:-help} in
     token) "${SSH[@]}" sudo cat /etc/millennium/admin-token ;;
     tunnel) exec ssh -N -L 8081:127.0.0.1:8081 -L 8080:127.0.0.1:8080 "${SSH[@]:1}" ;;
     display) test -f "$STATE_DIR/display.json" && cat "$STATE_DIR/display.json" || die "no display update captured" ;;
-    key|hook|coin|card) python3 "$SCRIPT_DIR/virtual_mcu.py" send --control "$STATE_DIR/control.sock" "$@" ;;
+    key|hook|coin|card|fault|reset-mcu)
+        action=$1; shift
+        test "$action" = reset-mcu && action=reset
+        python3 "$SCRIPT_DIR/virtual_mcu.py" send --control "$STATE_DIR/control.sock" "$action" "$@"
+        ;;
+    peripherals) python3 "$SCRIPT_DIR/virtual_mcu.py" send --control "$STATE_DIR/control.sock" status ;;
     smoke) "$SCRIPT_DIR/smoke-test.sh" ;;
     reset)
         stop_vm
@@ -178,6 +183,6 @@ case ${1:-help} in
         printf 'fresh overlay created; previous disk retained as a timestamped backup\n'
         ;;
     help|*)
-        printf 'usage: %s {fetch|init|start|wait|provision|stop|status|ssh|logs|token|tunnel|display|key|hook|coin|card|smoke|reset}\n' "$0"
+        printf 'usage: %s {fetch|init|start|wait|provision|stop|status|ssh|logs|token|tunnel|display|peripherals|key|hook|coin|card|fault|reset-mcu|smoke|reset}\n' "$0"
         ;;
 esac

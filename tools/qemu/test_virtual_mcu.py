@@ -25,6 +25,28 @@ class ProtocolTest(unittest.TestCase):
         good = MCU.encode(MCU.COIN, 2, b"8")
         self.assertEqual(MCU.Decoder().feed(b"junk" + bad + good), [(MCU.COIN, 2, b"8")])
 
+    def test_alpha_routes_key_through_i2c_model(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as directory:
+            hardware = MCU.PhoneHardware(str(pathlib.Path(directory) / "state.json"))
+            self.assertEqual(hardware.alpha_event("key", "5"), (MCU.KEY, b"5"))
+            hardware.manage("fault", "i2c down")
+            with self.assertRaisesRegex(ValueError, "I2C link is down"):
+                hardware.alpha_event("hook", "up")
+            self.assertEqual(hardware.i2c_drops, 1)
+
+    def test_beta_routes_commands_to_peripherals(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as directory:
+            hardware = MCU.PhoneHardware(str(pathlib.Path(directory) / "state.json"))
+            hardware.beta_command(MCU.DISPLAY, b"HELLO")
+            hardware.beta_command(MCU.COIN_CONTROL, b"z")
+            self.assertEqual(hardware.vfd_text, "HELLO")
+            self.assertEqual(hardware.coin_gate, "open")
+            hardware.manage("fault", "coin jam")
+            with self.assertRaisesRegex(ValueError, "jammed"):
+                hardware.alpha_event("coin", "25")
+
 
 if __name__ == "__main__":
     unittest.main()
