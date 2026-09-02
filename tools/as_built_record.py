@@ -29,6 +29,12 @@ REQUIRED_TESTS = (
     "ota_download_interruption", "mcu_flash_interruption",
     "host_activation_interruption",
 )
+INSTALLED_ARTIFACTS = (
+    "schematic", "pcb_layout", "bom", "gerbers", "keypad_hex",
+    "display_hex", "host_binary", "content_manifest",
+)
+MEASURED_TESTS = {"cold_boot", "ringer_audio_peak", "coin_validator",
+                  "controlled_brownout"}
 
 
 def digest(path):
@@ -57,6 +63,21 @@ def atomic_json(path, value):
     finally:
         if os.path.exists(temporary):
             os.unlink(temporary)
+
+
+def load_record(path):
+    value = json.loads(path.read_text(encoding="utf-8"))
+    if value.get("schema") != 1:
+        raise SystemExit("unsupported as-built schema")
+    return value
+
+
+def update_record(path, change):
+    value = load_record(path)
+    change(value)
+    value["status"] = "incomplete"
+    value["updated_at"] = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    atomic_json(path, value)
 
 
 def capture(args):
@@ -101,6 +122,59 @@ def capture(args):
     print(args.output)
 
 
+def set_physical(args):
+    def change(record):
+        record.setdefault("physical", {})[args.field] = args.value
+    update_record(args.record, change)
+
+
+def add_photo(args):
+    photo = args.path.resolve()
+    if not photo.is_file():
+        raise SystemExit("photo does not exist: %s" % photo)
+
+    def change(record):
+        item = {"path": str(photo), "sha256": digest(photo),
+                "description": args.description}
+        photos = record.setdefault("photos", [])
+        if any(existing.get("sha256") == item["sha256"] for existing in photos):
+            raise SystemExit("photo content is already recorded")
+        photos.append(item)
+    update_record(args.record, change)
+
+
+def record_installed(args):
+    artifact = args.path.resolve()
+    if not artifact.is_file():
+        raise SystemExit("installed artifact does not exist: %s" % artifact)
+
+    def change(record):
+        record.setdefault("installed_artifacts", {})[args.name] = {
+            "path": str(artifact), "sha256": digest(artifact),
+            "identity": args.identity,
+        }
+    update_record(args.record, change)
+
+
+def record_test(args):
+    evidence = args.evidence_file.resolve()
+    if not evidence.is_file():
+        raise SystemExit("evidence file does not exist: %s" % evidence)
+    if args.name in MEASURED_TESTS:
+        if not args.instrument_and_load or args.minimum_voltage is None:
+            raise SystemExit("%s requires instrument/load and minimum voltage" % args.name)
+
+    def change(record):
+        record.setdefault("tests", {})[args.name] = {
+            "passed": args.result == "pass",
+            "evidence": {"path": str(evidence), "sha256": digest(evidence)},
+            "date": args.date,
+            "instrument_and_load": args.instrument_and_load,
+            "minimum_voltage": args.minimum_voltage,
+        }
+    update_record(args.record, change)
+
+
 def missing_evidence(record):
     missing = []
     for field in ("device_id", "captured_by"):
@@ -126,17 +200,14 @@ def missing_evidence(record):
         test = tests.get(name, {})
         if test.get("passed") is not True or not test.get("evidence") or not test.get("date"):
             missing.append("tests." + name)
-        if name in {"cold_boot", "ringer_audio_peak", "coin_validator",
-                    "controlled_brownout"} and (not test.get("instrument_and_load") or
-                                                 test.get("minimum_voltage") is None):
+        if name in MEASURED_TESTS and (not test.get("instrument_and_load") or
+                                       test.get("minimum_voltage") is None):
             missing.append("tests.%s.measurement" % name)
     return missing
 
 
 def validate(args):
-    record = json.loads(args.record.read_text(encoding="utf-8"))
-    if record.get("schema") != 1:
-        raise SystemExit("unsupported as-built schema")
+    record = load_record(args.record)
     missing = missing_evidence(record)
     if missing:
         print("INCOMPLETE")
@@ -156,6 +227,31 @@ def main():
     make.add_argument("--repo", type=Path, default=ROOT)
     make.add_argument("--system-root", type=Path, default=Path("/"))
     make.set_defaults(function=capture)
+    physical = commands.add_parser("set-physical")
+    physical.add_argument("record", type=Path)
+    physical.add_argument("--field", choices=PHYSICAL_FIELDS, required=True)
+    physical.add_argument("--value", required=True)
+    physical.set_defaults(function=set_physical)
+    photo = commands.add_parser("add-photo")
+    photo.add_argument("record", type=Path)
+    photo.add_argument("--path", type=Path, required=True)
+    photo.add_argument("--description", required=True)
+    photo.set_defaults(function=add_photo)
+    installed = commands.add_parser("record-installed")
+    installed.add_argument("record", type=Path)
+    installed.add_argument("--name", choices=INSTALLED_ARTIFACTS, required=True)
+    installed.add_argument("--path", type=Path, required=True)
+    installed.add_argument("--identity", required=True)
+    installed.set_defaults(function=record_installed)
+    test = commands.add_parser("record-test")
+    test.add_argument("record", type=Path)
+    test.add_argument("--name", choices=REQUIRED_TESTS, required=True)
+    test.add_argument("--result", choices=("pass", "fail"), required=True)
+    test.add_argument("--evidence-file", type=Path, required=True)
+    test.add_argument("--date", required=True)
+    test.add_argument("--instrument-and-load")
+    test.add_argument("--minimum-voltage", type=float)
+    test.set_defaults(function=record_test)
     check = commands.add_parser("validate")
     check.add_argument("record", type=Path)
     check.set_defaults(function=validate)

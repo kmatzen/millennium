@@ -142,6 +142,9 @@ as an unattended appliance. Items are ordered by priority.
       reverse tunnel; the explicit FIDO identity succeeded without phone changes.
     - [ ] Complete an interactive maintenance session from a genuinely
       external network and retain the dated audit evidence.
+  - [x] Provide a machine-validated final handoff record that binds the real
+    Wi-Fi client matrix, external maintenance evidence, two distinct offline
+    key copies, physical as-built evidence, and first-time-caller playtests.
 
 ## P2 — Reliability and maintainability
 
@@ -186,6 +189,8 @@ as an unattended appliance. Items are ordered by priority.
   - [x] Document prohibited configuration and logging data.
 
 - [ ] Create an as-built record for every physical phone.
+  - [x] Provide guided commands that hash installed artifacts, photographs,
+    physical-test evidence, and enforce voltage measurements where required.
   - [ ] Record PCB revision, source tag, Gerber/BOM hashes, and installed firmware hashes.
   - [ ] Record device serial numbers, wiring deviations, and assembly photos.
   - [ ] Measure power and brownout behavior with the complete installed hardware.

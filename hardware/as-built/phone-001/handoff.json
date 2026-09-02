@@ -1,0 +1,21 @@
+{
+  "as_built_record": "evidence.json",
+  "created_at": "2026-09-02T04:55:00+00:00",
+  "device_id": "phone-001",
+  "external_maintenance": {
+    "date": null,
+    "evidence": null,
+    "network_description": null,
+    "passed": null
+  },
+  "offline_signing_key_copies": [],
+  "playtest_record": "playtest-last-line-2.1.0.json",
+  "schema": 1,
+  "status": "incomplete",
+  "wifi_clients": {
+    "android": {"date": null, "evidence": null, "passed": null},
+    "ios": {"date": null, "evidence": null, "passed": null},
+    "macos": {"date": null, "evidence": null, "passed": null},
+    "windows": {"date": null, "evidence": null, "passed": null}
+  }
+}
