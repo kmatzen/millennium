@@ -197,3 +197,6 @@ rollback selected `last-line-2.0.1`, and a second rollback restored 2.1.0;
 the final runtime SHA-256 is
 `0ad71cb2590684f3b730fc9c0129e20bfc38a1091a908a45c01efded67af6b27`.
 The daemon remained healthy with serial, SIP, and both MCU links healthy.
+A fresh restricted encrypted backup pull completed on anima immediately after
+deployment as Restic snapshot `40316409` at `2026-09-02T04:51:06Z`; the normal
+retention policy completed successfully.
