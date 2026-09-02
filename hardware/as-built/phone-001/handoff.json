@@ -11,11 +11,40 @@
   "offline_signing_key_copies": [],
   "playtest_record": "playtest-last-line-2.1.0.json",
   "schema": 1,
+  "server_state_backup": {
+    "completed_at": "2026-09-02T05:29:54+00:00",
+    "evidence": {
+      "path": "/Users/kmatzen/git/millennium/hardware/as-built/phone-001/server-state-backup-2026-09-02.json",
+      "sha256": "5e90ebe19caf986619155138aa46e4bbf186e6205fa0271cfca202147bcf16a1"
+    },
+    "snapshot_id": "f5472258"
+  },
   "status": "incomplete",
+  "updated_at": "2026-09-02T05:31:29+00:00",
   "wifi_clients": {
-    "android": {"date": null, "outcome_evidence": null, "passed": null, "portal_evidence": null},
-    "ios": {"date": null, "outcome_evidence": null, "passed": null, "portal_evidence": null},
-    "macos": {"date": null, "outcome_evidence": null, "passed": null, "portal_evidence": null},
-    "windows": {"date": null, "outcome_evidence": null, "passed": null, "portal_evidence": null}
+    "android": {
+      "date": null,
+      "outcome_evidence": null,
+      "passed": null,
+      "portal_evidence": null
+    },
+    "ios": {
+      "date": null,
+      "outcome_evidence": null,
+      "passed": null,
+      "portal_evidence": null
+    },
+    "macos": {
+      "date": null,
+      "outcome_evidence": null,
+      "passed": null,
+      "portal_evidence": null
+    },
+    "windows": {
+      "date": null,
+      "outcome_evidence": null,
+      "passed": null,
+      "portal_evidence": null
+    }
   }
 }

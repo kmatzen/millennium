@@ -129,6 +129,8 @@ as an unattended appliance. Items are ordered by priority.
   - [x] Alert on OTA failure or rollback, serial drops, and MCU resets.
   - [x] Monitor disk space, filesystem errors, certificate expiry, and reboot frequency.
   - [x] Back up OTA artifacts, server configuration, and authorized maintenance keys.
+    - [x] Stream update-server and doormand state into encrypted Restic and
+      verify every saved archive through a restore stream before success.
 
 - [ ] Validate the full unattended workflow on real hardware.
   - [x] Install a release from `kmatzen.com` using the normal timer path.

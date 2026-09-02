@@ -92,6 +92,10 @@ python3 tools/handoff_acceptance.py record-external \
   --network-description "cellular hotspot, not home ISP" \
   --evidence-file evidence/external-maintenance.json
 
+python3 tools/handoff_acceptance.py record-server-backup \
+  hardware/as-built/phone-001/handoff.json \
+  --evidence-file server-state-backup-2026-09-02.json
+
 python3 tools/handoff_acceptance.py validate \
   hardware/as-built/phone-001/handoff.json
 ```

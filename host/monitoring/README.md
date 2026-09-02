@@ -86,3 +86,31 @@ the monitor's fixed Prometheus textfile through that restricted key. The export
 command cannot read arbitrary files, and the pull validates the check-in metric
 before atomically replacing anima's node-exporter textfile. This avoids a stale
 LAN address and continues working wherever the phone's reverse tunnel connects.
+
+The same nightly service must also run `millennium_server_state_backup.py`.
+That helper streams an allowlisted archive directly into the existing encrypted
+Restic repository—no plaintext archive is staged—and immediately streams the
+saved archive back through `tar -t` to prove every required path is restorable.
+It covers the update origin, doormand configuration, maintenance systemd units
+and scripts, authorized public keys, and an installed copy of the recovery
+instructions. The service refuses to acknowledge overall backup success if a
+required path is missing or restore verification fails. Its latest evidence is
+`~/.config/millennium-backup/server-state-last.json`.
+
+Install the backup-host components and recovery documentation with permissions
+that keep the Restic credential private:
+
+```bash
+install -m 0755 host/monitoring/millennium_backup_pull.sh \
+  ~/.local/bin/millennium-backup-pull
+install -m 0755 host/monitoring/millennium_server_state_backup.py \
+  ~/.local/bin/millennium-server-state-backup
+install -d -m 0700 ~/.local/share/millennium-recovery
+install -m 0600 host/docs/UNATTENDED_APPLIANCE.md \
+  host/docs/SIGNING_KEY_LIFECYCLE.md ~/.local/share/millennium-recovery/
+install -m 0644 host/monitoring/millennium-backup-pull.service \
+  host/monitoring/millennium-backup-pull.timer ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now millennium-backup-pull.timer
+systemctl --user start millennium-backup-pull.service
+```

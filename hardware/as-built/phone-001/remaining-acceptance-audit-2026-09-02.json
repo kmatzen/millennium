@@ -12,7 +12,8 @@
     "ota_sequence_9": "committed and passed all eight HIL gates",
     "content": "signed last-line-2.1.0 installed",
     "content_rollback_drill": "passed and restored 2.1.0",
-    "completed_at": "2026-09-02T04:47:13Z"
+    "completed_at": "2026-09-02T04:47:13Z",
+    "server_state_backup": "snapshot f5472258 restore-stream verified; server-state-backup-2026-09-02.json"
   },
   "remaining_gates": {
     "signing_key_offline_media": {

@@ -74,6 +74,23 @@ class AcceptanceEvidenceTests(unittest.TestCase):
         self.assertIn("wifi_clients.windows", missing)
         self.assertIn("offline_signing_key_copies.two_distinct_media", missing)
         self.assertIn("external_maintenance", missing)
+        self.assertIn("server_state_backup", missing)
+
+    def test_server_backup_requires_restore_verified_allowlist(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            record = root / "handoff.json"
+            evidence = root / "server.json"
+            record.write_text(json.dumps({"schema": 1}), encoding="utf-8")
+            evidence.write_text(json.dumps({
+                "schema": 1, "operation": "millennium-server-state-backup",
+                "passed": True, "restore_stream_verified": False,
+                "plaintext_archive_staged": False, "snapshot_id": "12345678",
+                "paths": [],
+            }), encoding="utf-8")
+            with self.assertRaises(SystemExit):
+                handoff.record_server_backup(Namespace(record=record,
+                                                        evidence_file=evidence))
 
     def test_handoff_rejects_one_media_label_even_with_two_entries(self):
         key = {"media_label": "USB-A", "ciphertext_sha256": "a" * 64,

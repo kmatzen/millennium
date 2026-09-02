@@ -83,6 +83,7 @@ def template(args):
             for platform in WIFI_PLATFORMS
         },
         "offline_signing_key_copies": [],
+        "server_state_backup": None,
         "external_maintenance": {
             "passed": None,
             "date": None,
@@ -182,6 +183,33 @@ def record_external(args):
     update_record(args, change)
 
 
+def record_server_backup(args):
+    def change(value):
+        try:
+            backup = json.loads(args.evidence_file.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise SystemExit("invalid server-state backup evidence: %s" % exc)
+        paths = set(backup.get("paths", []))
+        required = {
+            "selfhosted/millennium-updates", ".config/doorman",
+            ".config/systemd/user/doormand.service", ".ssh/authorized_keys",
+            ".local/share/millennium-recovery",
+        }
+        if (backup.get("schema") != 1
+                or backup.get("operation") != "millennium-server-state-backup"
+                or backup.get("passed") is not True
+                or backup.get("restore_stream_verified") is not True
+                or backup.get("plaintext_archive_staged") is not False
+                or not backup.get("snapshot_id") or not required.issubset(paths)):
+            raise SystemExit("server-state evidence does not prove backup acceptance")
+        value["server_state_backup"] = {
+            "snapshot_id": backup["snapshot_id"],
+            "completed_at": backup.get("completed_at"),
+            "evidence": file_evidence(args.evidence_file),
+        }
+    update_record(args, change)
+
+
 def omissions(value, record_path, check_linked=True):
     missing = []
     if not value.get("device_id"):
@@ -207,6 +235,10 @@ def omissions(value, record_path, check_linked=True):
             or not external.get("network_description")
             or not valid_evidence(external.get("evidence"), record_path, check_linked)):
         missing.append("external_maintenance")
+    server = value.get("server_state_backup") or {}
+    if (not server.get("snapshot_id") or not server.get("completed_at")
+            or not valid_evidence(server.get("evidence"), record_path, check_linked)):
+        missing.append("server_state_backup")
     for field, module_path, function_name in (
         ("as_built_record", ROOT / "tools/as_built_record.py", "missing_evidence"),
         ("playtest_record", ROOT / "content/playtest_record.py", "omissions"),
@@ -279,6 +311,10 @@ def main():
     external.add_argument("--network-description", required=True)
     external.add_argument("--evidence-file", type=Path, required=True)
     external.set_defaults(function=record_external)
+    server = commands.add_parser("record-server-backup")
+    server.add_argument("record", type=Path)
+    server.add_argument("--evidence-file", type=Path, required=True)
+    server.set_defaults(function=record_server_backup)
     check = commands.add_parser("validate")
     check.add_argument("record", type=Path)
     check.set_defaults(function=validate)

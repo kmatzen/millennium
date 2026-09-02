@@ -1,0 +1,11 @@
+[Unit]
+Description=Nightly Millennium phone and server-state backup
+
+[Timer]
+OnCalendar=*-*-* 03:30:00
+RandomizedDelaySec=15m
+Persistent=true
+Unit=millennium-backup-pull.service
+
+[Install]
+WantedBy=timers.target

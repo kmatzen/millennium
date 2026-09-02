@@ -14,9 +14,12 @@
   "capture_path": "hardware-backed SSH via anima ProxyJump and loopback reverse port 22022",
   "backup": {
     "repository": "anima restricted Restic repository",
-    "snapshot": "40316409",
-    "completed_at": "2026-09-02T04:51:06Z",
-    "service_result": "success"
+    "snapshot": "044b0426",
+    "completed_at": "2026-09-02T05:29:55Z",
+    "service_result": "success",
+    "server_state_snapshot": "f5472258",
+    "server_state_restore_stream_verified": true,
+    "server_state_evidence": "server-state-backup-2026-09-02.json"
   },
   "content": {
     "identity": "last-line-2.1.0",

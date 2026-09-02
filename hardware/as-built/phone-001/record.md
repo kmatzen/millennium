@@ -213,3 +213,11 @@ on phone-001 on 2026-09-01. `systemd-analyze verify` accepted the unit, the
 reconcile service is enabled, and the harness reported `idle`; no destructive
 test was armed. It is ready to capture before/after evidence when a physical
 operator performs the remaining power and network interruptions.
+
+The anima backup workflow was extended and exercised on 2026-09-01. Phone
+snapshot `044b0426` completed together with server-state snapshot `f5472258`.
+The latter includes the update origin, doormand configuration, maintenance
+units and scripts, authorized public keys, and recovery instructions. It was
+streamed back through Restic and its allowlisted contents were verified without
+staging a plaintext archive. Exact evidence is in
+`server-state-backup-2026-09-02.json`.

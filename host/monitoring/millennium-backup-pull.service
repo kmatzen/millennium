@@ -1,0 +1,14 @@
+[Unit]
+Description=Pull encrypted Millennium phone and server-state backups into maintenance host
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/millennium-backup-pull
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=%h/backups/millennium/phone-001-restic %h/.config/millennium-backup
+RestrictSUIDSGID=true
+LockPersonality=true

@@ -25,6 +25,16 @@ ssh "${ssh_args[@]}" backup | \
     restic -r "$repository" backup --stdin --stdin-filename phone-001.tar \
         --tag millennium-phone --tag phone-001
 
+server_backup="${MILLENNIUM_SERVER_BACKUP_COMMAND:-$HOME/.local/bin/millennium-server-state-backup}"
+if [[ ! -x "$server_backup" ]]; then
+    echo "ERROR: required Millennium server-state backup command is missing" >&2
+    exit 1
+fi
+"$server_backup" \
+    --repository "$repository" --password-file "$RESTIC_PASSWORD_FILE" \
+    --server-id anima \
+    --evidence "$config_root/server-state-last.json"
+
 restic -r "$repository" forget --tag phone-001 --keep-daily 14 \
     --keep-weekly 8 --keep-monthly 12 --prune
 
