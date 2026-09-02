@@ -43,6 +43,11 @@ The post-update HIL run passed all eight gates at `2026-08-31T16:57:53Z`.
 - New signing public-key SHA-256: `581a1ff72d1867b3dfb3b1ffc5521308ac646878050f1c4c12739e0dedaf7348`
 - Installed release: sequence 3, version `0.4.0`, key ID `release-2026-08`
 - Encrypted-key recovery evidence: `signing-key-recovery-2026-08-31.json`
+- Current-custody audit: `signing-key-backup-audit-2026-09-01.json` found the
+  older recorded copies absent, then recorded checksum-matched replacement
+  ciphertext on local restricted storage and anima plus a successful in-memory
+  sign/verify recovery drill. Two separate removable/offline media are still
+  required by the lifecycle procedure before backup acceptance can close.
 - Device backup: Restic snapshot `0226382e` on anima, restore-stream checked
   on 2026-08-31; nightly timer enabled with 14 daily, 8 weekly, and 12 monthly
   retention points.
