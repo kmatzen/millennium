@@ -36,6 +36,23 @@ vault. The dated as-built evidence records a successful RAM-disk restore and
 disposable sign/verify drill. The OpenPGP/YubiKey copy remains an additional
 recovery option, not the sole recovery path.
 
+Install an existing encrypted ciphertext on each removable medium with the
+OS-verified copy command. It rejects the system disk and ordinary directories,
+refuses overwrites, flushes the copy, verifies its digest, and writes a local
+custody record:
+
+```bash
+python3 tools/signing_key_backup.py copy-offline \
+  --backup /restricted/recovery/release-2026-08.pem.aes256 \
+  --volume /Volumes/MILLENNIUM-A --key-id release-2026-08 \
+  --media-id millennium-a \
+  --evidence private-operations/key-copy-millennium-a.json
+```
+
+Eject that medium, repeat with a physically different device and media ID, and
+then perform `recover` independently from each read-only medium. Record both
+the copy evidence and per-medium recovery evidence in the final handoff record.
+
 ## Rotation
 
 1. Provision the new public key alongside the old one on every phone through a

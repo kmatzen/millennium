@@ -129,7 +129,8 @@ def add_key_copy(args):
             "physically_distinct": True,
             "verified_at": args.verified_at,
             "recovery_tested_at": args.recovery_tested_at,
-            "evidence": file_evidence(args.evidence_file),
+            "copy_evidence": file_evidence(args.copy_evidence_file),
+            "recovery_evidence": file_evidence(args.recovery_evidence_file),
         })
     update_record(args, change)
 
@@ -160,7 +161,8 @@ def omissions(value, record_path, check_linked=True):
               if item.get("media_label") and item.get("ciphertext_sha256")
               and item.get("physically_distinct") is True and item.get("verified_at")
               and item.get("recovery_tested_at")
-              and valid_evidence(item.get("evidence"), record_path, check_linked)]
+              and valid_evidence(item.get("copy_evidence"), record_path, check_linked)
+              and valid_evidence(item.get("recovery_evidence"), record_path, check_linked)]
     if len({item["media_label"] for item in usable}) < 2:
         missing.append("offline_signing_key_copies.two_distinct_media")
     external = value.get("external_maintenance", {})
@@ -229,7 +231,8 @@ def main():
     key.add_argument("--ciphertext", type=Path, required=True)
     key.add_argument("--verified-at", required=True)
     key.add_argument("--recovery-tested-at", required=True)
-    key.add_argument("--evidence-file", type=Path, required=True)
+    key.add_argument("--copy-evidence-file", type=Path, required=True)
+    key.add_argument("--recovery-evidence-file", type=Path, required=True)
     key.set_defaults(function=add_key_copy)
     external = commands.add_parser("record-external")
     external.add_argument("record", type=Path)

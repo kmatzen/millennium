@@ -79,7 +79,8 @@ class AcceptanceEvidenceTests(unittest.TestCase):
         key = {"media_label": "USB-A", "ciphertext_sha256": "a" * 64,
                "physically_distinct": True, "verified_at": "2026-09-02",
                "recovery_tested_at": "2026-09-02",
-               "evidence": {"path": "log", "sha256": "b" * 64}}
+               "copy_evidence": {"path": "copy", "sha256": "b" * 64},
+               "recovery_evidence": {"path": "recovery", "sha256": "c" * 64}}
         value = {
             "schema": 1, "device_id": "phone-001",
             "as_built_record": "as-built.json", "playtest_record": "playtest.json",
@@ -93,6 +94,30 @@ class AcceptanceEvidenceTests(unittest.TestCase):
         }
         missing = handoff.omissions(value, Path("handoff.json"), check_linked=False)
         self.assertIn("offline_signing_key_copies.two_distinct_media", missing)
+
+    def test_handoff_mutators_hash_wifi_and_key_evidence(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            record = root / "handoff.json"
+            evidence = root / "notes.txt"
+            ciphertext = root / "key.aes256"
+            evidence.write_text("observed", encoding="utf-8")
+            ciphertext.write_bytes(b"encrypted")
+            record.write_text(json.dumps({"schema": 1, "wifi_clients": {},
+                                          "offline_signing_key_copies": []}),
+                              encoding="utf-8")
+            handoff.record_wifi(Namespace(
+                record=record, platform="ios", result="pass", date="2026-09-02",
+                evidence_file=evidence))
+            handoff.add_key_copy(Namespace(
+                record=record, media_label="USB-A", ciphertext=ciphertext,
+                verified_at="2026-09-02", recovery_tested_at="2026-09-02",
+                copy_evidence_file=evidence, recovery_evidence_file=evidence))
+            saved = json.loads(record.read_text(encoding="utf-8"))
+            self.assertIn("sha256", saved["wifi_clients"]["ios"]["evidence"])
+            key = saved["offline_signing_key_copies"][0]
+            self.assertIn("sha256", key["copy_evidence"])
+            self.assertIn("sha256", key["recovery_evidence"])
 
     def test_measured_test_command_requires_measurement(self):
         with tempfile.TemporaryDirectory() as directory:

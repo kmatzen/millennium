@@ -7,7 +7,10 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import platform
+import plistlib
 import re
+import shutil
 import subprocess
 import tempfile
 
@@ -67,6 +70,57 @@ def sign_and_verify(private_key, public_key, directory):
     return hashlib.sha256(signature.read_bytes()).hexdigest()
 
 
+def safe_id(value, label):
+    if not re.fullmatch(r"[A-Za-z0-9._-]{1,64}", value):
+        raise SystemExit("invalid %s" % label)
+    return value
+
+
+def removable_volume_info(volume):
+    volume = volume.resolve()
+    if not volume.is_dir() or not os.path.ismount(volume):
+        raise SystemExit("destination is not a mounted volume: %s" % volume)
+    system = platform.system()
+    if system == "Darwin":
+        result = run(["diskutil", "info", "-plist", str(volume)],
+                     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        info = plistlib.loads(result.stdout)
+        reported = Path(info.get("MountPoint", "")).resolve()
+        removable = bool(info.get("RemovableMedia") or info.get("Ejectable"))
+        if reported != volume or info.get("Internal") is True or not removable:
+            raise SystemExit("destination is not OS-reported removable media")
+        return {
+            "mount_point": str(volume),
+            "device_identifier": info.get("DeviceIdentifier"),
+            "volume_uuid": info.get("VolumeUUID"),
+            "volume_name": info.get("VolumeName"),
+        }
+    if system == "Linux":
+        find = run(["findmnt", "--json", "--target", str(volume)],
+                   stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        filesystems = json.loads(find.stdout).get("filesystems", [])
+        if len(filesystems) != 1 or Path(filesystems[0].get("target", "")).resolve() != volume:
+            raise SystemExit("cannot identify removable destination mount")
+        source = filesystems[0].get("source")
+        block = run(["lsblk", "--json", "-o", "PATH,RM,HOTPLUG,TYPE,TRAN", source],
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        devices = json.loads(block.stdout).get("blockdevices", [])
+        if not devices or not any(device.get("rm") or device.get("hotplug")
+                                  for device in devices):
+            raise SystemExit("destination is not OS-reported removable media")
+        return {"mount_point": str(volume), "device_identifier": source,
+                "transport": devices[0].get("tran")}
+    raise SystemExit("removable-media verification is unsupported on %s" % system)
+
+
+def fsync_path(path):
+    descriptor = os.open(path, os.O_RDONLY)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
 def command_backup(args):
     if args.output.exists():
         raise SystemExit("refusing to overwrite encrypted backup: %s" % args.output)
@@ -123,6 +177,42 @@ def command_recover(args):
     print(json.dumps(record, sort_keys=True))
 
 
+def command_copy_offline(args):
+    key_id = safe_id(args.key_id, "key ID")
+    media_id = safe_id(args.media_id, "media ID")
+    source = args.backup.resolve()
+    if not source.is_file():
+        raise SystemExit("encrypted backup does not exist: %s" % source)
+    if b"PRIVATE KEY-----" in source.read_bytes()[:4096]:
+        raise SystemExit("refusing to copy apparent plaintext private key")
+    volume = args.volume.resolve()
+    volume_info = removable_volume_info(volume)
+    destination_dir = volume / "millennium-signing" / key_id / media_id
+    destination = destination_dir / source.name
+    if destination.exists():
+        raise SystemExit("refusing to overwrite offline backup: %s" % destination)
+    destination_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(source, destination)
+    os.chmod(destination, 0o600)
+    fsync_path(destination)
+    fsync_path(destination_dir)
+    expected = hashlib.sha256(source.read_bytes()).hexdigest()
+    observed = hashlib.sha256(destination.read_bytes()).hexdigest()
+    if observed != expected:
+        destination.unlink(missing_ok=True)
+        raise SystemExit("offline copy digest verification failed")
+    record = {
+        "schema": 1, "operation": "offline-media-copy", "passed": True,
+        "verified_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+        "key_id": key_id, "media_id": media_id,
+        "ciphertext_sha256": observed, "destination": str(destination),
+        "volume": volume_info,
+        "instruction": "Eject and store this media separately; perform the documented recovery drill before handoff.",
+    }
+    atomic_json(args.evidence, record)
+    print(json.dumps(record, sort_keys=True))
+
+
 def main():
     parser = argparse.ArgumentParser()
     commands = parser.add_subparsers(dest="command", required=True)
@@ -144,6 +234,13 @@ def main():
     recover.add_argument("--media-id", required=True)
     recover.add_argument("--operator", required=True)
     recover.set_defaults(function=command_recover)
+    copy = commands.add_parser("copy-offline")
+    copy.add_argument("--backup", type=Path, required=True)
+    copy.add_argument("--volume", type=Path, required=True)
+    copy.add_argument("--evidence", type=Path, required=True)
+    copy.add_argument("--key-id", required=True)
+    copy.add_argument("--media-id", required=True)
+    copy.set_defaults(function=command_copy_offline)
     args = parser.parse_args()
     args.function(args)
 

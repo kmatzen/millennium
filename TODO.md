@@ -108,6 +108,8 @@ as an unattended appliance. Items are ordered by priority.
   - [x] Document revocation and emergency recovery.
   - [ ] Maintain two currently verified encrypted offline copies of the private
     signing key on separate media, as required by the lifecycle procedure.
+    - [x] Provide an OS-verified removable-media copier that rejects internal
+      disks and overwrites, verifies the ciphertext, and records media custody.
   - [x] Perform and document a recovery drill.
 
 - [x] Expand CI into a reproducible release pipeline.

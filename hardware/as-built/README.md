@@ -66,7 +66,8 @@ python3 tools/handoff_acceptance.py add-key-copy \
   hardware/as-built/phone-001/handoff.json --media-label "USB-A" \
   --ciphertext /Volumes/USB-A/release-2026-08.pem.aes256 \
   --verified-at 2026-09-02 --recovery-tested-at 2026-09-02 \
-  --evidence-file evidence/key-copy-usb-a.txt
+  --copy-evidence-file evidence/key-copy-usb-a.json \
+  --recovery-evidence-file evidence/key-recovery-usb-a.json
 
 python3 tools/handoff_acceptance.py record-external \
   hardware/as-built/phone-001/handoff.json --result pass --date 2026-09-02 \
