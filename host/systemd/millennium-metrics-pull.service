@@ -1,0 +1,15 @@
+[Unit]
+Description=Pull Millennium phone metrics through restricted reverse SSH
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/millennium-metrics-pull
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=%h/selfhosted/prometheus/node-exporter-textfile
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictSUIDSGID=true
+LockPersonality=true

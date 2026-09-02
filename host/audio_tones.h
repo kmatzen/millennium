@@ -41,6 +41,9 @@ void audio_tones_play_coin_tone(void);
  * be layered after a fallback tone. No-op entirely when built without ALSA. */
 void audio_tones_play_clip(const char *path);
 
+/* Scale tones and recorded prompts for accessibility (10..100 percent). */
+void audio_tones_set_volume_percent(int percent);
+
 /* Stop whatever tone is currently playing. */
 void audio_tones_stop(void);
 

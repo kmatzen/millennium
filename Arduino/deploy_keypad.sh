@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# Build (on macOS), sync, then flash keypad firmware on the remote device (Pi).
+# DEVELOPMENT-ONLY: build, sync source with git/scp, then flash on a lab device.
+# Production appliances receive signed firmware through the OTA worker.
 # Uses GPIO17/GEN0 (pin 11) to assert Arduino Alpha's reset pin directly.
 #
 # Usage: ./deploy_keypad.sh [user@host]
-#   Default host: matzen@192.168.86.145
+#   Default host: matzen@millennium-phone.local
 #
 # Env: BRANCH=      deploy specific branch on remote
 #      REPO_DIR=    repo path on remote (default: millennium)
@@ -12,7 +13,7 @@
 
 set -e
 
-REMOTE="${1:-matzen@192.168.86.145}"
+REMOTE="${1:-matzen@millennium-phone.local}"
 REPO_DIR="${REPO_DIR:-millennium}"
 BRANCH="${BRANCH:-}"
 SKIP_BUILD="${SKIP_BUILD:-0}"

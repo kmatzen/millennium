@@ -1,0 +1,29 @@
+{
+  "audit_at": "2026-09-01T19:48:07-07:00",
+  "device_id": "phone-001",
+  "interactive_admin_access": {
+    "attempted_paths": [
+      "direct LAN SSH",
+      "anima loopback reverse port 22022 through ProxyJump",
+      "anima host through reverse port 22022"
+    ],
+    "identities_tried": 4,
+    "initial_result": "failed-public-key-authentication",
+    "later_result": "success-through-anima-reverse-port",
+    "successful_identity_fingerprint": "SHA256:hFZMtUQujYx00TkQck/4hFQuk8ZeasFz/JLIoLGjZ2Y",
+    "phone_configuration_changed": false
+  },
+  "monitoring_path": {
+    "last_success_utc": "2026-09-02T02:48:07Z",
+    "service": "millennium-metrics-pull.service",
+    "status": "success"
+  },
+  "backup_path": {
+    "latest_snapshot": "15515b87",
+    "snapshot_time_utc": "2026-09-01T03:31:44Z",
+    "last_service_result": "success",
+    "next_timer_utc": "2026-09-02T03:37:14Z"
+  },
+  "required_action": "Repeat the successful interactive maintenance session from a genuinely external network and retain evidence of the network vantage point.",
+  "schema": 1
+}

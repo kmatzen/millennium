@@ -1,0 +1,16 @@
+[Unit]
+Description=Restrict Millennium administrative API to loopback
+Before=daemon.service millennium-maintenance-tunnel.service
+Wants=network-pre.target
+After=network-pre.target
+
+[Service]
+Type=oneshot
+ExecStartPre=-/usr/sbin/nft delete table inet millennium_phone
+ExecStart=/usr/sbin/nft -f /etc/millennium/millennium.nft
+ExecReload=-/usr/sbin/nft delete table inet millennium_phone
+ExecReload=/usr/sbin/nft -f /etc/millennium/millennium.nft
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

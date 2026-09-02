@@ -19,6 +19,10 @@
 #include "../health_monitor.h"
 #include "../display_manager.h"
 #include "../wav.h"
+#include "../sip_text.h"
+#include "../sip_call_slot.h"
+#include "../serial_settings.h"
+#include "../mcu_protocol.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <pthread.h>
@@ -87,9 +91,11 @@ void millennium_sdk_get_sip_status(int *registered, char *last_error, size_t las
 /* Audio tone stubs */
 void audio_tones_init(void) {}
 void audio_tones_cleanup(void) {}
+void audio_tones_set_volume_percent(int percent) { (void)percent; }
 void audio_tones_play_dial_tone(void) {}
 void audio_tones_play_dtmf(char k) { (void)k; }
 void audio_tones_play_ringback(void) {}
+void audio_tones_play_ring(void) {}
 void audio_tones_play_busy_tone(void) {}
 void audio_tones_play_coin_tone(void) {}
 void audio_tones_play_clip(const char *p) { (void)p; }
@@ -221,7 +227,27 @@ static void test_config_validate_ranges(void) {
 
     cfg.count = 0;
     config_set_default_values(&cfg);
+    config_set_value(&cfg, "hardware.baud_rate", "12345");
+    TEST_ASSERT_EQ_INT(config_validate(&cfg), 0);
+
+    cfg.count = 0;
+    config_set_default_values(&cfg);
+    config_set_value(&cfg, "hardware.display_device", "");
+    TEST_ASSERT_EQ_INT(config_validate(&cfg), 0);
+
+    cfg.count = 0;
+    config_set_default_values(&cfg);
     config_set_value(&cfg, "logging.max_files", "0");
+    TEST_ASSERT_EQ_INT(config_validate(&cfg), 0);
+
+    cfg.count = 0;
+    config_set_default_values(&cfg);
+    config_set_value(&cfg, "story.callback_quiet_start", "24");
+    TEST_ASSERT_EQ_INT(config_validate(&cfg), 0);
+
+    cfg.count = 0;
+    config_set_default_values(&cfg);
+    config_set_value(&cfg, "story.callback_quiet_end", "-1");
     TEST_ASSERT_EQ_INT(config_validate(&cfg), 0);
 }
 
@@ -655,7 +681,7 @@ static void test_plugins_activation_handler_may_reenter_registry(void) {
     plugins_cleanup();
 }
 
-/* #229: the 0x02 display frame carries its length in one byte, and the
+/* The protocol-v2 display frame carries its length in one byte, and the
  * receiver consumes exactly that many bytes with no resynchronisation. The old
  * code narrowed strlen() to uint8_t for the header but wrote the full strlen()
  * in the body, so a message of 256+ bytes declared the wrong length and the
@@ -857,8 +883,8 @@ static void test_plugins_builtins_registered(void) {
 
     plugins_init();
 
-    /* Eight built-ins ship with the platform. */
-    TEST_ASSERT_EQ_INT(plugins_get_count(), 8);
+    /* Nine built-ins ship with the platform. */
+    TEST_ASSERT_EQ_INT(plugins_get_count(), 9);
 
     TEST_ASSERT_EQ_INT(plugins_list(buf, sizeof(buf)), 0);
     TEST_ASSERT_NOT_NULL(strstr(buf, "Classic Phone"));
@@ -869,6 +895,7 @@ static void test_plugins_builtins_registered(void) {
     TEST_ASSERT_NOT_NULL(strstr(buf, "Dial-A-Joke"));
     TEST_ASSERT_NOT_NULL(strstr(buf, "Trivia"));
     TEST_ASSERT_NOT_NULL(strstr(buf, "The Operator"));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "Story Mode"));
 
     millennium_client_destroy(client);
     client = NULL;
@@ -1301,11 +1328,11 @@ static void test_updater_apply_null_dir(void) {
     TEST_ASSERT(strstr(st, "no source") != NULL);
 }
 
-static void test_updater_apply_bad_dir(void) {
+static void test_updater_refuses_without_signed_ota(void) {
     char st[256];
     TEST_ASSERT_EQ_INT(-1, updater_apply("/nonexistent/path/to/repo"));
     updater_get_apply_status(st, sizeof(st));
-    TEST_ASSERT(strstr(st, "git pull failed") != NULL);
+    TEST_ASSERT(strstr(st, "signed OTA") != NULL);
 }
 
 /* ── Card config tests ─────────────────────────────────────────── */
@@ -1321,7 +1348,7 @@ static void test_card_free_card_match(void) {
     config_data_t cfg;
     memset(&cfg, 0, sizeof(cfg));
     config_set_default_values(&cfg);
-    config_set_value(&cfg, "card.free_cards", "1234567890123456,9999888877776666");
+    config_set_value(&cfg, "card.free_tokens", "1234567890123456,9999888877776666");
     TEST_ASSERT_EQ_INT(1, config_is_free_card(&cfg, "1234567890123456"));
     TEST_ASSERT_EQ_INT(1, config_is_free_card(&cfg, "9999888877776666"));
 }
@@ -1330,7 +1357,7 @@ static void test_card_free_card_no_match(void) {
     config_data_t cfg;
     memset(&cfg, 0, sizeof(cfg));
     config_set_default_values(&cfg);
-    config_set_value(&cfg, "card.free_cards", "1234567890123456");
+    config_set_value(&cfg, "card.free_tokens", "1234567890123456");
     TEST_ASSERT_EQ_INT(0, config_is_free_card(&cfg, "0000000000000000"));
 }
 
@@ -1338,8 +1365,8 @@ static void test_card_admin_card_match(void) {
     config_data_t cfg;
     memset(&cfg, 0, sizeof(cfg));
     config_set_default_values(&cfg);
-    config_set_value(&cfg, "card.admin_cards", "ADMIN12345678901");
-    TEST_ASSERT_EQ_INT(1, config_is_admin_card(&cfg, "ADMIN12345678901"));
+    config_set_value(&cfg, "card.admin_tokens", "1234000099998888");
+    TEST_ASSERT_EQ_INT(1, config_is_admin_card(&cfg, "1234000099998888"));
 }
 
 static void test_card_empty_list(void) {
@@ -1348,6 +1375,14 @@ static void test_card_empty_list(void) {
     config_set_default_values(&cfg);
     TEST_ASSERT_EQ_INT(0, config_is_free_card(&cfg, "1234567890123456"));
     TEST_ASSERT_EQ_INT(0, config_is_admin_card(&cfg, "1234567890123456"));
+}
+
+static void test_card_tokens_reject_payment_card_like_misconfiguration(void) {
+    config_data_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    config_set_default_values(&cfg);
+    config_set_value(&cfg, "card.free_tokens", "not-a-random-16-digit-token");
+    TEST_ASSERT_EQ_INT(0, config_validate(&cfg));
 }
 
 /* ── Display manager ────────────────────────────────────────────── */
@@ -1526,11 +1561,11 @@ static void test_metrics_export_no_overflow(void) {
     prefix[160] = '\0';
 
     for (i = 0; i < 200; i++) {
-        snprintf(name, sizeof(name), "%s%d", prefix, i);
+        snprintf(name, sizeof(name), "%.160s%d", prefix, i);
         metrics_increment_counter(name, (uint64_t)i);
     }
     for (i = 0; i < 50; i++) {
-        snprintf(name, sizeof(name), "%shist%d", prefix, i);
+        snprintf(name, sizeof(name), "%.160shist%d", prefix, i);
         metrics_observe_histogram(name, (double)i);
     }
 
@@ -2408,6 +2443,15 @@ static void test_serial_backoff_survives_a_long_outage(void) {
     TEST_ASSERT_EQ_INT(serial_recovery_backoff_seconds(-1), 1);
 }
 
+static void test_serial_readiness_holds_port_open_through_mcu_boot(void) {
+    TEST_ASSERT_EQ_INT(serial_recovery_readiness_action(0, 0), SERIAL_READY_WAIT);
+    TEST_ASSERT_EQ_INT(serial_recovery_readiness_action(1, 1), SERIAL_READY_SEND_HELLO);
+    TEST_ASSERT_EQ_INT(serial_recovery_readiness_action(5, 1), SERIAL_READY_SEND_HELLO);
+    TEST_ASSERT_EQ_INT(serial_recovery_readiness_action(9, 0), SERIAL_READY_WAIT);
+    TEST_ASSERT_EQ_INT(serial_recovery_readiness_action(10, 1), SERIAL_READY_FAIL);
+    TEST_ASSERT_EQ_INT(serial_recovery_readiness_action(30, 30), SERIAL_READY_FAIL);
+}
+
 /* ── Arduino diagnostics (#230) ─────────────────────────────────── */
 
 static void test_diag_parse_alpha_and_beta(void) {
@@ -2443,6 +2487,77 @@ static void test_diag_parse_rejects_malformed(void) {
     TEST_ASSERT_EQ_INT(event_diag_parse(NULL, &src, &n), 0);
     TEST_ASSERT_EQ_INT(event_diag_parse("A001", NULL, &n), 0);
     TEST_ASSERT_EQ_INT(event_diag_parse("A001", &src, NULL), 0);
+}
+
+static void test_reset_diag_parse(void) {
+    const char *role = NULL;
+    long cause = -1;
+    TEST_ASSERT_EQ_INT(event_reset_parse("K008", &role, &cause), 1);
+    TEST_ASSERT_EQ_STR(role, "keypad");
+    TEST_ASSERT_EQ_INT((int)cause, 8);
+    TEST_ASSERT_EQ_INT(event_reset_parse("D015", &role, &cause), 1);
+    TEST_ASSERT_EQ_STR(role, "display");
+    TEST_ASSERT_EQ_INT((int)cause, 15);
+    TEST_ASSERT_EQ_INT(event_reset_parse("D256", &role, &cause), 0);
+    TEST_ASSERT_EQ_INT(event_reset_parse("D0x1", &role, &cause), 0);
+    TEST_ASSERT_EQ_INT(event_reset_parse("A001", &role, &cause), 0);
+    TEST_ASSERT_EQ_INT(event_reset_parse(NULL, &role, &cause), 0);
+}
+
+static void test_mcu_protocol_round_trip_and_partial_input(void) {
+    static const uint8_t payload[] = {0, 1, 0x7e, 255};
+    uint8_t encoded[MCU_PROTOCOL_MAX_FRAME];
+    size_t length;
+    size_t i;
+    mcu_decoder_t decoder;
+    mcu_frame_t frame;
+    int result = 0;
+    length = mcu_protocol_encode(MCU_EVT_CARD, 42, payload, sizeof(payload),
+                                 encoded, sizeof(encoded));
+    TEST_ASSERT_EQ_INT((int)length, 11);
+    mcu_decoder_init(&decoder);
+    for (i = 0; i < length; i++) {
+        result = mcu_decoder_feed(&decoder, encoded[i], &frame);
+        TEST_ASSERT(result == 0 || (i == length - 1 && result == 1));
+    }
+    TEST_ASSERT_EQ_INT(frame.type, MCU_EVT_CARD);
+    TEST_ASSERT_EQ_INT(frame.sequence, 42);
+    TEST_ASSERT_EQ_INT(frame.length, (int)sizeof(payload));
+    TEST_ASSERT(memcmp(frame.payload, payload, sizeof(payload)) == 0);
+}
+
+static void test_mcu_protocol_rejects_crc_and_resynchronizes(void) {
+    uint8_t encoded[MCU_PROTOCOL_MAX_FRAME];
+    size_t length;
+    size_t i;
+    mcu_decoder_t decoder;
+    mcu_frame_t frame;
+    int result = 0;
+    length = mcu_protocol_encode(MCU_EVT_KEY, 7, (const uint8_t *)"5", 1,
+                                 encoded, sizeof(encoded));
+    encoded[length - 1] ^= 1;
+    mcu_decoder_init(&decoder);
+    TEST_ASSERT_EQ_INT(mcu_decoder_feed(&decoder, 0x00, &frame), 0);
+    for (i = 0; i < length; i++) result = mcu_decoder_feed(&decoder, encoded[i], &frame);
+    TEST_ASSERT_EQ_INT(result, -1);
+    length = mcu_protocol_encode(MCU_EVT_KEY, 8, (const uint8_t *)"6", 1,
+                                 encoded, sizeof(encoded));
+    for (i = 0; i < length; i++) result = mcu_decoder_feed(&decoder, encoded[i], &frame);
+    TEST_ASSERT_EQ_INT(result, 1);
+    TEST_ASSERT_EQ_INT(frame.payload[0], '6');
+}
+
+static void test_mcu_protocol_replay_and_critical_policy(void) {
+    mcu_replay_guard_t guard;
+    memset(&guard, 0, sizeof(guard));
+    TEST_ASSERT_EQ_INT(mcu_replay_accept(&guard, 254), 1);
+    TEST_ASSERT_EQ_INT(mcu_replay_accept(&guard, 254), 0);
+    TEST_ASSERT_EQ_INT(mcu_replay_accept(&guard, 255), 1);
+    TEST_ASSERT_EQ_INT(mcu_replay_accept(&guard, 0), 1);
+    TEST_ASSERT_EQ_INT(mcu_replay_accept(&guard, 200), 0);
+    TEST_ASSERT_EQ_INT(mcu_message_is_critical(MCU_CMD_DISPLAY), 1);
+    TEST_ASSERT_EQ_INT(mcu_message_is_critical(MCU_CMD_COIN_PROGRAM), 1);
+    TEST_ASSERT_EQ_INT(mcu_message_is_critical(MCU_CMD_KEEPALIVE), 0);
 }
 
 /* The count is ASCII rather than a raw byte precisely so a zero never appears
@@ -2490,6 +2605,93 @@ static void test_event_types_do_not_collide_with_debug_bytes(void) {
 }
 
 /* ── Main ───────────────────────────────────────────────────────── */
+
+static void test_sip_text_respects_length_without_source_nul(void) {
+    const char source[4] = {'f', 'a', 'i', 'l'};
+    char destination[8];
+    sip_text_copy(destination, sizeof(destination), source, 4);
+    TEST_ASSERT_EQ_STR("fail", destination);
+}
+
+static void test_sip_text_truncates_and_terminates(void) {
+    char destination[4];
+    sip_text_copy(destination, sizeof(destination), "overlong", 8);
+    TEST_ASSERT_EQ_STR("ove", destination);
+    TEST_ASSERT_EQ_INT(0, destination[3]);
+}
+
+static void test_sip_text_rejects_malformed_length(void) {
+    char destination[4] = "bad";
+    sip_text_copy(destination, sizeof(destination), "x", -1);
+    TEST_ASSERT_EQ_STR("", destination);
+    sip_text_copy(destination, sizeof(destination), NULL, 1000);
+    TEST_ASSERT_EQ_STR("", destination);
+}
+
+typedef struct {
+    sip_call_slot_t *slot;
+    int base;
+} sip_slot_thread_arg_t;
+
+static void *sip_slot_writer(void *opaque) {
+    sip_slot_thread_arg_t *arg = (sip_slot_thread_arg_t *)opaque;
+    int i;
+    for (i = 0; i < 50000; i++) sip_call_slot_set(arg->slot, arg->base + (i % 1000));
+    return NULL;
+}
+
+static void *sip_slot_reader(void *opaque) {
+    sip_slot_thread_arg_t *arg = (sip_slot_thread_arg_t *)opaque;
+    int i;
+    for (i = 0; i < 50000; i++) {
+        int value = sip_call_slot_snapshot(arg->slot);
+        if (value != -1 && (value < 1000 || value > 2999)) return (void *)1;
+    }
+    return NULL;
+}
+
+static void test_sip_call_slot_concurrent_snapshots(void) {
+    sip_call_slot_t slot = SIP_CALL_SLOT_INITIALIZER(-1);
+    sip_slot_thread_arg_t first = {&slot, 1000};
+    sip_slot_thread_arg_t second = {&slot, 2000};
+    pthread_t threads[4];
+    void *result = NULL;
+    TEST_ASSERT_EQ_INT(0, pthread_create(&threads[0], NULL, sip_slot_writer, &first));
+    TEST_ASSERT_EQ_INT(0, pthread_create(&threads[1], NULL, sip_slot_writer, &second));
+    TEST_ASSERT_EQ_INT(0, pthread_create(&threads[2], NULL, sip_slot_reader, &first));
+    TEST_ASSERT_EQ_INT(0, pthread_create(&threads[3], NULL, sip_slot_reader, &second));
+    TEST_ASSERT_EQ_INT(0, pthread_join(threads[0], NULL));
+    TEST_ASSERT_EQ_INT(0, pthread_join(threads[1], NULL));
+    TEST_ASSERT_EQ_INT(0, pthread_join(threads[2], &result));
+    TEST_ASSERT_NULL(result);
+    TEST_ASSERT_EQ_INT(0, pthread_join(threads[3], &result));
+    TEST_ASSERT_NULL(result);
+    {
+        int snapshot = sip_call_slot_snapshot(&slot);
+        TEST_ASSERT(sip_call_slot_clear_if(&slot, snapshot, -1));
+        TEST_ASSERT_EQ_INT(-1, sip_call_slot_snapshot(&slot));
+    }
+    pthread_mutex_destroy(&slot.mutex);
+}
+
+static void test_serial_settings_use_nondefault_stable_path_and_baud(void) {
+    config_data_t cfg;
+    serial_settings_t settings;
+    config_set_default_values(&cfg);
+    config_set_value(&cfg, "hardware.display_device",
+                     "/dev/serial/by-id/usb-Millennium_Custom-if00");
+    config_set_value(&cfg, "hardware.baud_rate", "57600");
+    TEST_ASSERT_EQ_INT(0, serial_settings_load(&cfg, &settings));
+    TEST_ASSERT_EQ_STR("/dev/serial/by-id/usb-Millennium_Custom-if00",
+                       settings.device_path);
+    TEST_ASSERT_EQ_INT(57600, settings.baud_rate);
+
+    /* Reconnects use this captured by-id path, even if unrelated config state
+     * changes after initial connection. */
+    config_set_value(&cfg, "hardware.display_device", "/dev/ttyACM99");
+    TEST_ASSERT_EQ_STR("/dev/serial/by-id/usb-Millennium_Custom-if00",
+                       settings.device_path);
+}
 
 int main(void) {
     logger_set_level(LOG_LEVEL_ERROR);
@@ -2562,6 +2764,10 @@ int main(void) {
     TEST_SUITE_BEGIN("Arduino Diagnostics");
     TEST_SUITE_RUN(test_diag_parse_alpha_and_beta);
     TEST_SUITE_RUN(test_diag_parse_rejects_malformed);
+    TEST_SUITE_RUN(test_reset_diag_parse);
+    TEST_SUITE_RUN(test_mcu_protocol_round_trip_and_partial_input);
+    TEST_SUITE_RUN(test_mcu_protocol_rejects_crc_and_resynchronizes);
+    TEST_SUITE_RUN(test_mcu_protocol_replay_and_critical_policy);
     TEST_SUITE_RUN(test_diag_payload_has_no_embedded_nul);
     TEST_SUITE_RUN(test_event_types_do_not_collide_with_debug_bytes);
 
@@ -2583,6 +2789,16 @@ int main(void) {
     TEST_SUITE_RUN(test_serial_null_state);
     TEST_SUITE_RUN(test_serial_backoff_doubles_then_caps);
     TEST_SUITE_RUN(test_serial_backoff_survives_a_long_outage);
+    TEST_SUITE_RUN(test_serial_readiness_holds_port_open_through_mcu_boot);
+
+    TEST_SUITE_BEGIN("SIP Text Safety");
+    TEST_SUITE_RUN(test_sip_text_respects_length_without_source_nul);
+    TEST_SUITE_RUN(test_sip_text_truncates_and_terminates);
+    TEST_SUITE_RUN(test_sip_text_rejects_malformed_length);
+    TEST_SUITE_RUN(test_sip_call_slot_concurrent_snapshots);
+
+    TEST_SUITE_BEGIN("Serial Settings");
+    TEST_SUITE_RUN(test_serial_settings_use_nondefault_stable_path_and_baud);
 
     TEST_SUITE_BEGIN("Clock Seam");
     TEST_SUITE_RUN(test_clock_default_is_real_time);
@@ -2601,6 +2817,7 @@ int main(void) {
     TEST_SUITE_RUN(test_card_free_card_no_match);
     TEST_SUITE_RUN(test_card_admin_card_match);
     TEST_SUITE_RUN(test_card_empty_list);
+    TEST_SUITE_RUN(test_card_tokens_reject_payment_card_like_misconfiguration);
 
     TEST_SUITE_BEGIN("Updater");
     TEST_SUITE_RUN(test_version_compare_equal);
@@ -2610,7 +2827,7 @@ int main(void) {
     TEST_SUITE_RUN(test_version_compare_with_v_prefix);
     TEST_SUITE_RUN(test_version_no_update_initially);
     TEST_SUITE_RUN(test_updater_apply_null_dir);
-    TEST_SUITE_RUN(test_updater_apply_bad_dir);
+    TEST_SUITE_RUN(test_updater_refuses_without_signed_ota);
 
     TEST_SUITE_BEGIN("Display Manager");
     TEST_SUITE_RUN(test_display_sanitizes_control_chars);

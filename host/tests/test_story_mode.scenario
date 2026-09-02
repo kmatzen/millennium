@@ -1,0 +1,76 @@
+# The House at the End of the Line: mystery, evidence, physical discoveries,
+# consequential choice, interruption-safe persistence, and return coda.
+config story.path ../content/stories/last_line/story.mst
+config story.state_path /tmp/millennium_story_mode_test_state
+config story.call_target 5550100
+clear_story_state
+activate_plugin Story Mode
+assert_display THIS CALL IS FOR
+hook_up
+assert_display OPERATOR 17
+key #
+assert_display MARA, AGE 9
+
+# Stay with Mara and hear the first piece of concrete evidence.
+key 1
+assert_display DO NOT HANG UP
+wait 18
+assert_display THE VOICE KNOWS
+
+# Optional physical evidence changes the player's interpretation, but not
+# their ability to reach either ending.
+coin 25
+assert_display A LOST VOICEMAIL
+key #
+assert_display YOUR WORDS CROSS
+card purpose-built-test-token
+assert_display A DEED FROM 2019
+key #
+assert_display YOUR WORDS CROSS
+
+# Tell Mara to leave; the configured call is the time-crossing climax.
+key 1
+assert_display MESSAGE: LEAVE NOW
+wait 12
+assert_display THE LINE IS OPEN
+call_active
+assert_display A DOOR SLAMS
+assert_display FOOTSTEPS RUN FREE
+
+# The ending schedules a persistent Operator 17 callback. It survives the
+# return to idle, arrives a day later, and exposes consequence-specific
+# voicemail without requiring the network.
+hook_down
+assert_display THIS CALL IS FOR
+activate_plugin Classic Phone
+activate_plugin Story Mode
+assert_display THIS CALL IS FOR
+config story.callbacks_enabled false
+wait 86400
+assert_display MISSED CALL
+config story.callbacks_enabled true
+config story.callback_quiet_start 0
+config story.callback_quiet_end 23
+wait 1
+assert_display MISSED CALL
+config story.callback_quiet_end 0
+wait 1
+assert_display INCOMING CALL
+assert_display OPERATOR 17
+hook_up
+assert_display OPERATOR MESSAGE
+key 1
+assert_display SHE LEFT IN 1989
+assert_display BUT CALLED IN 2019
+
+# Reloading preserves the content-version-scoped consequence.
+activate_plugin Classic Phone
+activate_plugin Story Mode
+assert_display SHE LEFT IN 1989
+hook_down
+assert_display THIS CALL IS FOR
+hook_up
+assert_display MARA VALE, 2019
+wait 24
+assert_display I BUILT THIS PHONE
+assert_display SO YOU COULD ANSWER

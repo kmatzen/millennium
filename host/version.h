@@ -15,10 +15,9 @@
 #define BUILD_TIME "unknown"
 #endif
 
-#define VERSION_MAJOR 0
-#define VERSION_MINOR 3
-#define VERSION_PATCH 0
-#define VERSION_STRING "0.3.0"
+#ifndef VERSION_STRING
+#define VERSION_STRING "0.0.0-development"
+#endif
 
 const char *version_get_string(void);
 const char *version_get_git_hash(void);

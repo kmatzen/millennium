@@ -1,8 +1,10 @@
 Arduino/build/**/*.elf
 Arduino/build/**/*.o
+Arduino/build/cache/
 *.so
 *.o
 *.dSYM/
+__pycache__/
 host/build/
 host/daemon
 host/daemon_c89
@@ -33,8 +35,10 @@ pcb/DRC.rpt
 pcb/*-erc.rpt
 host/unit_tests
 host/pjsip_smoke
+host/web_auth_tests
 host/daemon-override.conf.tmp
 host/audio/out/
+tools/qemu/state/
 
 # TLC scratch output. `make tla-check` and friends write a states/ directory
 # next to the spec on every run (fingerprint and state-queue files). It is

@@ -1,0 +1,9 @@
+[Unit]
+Description=Watch for an authenticated physical Wi-Fi recovery request
+
+[Path]
+PathExists=/var/lib/millennium/wifi/setup-requested
+Unit=millennium-wifi-bootstrap.service
+
+[Install]
+WantedBy=multi-user.target

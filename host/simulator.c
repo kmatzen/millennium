@@ -21,6 +21,8 @@ extern daemon_state_data_t *daemon_state;
 #include <ctype.h>
 #include <time.h>
 #include <pthread.h>
+#include <errno.h>
+#include <unistd.h>
 
 /* ── Simulated time ──────────────────────────────────────────────────
  * The daemon and plugins read the clock through mclock_now() (clock_source.h).
@@ -230,9 +232,11 @@ void plugins_adjust_inserted_cents(int delta) {
 /* Audio tone stubs */
 void audio_tones_init(void) {}
 void audio_tones_cleanup(void) {}
+void audio_tones_set_volume_percent(int percent) { (void)percent; }
 void audio_tones_play_dial_tone(void) { fprintf(stderr, "[TONE] Dial tone\n"); }
 void audio_tones_play_dtmf(char key) { fprintf(stderr, "[TONE] DTMF %c\n", key); }
 void audio_tones_play_ringback(void) { fprintf(stderr, "[TONE] Ringback\n"); }
+void audio_tones_play_ring(void) { fprintf(stderr, "[TONE] Incoming ring\n"); }
 void audio_tones_play_busy_tone(void) { fprintf(stderr, "[TONE] Busy\n"); }
 void audio_tones_play_coin_tone(void) { fprintf(stderr, "[TONE] Coin\n"); }
 void audio_tones_stop(void) { fprintf(stderr, "[TONE] Stop\n"); }
@@ -799,6 +803,42 @@ static int run_scenario(const char *path) {
                     daemon_state_to_string(daemon_state->current_state),
                     daemon_state->inserted_cents,
                     sim_display_line1, sim_display_line2);
+        }
+
+        /* Test-only cleanup for the data-authored story persistence file. */
+        else if (strcmp(cmd, "clear_story_state") == 0) {
+            const char *path = config_get_string(config_get_instance(),
+                                                  "story.state_path", "");
+            if (strncmp(path, "/tmp/millennium_", 16) != 0) {
+                fprintf(stderr, "  ERROR: refusing to remove non-test story state\n");
+                failures++;
+            } else if (remove(path) != 0 && errno != ENOENT) {
+                fprintf(stderr, "  ERROR: could not clear story state %s\n", path);
+                failures++;
+            }
+        }
+
+        /* Test-only Wi-Fi setup marker assertions, restricted to /tmp. */
+        else if (strcmp(cmd, "clear_wifi_request") == 0) {
+            const char *path = config_get_string(config_get_instance(),
+                                                  "wifi.setup_request_path", "");
+            if (strncmp(path, "/tmp/millennium_", 16) != 0) {
+                fprintf(stderr, "  ERROR: refusing non-test Wi-Fi request path\n");
+                failures++;
+            } else if (remove(path) != 0 && errno != ENOENT) {
+                fprintf(stderr, "  ERROR: could not clear Wi-Fi request %s\n", path);
+                failures++;
+            }
+        }
+        else if (strcmp(cmd, "assert_wifi_request") == 0) {
+            const char *path = config_get_string(config_get_instance(),
+                                                  "wifi.setup_request_path", "");
+            if (strncmp(path, "/tmp/millennium_", 16) != 0 || access(path, F_OK) != 0) {
+                fprintf(stderr, "  FAIL: Wi-Fi setup request was not created\n");
+                failures++;
+            } else {
+                fprintf(stderr, "  PASS: Wi-Fi setup request created\n");
+            }
         }
 
         /* ── save_state <filepath> ─────────────────────────────── */

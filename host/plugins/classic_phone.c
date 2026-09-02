@@ -34,6 +34,9 @@ typedef struct {
     int is_emergency_call;
     int is_card_call;
     char card_number[17];
+    int wifi_setup_gesture;
+    time_t wifi_setup_deadline;
+    time_t wifi_status_checked_at;
 } classic_phone_data_t;
 
 static classic_phone_data_t classic_phone_data = {0};
@@ -59,6 +62,37 @@ static void classic_phone_end_call(void);
 static void classic_phone_format_number(const char* buffer, char *output);
 static void classic_phone_tick(void);
 
+static void classic_phone_request_wifi_setup(void) {
+    const char *path = config_get_string(config_get_instance(),
+                                         "wifi.setup_request_path",
+                                         "/var/lib/millennium/wifi/setup-requested");
+    char temporary[512];
+    FILE *stream;
+    int failed = 0;
+    if (snprintf(temporary, sizeof(temporary), "%s.tmp", path) >= (int)sizeof(temporary)) {
+        logger_error_with_category("ClassicPhone", "Wi-Fi setup request path is too long");
+        return;
+    }
+    stream = fopen(temporary, "w");
+    if (!stream) {
+        failed = 1;
+    } else {
+        if (fputs("owner-token\n", stream) == EOF) failed = 1;
+        if (fclose(stream) != 0) failed = 1;
+        stream = NULL;
+    }
+    if (!failed && rename(temporary, path) != 0) failed = 1;
+    if (failed) {
+        remove(temporary);
+        display_manager_set_text("WIFI SETUP FAILED", "CONTACT MAINTAINER");
+        logger_error_with_category("ClassicPhone", "Could not request Wi-Fi setup");
+        return;
+    }
+    display_manager_set_text("WIFI SETUP", "STARTING...");
+    classic_phone_data.wifi_setup_gesture = 3;
+    logger_info_with_category("ClassicPhone", "Owner requested bounded Wi-Fi setup mode");
+}
+
 /* Classic phone event handlers */
 static int classic_phone_handle_coin(int coin_value, const char *coin_code) {
     /* Only accept coins when phone is ready for operation (IDLE_UP state) */
@@ -78,6 +112,25 @@ static int classic_phone_handle_coin(int coin_value, const char *coin_code) {
 }
 
 static int classic_phone_handle_keypad(char key) {
+    if (classic_phone_data.wifi_setup_gesture &&
+            sdk_now() > classic_phone_data.wifi_setup_deadline) {
+        classic_phone_data.wifi_setup_gesture = 0;
+    }
+    if (classic_phone_data.wifi_setup_gesture == 1 && key == '0') {
+        classic_phone_data.wifi_setup_gesture = 2;
+        audio_tones_play_dtmf(key);
+        display_manager_set_text("START WIFI SETUP?", "PRESS # TO CONFIRM");
+        return 1;
+    }
+    if (classic_phone_data.wifi_setup_gesture == 2 && key == '#') {
+        classic_phone_data.wifi_setup_gesture = 0;
+        audio_tones_play_dtmf(key);
+        classic_phone_request_wifi_setup();
+        return 1;
+    }
+    if (classic_phone_data.wifi_setup_gesture && key != '0') {
+        classic_phone_data.wifi_setup_gesture = 0;
+    }
     if (classic_phone_data.is_in_call) {
         /* #95: Send DTMF to the SIP stack for IVR/voicemail navigation */
         if (client && (isdigit((unsigned char)key) || key == '*' || key == '#')) {
@@ -234,7 +287,9 @@ static int classic_phone_handle_card(const char *card_number) {
     }
 
     if (config_is_admin_card(config_get_instance(), card_number)) {
-        display_manager_set_text("Admin card", "Access granted");
+        classic_phone_data.wifi_setup_gesture = 1;
+        classic_phone_data.wifi_setup_deadline = sdk_now() + 30;
+        display_manager_set_text("OWNER TOKEN", "PRESS 0 FOR WIFI");
         logger_infof_with_category("ClassicPhone", "Admin card swiped: %.4s...", card_number);
         return 1;
     }
@@ -246,6 +301,10 @@ static int classic_phone_handle_card(const char *card_number) {
 
 /* Internal function implementations */
 static void classic_phone_on_activation(void) {
+    const char *status_path;
+    FILE *status;
+    char value[160];
+    size_t count;
     /* Restore coins from daemon_state (may have been loaded from persisted state) */
     /* Nothing to restore: the balance is read live from sdk_balance(). */
     classic_phone_data.keypad_length = 0;
@@ -253,6 +312,22 @@ static void classic_phone_on_activation(void) {
     classic_phone_data.is_dialing = 0;
     classic_phone_data.is_in_call = 0;
     classic_phone_data.last_activity = sdk_now();
+    status_path = config_get_string(config_get_instance(), "wifi.status_path",
+                                    "/var/lib/millennium/wifi/status.json");
+    status = fopen(status_path, "r");
+    if (status) {
+        count = fread(value, 1, sizeof(value) - 1, status);
+        value[count] = '\0';
+        fclose(status);
+        if (strstr(value, "\"state\": \"setup\"") ||
+                strstr(value, "\"state\":\"setup\"") ||
+                strstr(value, "\"state\": \"connecting\"") ||
+                strstr(value, "\"state\":\"connecting\"")) {
+            classic_phone_data.wifi_setup_gesture = 3;
+            display_manager_set_text("WIFI SETUP", "JOIN SETUP NETWORK");
+            return;
+        }
+    }
     classic_phone_update_display();
 }
 
@@ -470,6 +545,30 @@ static void classic_phone_tick(void) {
     int seconds;
     char line1[21];
     char line2[21];
+
+    if (classic_phone_data.wifi_setup_gesture == 3 &&
+            sdk_now() != classic_phone_data.wifi_status_checked_at) {
+        const char *status_path = config_get_string(config_get_instance(),
+                                                     "wifi.status_path",
+                                                     "/var/lib/millennium/wifi/status.json");
+        FILE *status = fopen(status_path, "r");
+        char value[160];
+        classic_phone_data.wifi_status_checked_at = sdk_now();
+        if (status) {
+            size_t count = fread(value, 1, sizeof(value) - 1, status);
+            value[count] = '\0';
+            fclose(status);
+            if (strstr(value, "\"state\": \"connected\"") ||
+                    strstr(value, "\"state\":\"connected\"")) {
+                classic_phone_data.wifi_setup_gesture = 0;
+                display_manager_set_text("WIFI CONNECTED", "MAINTENANCE READY");
+            } else if (strstr(value, "\"state\": \"failed\"") ||
+                       strstr(value, "\"state\":\"failed\"")) {
+                classic_phone_data.wifi_setup_gesture = 0;
+                display_manager_set_text("WIFI NOT CONNECTED", "TRY SETUP AGAIN");
+            }
+        }
+    }
 
     /* Idle timeout: if handset is up but no activity, reset */
     if (!classic_phone_data.is_in_call && !classic_phone_data.is_dialing &&

@@ -3,7 +3,7 @@
 # Usage: ./break_test.sh [HOST]
 # Verifies: daemon doesn't crash, JSON responses stay valid
 set -e
-HOST="${HOST:-${1:-192.168.86.145}}"
+HOST="${HOST:-${1:-millennium-phone.local}}"
 BASE="http://${HOST}:80"
 FAILED=0
 
@@ -86,6 +86,7 @@ run "GET /api/plugins returns valid JSON" "curl -s $BASE/api/plugins" "json"
 run "GET /api/version returns valid JSON" "curl -s $BASE/api/version" "json"
 run "GET /api/metrics returns valid JSON" "curl -s $BASE/api/metrics" "json"
 run "GET /api/check-update returns valid JSON" "curl -s $BASE/api/check-update" "json"
+run "GET /api/update-status returns valid JSON" "curl -s $BASE/api/update-status" "json"
 
 # coin_insert validation (#129): reject invalid cents, accept valid
 run "POST coin_insert invalid cents (negative)" \

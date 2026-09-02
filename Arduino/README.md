@@ -1,5 +1,10 @@
 # Arduino Firmware
 
+Host and MCU communication uses the CRC-framed, negotiated protocol documented
+in [`../docs/MCU_PROTOCOL.md`](../docs/MCU_PROTOCOL.md). Both sketches report
+their role, release version, source build ID, protocol version, self-test result,
+and previous AVR reset cause for OTA attestation and monitoring.
+
 Two Arduino Micro boards (ATmega32U4) run the keypad/peripheral I/O:
 
 | Board             | FQBN                            | Sketch             | Role                                        |
@@ -68,7 +73,7 @@ bootloader open for several seconds, so there is no tight window to hit. Require
 ```bash
 ./Arduino/deploy_display.sh [user@host]   # flash Beta (display)
 ./Arduino/deploy_keypad.sh  [user@host]   # flash Alpha (keypad)
-# Default host: matzen@192.168.86.145
+# Default host: matzen@millennium-phone.local
 
 # Or via make:
 make deploy_display

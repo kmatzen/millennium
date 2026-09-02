@@ -322,19 +322,21 @@ PCB.
 
 ## Remaining Considerations
 
-1. **PCB layout**: The updated schematic requires a new PCB layout. The TDA2822M
-   uses the same DIP-8 footprint as the LM386, but additional capacitors and
-   protection components need board space.
+The phonev6 schematic, layout, and generated BOM are the fabricated as-built
+revision. Its migration is intentionally mixed technology: protection and
+support parts moved to SMD while U2 remains the verified DIP-8 TDA2822M. The
+layout is not pending; only the GPIO27 reset bodge in Known PCB Errata remains
+for a future revision.
 
-2. **ALSA config update**: The ALSA `softvol` max_dB setting in
+1. **ALSA config update**: The ALSA `softvol` max_dB setting in
    `host/asoundrc.example` may need adjustment since the TDA2822M provides
    hardware amplification. Software gain can likely be reduced.
 
-3. **Gain tuning**: The TDA2822M's default gain may need adjustment for
+2. **Gain tuning**: The TDA2822M's default gain may need adjustment for
    comfortable volume. If too loud, input attenuation resistors can be added.
    If too quiet, the coupling cap values can be increased.
 
-4. **Mounting holes**: Consider adding M3 mounting holes at board corners for
+3. **Mounting holes**: Consider adding M3 mounting holes at board corners for
    mechanical support inside the payphone enclosure.
 
 ## Circuit Improvement Ideas

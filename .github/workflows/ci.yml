@@ -3,6 +3,7 @@ name: CI
 on:
   push:
     branches: [main]
+    tags: ['v*']
   pull_request:
     branches: [main]
 
@@ -28,9 +29,20 @@ jobs:
         working-directory: host
         run: make simulator
 
+      - name: Verify generated compatibility metadata
+        run: python3 tools/generate_version_metadata.py --check
+
       - name: Run scenario tests
         working-directory: host
         run: make test
+
+      - name: Test QEMU virtual MCU protocol
+        run: python3 tools/qemu/test_virtual_mcu.py
+
+      - name: Test acceptance evidence gates
+        run: |
+          python3 tools/tests/test_acceptance_evidence.py
+          python3 host/tests/test_maintenance_repair.py
 
   # Second opinion from clang (#237). The two compilers implement different
   # warning sets, and the build treats warnings as errors: GCC has
@@ -55,6 +67,119 @@ jobs:
       - name: Compile-check daemon sources with clang
         working-directory: host
         run: make compile-check CC=clang
+
+  production-build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential git libasound2-dev libssl-dev \
+            libsamplerate0-dev libspeex-dev libspeexdsp-dev pkg-config nftables shellcheck
+
+      - name: Build pinned PJSIP 2.14.1
+        run: |
+          git clone --filter=blob:none https://github.com/pjsip/pjproject.git /tmp/pjproject
+          git -C /tmp/pjproject checkout --detach 2f4bc29b2fa65cc29e50ba03f0b8b6de820eaf6b
+          test "$(git -C /tmp/pjproject rev-parse HEAD)" = 2f4bc29b2fa65cc29e50ba03f0b8b6de820eaf6b
+          cd /tmp/pjproject
+          ./configure --prefix=/opt/pjproject --disable-video --disable-sdl \
+            --disable-ffmpeg --disable-v4l2 --disable-openh264
+          make dep
+          make -j2
+          sudo make install
+          echo 'PKG_CONFIG_PATH=/opt/pjproject/lib/pkgconfig' >> "$GITHUB_ENV"
+          PKG_CONFIG_PATH=/opt/pjproject/lib/pkgconfig pkg-config --modversion libpjproject | grep '^2\.14\.1$'
+
+      - name: Build and run PJSIP smoke test
+        working-directory: host
+        run: make daemon pjsip-smoke && ./pjsip-smoke "" ""
+
+      - name: Validate shell and systemd assets
+        run: |
+          find . -type f -name '*.sh' -print0 | xargs -0 shellcheck
+          systemd-analyze verify host/systemd/*.service host/systemd/*.timer
+          sudo nft --check --file host/firewall/millennium.nft
+
+      - name: Upload production daemon
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-daemon
+          path: host/daemon
+
+  firmware:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Arduino CLI and AVR core
+        run: |
+          curl -fsSLo /tmp/arduino-cli.tar.gz https://github.com/arduino/arduino-cli/releases/download/v1.5.1/arduino-cli_1.5.1_Linux_64bit.tar.gz
+          echo '28a8e119c498a25607821c36cb2dc49e8463941b261a0d99091baa7bc692dd2b  /tmp/arduino-cli.tar.gz' | sha256sum -c -
+          tar -xzf /tmp/arduino-cli.tar.gz -C /tmp
+          /tmp/arduino-cli core update-index
+          /tmp/arduino-cli core install arduino:avr@1.8.8
+
+      - name: Rebuild firmware reproducibly
+        working-directory: Arduino
+        run: make clean build ARDUINO_CLI=/tmp/arduino-cli
+
+      - name: Verify checked-in firmware is current
+        run: git diff --exit-code -- Arduino/build/keypad/keypad.ino.hex Arduino/build/display/display.ino.hex
+
+  pcb:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run source-level PCB guardrails
+        working-directory: pcb
+        run: make netlist-sync footprint-parity pinouts footprints
+      - name: Run ERC and DRC with pinned KiCad
+        run: |
+          docker run --rm --volume "$PWD:/work" --workdir /work/pcb kicad/kicad:9.0.9 sch erc phonev6.kicad_sch --output erc_report.txt --severity-error --exit-code-violations
+          docker run --rm --volume "$PWD:/work" --workdir /work/pcb kicad/kicad:9.0.9 pcb drc phonev6.kicad_pcb --output drc_report.txt --severity-error --exit-code-violations
+
+  release-evidence:
+    needs: [production-build, firmware, pcb, sanitizers]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: production-daemon
+          path: build/production
+      - name: Generate checksums, provenance, and SPDX SBOM
+        run: python3 tools/release_evidence.py --output-dir build/evidence --daemon build/production/daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-evidence
+          path: build/evidence
+      - name: Publish evidence with tagged releases
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1 || gh release create "${GITHUB_REF_NAME}" --generate-notes
+          gh release upload "${GITHUB_REF_NAME}" build/evidence/* --clobber
+
+  sanitizers:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev clang
+
+      - name: Run unit tests with ASan and UBSan
+        working-directory: host
+        run: |
+          make clean
+          make unit_tests CC=clang CFLAGS='-g -O1 -Wall -Wextra -std=gnu89 -Wdeclaration-after-statement -Werror -fsanitize=address,undefined -fno-omit-frame-pointer' UNIT_LDFLAGS='-lpthread -lasound -lm -fsanitize=address,undefined'
+          ./unit_tests
 
   # Formal verification: CBMC proofs and SPIN model checks.
   #

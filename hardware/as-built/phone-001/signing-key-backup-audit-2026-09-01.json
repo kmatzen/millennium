@@ -1,0 +1,23 @@
+{
+  "audit_at": "2026-09-01",
+  "ciphertext_sha256_sought": "a94302f82874284020aeca7b3ccc7543fb014e4207d4268e17aaa1b8aea9ccad",
+  "key_id": "release-2026-08",
+  "remediation": {
+    "ciphertext_sha256": "0d4b59b1b3ea3d9e9a6563ce033e8e3c6f8fa926a86c65ce1976c8c906f3b8ff",
+    "copies_verified": [
+      "local restricted recovery directory",
+      "anima /data/backups/millennium-signing-vault"
+    ],
+    "decrypted_public_key_der_sha256": "46d4ea8e2e8cf261816953b5c64f907840a5da84f50c3127011d4bbe1d77c946",
+    "disposable_signature_sha256": "0cac479b485782a6b1eb141f877be58cf3ac27fa3aff945baea90219ee0f09f8",
+    "plaintext_written_to_disk": false,
+    "recovery_drill_passed": true
+  },
+  "result": "online-copies-restored-offline-media-still-required",
+  "schema": 1,
+  "scope": [
+    "anima root filesystem and mounted /data, /data2, /data3 volumes",
+    "local Documents, .local, .config, .gnupg, and project trees"
+  ],
+  "statement": "The encrypted copies named by the 2026-08-31 recovery record were not found during a read-only live audit. Replacement ciphertext was created from the matching private key using the Keychain-held recovery secret, copied to local restricted storage and anima, checksum-verified at both locations, recovered without writing plaintext to disk, and used for a disposable sign/verify drill. These online copies restore recoverability but do not satisfy the separate removable/offline-media requirement."
+}

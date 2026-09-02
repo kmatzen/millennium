@@ -14,8 +14,9 @@
  * Build/run (needs libpjproject):
  *   make pjsip-smoke && ./pjsip_smoke
  *
- * `make pjsip-smoke` uses `pkg-config --libs libpjproject`, which is complete
- * for a source build (the Pi, or Linux). On macOS via `brew install pjproject`
+ * `make pjsip-smoke` uses `pkg-config --libs --static libpjproject`, which
+ * includes the private codec/TLS dependencies needed by a source build's
+ * static archives (the Pi, or Linux). On macOS via `brew install pjproject`
  * the generated .pc omits the bundled libsrtp/codec archives and the Apple
  * frameworks, so link those explicitly (see the bundled archives under
  * $(brew --prefix)/Cellar/pjproject/<ver>/lib plus -framework CoreAudio … ).

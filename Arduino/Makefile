@@ -11,7 +11,10 @@ ARDUINO_CLI ?= arduino-cli
 #   arduino-cli core install arduino:avr
 export ARDUINO_DIRECTORIES_USER = $(CURDIR)
 
-BUILD_ARGS =
+PROJECT_VERSION := $(shell cat ../VERSION)
+FIRMWARE_BUILD_ID ?= $(shell python3 ../tools/firmware_source_id.py)
+BUILD_ARGS = --build-property 'compiler.cpp.extra_flags=-DMILLENNIUM_FIRMWARE_VERSION="$(PROJECT_VERSION)" -DMILLENNIUM_FIRMWARE_BUILD="$(FIRMWARE_BUILD_ID)"'
+BUILD_CACHE ?= build/cache
 
 DISPLAY_FQBN = millennium:avr:millennium_beta
 KEYPAD_FQBN  = millennium:avr:millennium_alpha
@@ -28,11 +31,11 @@ build_display: build/display/display.ino.hex
 
 build/keypad/keypad.ino.hex build/keypad/keypad.ino.elf: sketches/keypad/keypad.ino
 	$(ARDUINO_CLI) compile --fqbn $(KEYPAD_FQBN) sketches/keypad \
-		$(BUILD_ARGS) --output-dir ./build/keypad
+		$(BUILD_ARGS) --build-path $(BUILD_CACHE)/keypad --output-dir ./build/keypad
 
 build/display/display.ino.hex build/display/display.ino.elf: sketches/display/display.ino
 	$(ARDUINO_CLI) compile --fqbn $(DISPLAY_FQBN) sketches/display \
-		$(BUILD_ARGS) --output-dir ./build/display
+		$(BUILD_ARGS) --build-path $(BUILD_CACHE)/display --output-dir ./build/display
 
 install_keypad: build/keypad/keypad.ino.hex
 	$(ARDUINO_CLI) upload -p $(KEYPAD_DEVICE) --fqbn $(KEYPAD_FQBN) \
@@ -44,7 +47,7 @@ install_display: build/display/display.ino.hex
 
 # Deploy to Pi via GPIO reset (build on Mac, sync, flash on Pi).
 # Requires raspi-gpio and avrdude on the Pi.
-DEPLOY_HOST ?= matzen@192.168.86.145
+DEPLOY_HOST ?= matzen@millennium-phone.local
 
 deploy_display: build/display/display.ino.hex
 	./deploy_display.sh $(DEPLOY_HOST)

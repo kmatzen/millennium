@@ -3,7 +3,7 @@
 # Usage: ./api_test.sh [HOST]
 #   HOST=localhost ./api_test.sh          # run on same machine as daemon
 #   ssh pi 'cd ~/millennium/host && make api-test'   # run on Pi
-#   HOST=192.168.86.145 ./api_test.sh     # run from another machine (if reachable)
+#   HOST=millennium-phone.local ./api_test.sh
 # Requires: curl
 
 set -e

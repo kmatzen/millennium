@@ -1,0 +1,5 @@
+# Dashboard requests can start only the audited OTA units; URLs and paths come
+# from root-owned /etc/millennium/ota.conf, never from an HTTP request.
+%millennium ALL=(root) NOPASSWD: /bin/systemctl start millennium-update-check.service
+%millennium ALL=(root) NOPASSWD: /bin/systemctl start millennium-update-apply.service
+%millennium ALL=(root) NOPASSWD: /bin/systemctl start --no-block millennium-update-apply.service

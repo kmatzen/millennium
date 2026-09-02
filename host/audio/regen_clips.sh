@@ -20,7 +20,7 @@
 #   VOICE_ID            default Sarah (EXAVITQu4vr4xnSDxMaL)
 #   MODEL_ID            default eleven_multilingual_v2
 #   OUTDIR              default <script dir>/out
-#   PI_HOST             default matzen@192.168.86.152   (for --deploy)
+#   PI_HOST             default matzen@millennium-phone.local (for --deploy)
 #   SSH_KEY             default ~/.ssh/id_ed25519_sk_anima_notouch
 #   CLIP_DIR            default /usr/local/share/millennium/audio  (on the Pi)
 #
@@ -31,7 +31,7 @@ MANIFEST="${MANIFEST:-$HERE/clips.manifest}"   # override to regen a subset
 OUTDIR="${OUTDIR:-$HERE/out}"
 VOICE_ID="${VOICE_ID:-EXAVITQu4vr4xnSDxMaL}"   # Sarah
 MODEL_ID="${MODEL_ID:-eleven_multilingual_v2}"
-PI_HOST="${PI_HOST:-matzen@192.168.86.152}"
+PI_HOST="${PI_HOST:-matzen@millennium-phone.local}"
 SSH_KEY="${SSH_KEY:-$HOME/.ssh/id_ed25519_sk_anima_notouch}"
 CLIP_DIR="${CLIP_DIR:-/usr/local/share/millennium/audio}"
 DEPLOY=0

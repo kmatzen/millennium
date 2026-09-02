@@ -1,0 +1,65 @@
+groups:
+  - name: millennium-phone
+    rules:
+      - alert: MillenniumPhoneMissing
+        expr: time() - millennium_last_checkin_timestamp_seconds > 300
+        for: 5m
+        labels: {severity: critical}
+        annotations: {summary: "Millennium phone has stopped checking in"}
+      - alert: MillenniumDaemonUnhealthy
+        expr: millennium_daemon_serving != 1
+        for: 2m
+        labels: {severity: critical}
+        annotations: {summary: "Millennium daemon is not serving"}
+      - alert: MillenniumSipUnregistered
+        expr: millennium_sip_registered != 1
+        for: 10m
+        labels: {severity: warning}
+        annotations: {summary: "Millennium SIP account is unregistered"}
+      - alert: MillenniumMaintenanceTunnelDown
+        expr: millennium_service_active{service="millennium-maintenance-tunnel.service"} != 1
+        for: 5m
+        labels: {severity: critical}
+        annotations: {summary: "Millennium remote-maintenance tunnel is down"}
+      - alert: MillenniumOtaFailure
+        expr: millennium_ota_error == 1
+        for: 1m
+        labels: {severity: warning}
+        annotations: {summary: "Millennium OTA failed or rolled back"}
+      - alert: MillenniumSerialDisconnects
+        expr: increase(millennium_serial_disconnects[15m]) > 0
+        labels: {severity: warning}
+        annotations: {summary: "Millennium display serial link disconnected"}
+      - alert: MillenniumMcuReset
+        expr: changes(millennium_mcu_resets_keypad[15m]) > 0 or changes(millennium_mcu_resets_display[15m]) > 0
+        labels: {severity: warning}
+        annotations: {summary: "A Millennium microcontroller reset"}
+      - alert: MillenniumFrequentReboot
+        expr: changes(millennium_boot_timestamp_seconds[1h]) > 2
+        labels: {severity: warning}
+        annotations: {summary: "Millennium phone rebooted repeatedly"}
+      - alert: MillenniumDiskLow
+        expr: millennium_root_filesystem_free_bytes < 536870912
+        for: 10m
+        labels: {severity: warning}
+        annotations: {summary: "Millennium root filesystem has less than 512 MiB free"}
+      - alert: MillenniumFilesystemErrors
+        expr: millennium_filesystem_errors_recent != 0
+        for: 1m
+        labels: {severity: critical}
+        annotations: {summary: "Millennium phone reports filesystem I/O errors"}
+      - alert: MillenniumBackupStale
+        expr: millennium_backup_age_seconds < 0 or millennium_backup_age_seconds > 129600
+        for: 1h
+        labels: {severity: warning}
+        annotations: {summary: "Millennium encrypted backup is missing or stale"}
+      - alert: MillenniumHilSmokeFailed
+        expr: millennium_hil_smoke_passed != 1 or millennium_hil_smoke_age_seconds < 0 or millennium_hil_smoke_age_seconds > 129600
+        for: 15m
+        labels: {severity: critical}
+        annotations: {summary: "Millennium nightly physical hardware smoke test failed or is stale"}
+      - alert: MillenniumCertificateExpiring
+        expr: millennium_update_certificate_days_remaining < 21
+        for: 1h
+        labels: {severity: warning}
+        annotations: {summary: "Millennium update certificate expires within 21 days"}

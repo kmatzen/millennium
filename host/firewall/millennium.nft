@@ -1,0 +1,8 @@
+#!/usr/sbin/nft -f
+
+table inet millennium_phone {
+    chain input {
+        type filter hook input priority filter; policy accept;
+        iifname != "lo" tcp dport 8081 counter drop comment "Millennium admin is tunnel-only"
+    }
+}

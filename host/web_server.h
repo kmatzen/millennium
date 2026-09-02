@@ -78,6 +78,9 @@ struct rate_limit_info {
 /* WebServer structure */
 struct web_server {
     int port;
+    char bind_address[64];
+    char admin_token[256];
+    char allowed_origin[256];
     int running;
     int should_stop;
     int paused;
@@ -120,6 +123,9 @@ struct web_server {
 
 /* WebServer API functions */
 struct web_server* web_server_create(int port);
+void web_server_set_bind_address(struct web_server* server, const char* address);
+void web_server_set_admin_token(struct web_server* server, const char* token);
+void web_server_set_allowed_origin(struct web_server* server, const char* origin);
 void web_server_destroy(struct web_server* server);
 void web_server_start(struct web_server* server);
 void web_server_stop(struct web_server* server);
@@ -181,6 +187,7 @@ struct http_response web_server_handle_api_plugins(const struct http_request* re
 struct http_response web_server_handle_api_update(const struct http_request* request);
 struct http_response web_server_handle_api_version(const struct http_request* request);
 struct http_response web_server_handle_api_check_update(const struct http_request* request);
+struct http_response web_server_handle_api_update_status(const struct http_request* request);
 struct http_response web_server_handle_dashboard(const struct http_request* request);
 
 /* Utility functions */
@@ -189,6 +196,8 @@ int web_server_is_ringing(void);
 int web_server_is_high_priority_state(void);
 int web_server_is_audio_active(void);
 int web_server_check_rate_limit(struct web_server* server, const char* client_ip, const char* endpoint);
+int web_server_request_is_admin_authorized(const struct web_server* server,
+                                           const struct http_request* request);
 struct http_response web_server_create_rate_limit_response(void);
 
 /* String utility functions */

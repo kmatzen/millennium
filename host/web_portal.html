@@ -412,6 +412,16 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:9001;
     <div class="rows" id="config" style="columns:2;column-gap:34px"><div class="muted">loading…</div></div>
   </section>
 
+  <!-- SIGNED OTA -->
+  <section class="panel col-4">
+    <div class="phead"><span class="bar"></span><h2>Software Update</h2><span class="tag">OTA</span></div>
+    <div class="rows"><div class="row"><span class="rk">Status</span><span class="dots"></span><span class="rval" id="ota-status">not checked</span></div></div>
+    <div class="btns">
+      <button class="btn primary" id="ota-check">Check</button>
+      <button class="btn good" id="ota-apply" disabled>Install</button>
+    </div>
+  </section>
+
   <!-- LOGS -->
   <section class="panel col-12">
     <div class="phead"><span class="bar"></span><h2>System Log</h2><span class="tag">JRNL · INFO</span></div>
@@ -436,9 +446,15 @@ let timer=null, autoOn=true;
 /* ===================== helpers ===================== */
 const $=id=>document.getElementById(id);
 async function jget(u){const r=await fetch(u);if(!r.ok)throw new Error(r.status);return r.json();}
+function adminHeaders(){
+  let token=sessionStorage.getItem('millenniumAdminToken');
+  if(!token){token=window.prompt('Administrator token');if(token)sessionStorage.setItem('millenniumAdminToken',token);}
+  return {'Content-Type':'application/json','Authorization':'Bearer '+(token||'')};
+}
 async function ctl(action,extra){
-  const r=await fetch('/api/control',{method:'POST',headers:{'Content-Type':'application/json'},
+  const r=await fetch('/api/control',{method:'POST',headers:adminHeaders(),
     body:JSON.stringify(Object.assign({action},extra||{}))});
+  if(r.status===401)sessionStorage.removeItem('millenniumAdminToken');
   return r.json();
 }
 function setLed(el,cls){el.className='led'+(cls?' '+cls:'');}
@@ -623,6 +639,32 @@ document.addEventListener('click',async ev=>{
   }
 });
 $('refresh').addEventListener('click',()=>autoOn?stopLoop():startLoop());
+
+async function checkUpdate(){
+  $('ota-check').disabled=true;$('ota-status').textContent='checking signature…';
+  try{
+    let d=await jget('/api/check-update');
+    for(let i=0;i<15&&d.checking;i++){
+      await new Promise(resolve=>setTimeout(resolve,1000));
+      d=await jget('/api/update-status');
+    }
+    $('ota-status').textContent=d.checking?'check still running':d.update_available?`v${d.latest_version} available`:'up to date';
+    $('ota-apply').disabled=!d.update_available;
+  }catch(e){$('ota-status').textContent='check failed';toast('Update check failed: '+e.message,'error');}
+  finally{$('ota-check').disabled=false;}
+}
+$('ota-check').addEventListener('click',checkUpdate);
+$('ota-apply').addEventListener('click',async()=>{
+  if(!confirm('Install the signed update? The phone will briefly restart.'))return;
+  $('ota-apply').disabled=true;$('ota-status').textContent='installation requested…';
+  try{
+    const response=await fetch('/api/update',{method:'POST',headers:adminHeaders(),body:'{}'});
+    if(response.status===401)sessionStorage.removeItem('millenniumAdminToken');
+    const data=await response.json();
+    $('ota-status').textContent=data.status||'request sent';
+    toast(data.status||'Update request sent',response.ok?'success':'error');
+  }catch(e){$('ota-status').textContent='request failed';toast('Update failed: '+e.message,'error');}
+});
 
 /* clock */
 setInterval(()=>{$('ro-clock').textContent=new Date().toLocaleTimeString();},1000);

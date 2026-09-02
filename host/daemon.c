@@ -29,6 +29,7 @@
 #include <fcntl.h>
 #include <pthread.h>
 #include <stdarg.h>
+#include <sys/stat.h>
 
 #define EVENT_CATEGORIES 3
 #define DISPLAY_WIDTH 20
@@ -53,6 +54,45 @@ char line2[MAX_STRING_LEN];
 
 /* State persistence */
 static const char *state_file_path = NULL;
+
+static int load_admin_token(const char* path, char* token, size_t token_size) {
+    FILE* file;
+    struct stat st;
+    size_t len;
+    if (!path || !path[0] || !token || token_size < 2) return 0;
+    token[0] = '\0';
+    if (stat(path, &st) != 0) {
+        logger_errorf_with_category("WebServer", "Cannot stat admin token file %s", path);
+        return 0;
+    }
+    if ((st.st_mode & (S_IRWXG | S_IRWXO)) != 0) {
+        logger_errorf_with_category("WebServer",
+            "Admin token file %s must not be accessible by group or others", path);
+        return 0;
+    }
+    file = fopen(path, "r");
+    if (!file) {
+        logger_errorf_with_category("WebServer", "Cannot read admin token file %s", path);
+        return 0;
+    }
+    if (!fgets(token, (int)token_size, file)) {
+        fclose(file);
+        token[0] = '\0';
+        return 0;
+    }
+    fclose(file);
+    len = strlen(token);
+    while (len > 0 && (token[len - 1] == '\n' || token[len - 1] == '\r' ||
+                       token[len - 1] == ' ' || token[len - 1] == '\t'))
+        token[--len] = '\0';
+    if (len < 32) {
+        logger_error_with_category("WebServer",
+            "Admin token must contain at least 32 characters");
+        token[0] = '\0';
+        return 0;
+    }
+    return 1;
+}
 
 /* Thread synchronization */
 pthread_mutex_t running_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -653,7 +693,7 @@ void handle_card_event(card_event_t *card_event) {
     }
     VALIDATE_BASICS();
 
-    logger_infof_with_category("Card", "Card swiped: %.4s...", card_event->card_number);
+    logger_info_with_category("Card", "Credential card swiped");
     metrics_increment_counter("card_swipes", 1);
 
     plugins_handle_card(card_event->card_number);
@@ -1156,6 +1196,18 @@ int main(int argc, char *argv[]) {
     
     /* Initialize client */
     client = millennium_client_create();
+    if (!client) {
+        /* (#263) Almost always the serial device not being there yet -- the Pi
+         * reaching this point before USB enumeration finishes, or a restart
+         * landing while a Micro is mid-reflash. Exit cleanly and let systemd
+         * retry, which is what already happened; the difference is that this
+         * used to be a SEGV, because millennium_client_update() dereferences
+         * the client with no NULL guard. A crash here is indistinguishable
+         * from a real memory fault and hides one. */
+        logger_error_with_category("Daemon",
+            "Client init failed (serial device unavailable?); exiting for restart");
+        return 1;
+    }
     display_manager_init(client);
     
     /* Initialize health monitoring */
@@ -1184,10 +1236,33 @@ int main(int argc, char *argv[]) {
     
     /* Start web server if enabled */
     if (config_get_web_server_enabled(config)) {
+        char admin_token[256];
         web_server = web_server_create(config_get_web_server_port(config));
-        
+        if (!web_server) {
+            logger_error_with_category("Daemon", "Could not create web server");
+            return 1;
+        }
+        web_server_set_bind_address(web_server,
+            config_get_web_server_bind_address(config));
+        web_server_set_allowed_origin(web_server,
+            config_get_web_server_allowed_origin(config));
+        if (!load_admin_token(config_get_web_server_admin_token_file(config),
+                              admin_token, sizeof(admin_token))) {
+            logger_error_with_category("Daemon",
+                "Refusing to start web server without a secure admin token");
+            web_server_destroy(web_server);
+            web_server = NULL;
+            return 1;
+        }
+        web_server_set_admin_token(web_server, admin_token);
+        memset(admin_token, 0, sizeof(admin_token));
+
         /* Add the web portal as a file route (streaming) */
-        web_server_add_file_route(web_server, "/", "/usr/local/share/millennium/web_portal.html", "text/html");
+        web_server_add_file_route(web_server, "/",
+            access("/opt/millennium/current/host/web_portal.html", R_OK) == 0
+                ? "/opt/millennium/current/host/web_portal.html"
+                : "/usr/local/share/millennium/web_portal.html",
+            "text/html");
         
         web_server_start(web_server);
         logger_infof_with_category("Daemon", "Web server started on port %d", 

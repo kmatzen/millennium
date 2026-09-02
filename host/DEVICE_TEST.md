@@ -36,7 +36,8 @@ export HOST=raspberrypi.local
 make api-test
 ```
 
-> `make device-test` is a shortcut that hardwires the old `192.168.86.145`
+> `make device-test` defaults to `millennium-phone.local`; override it with
+> `DEVICE_HOST=<hostname>` when testing another lab device.
 > address — only use it if the Pi still happens to live there. Prefer
 > `make api-test HOST=...` with the current address.
 

@@ -1,0 +1,15 @@
+#!/usr/sbin/nft -f
+
+table inet millennium_wifi_setup {
+    chain input {
+        type filter hook input priority -5; policy accept;
+        iifname "wlan0" udp dport { 53, 67 } accept comment "Setup DHCP and DNS"
+        iifname "wlan0" tcp dport { 53, 80 } accept comment "Setup DNS and portal"
+        iifname "wlan0" drop comment "Setup clients cannot reach device services"
+    }
+    chain forward {
+        type filter hook forward priority -5; policy accept;
+        iifname "wlan0" drop comment "Setup clients cannot reach LAN or Internet"
+        oifname "wlan0" drop comment "No forwarding into setup network"
+    }
+}

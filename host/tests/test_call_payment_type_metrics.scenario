@@ -11,7 +11,7 @@
 # Default config: call.cost_cents=50, call.free_numbers includes 911, and card
 # support is enabled, so each path is reachable without extra setup beyond a
 # registered free calling card.
-config card.free_cards 1234567890123456
+config card.free_tokens 1234567890123456
 
 # ── 1) Emergency / free-number call: dial 911 with no coins ───────────────
 hook_up

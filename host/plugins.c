@@ -38,6 +38,7 @@ void plugins_init(void) {
     register_dial_a_joke_plugin();
     register_trivia_plugin();
     register_time_operator_plugin();
+    register_story_mode_plugin();
 
     /* Activate classic phone by default */
     plugins_activate("Classic Phone");

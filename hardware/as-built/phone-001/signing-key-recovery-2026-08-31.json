@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "key_id": "release-2026-08",
+  "completed_at": "2026-08-31T17:03:00Z",
+  "operator": "kmatzen",
+  "method": "AES-256-CBC PBKDF2, 600000 iterations; random recovery secret in macOS Keychain",
+  "public_key_sha256": "581a1ff72d1867b3dfb3b1ffc5521308ac646878050f1c4c12739e0dedaf7348",
+  "ciphertext_sha256": "a94302f82874284020aeca7b3ccc7543fb014e4207d4268e17aaa1b8aea9ccad",
+  "disposable_signature_sha256": "ba6df3b499a27bc9005fda435147b1ac82fd062ae0062c8d47532e09c6667786",
+  "passed": true,
+  "plaintext_storage": "temporary RAM disk, destroyed after verification",
+  "copies": [
+    "local restricted recovery vault",
+    "anima restricted signing-key vault"
+  ],
+  "note": "A YubiKey OpenPGP-encrypted copy also exists, but its recovery drill remains pending because the supplied OpenPGP PIN was rejected."
+}

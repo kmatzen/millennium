@@ -1,0 +1,18 @@
+# The Wi-Fi recovery gesture requires a provisioned owner/admin token and
+# deliberate 0, # confirmation with the handset lifted.
+config card.admin_tokens 9876543210987654
+config wifi.setup_request_path /tmp/millennium_wifi_request_test
+clear_wifi_request
+activate_plugin Classic Phone
+hook_up
+card 9876543210987654
+assert_display OWNER TOKEN
+assert_display PRESS 0 FOR WIFI
+key 0
+assert_display START WIFI SETUP?
+assert_display PRESS # TO CONFIRM
+key #
+assert_display WIFI SETUP
+assert_display STARTING...
+assert_wifi_request
+clear_wifi_request

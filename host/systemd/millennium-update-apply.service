@@ -1,0 +1,12 @@
+[Unit]
+Description=Apply a pending signed Millennium update
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/libexec/millennium-ota apply
+ExecStopPost=/bin/systemctl start daemon.service
+User=root
+Group=root
+TimeoutStartSec=10min

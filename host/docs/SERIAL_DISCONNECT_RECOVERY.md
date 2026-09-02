@@ -63,13 +63,21 @@ T+120  current_state 4, health HEALTHY
 The call was unaffected throughout and the display returned to the correct
 call state without intervention.
 
-## Display Re-sync on Reconnect
+## MCU Readiness and State Re-sync on Reconnect
 
 When `open_serial_port` succeeds:
 
-1. `client->display_dirty = 1` is set if `client->display_message` exists.
-2. `millennium_client_update` writes `display_message` to the display on the next cycle (throttled to ~33ms).
-3. `display_message` is kept current by `display_manager_tick`, which is driven by the main loop. So it contains the latest "Call active | X:XX remaining" (or whatever the plugin last set) even while disconnected.
+1. Opening Beta's Arduino Micro serial port resets the board. The daemon keeps
+   the descriptor open for a 10-second readiness window and retries protocol
+   `HELLO` once per second while the bootloader and sketch start.
+2. Coin and display commands remain deferred until Beta answers `HELLO`. This
+   prevents an early command from being lost and, critically, prevents a short
+   negotiation timeout from closing and reopening the port in a reset loop.
+3. Once the protocol is ready, the daemon replays the desired coin-gate state
+   and marks the current display message dirty.
+4. `millennium_client_update` writes that display message on the next cycle
+   (throttled to ~33ms). `display_manager_tick` keeps it current while the link
+   is unavailable.
 
 **Result**: After reconnect, the display shows the correct state (e.g. "Call active | 2:15 remaining") because the SDK re-sends the last display content.
 
@@ -113,7 +121,9 @@ still set must resolve to `MARK_DEAD`, never `NONE`.
 
 Policy: covered by the `Serial Recovery` unit suite (`make test`), including the
 keepalive/watchdog boundaries, that retries never give up while the link is down,
-and that the backoff stays in range for an unbounded outage.
+that the backoff stays in range for an unbounded outage, and that an Arduino boot
+holds one descriptor open while retrying `HELLO` instead of repeatedly resetting
+the board.
 
 Execution: still needs hardware. Unbinding the display Arduino from its driver on
 the Pi drives a real disconnect without touching the cable:

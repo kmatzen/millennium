@@ -1,0 +1,65 @@
+{
+  "schema": 1,
+  "audit_at": "2026-09-02T04:04:35Z",
+  "device_id": "phone-001",
+  "software_lab": {
+    "result": "passed",
+    "commit": "c16c576",
+    "evidence": "tools/qemu/state/artifacts/full-20260902T035429Z/full-test-result.json",
+    "physical_hardware_claimed": false
+  },
+  "remaining_gates": {
+    "signing_key_offline_media": {
+      "status": "requires-two-removable-media",
+      "mounted_external_volumes_observed": 0,
+      "online_encrypted_copies_verified": true,
+      "recovery_drill_verified": true,
+      "evidence": "signing-key-backup-audit-2026-09-01.json"
+    },
+    "physical_wifi_clients": {
+      "status": "requires-operator-and-real-radio",
+      "required_clients": ["iOS", "Android", "macOS", "Windows"],
+      "automated_model_passed": true
+    },
+    "physical_power_and_brownout": {
+      "status": "requires-operator-and-instrumentation",
+      "required_interruptions": [
+        "cold boot",
+        "ringer/audio peak",
+        "coin validator operation",
+        "controlled brownout",
+        "idle power loss",
+        "active-call power loss",
+        "content-save power loss",
+        "OTA download interruption",
+        "MCU flash interruption",
+        "host activation interruption"
+      ],
+      "software_fault_model_passed": true
+    },
+    "external_maintenance_vantage": {
+      "status": "requires-external-network-and-working-local-FIDO-provider",
+      "reverse_tunnel_previously_verified": true,
+      "audit_attempt": "Local OpenSSH in the automation environment could not load security-key support; authentication policy was not weakened.",
+      "evidence": "maintenance-access-audit-2026-09-01.json"
+    },
+    "physical_as_built_observations": {
+      "status": "requires-physical-inspection",
+      "missing": [
+        "asset label",
+        "owner/location inventory reference",
+        "installed PCB revision",
+        "wiring deviations",
+        "power supply ratings",
+        "assembly photographs"
+      ]
+    },
+    "first_time_caller_playtest": {
+      "status": "requires-two-uncoached-participants",
+      "content": "last-line-2.1.0",
+      "template": "playtest-last-line-2.1.0.json",
+      "automated_story_matrix_passed": true
+    }
+  },
+  "goal_complete": false
+}

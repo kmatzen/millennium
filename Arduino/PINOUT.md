@@ -100,41 +100,29 @@ keypad PCB (volume, language, etc.).
 ## I2C Bus
 
 - **Master**: Keypad Arduino (A1) via `Wire.begin()`
-- **Slave**: Display Arduino (A2) via `Wire.begin(0)`
-- **Address**: 0 (general call address — see known issue below)
+- **Slave**: Display Arduino (A2) via `Wire.begin(8)`
+- **Address**: 8 (`I2C_DISPLAY_ADDR` on both controllers)
 - **Pull-ups**: External pull-ups required on SDA/SCL (check PCB)
 
 ### Protocol (Keypad → Display → Pi)
 
-The keypad Arduino sends short I2C messages to the display Arduino. The display
-Arduino's `receiveEvent` ISR immediately forwards each byte over USB serial to
-the Pi.
-
-| Event       | I2C Bytes                    | USB Serial to Pi      |
-|-------------|------------------------------|-----------------------|
-| Key press   | `K` + key char (e.g. `K5`)   | `K5`                  |
-| Hook up     | `H` `U`                      | `HU`                  |
-| Hook down   | `H` `D`                      | `HD`                  |
-| Card swipe  | `C` + PAN (up to 16 chars)   | `C1234567890123456`   |
+The keypad Arduino sends complete protocol-v2 frames over I2C. The display
+Arduino's `receiveEvent` ISR forwards each byte unchanged over USB serial to the
+Pi. Key, hook, credential, and diagnostic types are defined in
+[`../docs/MCU_PROTOCOL.md`](../docs/MCU_PROTOCOL.md). The Wire buffer limits an
+Alpha frame to 32 bytes and its credential payload to 24 bytes.
 
 ### Pi → Display Arduino (USB Serial)
 
-| Command   | Bytes                        | Action                                          |
-|-----------|------------------------------|-------------------------------------------------|
-| Display   | `0x02` + length + data bytes | Clear and write text to VFD                     |
-| Coin cmd  | `0x03` + byte                | Send byte to coin validator (`@` = reset)       |
-| EEPROM    | `0x04`                       | Program coin validator EEPROM (256 bytes)       |
-| Verify    | `0x05`                       | Read back and verify coin validator EEPROM      |
-| Keepalive | `0x06`                       | No-op; resets serial watchdog when idle (#59)   |
+All commands use the versioned frame described in `docs/MCU_PROTOCOL.md`.
+Display, coin control, EEPROM program, and EEPROM verify are types `0x10`–`0x13`;
+keepalive is `0x14`. Critical commands are acknowledged by sequence number and
+replays are not executed twice.
 
 ### Coin Validator → Pi
 
 When the coin validator sends a byte over SoftwareSerial, the display Arduino
-prefixes it with `V` and forwards over USB serial:
-
-| USB Serial | Meaning                                             |
-|------------|-----------------------------------------------------|
-| `V` + byte | Coin validator event (byte value encodes coin type) |
+wraps it as a `MCU_EVT_COIN` (`0x23`) frame and forwards it over USB serial.
 
 ## Custom Board Definitions
 

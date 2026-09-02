@@ -5,31 +5,45 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-# Run as user who has ~/.baresip/ (accounts, config). make install creates daemon.service.d/override.conf with User=<you>
-# Wrapper: redirect stdin before exec. Baresip/libre epolls fd 0; systemd's fd 0 causes EPERM and SEGV.
-ExecStart=/bin/sh -c 'exec 0</dev/null; exec /usr/local/bin/millennium-daemon --config /etc/millennium/daemon.conf'
-# Optional: wait for network before starting
-ExecStartPre=/bin/bash -c 'for i in $(seq 1 60); do /bin/ping -c1 -W1 8.8.8.8 >/dev/null 2>/dev/null && break; sleep 1; done'
+# The daemon starts offline and lets SIP reconnect when networking becomes
+# available. Waiting on a public ICMP endpoint made boot depend on 8.8.8.8.
+ExecStart=/usr/local/bin/millennium-daemon --config /etc/millennium/daemon.conf
 Restart=on-failure
 RestartSec=2
-WorkingDirectory=/tmp
-# Baresip/libre tries to use stdin for UI; systemd gives none.
+WorkingDirectory=/var/lib/millennium
 StandardInput=null
 StandardOutput=journal
 StandardError=journal
-# Relax hardening: epoll_ctl on fd 0 can fail with EPERM under default systemd
 PrivateDevices=no
-ProtectSystem=no
-NoNewPrivileges=no
+DevicePolicy=closed
+DeviceAllow=char-alsa rw
+DeviceAllow=/dev/ttyACM0 rw
+DeviceAllow=/dev/ttyACM1 rw
+DeviceAllow=/dev/ttyACM2 rw
+DeviceAllow=/dev/ttyACM3 rw
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+NoNewPrivileges=true
+UMask=0077
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+RestrictSUIDSGID=true
+RestrictRealtime=false
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+LockPersonality=true
+ReadWritePaths=/var/lib/millennium /var/log/millennium
 # Capabilities for the non-root daemon user (User= comes from the install-time
 # daemon.service.d/override.conf):
-#   CAP_NET_BIND_SERVICE — bind the web dashboard on privileged port 80
 #   CAP_SYS_NICE + CAP_IPC_LOCK / LimitRTPRIO + LimitMEMLOCK — real-time audio
 #     scheduling and mlock for the ALSA threads
-AmbientCapabilities=CAP_NET_BIND_SERVICE CAP_SYS_NICE CAP_IPC_LOCK
+AmbientCapabilities=CAP_SYS_NICE CAP_IPC_LOCK
+CapabilityBoundingSet=CAP_SYS_NICE CAP_IPC_LOCK
 LimitRTPRIO=99
-LimitMEMLOCK=infinity
+LimitMEMLOCK=64M
 
 [Install]
 WantedBy=default.target
-

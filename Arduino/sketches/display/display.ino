@@ -6,27 +6,28 @@
 #include <SoftwareSerial.h>
 #include <Wire.h>
 #include <avr/wdt.h>
+#include <MillenniumProtocol.h>
 
+#ifndef MILLENNIUM_FIRMWARE_VERSION
+#define MILLENNIUM_FIRMWARE_VERSION "0.0.0-development"
+#endif
+#ifndef MILLENNIUM_FIRMWARE_BUILD
+#define MILLENNIUM_FIRMWARE_BUILD "unknown"
+#endif
 #define I2C_DISPLAY_ADDR 8
 
-/* Pi -> Display serial commands */
-#define CMD_DISPLAY_TEXT  0x02
-#define CMD_COIN_CTRL     0x03
-#define CMD_COIN_PROGRAM  0x04
-#define CMD_COIN_VERIFY   0x05
-#define CMD_KEEPALIVE     0x06  /* Pi->Arduino: no-op, resets serial watchdog (#59) */
+/* Legacy raw query retained only for the offline OTA attestation helper. */
+#define CMD_IDENTITY      0x07  /* OTA attestation query */
 
-/* I2C event prefixes (keypad -> display -> Pi) */
-#define EVT_KEY        'K'
-#define EVT_HOOK_UP    "HU"
-#define EVT_HOOK_DOWN  "HD"
-#define EVT_CARD       'C'
-#define EVT_COIN_DATA  'V'
-#define EVT_DIAG       'G'   /* (#230) diagnostics: 'G' + 'B' + 3 ASCII digits.
-                                * Not 'X' -- that is this sketch's own serial
-                                * timeout response, and a marker collision makes
-                                * the host eat the events behind it (#259). */
-#define EVT_HEARTBEAT  'P'
+/* Captured before the Arduino runtime or boot-time watchdog can clear MCUSR. */
+uint8_t previousResetCause __attribute__((section(".noinit")));
+void captureResetCause(void) __attribute__((naked, section(".init3")));
+void captureResetCause(void) {
+  previousResetCause = MCUSR;
+  MCUSR = 0;
+  wdt_disable();
+}
+static bool resetCauseReported = false;
 
 #define HEARTBEAT_INTERVAL_MS 10000UL
 
@@ -92,21 +93,8 @@ byte coinEeprom[] = {
 
 /* I2C rx buffer: 64 bytes. Wire lib on AVR uses 32-byte hw buffer.
  * Host must keep commands under this limit (#134). */
-/* (#230 item 3) Sized against the worst case a blocked main loop can face.
- *
- * A VFD repaint blocks this loop for ~192 ms (vfdreset 12 ms + delay(100) +
- * ~2 ms per character), and the coin-validator reset for ~2 s. The TWI ISR
- * keeps running throughout -- nothing here disables interrupts, and AVR
- * delay() does not either -- so Alpha's messages are still ACKed and still
- * land in this ring. What stops for that window is the drain into USB, so the
- * ring is the only thing standing between a long repaint and a lost message.
- *
- * Alpha sends at most 17 bytes per message (a card PAN); keypresses and hook
- * changes are 2. At 256 the ring absorbs ~15 card swipes or 128 keypresses
- * inside a single repaint, which is far past anything a person can produce.
- * At the previous 64 it was ~3 swipes -- still ample, but the margin was
- * reasoned rather than generous, and 192 bytes of SRAM is cheap insurance on a
- * board sitting at 30% usage.
+/* Sized to hold multiple complete Wire frames while USB is briefly
+ * backpressured. Long display and coin work is now cooperative.
  *
  * Keep this <= 256: i2cHead/i2cTail are bytes. */
 #define I2C_BUF_SIZE 256
@@ -129,16 +117,35 @@ static unsigned long lastOverflowReport = 0;
 static const unsigned long OVERFLOW_REPORT_INTERVAL_MS = 30000;
 
 static unsigned long lastHeartbeat = 0;
+static MillenniumDecoder protocolDecoder;
+static uint8_t protocolSequence = 0;
+static bool lastDisplayCommandValid = false;
+static bool lastCoinCommandValid = false;
+static uint8_t lastDisplayCommandSequence = 0;
+static uint8_t lastCoinCommandSequence = 0;
+
+enum DisplayOperation { DISPLAY_IDLE, DISPLAY_RESET_HIGH, DISPLAY_RESET_LOW,
+                        DISPLAY_WAIT_CLEAR, DISPLAY_WRITE_CONTROL, DISPLAY_WRITE_TEXT };
+static DisplayOperation displayOperation = DISPLAY_IDLE;
+static uint8_t displayBuffer[100];
+static uint8_t displayLength = 0;
+static uint8_t displayIndex = 0;
+static uint8_t displayControl = 0;
+static uint8_t displayTransaction = 0;
+static unsigned long displayNext = 0;
+static unsigned long displayDeadline = 0;
+
+enum CoinOperation { COIN_IDLE, COIN_RESET_LOW, COIN_RESET_HIGH, COIN_CONTROL_WAIT,
+                     COIN_PROGRAM, COIN_VERIFY_SEND, COIN_VERIFY_WAIT };
+static CoinOperation coinOperation = COIN_IDLE;
+static uint16_t coinIndex = 0;
+static uint8_t coinStep = 0;
+static uint8_t coinTransaction = 0;
+static unsigned long coinNext = 0;
+static unsigned long coinDeadline = 0;
+static unsigned long coinByteDeadline = 0;
 
 const unsigned long SERIAL_TIMEOUT_MS = 2000;
-
-static bool waitForSerial() {
-  unsigned long start = millis();
-  while (!SerialUSB.available()) {
-    if (millis() - start > SERIAL_TIMEOUT_MS) return false;
-  }
-  return true;
-}
 
 void setup() {
   SerialUSB.begin(9600);
@@ -210,9 +217,241 @@ void vfdreset() {
   delay(10);
 }
 
-void loop() {
-  wdt_reset();
+static void sendFrame(uint8_t type, const uint8_t *payload, uint8_t length) {
+  uint8_t frame[MILLENNIUM_PROTOCOL_MAX_FRAME];
+  size_t frameLength = millenniumEncode(type, protocolSequence++, payload, length,
+                                        frame, sizeof(frame));
+  if (frameLength) SerialUSB.write(frame, frameLength);
+}
 
+static void sendAck(uint8_t sequence, uint8_t status) {
+  uint8_t payload[2] = {sequence, status};
+  sendFrame(MCU_MSG_ACK, payload, sizeof(payload));
+}
+
+static void sendOperation(char code, uint8_t transaction,
+                          const uint8_t *details, uint8_t length) {
+  uint8_t payload[5];
+  if (length > 3) length = 3;
+  payload[0] = (uint8_t)code;
+  payload[1] = transaction;
+  if (length) memcpy(payload + 2, details, length);
+  sendFrame(MCU_EVT_OPERATION, payload, length + 2);
+}
+
+static void sendResetCause() {
+  uint8_t payload[4];
+  unsigned int n;
+  if (resetCauseReported) return;
+  n = previousResetCause;
+  payload[0] = 'D';
+  payload[1] = '0' + (n / 100) % 10;
+  payload[2] = '0' + (n / 10) % 10;
+  payload[3] = '0' + n % 10;
+  sendFrame(MCU_EVT_DIAGNOSTIC, payload, sizeof(payload));
+  resetCauseReported = true;
+}
+
+static void printIdentity() {
+  SerialUSB.println(F("MILLENNIUM role=display version=" MILLENNIUM_FIRMWARE_VERSION
+                      " protocol=" MILLENNIUM_PROTOCOL_VERSION_STRING
+                      " build=" MILLENNIUM_FIRMWARE_BUILD " selftest=ok"));
+  SerialUSB.print(F("reset_cause="));
+  SerialUSB.println(previousResetCause);
+}
+
+static bool timeReached(unsigned long target) {
+  return (long)(millis() - target) >= 0;
+}
+
+static void startDisplay(const MillenniumFrame &frame) {
+  displayLength = frame.length;
+  memcpy(displayBuffer, frame.payload, frame.length);
+  displayIndex = 0;
+  displayControl = 0;
+  displayTransaction = frame.sequence;
+  displayDeadline = millis() + 5000UL;
+  digitalWrite(RESET, HIGH);
+  displayNext = millis() + 2UL;
+  displayOperation = DISPLAY_RESET_HIGH;
+}
+
+static void serviceDisplay() {
+  if (displayOperation == DISPLAY_IDLE) return;
+  if (timeReached(displayDeadline)) {
+    sendOperation('X', displayTransaction, NULL, 0);
+    displayOperation = DISPLAY_IDLE;
+    return;
+  }
+  if (!timeReached(displayNext)) return;
+  if (displayOperation == DISPLAY_RESET_HIGH) {
+    digitalWrite(RESET, LOW);
+    displayNext = millis() + 10UL;
+    displayOperation = DISPLAY_RESET_LOW;
+  } else if (displayOperation == DISPLAY_RESET_LOW) {
+    displayNext = millis() + 100UL;
+    displayOperation = DISPLAY_WAIT_CLEAR;
+  } else if (displayOperation == DISPLAY_WAIT_CLEAR) {
+    displayControl = 0;
+    displayOperation = DISPLAY_WRITE_CONTROL;
+  } else if (displayOperation == DISPLAY_WRITE_CONTROL) {
+    writeCharacter(displayControl++ == 0 ? 20u : 18u);
+    if (displayControl >= 2) displayOperation = DISPLAY_WRITE_TEXT;
+    displayNext = millis();
+  } else if (displayOperation == DISPLAY_WRITE_TEXT) {
+    if (displayIndex < displayLength) {
+      uint8_t value = displayBuffer[displayIndex++];
+      writeCharacter(value == 0x0A ? 13 : value);
+      displayNext = millis();
+    }
+    if (displayIndex >= displayLength) {
+      sendOperation('R', displayTransaction, NULL, 0);
+      displayOperation = DISPLAY_IDLE;
+    }
+  }
+}
+
+static void finishCoin(char code) {
+  sendOperation(code, coinTransaction, NULL, 0);
+  coinOperation = COIN_IDLE;
+}
+
+static void startCoinProgram(uint8_t transaction) {
+  coinTransaction = transaction;
+  coinIndex = 0;
+  coinStep = 0;
+  coinNext = millis();
+  coinDeadline = millis() + 45000UL;
+  coinOperation = COIN_PROGRAM;
+  sendOperation('A', transaction, NULL, 0);
+}
+
+static void startCoinVerify(uint8_t transaction) {
+  coinTransaction = transaction;
+  coinIndex = 0;
+  coinStep = 0;
+  coinNext = millis();
+  coinDeadline = millis() + 600000UL;
+  coinOperation = COIN_VERIFY_SEND;
+  sendOperation('D', transaction, NULL, 0);
+}
+
+static void serviceCoin() {
+  static const uint8_t programPrefix[4] = {'E', 'A', 'P', 'w'};
+  if (coinOperation == COIN_IDLE) return;
+  if (timeReached(coinDeadline)) {
+    finishCoin('X');
+    return;
+  }
+  if (coinOperation == COIN_RESET_LOW && timeReached(coinNext)) {
+    digitalWrite(coinResetPin, HIGH);
+    coinNext = millis() + 1000UL;
+    coinOperation = COIN_RESET_HIGH;
+  } else if ((coinOperation == COIN_RESET_HIGH || coinOperation == COIN_CONTROL_WAIT) &&
+             timeReached(coinNext)) {
+    finishCoin('R');
+  } else if (coinOperation == COIN_PROGRAM && timeReached(coinNext)) {
+    if (coinStep < 4) coinSerialDevice.write(programPrefix[coinStep]);
+    else if (coinStep == 4) coinSerialDevice.write(lowByte(coinIndex));
+    else coinSerialDevice.write(coinEeprom[coinIndex]);
+    coinStep++;
+    coinNext = millis() + 20UL;
+    if (coinStep >= 6) {
+      coinStep = 0;
+      coinIndex++;
+      if (coinIndex >= 256) finishCoin('B');
+    }
+  } else if (coinOperation == COIN_VERIFY_SEND && timeReached(coinNext)) {
+    while (coinSerialDevice.available()) coinSerialDevice.read();
+    if (coinStep == 0) coinSerialDevice.write('q');
+    else if (coinStep == 1) coinSerialDevice.write(0x01);
+    else coinSerialDevice.write(lowByte(coinIndex));
+    coinStep++;
+    coinNext = millis() + 20UL;
+    if (coinStep >= 3) {
+      coinByteDeadline = millis() + SERIAL_TIMEOUT_MS;
+      coinOperation = COIN_VERIFY_WAIT;
+    }
+  } else if (coinOperation == COIN_VERIFY_WAIT) {
+    if (coinSerialDevice.available()) {
+      uint8_t value = coinSerialDevice.read();
+      if (value != coinEeprom[coinIndex]) {
+        uint8_t detail[3] = {lowByte(coinIndex), value, coinEeprom[coinIndex]};
+        sendOperation('E', coinTransaction, detail, sizeof(detail));
+      }
+      coinIndex++;
+      coinStep = 0;
+      coinNext = millis();
+      coinOperation = coinIndex >= 256 ? COIN_IDLE : COIN_VERIFY_SEND;
+      if (coinIndex >= 256) sendOperation('F', coinTransaction, NULL, 0);
+    } else if (timeReached(coinByteDeadline)) {
+      uint8_t detail[3] = {lowByte(coinIndex), 0xff, coinEeprom[coinIndex]};
+      sendOperation('E', coinTransaction, detail, sizeof(detail));
+      coinIndex++;
+      coinStep = 0;
+      coinNext = millis();
+      coinOperation = coinIndex >= 256 ? COIN_IDLE : COIN_VERIFY_SEND;
+      if (coinIndex >= 256) sendOperation('F', coinTransaction, NULL, 0);
+    }
+  }
+}
+
+static void handleProtocolFrame(const MillenniumFrame &frame) {
+  if (frame.type == MCU_MSG_HELLO) {
+    uint8_t versions[2] = {MILLENNIUM_PROTOCOL_VERSION, MILLENNIUM_PROTOCOL_VERSION};
+    sendFrame(MCU_MSG_HELLO, versions, sizeof(versions));
+    return;
+  }
+  if (frame.type >= MCU_CMD_DISPLAY && frame.type <= MCU_CMD_COIN_VERIFY) {
+    bool isDisplay = frame.type == MCU_CMD_DISPLAY;
+    bool isReplay = isDisplay ?
+        (lastDisplayCommandValid && frame.sequence == lastDisplayCommandSequence) :
+        (lastCoinCommandValid && frame.sequence == lastCoinCommandSequence);
+    if (isReplay) {
+      sendAck(frame.sequence, 0);
+      return;
+    }
+    if ((frame.type == MCU_CMD_DISPLAY && displayOperation != DISPLAY_IDLE) ||
+        (frame.type >= MCU_CMD_COIN_CONTROL && frame.type <= MCU_CMD_COIN_VERIFY &&
+         coinOperation != COIN_IDLE)) {
+      sendAck(frame.sequence, 1);
+      return;
+    }
+    if (isDisplay) {
+      lastDisplayCommandSequence = frame.sequence;
+      lastDisplayCommandValid = true;
+    } else {
+      lastCoinCommandSequence = frame.sequence;
+      lastCoinCommandValid = true;
+    }
+    sendAck(frame.sequence, 0);
+  }
+  if (frame.type == MCU_CMD_DISPLAY) {
+    startDisplay(frame);
+  } else if (frame.type == MCU_CMD_COIN_CONTROL && frame.length == 1) {
+    coinTransaction = frame.sequence;
+    coinDeadline = millis() + 5000UL;
+    if (frame.payload[0] == '@') {
+      digitalWrite(coinResetPin, LOW);
+      coinNext = millis() + 1000UL;
+      coinOperation = COIN_RESET_LOW;
+    } else {
+      coinSerialDevice.write(frame.payload[0]);
+      coinNext = millis() + 100UL;
+      coinOperation = COIN_CONTROL_WAIT;
+    }
+  } else if (frame.type == MCU_CMD_COIN_PROGRAM) {
+    startCoinProgram(frame.sequence);
+  } else if (frame.type == MCU_CMD_COIN_VERIFY) {
+    startCoinVerify(frame.sequence);
+  } else if (frame.type == MCU_CMD_KEEPALIVE) {
+    sendResetCause();
+  } else if (frame.type == MCU_CMD_IDENTITY) {
+    printIdentity();
+  }
+}
+
+void loop() {
   noInterrupts();
   byte head = i2cHead;
   interrupts();
@@ -237,116 +476,39 @@ void loop() {
         lastOverflowReport == 0 ||
         nowMs - lastOverflowReport >= OVERFLOW_REPORT_INTERVAL_MS) {
       unsigned int n = (ov > 999) ? 999 : ov;
-      SerialUSB.write(EVT_DIAG);
-      SerialUSB.write('B');
-      SerialUSB.write('0' + (n / 100) % 10);
-      SerialUSB.write('0' + (n / 10) % 10);
-      SerialUSB.write('0' + n % 10);
+      uint8_t payload[4] = {'B', (uint8_t)('0' + (n / 100) % 10),
+                            (uint8_t)('0' + (n / 10) % 10),
+                            (uint8_t)('0' + n % 10)};
+      sendFrame(MCU_EVT_DIAGNOSTIC, payload, sizeof(payload));
       i2cOverflowReported = ov;
       lastOverflowReport = nowMs;
     }
   }
 
-  byte buf[100];
-  if (SerialUSB.available()) {
+  while (SerialUSB.available()) {
     byte data = SerialUSB.read();
-    if (data == CMD_DISPLAY_TEXT) {
-      SerialUSB.write('Y');
-      if (!waitForSerial()) { SerialUSB.write('X'); return; }
-      byte num_bytes = SerialUSB.read();
-      SerialUSB.write('L'); SerialUSB.write(num_bytes);
-      if (num_bytes > sizeof(buf)) { SerialUSB.write('Z'); return; }
-      for (int i = 0; i < num_bytes; ++i) {
-        if (!waitForSerial()) { SerialUSB.write('X'); return; }
-        buf[i] = SerialUSB.read();
-      }
-      SerialUSB.write('R');
-      vfdreset();
-      delay(100);
-      writeCharacter(20u); /* display on */
-      writeCharacter(18);  /* scroll off */
-      for (int i = 0; i < num_bytes; ++i) {
-        writeCharacter(buf[i] == 0x0A ? 13 : buf[i]);
-      }
-      SerialUSB.write('W');
-    } else if (data == CMD_COIN_CTRL) {
-      if (!waitForSerial()) return;
-      char data = SerialUSB.read();
-
-      if (data == '@') {
-        digitalWrite(coinResetPin, LOW);
-        delay(1000);
-        digitalWrite(coinResetPin, HIGH);
-        delay(1000);
-      } else {
-        coinSerialDevice.write(data);
-        delay(100);
-      }
-    } else if (data == CMD_COIN_PROGRAM) {
-      SerialUSB.write("A");
-      for (int i = 0; i < 256; ++i) {
-        wdt_reset();
-        coinSerialDevice.write('E');
-        delay(20);
-        coinSerialDevice.write('A');
-        delay(20);
-        coinSerialDevice.write('P');
-        delay(20);
-        coinSerialDevice.write('w');
-        delay(20);
-        coinSerialDevice.write(lowByte(i));
-        delay(20);
-        coinSerialDevice.write(coinEeprom[i]);
-        delay(20);
-      }
-      SerialUSB.write('B');
-    } else if (data == CMD_COIN_VERIFY) {
-      SerialUSB.write('D');
-      for (int i = 0; i < 256; ++i) {
-        wdt_reset();
-        while (coinSerialDevice.available()) {
-          coinSerialDevice.read();
-        }
-        coinSerialDevice.write('q');
-        delay(20);
-        coinSerialDevice.write(0x01);
-        delay(20);
-        coinSerialDevice.write(lowByte(i));
-        delay(20);
-        unsigned long start = millis();
-        while (!coinSerialDevice.available()) {
-          if (millis() - start > SERIAL_TIMEOUT_MS) break;
-        }
-        if (coinSerialDevice.available()) {
-          byte val = coinSerialDevice.read();
-          if (val != coinEeprom[i]) {
-            SerialUSB.write('E');
-            SerialUSB.write(lowByte(i));
-            SerialUSB.write(val);
-            SerialUSB.write(coinEeprom[i]);
-          }
-        }
-      }
-      SerialUSB.write('F');
-    } else if (data == CMD_KEEPALIVE) {
-      /* No-op: Pi sends this when idle to keep serial watchdog from false-triggering */
-    } else {
-      /* Unknown command byte — report it for debugging */
-      SerialUSB.write('?');
-      SerialUSB.write(data);
+    if (data == CMD_IDENTITY && !protocolDecoder.active()) {
+      printIdentity();
+      continue;
     }
+    MillenniumFrame frame;
+    if (protocolDecoder.feed(data, frame) == 1) handleProtocolFrame(frame);
   }
+  serviceDisplay();
+  serviceCoin();
   if (coinSerialDevice.available()) {
-    char data = coinSerialDevice.read();
-    SerialUSB.write(EVT_COIN_DATA);
-    SerialUSB.write(data);
+    uint8_t data = coinSerialDevice.read();
+    sendFrame(MCU_EVT_COIN, &data, 1);
   }
 
   unsigned long now = millis();
   if (now - lastHeartbeat >= HEARTBEAT_INTERVAL_MS) {
-    SerialUSB.write(EVT_HEARTBEAT);
+    sendFrame(MCU_EVT_HEARTBEAT, NULL, 0);
     lastHeartbeat = now;
   }
+  /* Reaching the end proves the main loop, serial parser, I2C drain, and active
+   * operation all returned control; blocked code can no longer pet the dog. */
+  wdt_reset();
 }
 
 void writeCommand(byte v) {
