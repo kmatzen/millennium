@@ -239,6 +239,7 @@ test: simulator unit_tests web_auth_tests
 	@./unit_tests
 	@./web_auth_tests
 	@python3 tests/test_monitor.py
+	@python3 tests/test_wifi.py
 	@python3 ../content/tests/test_storytool.py
 	@python3 ../content/tests/test_content_install.py
 	@echo ""
@@ -317,6 +318,36 @@ install: daemon
 	sudo systemctl enable --now millennium-hil-smoke.timer
 	@if test -s /etc/millennium/backup.env; then sudo systemctl enable --now millennium-backup.timer; else echo "Backup timer not enabled: configure /etc/millennium/backup.env"; fi
 	sudo systemctl start daemon.service
+
+# Install Wi-Fi onboarding into a NetworkManager-based factory image. This
+# target deliberately enables services for the next boot instead of starting
+# them immediately: setup mode takes ownership of wlan0 and disconnects SSH.
+install-wifi:
+	@command -v nmcli >/dev/null || { echo "ERROR: NetworkManager/nmcli is required"; exit 1; }
+	@command -v nft >/dev/null || { echo "ERROR: nftables is required"; exit 1; }
+	sudo install -m 0644 systemd/millennium-wifi.sysusers /usr/lib/sysusers.d/millennium-wifi.conf
+	sudo systemd-sysusers /usr/lib/sysusers.d/millennium-wifi.conf
+	sudo install -d -m 0755 /usr/local/libexec /etc/NetworkManager/dnsmasq-shared.d
+	sudo install -m 0644 firewall/wifi-setup.nft /etc/millennium/wifi-setup.nft
+	sudo install -m 0644 wifi/dnsmasq-shared.conf /etc/NetworkManager/dnsmasq-shared.d/millennium.conf
+	sudo install -m 0755 wifi/millennium_wifi.py /usr/local/libexec/millennium_wifi.py
+	sudo install -m 0755 wifi/millennium_wifi_bootstrap.py /usr/local/libexec/millennium-wifi-bootstrap
+	sudo install -m 0755 wifi/millennium_wifi_helper.py /usr/local/libexec/millennium-wifi-helper
+	sudo install -m 0755 wifi/millennium_wifi_portal.py /usr/local/libexec/millennium-wifi-portal
+	sudo install -m 0755 wifi/provision_wifi.py /usr/local/libexec/millennium-wifi-provision
+	sudo install -m 0644 systemd/millennium-wifi-bootstrap.service systemd/millennium-wifi-helper.service systemd/millennium-wifi-portal.service systemd/millennium-wifi-recovery.path /etc/systemd/system/
+	sudo install -d -m 0700 /var/lib/millennium/wifi
+	sudo chown "$$(logname 2>/dev/null || whoami)" /var/lib/millennium/wifi
+	sudo systemctl daemon-reload
+	sudo systemctl enable millennium-wifi-bootstrap.service millennium-wifi-helper.service millennium-wifi-portal.service millennium-wifi-recovery.path
+	@echo "Wi-Fi onboarding installed for next boot; provision per-device credentials before rebooting."
+
+uninstall-wifi:
+	sudo systemctl disable --now millennium-wifi-recovery.path millennium-wifi-portal.service millennium-wifi-helper.service millennium-wifi-bootstrap.service 2>/dev/null || true
+	sudo rm -f /etc/systemd/system/millennium-wifi-bootstrap.service /etc/systemd/system/millennium-wifi-helper.service /etc/systemd/system/millennium-wifi-portal.service /etc/systemd/system/millennium-wifi-recovery.path
+	sudo rm -f /usr/local/libexec/millennium-wifi-bootstrap /usr/local/libexec/millennium-wifi-helper /usr/local/libexec/millennium-wifi-portal /usr/local/libexec/millennium-wifi-provision /usr/local/libexec/millennium_wifi.py
+	sudo rm -f /etc/NetworkManager/dnsmasq-shared.d/millennium.conf /etc/millennium/wifi-setup.nft /usr/lib/sysusers.d/millennium-wifi.conf
+	sudo systemctl daemon-reload
 
 uninstall:
 	sudo systemctl stop daemon.service

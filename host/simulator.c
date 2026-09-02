@@ -22,6 +22,7 @@ extern daemon_state_data_t *daemon_state;
 #include <time.h>
 #include <pthread.h>
 #include <errno.h>
+#include <unistd.h>
 
 /* ── Simulated time ──────────────────────────────────────────────────
  * The daemon and plugins read the clock through mclock_now() (clock_source.h).
@@ -814,6 +815,29 @@ static int run_scenario(const char *path) {
             } else if (remove(path) != 0 && errno != ENOENT) {
                 fprintf(stderr, "  ERROR: could not clear story state %s\n", path);
                 failures++;
+            }
+        }
+
+        /* Test-only Wi-Fi setup marker assertions, restricted to /tmp. */
+        else if (strcmp(cmd, "clear_wifi_request") == 0) {
+            const char *path = config_get_string(config_get_instance(),
+                                                  "wifi.setup_request_path", "");
+            if (strncmp(path, "/tmp/millennium_", 16) != 0) {
+                fprintf(stderr, "  ERROR: refusing non-test Wi-Fi request path\n");
+                failures++;
+            } else if (remove(path) != 0 && errno != ENOENT) {
+                fprintf(stderr, "  ERROR: could not clear Wi-Fi request %s\n", path);
+                failures++;
+            }
+        }
+        else if (strcmp(cmd, "assert_wifi_request") == 0) {
+            const char *path = config_get_string(config_get_instance(),
+                                                  "wifi.setup_request_path", "");
+            if (strncmp(path, "/tmp/millennium_", 16) != 0 || access(path, F_OK) != 0) {
+                fprintf(stderr, "  FAIL: Wi-Fi setup request was not created\n");
+                failures++;
+            } else {
+                fprintf(stderr, "  PASS: Wi-Fi setup request created\n");
             }
         }
 

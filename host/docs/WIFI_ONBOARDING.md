@@ -1,10 +1,13 @@
 # Owner Wi-Fi onboarding
 
-## Decision
+## Implemented architecture
 
-Use a temporary captive portal backed by `hostapd`, `dnsmasq`, and the existing
-`wpa_supplicant`/`dhcpcd` network stack. Do not migrate deployed Bullseye phones
-to NetworkManager solely for onboarding.
+Use the repository's temporary captive portal with NetworkManager shared/AP
+mode. NetworkManager supplies the DHCP/DNS process, owns station and hotspot
+profiles, and keeps radio state under one authority. New factory images should
+use a supported Raspberry Pi OS Lite release where NetworkManager is the
+default. Do not migrate a remotely deployed Bullseye phone: changing the live
+network manager can permanently sever maintenance access.
 
 Each phone advertises `Millennium-Setup-<device-id>` only when it has never had
 a configured network or when an authenticated physical recovery gesture opens
@@ -51,9 +54,10 @@ protected physical gesture or local console can do so.
 
 ## Recovery gesture
 
-Reserve a purpose-built owner token plus a deliberate handset/keypad sequence,
-for example: swipe the owner token, lift the handset, and hold `0` for five
-seconds. The display asks for confirmation before creating the setup network.
+The implemented gesture is: lift the handset, swipe a provisioned owner/admin
+token, press `0`, then press `#` within 30 seconds. The display asks for
+confirmation before creating the setup network. The daemon only writes an
+unprivileged marker; a systemd path unit performs the privileged transition.
 This avoids accidental activation and prevents an unauthenticated passerby
 from reopening onboarding with a guessable key sequence.
 
@@ -61,10 +65,34 @@ The old network remains available for rollback until the replacement has
 passed all connectivity checks. A local-console command can cancel setup or
 restore the last-known-good configuration even if the radio is unusable.
 
+## Factory installation
+
+Install into a NetworkManager-based image, but do not run this target over the
+only active Wi-Fi maintenance connection:
+
+```sh
+cd host
+sudo make install-wifi
+sudo /usr/local/libexec/millennium-wifi-provision \
+  --device-id phone-001 \
+  --handoff /secure/factory/phone-001-wifi.json
+sudo reboot
+```
+
+The handoff JSON contains the SSID, per-device password, portal URL, and
+standards-compatible Wi-Fi QR payload. Render and print that payload on the
+owner card in the offline factory environment. Delete unneeded working copies;
+the phone retains its root-only setup password under `/etc/millennium`.
+
+`make install-wifi` enables services for the next boot and intentionally does
+not start them immediately. If no owner connection marker exists, rebooting
+will take `wlan0` away from station mode and start the setup AP.
+
 ## Deployment phases
 
 1. Build and unit-test the parser, state machine, atomic candidate/rollback
-   helper, portal, and nftables setup-mode rules.
+   helper, portal, and nftables setup-mode rules. These components and tests
+   are checked in under `host/wifi/` and `host/tests/test_wifi.py`.
 2. Test on a spare Pi or with local serial/keyboard recovery. Switching a
    single Wi-Fi radio from station to AP mode will intentionally sever SSH.
 3. Exercise iOS, Android, macOS, and Windows captive-portal behavior plus

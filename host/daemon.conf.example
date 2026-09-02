@@ -76,6 +76,10 @@ story.state_path=/var/lib/millennium/story-state
 story.callbacks_enabled=true
 story.callback_quiet_start=22
 story.callback_quiet_end=8
+# Owner-token recovery gesture writes this marker; a root-owned systemd path
+# unit performs the privileged network transition.
+wifi.setup_request_path=/var/lib/millennium/wifi/setup-requested
+wifi.status_path=/var/lib/millennium/wifi/status.json
 # State Persistence
 persistence.state_file=/var/lib/millennium/state
 

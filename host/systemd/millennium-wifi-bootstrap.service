@@ -1,0 +1,22 @@
+[Unit]
+Description=Enter Millennium owner Wi-Fi setup when explicitly required
+After=NetworkManager.service millennium-firewall.service
+Wants=NetworkManager.service millennium-firewall.service
+Wants=millennium-wifi-helper.service millennium-wifi-portal.service
+Before=millennium-wifi-helper.service millennium-wifi-portal.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/libexec/millennium-wifi-bootstrap
+RuntimeDirectory=millennium-wifi
+RuntimeDirectoryMode=0750
+ProtectHome=true
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/etc/NetworkManager/system-connections /var/lib/millennium/wifi /run/millennium-wifi
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_DAC_OVERRIDE CAP_CHOWN CAP_FOWNER
+RestrictAddressFamilies=AF_UNIX AF_NETLINK AF_INET AF_INET6
+
+[Install]
+WantedBy=multi-user.target

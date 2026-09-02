@@ -6,28 +6,28 @@ as an unattended appliance. Items are ordered by priority.
 ## P0 — Required before handoff
 
 - [ ] Add owner-friendly Wi-Fi onboarding and recovery.
-  - [ ] On first boot with no configured network, create a temporary
+  - [x] On first boot with no configured network, create a temporary
     `Millennium-Setup-<device-id>` WPA2 access point and captive portal.
-  - [ ] Generate a unique per-device setup password at provisioning time and
+  - [x] Generate a unique per-device setup password at provisioning time and
     print the SSID, password, and portal URL as a QR code in the owner packet.
     Never use a fleet-wide password.
-  - [ ] Let the owner scan for nearby networks, enter credentials over the
+  - [x] Let the owner scan for nearby networks, enter credentials over the
     local setup link, and see clear connecting/success/failure feedback.
-  - [ ] Store Wi-Fi credentials only in root-owned `wpa_supplicant`
-    configuration; never log, back up, export, or expose them to the daemon.
-  - [ ] Validate and escape SSIDs and passphrases without invoking a shell.
+  - [x] Store Wi-Fi credentials only in root-owned NetworkManager connection
+    profiles; never log, back up, export, or expose them to the daemon.
+  - [x] Validate and escape SSIDs and passphrases without invoking a shell.
     Support spaces, Unicode, hidden SSIDs, WPA2/WPA3 transition networks, and
     open networks only after an explicit warning.
-  - [ ] Shut down the setup AP after a verified station connection, restart
+  - [x] Shut down the setup AP after a verified station connection, restart
     OTA and maintenance services, and confirm the phone reaches its update and
     maintenance endpoints.
-  - [ ] Provide a protected physical recovery gesture that reopens setup for
+  - [x] Provide a protected physical recovery gesture that reopens setup for
     15 minutes without erasing the existing network; never enter setup merely
     because Internet access is temporarily unavailable.
-  - [ ] Isolate setup mode with firewall rules: permit only DHCP, DNS, and the
+  - [x] Isolate setup mode with firewall rules: permit only DHCP, DNS, and the
     portal from the setup interface; block SSH, the admin API, forwarding, and
     access to stored credentials.
-  - [ ] Add attempt throttling, a visible setup-mode indicator, a hard timeout,
+  - [x] Add attempt throttling, a visible setup-mode indicator, a hard timeout,
     and automatic rollback to the previous working network after failure.
   - [ ] Test wrong passwords, hidden networks, power loss during save, radio
     failure, captive-portal detection on iOS/Android/macOS/Windows, and recovery

@@ -1,0 +1,28 @@
+[Unit]
+Description=Millennium privileged Wi-Fi setup broker
+Requires=millennium-wifi-bootstrap.service
+After=millennium-wifi-bootstrap.service
+ConditionPathExists=/run/millennium-wifi/setup-active
+
+[Service]
+Type=simple
+Group=millennium-wifi
+ExecStart=/usr/local/libexec/millennium-wifi-helper
+ExecStopPost=-/usr/bin/nmcli connection down millennium-setup
+ExecStopPost=-/usr/sbin/nft delete table inet millennium_wifi_setup
+RuntimeDirectory=millennium-wifi
+RuntimeDirectoryMode=0750
+RuntimeMaxSec=900
+Restart=on-failure
+RestartSec=2
+UMask=0007
+ProtectHome=true
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/etc/NetworkManager/system-connections /var/lib/millennium/wifi /run/millennium-wifi
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_DAC_OVERRIDE CAP_CHOWN CAP_FOWNER
+RestrictAddressFamilies=AF_UNIX AF_NETLINK AF_INET AF_INET6
+
+[Install]
+WantedBy=multi-user.target
