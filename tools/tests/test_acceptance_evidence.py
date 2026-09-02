@@ -36,15 +36,28 @@ class AcceptanceEvidenceTests(unittest.TestCase):
         participant = {"first_time_caller": True, "started_without_coaching": True,
                        "completed_primary_ending": True, "audio_clear": True,
                        "display_legible": True, "time_to_first_action_seconds": 4,
-                       "total_duration_seconds": 300, "confusion_or_disengagement": []}
+                       "total_duration_seconds": 300, "confusion_or_disengagement": [],
+                       "optional_interaction_discovered": False,
+                       "observation_evidence": {"path": "notes", "sha256": "a" * 64}}
         value = {"schema": 1, "content_version": "story-1", "device_as_built_record": "phone-001",
                  "participants": [dict(participant), dict(participant)],
-                 "physical_scenarios": {name: {"passed": True, "evidence": "observed"}
+                 "physical_scenarios": {name: {"passed": True,
+                                                "evidence": {"path": "notes", "sha256": "b" * 64}}
                                         for name in playtest.SCENARIOS},
-                 "open_defects": [], "accepted_for_handoff": True}
+                 "open_defects": [], "accepted_for_handoff": True,
+                 "decision_evidence": {"path": "decision", "sha256": "c" * 64}}
         self.assertEqual(playtest.omissions(value), [])
         value["physical_scenarios"]["offline"]["evidence"] = None
         self.assertIn("physical_scenarios.offline", playtest.omissions(value))
+
+    def test_playtest_evidence_digest_detects_tampering(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "notes.txt"
+            path.write_text("observed", encoding="utf-8")
+            reference = playtest.file_evidence(path)
+            self.assertTrue(playtest.valid_evidence(reference, Path(directory) / "record.json"))
+            path.write_text("changed", encoding="utf-8")
+            self.assertFalse(playtest.valid_evidence(reference, Path(directory) / "record.json"))
 
     def test_handoff_requires_every_physical_gate(self):
         value = {

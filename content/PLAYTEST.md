@@ -59,8 +59,28 @@ than two first-time callers or a missing physical resilience scenario:
 ```bash
 python3 content/playtest_record.py template --content-version VERSION \
   --as-built-record phone-001 --output playtest-VERSION.json
+
+python3 content/playtest_record.py record-participant playtest-VERSION.json \
+  --participant P1 --started-without-coaching yes \
+  --completed-primary-ending yes --time-to-first-action-seconds 8 \
+  --total-duration-seconds 420 --audio-clear yes --display-legible yes \
+  --optional-interaction-discovered no --confusion "hesitated at first choice" \
+  --evidence-file evidence/playtest-p1.txt
+
+python3 content/playtest_record.py record-scenario playtest-VERSION.json \
+  --scenario interruption --result pass \
+  --evidence-file evidence/playtest-interruption.txt
+
+python3 content/playtest_record.py decision playtest-VERSION.json \
+  --result accept --evidence-file evidence/playtest-decision.txt
+
 python3 content/playtest_record.py validate playtest-VERSION.json
 ```
+
+Repeat `record-participant` for P2 and `record-scenario` for every scenario in
+Part B. Use `--result reject --open-defect "description"` when a defect remains.
+The commands retain no participant identity or recordings; they hash each
+privacy-preserving observation note and validation rechecks that exact file.
 
 Create one copy of this section per participant.
 

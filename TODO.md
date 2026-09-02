@@ -161,6 +161,8 @@ as an unattended appliance. Items are ordered by priority.
   - [x] Make content packages independently versioned, signed, updateable, and reversible through OTA.
   - [x] Add accessibility options for volume, prompt repetition, response timing, spoken instructions, and display legibility.
   - [ ] Conduct playtests with first-time callers and record where they become confused, disengage, or fail to discover an interaction.
+    - [x] Provide privacy-preserving guided participant, resilience-scenario,
+      and release-decision commands with tamper-checked evidence files.
   - [x] Collect privacy-preserving experience metrics such as completion, abandonment, retries, branch selection, and session duration.
   - [x] Document the intended tone, characters, world rules, interaction vocabulary, and content-review standards.
   - Done when a non-developer can author and preview a branching experience, a first-time caller can complete it without coaching, interrupted sessions recover coherently, and content can be safely deployed or rolled back independently.

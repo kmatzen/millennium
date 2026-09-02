@@ -184,7 +184,9 @@ def omissions(value, record_path, check_linked=True):
             continue
         linked = read(path)
         module = load_module("handoff_" + field, module_path)
-        if getattr(module, function_name)(linked):
+        function = getattr(module, function_name)
+        linked_missing = function(linked, path) if field == "playtest_record" else function(linked)
+        if linked_missing:
             missing.append(field + ".incomplete")
     return missing
 
