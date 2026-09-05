@@ -52,6 +52,15 @@ class PhysicalInterruptionTests(unittest.TestCase):
         checks = physical.snapshot_healthy(snapshot(ota_state="current"))
         self.assertTrue(checks["ota_not_failed"])
 
+    def test_default_firmware_directory_matches_ota_state_layout(self):
+        parser = physical.argparse.ArgumentParser()
+        subparsers = parser.add_subparsers(dest="command", required=True)
+        status = subparsers.add_parser("status")
+        physical.add_paths(status)
+        args = parser.parse_args(["status"])
+        self.assertEqual(args.firmware_dir,
+                         Path("/var/lib/millennium/ota/firmware"))
+
     def test_reconcile_waits_for_required_boot_change(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

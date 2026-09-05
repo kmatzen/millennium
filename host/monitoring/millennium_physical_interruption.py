@@ -232,7 +232,7 @@ def add_paths(parser):
     parser.add_argument("--installed-sequence", type=Path,
                         default=Path("/var/lib/millennium/ota/installed-sequence"))
     parser.add_argument("--firmware-dir", type=Path,
-                        default=Path("/var/lib/millennium/firmware"))
+                        default=Path("/var/lib/millennium/ota/firmware"))
     parser.add_argument("--hil-command", type=Path,
                         default=Path("/usr/local/libexec/millennium-hil-smoke"))
 
