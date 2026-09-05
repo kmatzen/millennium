@@ -1,0 +1,14 @@
+{
+  "bundle_bytes": 1267485,
+  "bundle_sha256": "262dbf316ae484a92c893fcde384f1444a35c1e6695f835829816d224519989e",
+  "completed_at": "2026-09-05T23:10:49+00:00",
+  "key_id": "release-2026-08",
+  "manifest_sha256": "341b440042870d8a0101dabfeb4aa12ee05c02a80e9a388bed5a8182a4485590",
+  "operation": "physical-ota-download-probe",
+  "passed": true,
+  "phase": "complete",
+  "schema": 1,
+  "sequence": 9,
+  "started_at": "2026-09-05T23:10:40+00:00",
+  "version": "0.4.0"
+}

@@ -59,15 +59,79 @@
   "schema": 1,
   "status": "incomplete",
   "tests": {
-    "active_call_power_loss": {"date": null, "evidence": null, "instrument_and_load": null, "minimum_voltage": null, "passed": null},
-    "cold_boot": {"date": null, "evidence": null, "instrument_and_load": null, "minimum_voltage": null, "passed": null},
-    "coin_validator": {"date": null, "evidence": null, "instrument_and_load": null, "minimum_voltage": null, "passed": null},
-    "content_save_power_loss": {"date": null, "evidence": null, "instrument_and_load": null, "minimum_voltage": null, "passed": null},
-    "controlled_brownout": {"date": null, "evidence": null, "instrument_and_load": null, "minimum_voltage": null, "passed": null},
-    "host_activation_interruption": {"date": "2026-08-31", "evidence": "production automatic rollback journal", "instrument_and_load": null, "minimum_voltage": null, "passed": true},
-    "idle_power_loss": {"date": null, "evidence": null, "instrument_and_load": null, "minimum_voltage": null, "passed": null},
-    "mcu_flash_interruption": {"date": null, "evidence": null, "instrument_and_load": null, "minimum_voltage": null, "passed": null},
-    "ota_download_interruption": {"date": null, "evidence": null, "instrument_and_load": null, "minimum_voltage": null, "passed": null},
-    "ringer_audio_peak": {"date": null, "evidence": null, "instrument_and_load": null, "minimum_voltage": null, "passed": null}
-  }
+    "active_call_power_loss": {
+      "date": null,
+      "evidence": null,
+      "instrument_and_load": null,
+      "minimum_voltage": null,
+      "passed": null
+    },
+    "coin_validator": {
+      "date": null,
+      "evidence": null,
+      "instrument_and_load": null,
+      "minimum_voltage": null,
+      "passed": null
+    },
+    "cold_boot": {
+      "date": null,
+      "evidence": null,
+      "instrument_and_load": null,
+      "minimum_voltage": null,
+      "passed": null
+    },
+    "content_save_power_loss": {
+      "date": null,
+      "evidence": null,
+      "instrument_and_load": null,
+      "minimum_voltage": null,
+      "passed": null
+    },
+    "controlled_brownout": {
+      "date": null,
+      "evidence": null,
+      "instrument_and_load": null,
+      "minimum_voltage": null,
+      "passed": null
+    },
+    "host_activation_interruption": {
+      "date": "2026-08-31",
+      "evidence": "production automatic rollback journal",
+      "instrument_and_load": null,
+      "minimum_voltage": null,
+      "passed": true
+    },
+    "idle_power_loss": {
+      "date": null,
+      "evidence": null,
+      "instrument_and_load": null,
+      "minimum_voltage": null,
+      "passed": null
+    },
+    "mcu_flash_interruption": {
+      "date": null,
+      "evidence": null,
+      "instrument_and_load": null,
+      "minimum_voltage": null,
+      "passed": null
+    },
+    "ota_download_interruption": {
+      "date": "2026-09-05",
+      "evidence": {
+        "path": "/Users/kmatzen/git/millennium/hardware/as-built/phone-001/evidence/ota-download-interruption-2026-09-05.json",
+        "sha256": "0e11e85579d99ff0018da69a86acbf148f8b263edd570f051af07b8e85d5110a"
+      },
+      "instrument_and_load": null,
+      "minimum_voltage": null,
+      "passed": true
+    },
+    "ringer_audio_peak": {
+      "date": null,
+      "evidence": null,
+      "instrument_and_load": null,
+      "minimum_voltage": null,
+      "passed": null
+    }
+  },
+  "updated_at": "2026-09-05T23:12:56+00:00"
 }

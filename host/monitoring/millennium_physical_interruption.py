@@ -115,7 +115,7 @@ def capture_snapshot(args):
 def snapshot_healthy(snapshot, scenario=None):
     rollback_scenarios = {"mcu_flash_interruption", "host_activation_interruption"}
     ota_state = snapshot.get("ota_state")
-    ota_ok = ota_state in ("committed", "idle", "available", "pending")
+    ota_ok = ota_state in ("committed", "current", "idle", "available", "pending")
     if scenario in rollback_scenarios and ota_state == "rolled-back":
         ota_ok = True
     hil = snapshot.get("hil", {})

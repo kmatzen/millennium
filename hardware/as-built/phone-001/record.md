@@ -214,6 +214,21 @@ reconcile service is enabled, and the harness reported `idle`; no destructive
 test was armed. It is ready to capture before/after evidence when a physical
 operator performs the remaining power and network interruptions.
 
+On 2026-09-05 the OTA-download network case was completed using a physically
+isolated GL.iNet Ethernet segment while the Wi-Fi reverse tunnel provided an
+independent observation path. The phone verified the unchanged production
+sequence-9 manifest before the operator removed RJ45. A Pi-facing throttled
+relay recorded a broken pipe after 170045 response bytes, the phone downloader
+recorded a read timeout, the direct address became unreachable, and the
+maintenance tunnel remained active. After RJ45 restoration, the direct address
+returned without reboot, the complete 1267485-byte bundle matched SHA-256
+`262dbf316ae484a92c893fcde384f1444a35c1e6695f835829816d224519989e`,
+and all eight HIL gates passed with sequence 9, release 0.4.0, and content
+2.1.0 unchanged. The composite record is
+`evidence/ota-download-interruption-2026-09-05.json`. The controller board was
+disconnected from the phone peripherals during this network-only test, so the
+record makes no peripheral or measured-load claim.
+
 The anima backup workflow was extended and exercised on 2026-09-01. Phone
 snapshot `044b0426` completed together with server-state snapshot `f5472258`.
 The latter includes the update origin, doormand configuration, maintenance

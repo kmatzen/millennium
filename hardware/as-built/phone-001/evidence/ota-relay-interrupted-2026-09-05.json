@@ -1,0 +1,14 @@
+{
+  "accepted_at": "2026-09-05T23:08:24+00:00",
+  "connection": 3,
+  "error": "[Errno 32] Broken pipe",
+  "operation": "rate-limited-tcp-relay",
+  "peer": "192.168.8.240",
+  "rate_bytes_per_second": 8192,
+  "request_bytes": 2413,
+  "request_error": "[Errno 60] Operation timed out",
+  "response_bytes": 170045,
+  "schema": 1,
+  "started_at": "2026-09-05T23:08:04+00:00",
+  "status": "interrupted"
+}

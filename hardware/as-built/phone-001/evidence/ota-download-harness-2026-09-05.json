@@ -1,0 +1,91 @@
+{
+  "after": {
+    "active_content": "/var/lib/millennium/content/releases/last-line-2.1.0",
+    "active_release": "/opt/millennium/releases/00000009-0.4.0",
+    "boot_id": "68bc8414-0984-4466-8e0d-74727b8b168f",
+    "captured_at": "2026-09-05T23:11:10+00:00",
+    "firmware_digests": {
+      "display": null,
+      "keypad": null
+    },
+    "hil": {
+      "checked_at": "2026-09-05T23:11:10+00:00",
+      "checks": {
+        "daemon_health": true,
+        "daemon_service": true,
+        "display_present": true,
+        "host_version": true,
+        "keypad_present": true,
+        "maintenance_tunnel": true,
+        "mcu_protocol": true,
+        "ota_not_failed": true
+      },
+      "passed": true,
+      "schema": 1
+    },
+    "hil_exit_status": 0,
+    "installed_sequence": "9",
+    "ota_sequence": 9,
+    "ota_state": "current",
+    "services": {
+      "daemon": true,
+      "maintenance_tunnel": true
+    }
+  },
+  "armed_at": "2026-09-05T23:08:22+00:00",
+  "automatic_acceptance_claimed": false,
+  "before": {
+    "active_content": "/var/lib/millennium/content/releases/last-line-2.1.0",
+    "active_release": "/opt/millennium/releases/00000009-0.4.0",
+    "boot_id": "68bc8414-0984-4466-8e0d-74727b8b168f",
+    "captured_at": "2026-09-05T23:08:22+00:00",
+    "firmware_digests": {
+      "display": null,
+      "keypad": null
+    },
+    "hil": {
+      "checked_at": "2026-09-05T23:08:22+00:00",
+      "checks": {
+        "daemon_health": true,
+        "daemon_service": true,
+        "display_present": true,
+        "host_version": true,
+        "keypad_present": true,
+        "maintenance_tunnel": true,
+        "mcu_protocol": true,
+        "ota_not_failed": true
+      },
+      "passed": true,
+      "schema": 1
+    },
+    "hil_exit_status": 0,
+    "installed_sequence": "9",
+    "ota_sequence": 9,
+    "ota_state": "current",
+    "services": {
+      "daemon": true,
+      "maintenance_tunnel": true
+    }
+  },
+  "checks": {
+    "boot_id_present": true,
+    "content_present": true,
+    "content_target_valid": true,
+    "daemon_active": true,
+    "hil_passed_or_expected_rollback": true,
+    "maintenance_tunnel_active": true,
+    "ota_not_failed": true,
+    "release_present": true,
+    "release_target_valid": true,
+    "required_boot_change": true
+  },
+  "completed_at": "2026-09-05T23:11:10+00:00",
+  "instruction": "Interrupt and restore the network during OTA download, then reconcile.",
+  "measurement_required": false,
+  "operation": "physical-interruption-test",
+  "physical_observation_required": true,
+  "requires_boot_change": false,
+  "scenario": "ota_download_interruption",
+  "schema": 1,
+  "status": "system-recovered"
+}

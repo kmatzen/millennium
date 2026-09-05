@@ -48,6 +48,10 @@ class PhysicalInterruptionTests(unittest.TestCase):
             self.assertEqual(armed["scenario"], "idle_power_loss")
             self.assertTrue(armed["requires_boot_change"])
 
+    def test_current_release_is_a_healthy_ota_baseline(self):
+        checks = physical.snapshot_healthy(snapshot(ota_state="current"))
+        self.assertTrue(checks["ota_not_failed"])
+
     def test_reconcile_waits_for_required_boot_change(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

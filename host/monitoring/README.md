@@ -46,6 +46,40 @@ instrument/load, minimum voltage where applicable, observed behavior, and use
 system recovery only when the prior host release is restored and, for an MCU
 flash interruption, both prior firmware digests are restored.
 
+### Isolated OTA-download interruption
+
+Use `tools/physical_ota_download_probe.py` when the production manifest is
+already current and a destructive reinstallation would add risk without
+improving the network evidence. The probe downloads the unchanged production
+manifest and detached signature, validates both through the installed OTA
+worker and trust store, then downloads and hashes the referenced bundle. It
+never calls the install or activation commands.
+
+For a Pi with an independent Wi-Fi maintenance path, connect its Ethernet
+adapter and the operator laptop to an isolated router. Run an SSH TLS byte
+forward on the laptop and put `tools/rate_limited_tcp_relay.py` between that
+forward and the Pi. The rate limit belongs on the Pi-facing relay—not in the
+downloader—so upstream or kernel buffers cannot complete the transfer after
+the cable is removed. The relay binds only to the isolated laptop address and
+the probe overrides DNS in-process; neither `/etc/hosts`, firewall rules, nor
+the published manifest are changed.
+
+Arm `ota_download_interruption`, begin the paced probe, and confirm its JSON
+reports `phase: bundle-download` before physically removing only the RJ45
+cable. Valid interruption evidence requires all of the following:
+
+- the direct Ethernet address becomes unreachable;
+- the probe terminates with `phase: interrupted` before receiving the signed
+  bundle's declared byte count;
+- the independent maintenance tunnel remains active;
+- reconnecting RJ45 restores the direct address without a reboot;
+- a subsequent probe validates the full bundle size and SHA-256; and
+- harness reconciliation passes the full HIL snapshot without changing the
+  active release, content target, installed sequence, or firmware identities.
+
+A transfer that completes from buffered bytes after link loss is diagnostic
+only and must not be entered into the as-built acceptance record.
+
 ## Encrypted backup
 
 Install `restic`, copy `backup.env.example` to

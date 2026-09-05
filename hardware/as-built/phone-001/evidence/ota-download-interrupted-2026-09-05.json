@@ -1,0 +1,13 @@
+{
+  "completed_at": "2026-09-05T23:08:57+00:00",
+  "error": "The read operation timed out",
+  "key_id": "release-2026-08",
+  "manifest_sha256": "341b440042870d8a0101dabfeb4aa12ee05c02a80e9a388bed5a8182a4485590",
+  "operation": "physical-ota-download-probe",
+  "passed": false,
+  "phase": "interrupted",
+  "schema": 1,
+  "sequence": 9,
+  "started_at": "2026-09-05T23:08:22+00:00",
+  "version": "0.4.0"
+}

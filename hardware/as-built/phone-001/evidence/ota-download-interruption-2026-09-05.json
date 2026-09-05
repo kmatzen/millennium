@@ -1,0 +1,62 @@
+{
+  "schema": 1,
+  "operation": "physical-ota-download-interruption-acceptance",
+  "device_id": "phone-001",
+  "date": "2026-09-05",
+  "passed": true,
+  "topology": {
+    "operator_client": "192.168.8.239",
+    "isolated_router": "192.168.8.1",
+    "phone_ethernet": "192.168.8.240",
+    "independent_maintenance": "phone Wi-Fi reverse tunnel through anima",
+    "physical_action": "RJ45 removed between isolated router and phone Ethernet adapter, then restored"
+  },
+  "scope": {
+    "manifest_sequence": 9,
+    "manifest_version": "0.4.0",
+    "manifest_key_id": "release-2026-08",
+    "manifest_sha256": "341b440042870d8a0101dabfeb4aa12ee05c02a80e9a388bed5a8182a4485590",
+    "expected_bundle_bytes": 1267485,
+    "expected_bundle_sha256": "262dbf316ae484a92c893fcde384f1444a35c1e6695f835829816d224519989e",
+    "installation_attempted": false,
+    "controller_board_connected_to_phone_peripherals": false
+  },
+  "observations": {
+    "signed_manifest_verified_before_pull": true,
+    "direct_ethernet_unreachable_during_pull": true,
+    "downloader_failed_before_declared_bundle_size": true,
+    "downloader_error": "The read operation timed out",
+    "relay_error": "Broken pipe",
+    "relay_response_bytes_before_failure": 170045,
+    "maintenance_tunnel_active_during_pull": true,
+    "ethernet_recovered_without_reboot": true,
+    "complete_signed_retry_passed": true,
+    "post_recovery_hil_passed": true,
+    "active_release_unchanged": "/opt/millennium/releases/00000009-0.4.0",
+    "active_content_unchanged": "/var/lib/millennium/content/releases/last-line-2.1.0",
+    "installed_sequence_unchanged": "9"
+  },
+  "evidence": [
+    {
+      "path": "ota-download-harness-2026-09-05.json",
+      "sha256": "b4da5387c224d4219d591dee0c7cf5a643c0ab490684a4a43499c8f9f1d4cf6c"
+    },
+    {
+      "path": "ota-download-interrupted-2026-09-05.json",
+      "sha256": "fe4f419d331d5708f204b2ebb62e19268154978b86f662f8a591cead7cae4b26"
+    },
+    {
+      "path": "ota-relay-interrupted-2026-09-05.json",
+      "sha256": "68e5fce5f6f0eb56ff8d8aafafd8878a607e3639ea96764d8c57020ce443dd94"
+    },
+    {
+      "path": "ota-download-recovery-2026-09-05.json",
+      "sha256": "809bc52e20380454fcc5ca981c6d3acaf7a5c4f577708ef436ef0218c1e7f7f2"
+    },
+    {
+      "path": "ota-relay-recovery-2026-09-05.json",
+      "sha256": "16acb5fe4c3b8fd391b0de2ba27e291d2d7743b919e4d97c9db2f6c963a97966"
+    }
+  ],
+  "acceptance_note": "This proves physical Ethernet interruption and recovery during authenticated OTA bundle transport. It does not claim phone-peripheral or measured-load coverage because the controller board was disconnected from those peripherals."
+}

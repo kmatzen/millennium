@@ -141,8 +141,12 @@ as an unattended appliance. Items are ordered by priority.
       recovery, and activation-journal rollback.
     - [x] Provide a durable physical-interruption harness that captures the
       before/after boot, release, content, firmware, OTA, service, and HIL state.
+    - [x] Physically interrupt Ethernet during an authenticated production-signed
+      bundle download, retain client/relay/harness evidence, restore the link,
+      and verify the complete bundle plus unchanged release state and full HIL.
     - [ ] Repeat the interruptions by physically removing power/network on the
-      production phone and attach journal and measurement evidence.
+      production phone for the remaining power, MCU-flash, and activation cases,
+      and attach journal and measurement evidence.
   - [ ] Confirm remote maintenance works from outside the home network.
     - [x] Confirm the reverse tunnel, one-minute metrics pull, and nightly
       restricted backup pull remain operational through anima.
