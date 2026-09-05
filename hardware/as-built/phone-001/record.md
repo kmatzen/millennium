@@ -246,3 +246,15 @@ units and scripts, authorized public keys, and recovery instructions. It was
 streamed back through Restic and its allowlisted contents were verified without
 staging a plaintext archive. Exact evidence is in
 `server-state-backup-2026-09-02.json`.
+
+The release signing key now has two verified encrypted offline copies on
+physically distinct removable media. On 2026-09-05, `SD-EEE0E3AE` and
+`NVME-68D6C050` each received the same AES-256-CBC/PBKDF2 ciphertext (SHA-256
+`0d4b59b1b3ea3d9e9a6563ce033e8e3c6f8fa926a86c65ce1976c8c906f3b8ff`).
+Each copy was independently decrypted using the macOS Keychain secret only
+into a disposable APFS RAM disk, matched against the production public key,
+and used to produce a successfully verified Ed25519 challenge signature. The
+RAM disks were destroyed and both removable devices were safely ejected.
+Copy and recovery evidence is in `evidence/key-copy-*-2026-09-05.json` and
+`evidence/key-recovery-*-2026-09-05.json`; custody metadata is registered in
+`handoff.json`.

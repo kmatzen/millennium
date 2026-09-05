@@ -23,6 +23,21 @@
       },
       "recovery_tested_at": "2026-09-05",
       "verified_at": "2026-09-05"
+    },
+    {
+      "ciphertext_sha256": "0d4b59b1b3ea3d9e9a6563ce033e8e3c6f8fa926a86c65ce1976c8c906f3b8ff",
+      "copy_evidence": {
+        "path": "/Users/kmatzen/git/millennium/hardware/as-built/phone-001/evidence/key-copy-ueb-68d6c050-2026-09-05.json",
+        "sha256": "d9eac6629039d9c954014680941d55f5eff79842ebcff43b7204775154d6d0f5"
+      },
+      "media_label": "NVME-68D6C050",
+      "physically_distinct": true,
+      "recovery_evidence": {
+        "path": "/Users/kmatzen/git/millennium/hardware/as-built/phone-001/evidence/key-recovery-ueb-68d6c050-2026-09-05.json",
+        "sha256": "768ab485c39d02d809eeb6e1a2b67f2d5900e5ea500cf40f1cbad20546b57b6e"
+      },
+      "recovery_tested_at": "2026-09-05",
+      "verified_at": "2026-09-05"
     }
   ],
   "playtest_record": "playtest-last-line-2.1.0.json",
@@ -36,7 +51,7 @@
     "snapshot_id": "f5472258"
   },
   "status": "incomplete",
-  "updated_at": "2026-09-05T23:24:36+00:00",
+  "updated_at": "2026-09-05T23:30:01+00:00",
   "wifi_clients": {
     "android": {
       "date": null,

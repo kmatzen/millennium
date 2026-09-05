@@ -105,17 +105,17 @@ as an unattended appliance. Items are ordered by priority.
   - [x] Never fall back from signed OTA when the worker or trust key is unavailable.
   - [x] Replace remaining shell-interpolated commands with argument-vector execution.
 
-- [ ] Add signing-key lifecycle support.
+- [x] Add signing-key lifecycle support.
   - [x] Support key IDs and multiple trusted public keys during rotation.
   - [x] Document revocation and emergency recovery.
-  - [ ] Maintain two currently verified encrypted offline copies of the private
+  - [x] Maintain two currently verified encrypted offline copies of the private
     signing key on separate media, as required by the lifecycle procedure.
     - [x] Provide an OS-verified removable-media copier that rejects internal
       disks and overwrites, verifies the ciphertext, and records media custody.
     - [x] Create, recovery-test, and eject the first encrypted removable-media
       copy (`SD-EEE0E3AE`, 2026-09-05).
-    - [ ] Repeat the verified copy and recovery drill on a second physically
-      distinct removable device.
+    - [x] Repeat the verified copy and recovery drill on a second physically
+      distinct removable device (`NVME-68D6C050`, 2026-09-05).
   - [x] Perform and document a recovery drill.
 
 - [x] Expand CI into a reproducible release pipeline.
@@ -240,7 +240,7 @@ A release is ready for an inexperienced end user only when:
 - [ ] Power and network interruption tests recover safely.
 - [x] Remote maintenance works through the known domain without inbound home-network access.
 - [x] Monitoring reports the phone's health and alerts on loss of contact.
-- [ ] Signing keys, server state, and recovery instructions have currently
+- [x] Signing keys, server state, and recovery instructions have currently
   verified tested backups.
 - [ ] A first-time caller can discover and complete the primary experience without instruction from the owner.
 - [ ] Story interruption, timeout, repeat-play, offline, and return-visit paths have been playtested.
