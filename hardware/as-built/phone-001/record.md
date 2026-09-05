@@ -58,6 +58,16 @@ The post-update HIL run passed all eight gates at `2026-08-31T16:57:53Z`.
   ciphertext on local restricted storage and anima plus a successful in-memory
   sign/verify recovery drill. Two separate removable/offline media are still
   required by the lifecycle procedure before backup acceptance can close.
+- First removable copy: on 2026-09-05 macOS identified a 64 GB SD card as
+  external/removable with volume UUID `EEE0E3AE-2A6F-37D3-8498-B7AE4AB4D163`.
+  The non-overwriting copier verified ciphertext SHA-256
+  `0d4b59b1b3ea3d9e9a6563ce033e8e3c6f8fa926a86c65ce1976c8c906f3b8ff`.
+  Recovery occurred only on a temporary RAM disk using the Keychain-held
+  secret; the public identity matched and a disposable signature verified.
+  The RAM disk was destroyed and the card ejected. Evidence is in
+  `evidence/key-copy-sd-eee0e3ae-2026-09-05.json` and
+  `evidence/key-recovery-sd-eee0e3ae-2026-09-05.json`. One more physically
+  distinct removable device remains required.
 - Device backup: Restic snapshot `0226382e` on anima, restore-stream checked
   on 2026-08-31; nightly timer enabled with 14 daily, 8 weekly, and 12 monthly
   retention points.

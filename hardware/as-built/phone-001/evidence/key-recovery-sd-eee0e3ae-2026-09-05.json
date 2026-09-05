@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "operation": "recovery-drill",
+  "passed": true,
+  "completed_at": "2026-09-05T23:23:42Z",
+  "key_id": "release-2026-08",
+  "media_id": "sd-eee0e3ae",
+  "media_volume_uuid": "EEE0E3AE-2A6F-37D3-8498-B7AE4AB4D163",
+  "operator": "kmatzen with Codex",
+  "method": "AES-256-CBC PBKDF2, 600000 iterations; secret retrieved directly from macOS Keychain without display",
+  "ciphertext_sha256": "0d4b59b1b3ea3d9e9a6563ce033e8e3c6f8fa926a86c65ce1976c8c906f3b8ff",
+  "public_key_file_sha256": "2ea317115b432ca4da40f78b983b81b2afe30ce8a2e4d470493cf16d64c7bd1d",
+  "public_identity_matched": true,
+  "disposable_signature_sha256": "f21f92fff9801367f1ec2d7cbd1e9ad6367fbb1760b399da43ec6d61fd4a32e6",
+  "signature_verified": true,
+  "plaintext_location": "temporary APFS RAM disk",
+  "plaintext_persisted": false,
+  "ram_device": "disk11",
+  "ram_volume": "disk12s1",
+  "cleanup_completed_at": "2026-09-05T23:23:42Z",
+  "cleanup_required": false,
+  "media_ejected": true
+}
