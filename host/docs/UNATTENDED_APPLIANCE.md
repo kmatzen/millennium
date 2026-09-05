@@ -80,10 +80,14 @@ arduino/pi_flash.sh
 ota/millennium-ota
 ```
 
-`release.json` repeats the version, sequence, target architecture, file sizes,
-and SHA-256 digest of every payload. The updater verifies the architecture,
-outer bundle digest, and all inner file digests before stopping the phone
-service. Cross-builds pass `--architecture` explicitly to the release builder.
+`release.json` repeats the version, sequence, full source commit, target
+architecture, file sizes, and SHA-256 digest of every payload. The updater
+verifies the architecture, source-commit shape, outer bundle digest, and all
+inner file digests before stopping the phone service. The release builder also
+requires the commit embedded by the packaged daemon to match this full commit;
+it rejects `unknown`, dirty, and mismatched daemon identities. Cross-builds
+pass `--architecture` and the full `--source-commit` explicitly. A local
+production build derives the commit itself and refuses a dirty worktree.
 
 ## Device layout and atomic host rollback
 

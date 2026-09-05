@@ -36,6 +36,13 @@ def write_identity_hex(path, role, version="0.4.0", build="test-build"):
 
 
 class OtaTests(unittest.TestCase):
+    @staticmethod
+    def source_commit():
+        return subprocess.run(
+            ["git", "-C", str(ROOT), "rev-parse", "HEAD"], check=True,
+            stdout=subprocess.PIPE, text=True,
+        ).stdout.strip()
+
     def test_network_loss_during_manifest_download_preserves_pending_release(self):
         with tempfile.TemporaryDirectory() as name:
             state = Path(name)
@@ -218,10 +225,44 @@ class OtaTests(unittest.TestCase):
             result = subprocess.run([
                 sys.executable, str(BUILDER), "--version", "0.4.0", "--sequence", "8",
                 "--base-url", "https://updates.example/millennium",
-                "--daemon", str(daemon), "--output-dir", str(root / "out"),
+                "--daemon", str(daemon), "--source-commit", self.source_commit(),
+                "--output-dir", str(root / "out"),
             ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             self.assertNotEqual(result.returncode, 0)
             self.assertIn(b"daemon version does not match", result.stderr)
+
+    def test_builder_rejects_unknown_daemon_source(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            daemon = root / "daemon"
+            daemon.write_text("#!/bin/sh\necho 'millennium-daemon 0.4.0 (git unknown)'\n")
+            daemon.chmod(0o755)
+            result = subprocess.run([
+                sys.executable, str(BUILDER), "--version", "0.4.0", "--sequence", "8",
+                "--base-url", "https://updates.example/millennium",
+                "--daemon", str(daemon), "--source-commit", self.source_commit(),
+                "--output-dir", str(root / "out"),
+            ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(b"no usable git source identity", result.stderr)
+
+    def test_builder_rejects_mismatched_daemon_source(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            daemon = root / "daemon"
+            daemon.write_text(
+                "#!/bin/sh\necho 'millennium-daemon 0.4.0 "
+                "(git 000000000000)'\n")
+            daemon.chmod(0o755)
+            result = subprocess.run([
+                sys.executable, str(BUILDER), "--version", "0.4.0",
+                "--sequence", "8", "--base-url",
+                "https://updates.example/millennium", "--daemon", str(daemon),
+                "--source-commit", self.source_commit(), "--output-dir",
+                str(root / "out"),
+            ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(b"git source does not match release", result.stderr)
 
     def test_failed_release_is_backed_off_and_quarantined(self):
         with tempfile.TemporaryDirectory() as name:
@@ -264,7 +305,9 @@ class OtaTests(unittest.TestCase):
                              "content_installer", "storytool"):
                 paths[filename] = inputs / filename
                 paths[filename].write_bytes((filename + "\n").encode())
-            paths["daemon"].write_text("#!/bin/sh\necho 'millennium-daemon 0.4.0 (test)'\n")
+            commit = self.source_commit()
+            paths["daemon"].write_text(
+                "#!/bin/sh\necho 'millennium-daemon 0.4.0 (git %s)'\n" % commit[:12])
             paths["daemon"].chmod(0o755)
             write_identity_hex(paths["keypad"], "keypad")
             write_identity_hex(paths["display"], "display")
@@ -283,6 +326,7 @@ class OtaTests(unittest.TestCase):
                 "--content-installer", str(paths["content_installer"]),
                 "--storytool", str(paths["storytool"]),
                 "--private-key", str(private),
+                "--source-commit", commit,
             ]
             subprocess.run(base + ["--output-dir", str(output_a)], check=True, stdout=subprocess.PIPE)
             subprocess.run(base + ["--output-dir", str(output_b)], check=True, stdout=subprocess.PIPE)
@@ -300,6 +344,12 @@ class OtaTests(unittest.TestCase):
             extracted = root / "extracted"
             ota.safe_extract(output_a / bundle_name, extracted)
             ota.verify_release(extracted, data)
+            release_metadata = json.loads((extracted / "release.json").read_text())
+            self.assertEqual(release_metadata["source_commit"], commit)
+            del release_metadata["source_commit"]
+            (extracted / "release.json").write_text(json.dumps(release_metadata))
+            with self.assertRaisesRegex(ota.OtaError, "source commit"):
+                ota.verify_release(extracted, data)
 
             state = root / "state"
             releases = root / "releases"

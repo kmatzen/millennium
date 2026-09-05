@@ -353,6 +353,9 @@ def verify_release(release_dir, manifest, architecture=None):
     data = json.loads(release_file.read_text())
     if data.get("schema") != 1 or data.get("version") != manifest["version"] or data.get("sequence") != manifest["sequence"]:
         raise OtaError("release metadata does not match manifest")
+    if not isinstance(data.get("source_commit"), str) or not re.fullmatch(
+            r"[0-9a-f]{40}", data["source_commit"]):
+        raise OtaError("release source commit is missing or invalid")
     expected_architecture = platform.machine() if architecture in (None, "auto") else architecture
     if data.get("architecture") != expected_architecture:
         raise OtaError("release architecture %s does not match device %s" %

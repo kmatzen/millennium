@@ -16,6 +16,9 @@ import re
 from datetime import datetime, timezone
 
 
+ROOT = Path(__file__).resolve().parents[1]
+
+
 def sha256(path):
     digest = hashlib.sha256()
     with path.open("rb") as stream:
@@ -26,6 +29,38 @@ def sha256(path):
 
 def canonical(data):
     return (json.dumps(data, sort_keys=True, separators=(",", ":")) + "\n").encode()
+
+
+def source_commit():
+    try:
+        commit = subprocess.run(
+            ["git", "-C", str(ROOT), "rev-parse", "HEAD"], check=True,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        ).stdout.strip().lower()
+        status = subprocess.run(
+            ["git", "-C", str(ROOT), "status", "--porcelain",
+             "--untracked-files=normal"], check=True, stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE, text=True,
+        ).stdout
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise SystemExit("cannot determine release source commit: %s" % exc)
+    if not re.fullmatch(r"[0-9a-f]{40}", commit):
+        raise SystemExit("invalid release source commit: %r" % commit)
+    if status:
+        raise SystemExit("refusing to build a production release from a dirty worktree")
+    return commit
+
+
+def verify_daemon_source(output, commit):
+    match = re.search(r"\bgit ([0-9a-f]{7,40})(-dirty)?\b", output, re.IGNORECASE)
+    if not match:
+        raise SystemExit("packaged daemon has no usable git source identity: %r" % output)
+    daemon_commit = match.group(1).lower()
+    if match.group(2):
+        raise SystemExit("packaged daemon was built from a dirty worktree: %r" % output)
+    if not commit.startswith(daemon_commit):
+        raise SystemExit("packaged daemon git source does not match release: %s != %s" %
+                         (daemon_commit, commit))
 
 
 def sign_ed25519(private_key, message, signature):
@@ -142,10 +177,12 @@ def main():
     parser.add_argument("--hold", action="store_true")
     parser.add_argument("--withdrawn", action="store_true")
     parser.add_argument("--architecture", default=platform.machine())
+    parser.add_argument("--source-commit",
+                        help="full commit embedded in a separately built daemon")
     parser.add_argument("--output-dir", type=Path, required=True)
     args = parser.parse_args()
 
-    source_version = (Path(__file__).resolve().parents[1] / "VERSION").read_text().strip()
+    source_version = (ROOT / "VERSION").read_text().strip()
     requested_version = args.version or source_version
     if requested_version != source_version:
         raise SystemExit("requested version %s does not match VERSION (%s)" %
@@ -161,6 +198,14 @@ def main():
     match = re.search(r"(?:^|\s)(\d+\.\d+\.\d+)(?:\s|$)", output)
     if not match or match.group(1) != args.version:
         raise SystemExit("packaged daemon version does not match release: %r" % output)
+    if args.source_commit:
+        commit = args.source_commit.lower()
+        if not re.fullmatch(r"[0-9a-f]{40}", commit):
+            raise SystemExit("invalid explicit release source commit: %r" %
+                             args.source_commit)
+    else:
+        commit = source_commit()
+    verify_daemon_source(output, commit)
 
     if args.sequence < 0 or not args.version or "/" in args.version:
         raise SystemExit("invalid version or sequence")
@@ -198,6 +243,7 @@ def main():
             "schema": 1,
             "version": args.version,
             "sequence": args.sequence,
+            "source_commit": commit,
             "architecture": args.architecture,
             "files": files,
             "firmware": {
