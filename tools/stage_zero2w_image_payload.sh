@@ -4,6 +4,7 @@ set -euo pipefail
 repo=$(cd "$(dirname "$0")/.." && pwd)
 payload="$repo/host/os_image/payload/rootfs"
 host="$repo/host"
+source_commit=${MILLENNIUM_SOURCE_COMMIT:-}
 
 test "$(uname -s)" = Linux || { echo "run on the native arm64 image-builder host" >&2; exit 1; }
 test "$(uname -m)" = aarch64 || { echo "payload must be built natively for arm64" >&2; exit 1; }
@@ -11,9 +12,16 @@ test ! -e "$repo/host/os_image/payload" || {
     echo "refusing to overwrite host/os_image/payload" >&2
     exit 1
 }
+if [[ -z "$source_commit" ]] && git -C "$repo" rev-parse HEAD >/dev/null 2>&1; then
+    source_commit=$(git -C "$repo" rev-parse HEAD)
+fi
+[[ "$source_commit" =~ ^[0-9a-f]{40}$ ]] || {
+    echo "set MILLENNIUM_SOURCE_COMMIT to the exact 40-character source commit" >&2
+    exit 1
+}
 
 make -C "$host" clean
-make -C "$host" daemon
+make -C "$host" daemon GIT_HASH="${source_commit:0:12}"
 mkdir -p "$payload/usr/local/bin" "$payload/usr/local/libexec" \
     "$payload/usr/local/share/millennium/audio" "$payload/etc/millennium" \
     "$payload/etc/NetworkManager/dnsmasq-shared.d" \
