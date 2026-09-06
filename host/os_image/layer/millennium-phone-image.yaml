@@ -84,7 +84,17 @@ mmdebstrap:
         echo "missing staged Millennium image payload; run tools/stage_zero2w_image_payload.sh" >&2
         exit 1
       }
-      cp -a "$payload/." "$1/"
+      # Preserve metadata on directories already owned by the base image.
+      # `cp -a payload/.` previously replaced /usr and /usr/lib metadata with
+      # uid-1000, mode-0770 values inherited from the build workspace, which
+      # prevented non-root services such as D-Bus from executing.
+      payload_archive=$(mktemp)
+      trap 'rm -f "$payload_archive"' EXIT
+      tar -C "$payload" -cpf "$payload_archive" .
+      tar -C "$1" -xpf "$payload_archive" \
+        --no-same-owner --no-overwrite-dir
+      rm -f "$payload_archive"
+      trap - EXIT
       # This hook executes on the build host, where the target-only
       # `millennium` account need not exist. Create the directory without a
       # named owner here; the target-side recursive chown below assigns the

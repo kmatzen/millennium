@@ -38,3 +38,9 @@ class Zero2WImageLayerTests(unittest.TestCase):
         self.assertIn(source, cleanup_text)
         self.assertIn(destination, cleanup_text)
         self.assertIn("cmp ", cleanup_text)
+
+    def test_payload_merge_preserves_base_directory_metadata(self) -> None:
+        text = LAYER.read_text()
+
+        self.assertNotIn('cp -a "$payload/." "$1/"', text)
+        self.assertIn('--no-same-owner --no-overwrite-dir', text)
