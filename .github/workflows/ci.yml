@@ -95,7 +95,7 @@ jobs:
 
       - name: Build and run PJSIP smoke test
         working-directory: host
-        run: make daemon pjsip-smoke && ./pjsip-smoke "" ""
+        run: make daemon pjsip-smoke && ./pjsip_smoke "" ""
 
       - name: Validate shell and systemd assets
         run: |
