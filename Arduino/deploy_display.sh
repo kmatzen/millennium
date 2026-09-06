@@ -21,9 +21,6 @@ VIA_SCP="${VIA_SCP:-0}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-# GPIO pin on Pi connected to Arduino Beta RST (GPIO27/GEN2, pin 13)
-RESET_GPIO=27
-
 echo "Deploying display firmware (Millennium Beta) to $REMOTE"
 
 # Step 1: Build on macOS
@@ -48,12 +45,16 @@ fi
 # Step 2: Sync
 echo "  Step 2: Syncing..."
 if [ "$VIA_SCP" = "1" ] && [ -f "$SCRIPT_DIR/build/display/display.ino.hex" ]; then
+  # REPO_DIR is deliberately expanded by the local deployment operator.
+  # shellcheck disable=SC2029
   ssh "$REMOTE" "mkdir -p $REPO_DIR/Arduino/build/display"
   scp "$SCRIPT_DIR/build/display/display.ino.hex" "$REMOTE:$REPO_DIR/Arduino/build/display/"
 else
   if [ -n "$BRANCH" ]; then
+    # shellcheck disable=SC2029
     ssh "$REMOTE" "cd $REPO_DIR && git fetch origin && git checkout $BRANCH && git pull --ff-only || git pull || true"
   else
+    # shellcheck disable=SC2029
     ssh "$REMOTE" "cd $REPO_DIR && git pull --ff-only || git pull || true"
   fi
 fi
@@ -65,6 +66,7 @@ fi
 # timeout, and always restarts the daemon on exit.
 echo "  Step 3: Flashing display Arduino (Beta) on $REMOTE via pi_flash.sh..."
 scp "$SCRIPT_DIR/pi_flash.sh" "$REMOTE:/tmp/pi_flash.sh"
+# shellcheck disable=SC2029
 ssh "$REMOTE" "bash -l -c 'bash /tmp/pi_flash.sh display $REPO_DIR/Arduino/build/display/display.ino.hex'"
 
 echo "Done."

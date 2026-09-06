@@ -43,7 +43,7 @@ finish() {
   fi
   if [ -n "$bed" ]; then
     ffmpeg -nostdin -hide_banner -loglevel error -y -i "$voice" -stream_loop -1 -i "$BUILD/sfx/$bed.mp3" \
-      -filter_complex "[0:a]$voice_filter[v];[1:a]volume=0.12[b];[v][b]amix=inputs=2:duration=first:dropout_transition=0[m];[m]highpass=f=220,lowpass=f=3500,loudnorm=I=-20:TP=-2:LRA=7[out]" \
+      -filter_complex "[0:a]${voice_filter}[v];[1:a]volume=0.12[b];[v][b]amix=inputs=2:duration=first:dropout_transition=0[m];[m]highpass=f=220,lowpass=f=3500,loudnorm=I=-20:TP=-2:LRA=7[out]" \
       -map '[out]' -ar 8000 -ac 1 -c:a pcm_s16le "$MEDIA/$name.wav"
   else
     ffmpeg -nostdin -hide_banner -loglevel error -y -i "$voice" \

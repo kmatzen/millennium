@@ -23,7 +23,9 @@ while [ "$#" -gt 0 ]; do
         *) usage ;;
     esac
 done
-[ -n "$SERVER_KEY" ] && [ -n "$ADDRESS" ] && [ -n "$MAINTAINER_KEY" ] || usage
+if [ -z "$SERVER_KEY" ] || [ -z "$ADDRESS" ] || [ -z "$MAINTAINER_KEY" ]; then
+    usage
+fi
 [ "$(id -u)" -eq 0 ] || { echo "run as root" >&2; exit 1; }
 command -v wg >/dev/null || { echo "wireguard-tools is required" >&2; exit 1; }
 command -v sshd >/dev/null || { echo "OpenSSH server is required" >&2; exit 1; }

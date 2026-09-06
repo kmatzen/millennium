@@ -9,10 +9,10 @@ if [ "$(id -u)" -ne 0 ]; then
     echo "install_ota.sh must run as root (use sudo)" >&2
     exit 1
 fi
-[ -n "$RUN_USER" ] && [ "$RUN_USER" != root ] || {
+if [ -z "$RUN_USER" ] || [ "$RUN_USER" = root ]; then
     echo "cannot determine daemon user; run with sudo or set OTA_USER" >&2
     exit 1
-}
+fi
 id "$RUN_USER" >/dev/null 2>&1 || { echo "unknown OTA_USER: $RUN_USER" >&2; exit 1; }
 
 install -d -m 0755 /usr/local/libexec /etc/millennium /var/lib/millennium/ota

@@ -7,7 +7,10 @@ SOURCE="$(cd "$1" && pwd)"
 WEB_ROOT="$2"
 MANIFEST="$SOURCE/manifest.json"
 SIGNATURE="$SOURCE/manifest.json.sig"
-[ -s "$MANIFEST" ] && [ -s "$SIGNATURE" ] || { echo "signed manifest is required" >&2; exit 1; }
+if [ ! -s "$MANIFEST" ] || [ ! -s "$SIGNATURE" ]; then
+    echo "signed manifest is required" >&2
+    exit 1
+fi
 
 META="$(python3 - "$MANIFEST" <<'PY'
 import json, pathlib, sys

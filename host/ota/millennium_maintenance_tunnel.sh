@@ -37,14 +37,14 @@ EOF
     exit 0
 fi
 
-[ "${1:-}" = "run" ] && [ "$#" -eq 1 ] || {
+if [ "${1:-}" != "run" ] || [ "$#" -ne 1 ]; then
     echo "usage: $0 run" >&2
     exit 2
-}
-[ -r "$CONFIG" ] && [ -s "$KEY" ] && [ -s "$KNOWN_HOSTS" ] || {
+fi
+if [ ! -r "$CONFIG" ] || [ ! -s "$KEY" ] || [ ! -s "$KNOWN_HOSTS" ]; then
     echo "maintenance tunnel is not provisioned" >&2
     exit 1
-}
+fi
 # shellcheck disable=SC1090
 . "$CONFIG"
 exec /usr/bin/ssh -NT \

@@ -33,7 +33,10 @@ AVRDUDE_TIMEOUT="${AVRDUDE_TIMEOUT:-25}"
 BOTH_RESET="${BOTH_RESET:-0}"
 MANAGE_DAEMON="${MANAGE_DAEMON:-1}"
 
-[ -n "$TARGET" ] && [ -n "$HEX" ] || { echo "usage: pi_flash.sh <keypad|display> <hex-path>"; exit 2; }
+if [ -z "$TARGET" ] || [ -z "$HEX" ]; then
+    echo "usage: pi_flash.sh <keypad|display> <hex-path>"
+    exit 2
+fi
 [ -f "$HEX" ] || { echo "hex not found: $HEX"; exit 2; }
 
 # GPIO17 -> Alpha (keypad) RST, GPIO27 -> Beta (display) RST.
@@ -56,16 +59,20 @@ esac
 OTHER_GPIO=$([ "$GPIO" = 17 ] && echo 27 || echo 17)
 
 cleanup() {
-    [ "$MANAGE_DAEMON" = 1 ] && sudo systemctl start daemon.service >/dev/null 2>&1 || true
+    if [ "$MANAGE_DAEMON" = 1 ]; then
+        sudo systemctl start daemon.service >/dev/null 2>&1 || true
+    fi
 }
 trap cleanup EXIT
 
 echo "pi_flash: target=$TARGET hex=$HEX gpio=$GPIO both_reset=$BOTH_RESET"
-[ "$MANAGE_DAEMON" = 1 ] && sudo systemctl stop daemon.service >/dev/null 2>&1 || true
+if [ "$MANAGE_DAEMON" = 1 ]; then
+    sudo systemctl stop daemon.service >/dev/null 2>&1 || true
+fi
 sleep 0.3
 
 flash_once() {
-    local i P out
+    local P out
     # Release reset line(s), then pulse low to reset.
     raspi-gpio set "$GPIO" ip
     [ "$BOTH_RESET" = 1 ] && raspi-gpio set "$OTHER_GPIO" ip
@@ -77,12 +84,12 @@ flash_once() {
         raspi-gpio set "$GPIO" op dl; sleep 0.15; raspi-gpio set "$GPIO" ip
     fi
     # Wait for the sketch port to drop (confirms the reset took).
-    for i in $(seq 1 100); do [ ! -e "$BY_ID" ] && break; sleep 0.02; done
+    for _ in $(seq 1 100); do [ ! -e "$BY_ID" ] && break; sleep 0.02; done
     # Tight poll for the BOOTLOADER port, resolve, and flash with NO added
     # latency. An external reset holds Caterina open for several seconds, but
     # poll tightly anyway so a USB-triggered reset works too.
     P=""
-    for i in $(seq 1 600); do
+    for _ in $(seq 1 600); do
         if [ -e "$BOOT_BY_ID" ]; then P=$(readlink -f "$BOOT_BY_ID"); break; fi
         sleep 0.01
     done

@@ -42,7 +42,7 @@ PY
 openssl pkeyutl -sign -rawin -inkey "$KEY" -in "$ORIGIN/manifest.json" \
     -out "$ORIGIN/manifest.json.sig"
 /usr/local/libexec/millennium-ota check >/dev/null
-for attempt in 1 2 3; do
+for _ in 1 2 3; do
     /usr/local/libexec/millennium-ota auto-apply >/dev/null 2>&1 || true
     # Exponential backoff is 1, 2, then 4 seconds in the lab configuration.
     sleep 5

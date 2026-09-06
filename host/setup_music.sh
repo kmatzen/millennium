@@ -9,7 +9,7 @@ echo "Setting up Jukebox plugin music directory..."
 sudo mkdir -p /usr/share/millennium/music
 
 # Set proper permissions
-sudo chown -R $USER:$USER /usr/share/millennium/music
+sudo chown -R "$USER":"$USER" /usr/share/millennium/music
 sudo chmod 755 /usr/share/millennium/music
 
 echo "Created directory: /usr/share/millennium/music"

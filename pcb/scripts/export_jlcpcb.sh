@@ -73,6 +73,8 @@ PYEOF
 rm -f "$OUT/CPL-$PROJ.csv.raw"
 
 echo "BOM..."
+# `${QUANTITY}` is KiCad's literal computed-field name, not a shell variable.
+# shellcheck disable=SC2016
 kicad-cli sch export bom --output "$OUT/BOM-$PROJ.csv" \
   --fields 'Value,Reference,Footprint,${QUANTITY},LCSC' \
   --labels 'Comment,Designator,Footprint,Quantity,LCSC Part #' \

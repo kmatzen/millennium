@@ -7,7 +7,7 @@ echo "Creating test audio files for Millennium Jukebox..."
 
 # Create the music directory
 sudo mkdir -p /usr/share/millennium/music
-sudo chown -R $USER:$USER /usr/share/millennium/music
+sudo chown -R "$USER":"$USER" /usr/share/millennium/music
 sudo chmod 755 /usr/share/millennium/music
 
 echo "Created directory: /usr/share/millennium/music"
@@ -27,12 +27,10 @@ create_test_tone() {
     local name="$4"
     
     echo "Creating $name ($filename)..."
-    ffmpeg -f lavfi -i "sine=frequency=$frequency:duration=$duration" \
+    if ffmpeg -f lavfi -i "sine=frequency=$frequency:duration=$duration" \
            -ar 44100 -ac 2 -f wav \
            "/usr/share/millennium/music/$filename" \
-           -y -loglevel quiet
-    
-    if [ $? -eq 0 ]; then
+           -y -loglevel quiet; then
         echo "  ✅ Created $filename"
     else
         echo "  ❌ Failed to create $filename"
@@ -45,22 +43,17 @@ create_melody() {
     local name="$2"
     local notes="$3"
     
-    echo "Creating $name ($filename)..."
-    
-    # Create a temporary file for the melody
-    local temp_file="/tmp/melody_$filename"
+    echo "Creating $name ($filename, notes $notes)..."
     
     # Generate melody using multiple sine waves
-    ffmpeg -f lavfi -i "sine=frequency=440:duration=0.5" \
+    if ffmpeg -f lavfi -i "sine=frequency=440:duration=0.5" \
            -f lavfi -i "sine=frequency=523:duration=0.5" \
            -f lavfi -i "sine=frequency=659:duration=0.5" \
            -f lavfi -i "sine=frequency=784:duration=1.0" \
            -filter_complex "[0][1][2][3]concat=n=4:v=0:a=1[out]" \
            -map "[out]" -ar 44100 -ac 2 -f wav \
            "/usr/share/millennium/music/$filename" \
-           -y -loglevel quiet
-    
-    if [ $? -eq 0 ]; then
+           -y -loglevel quiet; then
         echo "  ✅ Created $filename"
     else
         echo "  ❌ Failed to create $filename"
@@ -104,4 +97,3 @@ echo "1. Convert your MP3 files to WAV:"
 echo "   ffmpeg -i song.mp3 -ar 44100 -ac 2 song.wav"
 echo "2. Copy to /usr/share/millennium/music/"
 echo "3. Make sure filenames match the expected names"
-

@@ -48,7 +48,9 @@ network_link() {
 power_cut() {
     monitor_command quit || true
     for _ in {1..20}; do running || break; sleep 0.25; done
-    test -f "$STATE_DIR/mcu.pid" && kill "$(cat "$STATE_DIR/mcu.pid")" 2>/dev/null || true
+    if test -f "$STATE_DIR/mcu.pid"; then
+        kill "$(cat "$STATE_DIR/mcu.pid")" 2>/dev/null || true
+    fi
     rm -f "$STATE_DIR/qemu.pid" "$STATE_DIR/mcu.pid"
     printf 'VM power cut; disk was not gracefully shut down\n'
 }
@@ -211,6 +213,8 @@ experience_test() {
     running || die "start and provision the VM before experience-test"
     python3 "$SCRIPT_DIR/virtual_mcu.py" send --control "$STATE_DIR/control.sock" hook down >/dev/null
     "${SSH[@]}" sudo rm -f /var/lib/millennium/story-state
+    # The token expansion intentionally happens in the single-quoted remote shell.
+    # shellcheck disable=SC2016
     "${SSH[@]}" 'token=$(sudo cat /etc/millennium/admin-token); curl --fail --silent --request POST --header "Content-Type: application/json" --header "Authorization: Bearer $token" --data '\''{"action":"activate_plugin","plugin":"Story Mode"}'\'' http://127.0.0.1:8081/api/control >/dev/null'
     wait_display "THIS CALL IS FOR"
     network_link down >/dev/null
@@ -284,7 +288,8 @@ wifi_test() {
 }
 
 full_test() {
-    local run="full-$(date -u +%Y%m%dT%H%M%SZ)"
+    local run
+    run="full-$(date -u +%Y%m%dT%H%M%SZ)"
     if ! running; then
         start_vm
     fi
@@ -412,7 +417,9 @@ start_vm() {
         -monitor "unix:$STATE_DIR/monitor.sock,server=on,wait=off" \
         -serial "file:$STATE_DIR/console.log" -display none \
         -daemonize -pidfile "$STATE_DIR/qemu.pid"; then
-        test -f "$STATE_DIR/mcu.pid" && kill "$(cat "$STATE_DIR/mcu.pid")" 2>/dev/null || true
+        if test -f "$STATE_DIR/mcu.pid"; then
+            kill "$(cat "$STATE_DIR/mcu.pid")" 2>/dev/null || true
+        fi
         rm -f "$STATE_DIR/mcu.pid"
         die "QEMU failed to start; the newly started virtual MCU was cleaned up"
     fi
@@ -451,7 +458,9 @@ stop_vm() {
             for _ in {1..20}; do running || break; sleep 0.25; done
         fi
     fi
-    test -f "$STATE_DIR/mcu.pid" && kill "$(cat "$STATE_DIR/mcu.pid")" 2>/dev/null || true
+    if test -f "$STATE_DIR/mcu.pid"; then
+        kill "$(cat "$STATE_DIR/mcu.pid")" 2>/dev/null || true
+    fi
     rm -f "$STATE_DIR/qemu.pid" "$STATE_DIR/mcu.pid"
     printf 'VM stopped\n'
 }
@@ -479,12 +488,22 @@ case ${1:-help} in
     experience-test) experience_test ;;
     full-test) full_test ;;
     collect-artifacts) collect_artifacts "${2:-}" ;;
-    status) running && printf 'running (pid %s)\n' "$(cat "$STATE_DIR/qemu.pid")" || { printf 'stopped\n'; exit 1; } ;;
+    status)
+        if running; then
+            printf 'running (pid %s)\n' "$(cat "$STATE_DIR/qemu.pid")"
+        else
+            printf 'stopped\n'
+            exit 1
+        fi
+        ;;
     ssh) shift; "${SSH[@]}" "$@" ;;
     logs) "${SSH[@]}" sudo journalctl -u daemon.service -f ;;
     token) "${SSH[@]}" sudo cat /etc/millennium/admin-token ;;
     tunnel) exec ssh -N -L 8081:127.0.0.1:8081 -L 8080:127.0.0.1:8080 "${SSH[@]:1}" ;;
-    display) test -f "$STATE_DIR/display.json" && cat "$STATE_DIR/display.json" || die "no display update captured" ;;
+    display)
+        test -f "$STATE_DIR/display.json" || die "no display update captured"
+        cat "$STATE_DIR/display.json"
+        ;;
     key|hook|coin|card|fault|reset-mcu)
         action=$1; shift
         test "$action" = reset-mcu && action=reset
