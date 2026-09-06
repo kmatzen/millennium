@@ -95,6 +95,11 @@ mmdebstrap:
         --no-same-owner --no-overwrite-dir
       rm -f "$payload_archive"
       trap - EXIT
+      # Some upstream image-generation overlays are themselves copied from a
+      # non-root build workspace.  Enforce traversal metadata for the system
+      # hierarchy after all payload extraction so service accounts can exec.
+      chown 0:0 "$1/usr" "$1/usr/lib" "$1/usr/lib/systemd"
+      chmod 0755 "$1/usr" "$1/usr/lib" "$1/usr/lib/systemd"
       # This hook executes on the build host, where the target-only
       # `millennium` account need not exist. Create the directory without a
       # named owner here; the target-side recursive chown below assigns the
