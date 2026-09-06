@@ -313,3 +313,11 @@ the plaintext workspace was destroyed. The artifact remains explicitly named
 `unapproved`: it has not yet been written to dedicated recovery media, read
 back, or booted on a physical Zero 2 W. Exact hashes and scope are in
 `evidence/zero2w-recovery-artifact-25c2729-2026-09-06.json`.
+
+The signed candidate also has an independently verified restricted copy on
+`anima`. All transferred hashes, the Ed25519 signature, and the canonical
+public-key identity were checked before atomic publication. Encrypted Restic
+snapshot `e51ac235` then captured the server recovery store without staging a
+plaintext archive; a fresh restore stream reproduced the exact whole-image
+SHA-256. Exact evidence is in
+`evidence/zero2w-recovery-retention-25c2729-2026-09-06.json`.
