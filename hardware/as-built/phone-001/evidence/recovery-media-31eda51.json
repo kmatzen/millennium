@@ -1,0 +1,26 @@
+{
+  "completed_at": "2026-09-06T16:20:06+00:00",
+  "compressed_image_verified": true,
+  "expanded_write_verified": true,
+  "image": {
+    "compressed_sha256": "baa2a108ebb6af2e13646f4a4a043ba6b8ebdffbfec2bc4579bd97279d798a66",
+    "compressed_size": 444638424,
+    "compression": "zstd",
+    "expanded_sha256": "7eca956c1d94bc0cd706a9152aae78262bafb2163d113959448df076469ba128",
+    "expanded_size": 15636365312,
+    "filename": "millennium-zero2w-ab.img.zst"
+  },
+  "key_id": "release-2026-08",
+  "operation": "recovery-media-write",
+  "passed": true,
+  "readback_sha256": "7eca956c1d94bc0cd706a9152aae78262bafb2163d113959448df076469ba128",
+  "schema": 1,
+  "signature_verified": true,
+  "source_commit": "31eda512ab94cf7d9959451673e2674d44516270",
+  "target": {
+    "device_identifier": "disk10",
+    "path": "/dev/disk10",
+    "size_bytes": 63864569856,
+    "transport": "USB"
+  }
+}

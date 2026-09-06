@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import os
 from pathlib import Path
 import plistlib
 import subprocess
@@ -101,7 +102,37 @@ class RecoveryMediaTests(unittest.TestCase):
             target = Path(temporary) / "disk"
             target.write_bytes(b"signed image" + b"trailing media")
             expected = MODULE.hashlib.sha256(b"signed image").hexdigest()
-            self.assertEqual(MODULE.verify_readback(target, 12, expected), expected)
+            descriptor = os.open(target, os.O_RDONLY)
+            try:
+                self.assertEqual(MODULE.verify_readback(descriptor, 12, expected), expected)
+            finally:
+                os.close(descriptor)
+
+    def test_darwin_target_is_opened_exclusively(self):
+        with mock.patch.object(MODULE.os, "open", return_value=42) as opened:
+            self.assertEqual(MODULE.open_target("/dev/rdisk9", "Darwin"), 42)
+        flags = opened.call_args.args[1]
+        self.assertEqual(flags & os.O_RDWR, os.O_RDWR)
+        self.assertEqual(flags & os.O_EXCL, os.O_EXCL)
+
+    def test_write_and_readback_share_one_descriptor(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            manifest, signature, public, image = self.make_signed_artifact(root)
+            value = MODULE.verified_manifest(manifest, signature, public, image)
+            target = root / "target"
+            target.write_bytes(b"\0" * 4096)
+            descriptor = os.open(target, os.O_RDWR)
+            try:
+                metadata = value["image"]
+                MODULE.stream_image(image, descriptor, metadata["expanded_size"],
+                                    metadata["expanded_sha256"])
+                self.assertEqual(
+                    MODULE.verify_readback(descriptor, metadata["expanded_size"],
+                                           metadata["expanded_sha256"]),
+                    metadata["expanded_sha256"])
+            finally:
+                os.close(descriptor)
 
     def test_canonical_manifest_rejects_formatting_changes(self):
         value = {"schema": 1, "kind": "millennium-recovery-image"}

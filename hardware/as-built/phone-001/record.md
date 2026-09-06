@@ -361,7 +361,7 @@ to expanded SHA-256
 It was signed with the active `release-2026-08` key recovered only on a
 disposable RAM disk; the public identity and signature were independently
 verified and the RAM disk was ejected. This candidate remains explicitly
-`unapproved` pending dedicated-media readback and a physical Zero 2 W boot.
+`unapproved` pending a physical Zero 2 W boot.
 Exact evidence is in
 `evidence/zero2w-recovery-artifact-31eda51-2026-09-06.json`.
 
@@ -374,3 +374,14 @@ fresh restore stream from that snapshot reproduced compressed image SHA-256
 `baa2a108ebb6af2e13646f4a4a043ba6b8ebdffbfec2bc4579bd97279d798a66`.
 Exact evidence is in
 `evidence/zero2w-recovery-retention-31eda51-2026-09-06.json`.
+
+On 2026-09-06 macOS identified a dedicated 63.9 GB USB SD card as removable
+whole disk `/dev/disk10`. The recovery-media writer verified the canonical
+manifest signature and compressed artifact, held exclusive raw-device access
+through the write and mandatory full image-length readback, and reproduced the
+signed expanded SHA-256
+`7eca956c1d94bc0cd706a9152aae78262bafb2163d113959448df076469ba128`.
+The card was safely ejected immediately afterward. This closes media creation
+and byte-for-byte readback only; the candidate remains `unapproved` until it
+boots and passes its health gates on the physical production-equivalent Zero
+2 W. Exact evidence is in `evidence/recovery-media-31eda51.json`.

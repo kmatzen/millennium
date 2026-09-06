@@ -22,7 +22,17 @@ steps may be replaced by QEMU evidence.
 Do **not** use `/dev/disk11` or the `UEBuild` volume as recovery media. It holds
 the builder, retained images, and signing-key backup.
 
-## 1. Create the recovery card before wiring the phone
+## 1. Recovery card created and verified
+
+This step passed on 2026-09-06 using macOS whole disk `/dev/disk10`, a 63.9 GB
+USB removable SD card. The writer retained exclusive raw-device access through
+the write and complete readback, and the observed expanded SHA-256 matched the
+signed value `7eca956c1d94bc0cd706a9152aae78262bafb2163d113959448df076469ba128`.
+The card was then ejected. Exact evidence is in
+`evidence/recovery-media-31eda51.json`. Do not repeat this step unless the card
+is damaged or intentionally replaced.
+
+The reproducible procedure remains below for disaster recovery.
 
 The approved software candidate is intentionally named `unapproved` until this
 section and its physical boot both pass:

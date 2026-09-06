@@ -80,8 +80,9 @@ with one assembled-hardware session and without repeating the network wiring.
     - [x] Produce, sign, and retain a software-verified production-equivalent
       recovery image, with its exact compressed and expanded hashes bound to
       the active release key. Keep it explicitly unapproved until physical boot.
-    - [ ] Write the retained image to OS-identified removable recovery media,
-      verify its full readback, and boot it on the production-equivalent Zero 2 W.
+    - [x] Write the retained image to OS-identified removable recovery media and
+      verify its full image-length readback against the signed expanded digest.
+    - [ ] Boot the verified recovery media on the production-equivalent Zero 2 W.
   - [ ] Exercise download, inactive-slot write, pre-reboot, first boot, health
     commit, and rollback in QEMU and by physically removing power on the
     production-equivalent Zero 2 W image.

@@ -218,20 +218,37 @@ def unmount_target(target, system):
             stack.extend(device.get("children") or [])
 
 
-def stream_image(image_path, destination, expected_size, expected_digest):
+def open_target(destination, system):
+    flags = os.O_RDWR
+    # On macOS, retaining an exclusive raw-device descriptor prevents Disk
+    # Arbitration/filesystem probes from changing FAT status bits between the
+    # write and the mandatory byte-for-byte readback.
+    if system == "Darwin":
+        flags |= os.O_EXCL
+    try:
+        return os.open(destination, flags)
+    except OSError as exc:
+        raise SystemExit("cannot exclusively open recovery-media target: %s" % exc)
+
+
+def stream_image(image_path, destination_fd, expected_size, expected_digest):
     process = subprocess.Popen(
         ["zstd", "--quiet", "--decompress", "--stdout", str(image_path)],
         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     digest = hashlib.sha256()
     size = 0
     try:
-        with open(destination, "wb", buffering=0) as output:
-            for chunk in iter(lambda: process.stdout.read(CHUNK_SIZE), b""):
-                output.write(chunk)
-                digest.update(chunk)
-                size += len(chunk)
-            output.flush()
-            os.fsync(output.fileno())
+        os.lseek(destination_fd, 0, os.SEEK_SET)
+        for chunk in iter(lambda: process.stdout.read(CHUNK_SIZE), b""):
+            view = memoryview(chunk)
+            while view:
+                written = os.write(destination_fd, view)
+                if written <= 0:
+                    raise OSError("short recovery-media write")
+                view = view[written:]
+            digest.update(chunk)
+            size += len(chunk)
+        os.fsync(destination_fd)
     except BaseException:
         process.kill()
         process.wait()
@@ -244,16 +261,16 @@ def stream_image(image_path, destination, expected_size, expected_digest):
         raise SystemExit("expanded recovery image does not match signed manifest")
 
 
-def verify_readback(source, size, expected_digest):
+def verify_readback(source_fd, size, expected_digest):
     digest = hashlib.sha256()
     remaining = size
-    with open(source, "rb", buffering=0) as stream:
-        while remaining:
-            chunk = stream.read(min(CHUNK_SIZE, remaining))
-            if not chunk:
-                raise SystemExit("short recovery-media readback")
-            digest.update(chunk)
-            remaining -= len(chunk)
+    os.lseek(source_fd, 0, os.SEEK_SET)
+    while remaining:
+        chunk = os.read(source_fd, min(CHUNK_SIZE, remaining))
+        if not chunk:
+            raise SystemExit("short recovery-media readback")
+        digest.update(chunk)
+        remaining -= len(chunk)
     if digest.hexdigest() != expected_digest:
         raise SystemExit("recovery-media readback digest mismatch")
     return digest.hexdigest()
@@ -302,10 +319,14 @@ def main():
         if os.geteuid() != 0:
             raise SystemExit("recovery-media writing requires root")
         unmount_target(target["path"], system)
-        stream_image(args.image, target["raw_path"], image["expanded_size"],
-                     image["expanded_sha256"])
-        summary["readback_sha256"] = verify_readback(
-            target["raw_path"], image["expanded_size"], image["expanded_sha256"])
+        target_fd = open_target(target["raw_path"], system)
+        try:
+            stream_image(args.image, target_fd, image["expanded_size"],
+                         image["expanded_sha256"])
+            summary["readback_sha256"] = verify_readback(
+                target_fd, image["expanded_size"], image["expanded_sha256"])
+        finally:
+            os.close(target_fd)
         summary["expanded_write_verified"] = True
     if args.evidence:
         if args.evidence.exists():
