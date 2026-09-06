@@ -108,6 +108,7 @@ ln -s "releases/$content_id" "$payload/var/lib/millennium/content/current"
 cat >"$payload/etc/rpi-image-gen/slot-shared.d/millennium.conf" <<'EOF'
 Version=1
 Path=/etc/millennium
+Path=/etc/ssh
 Path=/etc/NetworkManager/system-connections
 Path=/var/lib/millennium
 Path=/var/log/millennium
