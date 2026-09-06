@@ -1,0 +1,40 @@
+{
+  "artifact": {
+    "compressed_sha256": "41232f4ea1b155329e0adb314b9a65bff962dac47686c077b79ae63fa2da7dd9",
+    "expanded_sha256": "0bc09f573c2a1f54ebcb3c80093c05c03f14beb3b1070e97c4af7c5ef0269a5e",
+    "source_commit": "31eda512ab94cf7d9959451673e2674d44516270"
+  },
+  "board": "Raspberry Pi Zero 2 W Rev 1.0",
+  "boot_observed": true,
+  "completed_at": "2026-09-06T19:47:50Z",
+  "defects": [
+    "factory validation accepted a 32-hex machine-id followed by two newlines",
+    "the slot-shared generator emitted mount units without local-fs.target dependency links",
+    "the Wi-Fi state directory was absent",
+    "the root-owned admin token was mode 0600 and unreadable by the daemon group"
+  ],
+  "hardware_observations": {
+    "alpha_serial_present": true,
+    "beta_serial_present": true,
+    "daemon_healthy": false,
+    "journald_active_after_machine_id_repair": true,
+    "maintenance_tunnel_healthy": false,
+    "root_read_only": true,
+    "shared_etc_mounts_active": false,
+    "usb_host_transfer_timeout_warnings_observed": true
+  },
+  "kind": "recovery-media-physical-boot-result",
+  "machine_id_repair": {
+    "copies_repaired": [
+      "system_a:/etc/machine-id",
+      "system_b:/etc/machine-id",
+      "persistent:/common/etc/machine-id"
+    ],
+    "exact_bytes_sha256": "3ac81f8c297084dbe825bea0ee44124fec3d7439ef033f74e4a79f19045f59aa",
+    "filesystem_checks_clean_after_repair": true
+  },
+  "passed": false,
+  "schema": 1,
+  "status": "quarantined-do-not-redeploy",
+  "superseded_by_commit": "f285b369852b1e5d7a00bca71c4c1ff22de390be"
+}
