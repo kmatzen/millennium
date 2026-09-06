@@ -260,6 +260,9 @@ It was decrypted only on a disposable RAM disk using the Keychain secret and
 matched the production canonical public-key identity
 `581a1ff72d1867b3dfb3b1ffc5521308ac646878050f1c4c12739e0dedaf7348`.
 The local restricted vault was repaired without deleting the legacy backup.
+The generic local public-key path now contains the active key, while the
+legacy public and private files were preserved under explicit
+`legacy-primary-*` names; no plaintext active private key is stored there.
 Two new removable copies of this active ciphertext remain required. Exact
 findings are in `evidence/key-custody-correction-2026-09-06.json`.
 

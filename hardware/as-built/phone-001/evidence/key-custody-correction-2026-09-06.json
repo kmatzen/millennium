@@ -10,13 +10,16 @@
     "ciphertext_recovered_from": "anima restricted signing backup",
     "ram_disk_recovery_verified": true,
     "production_signature_verified": true,
-    "local_restricted_vault_repaired": true
+    "local_restricted_vault_repaired": true,
+    "generic_public_key_path_corrected": true,
+    "plaintext_private_key_persisted": false
   },
   "legacy_key": {
     "key_id": "legacy-primary",
     "canonical_public_key_sha256": "46d4ea8e2e8cf261816953b5c64f907840a5da84f50c3127011d4bbe1d77c946",
     "ciphertext_sha256": "0d4b59b1b3ea3d9e9a6563ce033e8e3c6f8fa926a86c65ce1976c8c906f3b8ff",
     "preserved_in_local_vault": true,
+    "generic_key_files_renamed_with_legacy_identity": true,
     "removable_media": [
       "SD-EEE0E3AE",
       "NVME-68D6C050"
