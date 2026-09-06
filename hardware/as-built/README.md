@@ -72,6 +72,8 @@ maintenance session performed from outside the home network:
 python3 tools/handoff_acceptance.py template --device-id phone-001 \
   --as-built-record evidence.json \
   --playtest-record playtest-last-line-2.1.0.json \
+  --signing-key-id release-2026-08 \
+  --signing-public-key host/ota/keys/release-2026-08.pem \
   --output hardware/as-built/phone-001/handoff.json
 
 python3 tools/handoff_acceptance.py record-wifi \
@@ -102,6 +104,8 @@ python3 tools/handoff_acceptance.py validate \
 
 Repeat `record-wifi` for `android`, `macos`, and `windows`, and `add-key-copy`
 for a second removable device. The tool hashes each ciphertext itself, rejects
-duplicate media labels, hashes and rechecks every referenced evidence file,
-validates the linked as-built and playtest records, and will not mark the phone
-acceptable from QEMU or unsupported narrative assertions alone.
+duplicate media labels, and requires every recovery drill to match the
+canonical public-key identity selected for production. It also hashes and
+rechecks every referenced evidence file, validates the linked as-built and
+playtest records, and will not mark the phone acceptable from QEMU, a
+mislabeled legacy key, or unsupported narrative assertions alone.

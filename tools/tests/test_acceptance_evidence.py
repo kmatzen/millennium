@@ -63,6 +63,10 @@ class AcceptanceEvidenceTests(unittest.TestCase):
         value = {
             "schema": 1,
             "device_id": "phone-001",
+            "release_signing_key": {
+                "key_id": "release-2026-08",
+                "canonical_public_key_sha256": "a" * 64,
+            },
             "as_built_record": "as-built.json",
             "playtest_record": "playtest.json",
             "wifi_clients": {},
@@ -94,12 +98,18 @@ class AcceptanceEvidenceTests(unittest.TestCase):
 
     def test_handoff_rejects_one_media_label_even_with_two_entries(self):
         key = {"media_label": "USB-A", "ciphertext_sha256": "a" * 64,
+               "key_id": "release-2026-08",
+               "canonical_public_key_sha256": "e" * 64,
                "physically_distinct": True, "verified_at": "2026-09-02",
                "recovery_tested_at": "2026-09-02",
                "copy_evidence": {"path": "copy", "sha256": "b" * 64},
                "recovery_evidence": {"path": "recovery", "sha256": "c" * 64}}
         value = {
             "schema": 1, "device_id": "phone-001",
+            "release_signing_key": {
+                "key_id": "release-2026-08",
+                "canonical_public_key_sha256": "e" * 64,
+            },
             "as_built_record": "as-built.json", "playtest_record": "playtest.json",
             "wifi_clients": {name: {"passed": True, "date": "2026-09-02",
                                      "portal_evidence": {"path": "portal", "sha256": "a" * 64},
@@ -118,6 +128,8 @@ class AcceptanceEvidenceTests(unittest.TestCase):
             root = Path(directory)
             record = root / "handoff.json"
             evidence = root / "notes.txt"
+            copy_evidence = root / "copy.json"
+            recovery_evidence = root / "recovery.json"
             ciphertext = root / "key.aes256"
             evidence.write_text(json.dumps({
                 "schema": 1, "operation": "physical-wifi-client-observation",
@@ -127,8 +139,25 @@ class AcceptanceEvidenceTests(unittest.TestCase):
                 "user_agent_stored": False,
             }), encoding="utf-8")
             ciphertext.write_bytes(b"encrypted")
-            record.write_text(json.dumps({"schema": 1, "wifi_clients": {},
-                                          "offline_signing_key_copies": []}),
+            digest = handoff.hashlib.sha256(ciphertext.read_bytes()).hexdigest()
+            copy_evidence.write_text(json.dumps({
+                "schema": 1, "operation": "offline-media-copy", "passed": True,
+                "key_id": "release-2026-08", "ciphertext_sha256": digest,
+            }), encoding="utf-8")
+            recovery_evidence.write_text(json.dumps({
+                "schema": 1, "operation": "recovery-drill", "passed": True,
+                "key_id": "release-2026-08", "ciphertext_sha256": digest,
+                "canonical_public_key_sha256": "e" * 64,
+                "public_identity_matched": True, "signature_verified": True,
+                "plaintext_persisted": False, "media_ejected": True,
+            }), encoding="utf-8")
+            record.write_text(json.dumps({
+                "schema": 1, "wifi_clients": {},
+                "release_signing_key": {
+                    "key_id": "release-2026-08",
+                    "canonical_public_key_sha256": "e" * 64,
+                },
+                "offline_signing_key_copies": []}),
                               encoding="utf-8")
             handoff.record_wifi(Namespace(
                 record=record, platform="ios", result="pass", date="2026-09-02",
@@ -136,13 +165,48 @@ class AcceptanceEvidenceTests(unittest.TestCase):
             handoff.add_key_copy(Namespace(
                 record=record, media_label="USB-A", ciphertext=ciphertext,
                 verified_at="2026-09-02", recovery_tested_at="2026-09-02",
-                copy_evidence_file=evidence, recovery_evidence_file=evidence))
+                copy_evidence_file=copy_evidence,
+                recovery_evidence_file=recovery_evidence))
             saved = json.loads(record.read_text(encoding="utf-8"))
             self.assertIn("sha256", saved["wifi_clients"]["ios"]["portal_evidence"])
             self.assertIn("sha256", saved["wifi_clients"]["ios"]["outcome_evidence"])
             key = saved["offline_signing_key_copies"][0]
             self.assertIn("sha256", key["copy_evidence"])
             self.assertIn("sha256", key["recovery_evidence"])
+
+    def test_handoff_rejects_recovered_legacy_key_identity(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            record = root / "handoff.json"
+            ciphertext = root / "key.aes256"
+            copy = root / "copy.json"
+            recovery = root / "recovery.json"
+            ciphertext.write_bytes(b"encrypted")
+            digest = handoff.hashlib.sha256(ciphertext.read_bytes()).hexdigest()
+            record.write_text(json.dumps({
+                "schema": 1,
+                "release_signing_key": {
+                    "key_id": "release-2026-08",
+                    "canonical_public_key_sha256": "a" * 64,
+                },
+                "offline_signing_key_copies": [],
+            }), encoding="utf-8")
+            copy.write_text(json.dumps({
+                "operation": "offline-media-copy", "passed": True,
+                "key_id": "release-2026-08", "ciphertext_sha256": digest,
+            }), encoding="utf-8")
+            recovery.write_text(json.dumps({
+                "operation": "recovery-drill", "passed": True,
+                "key_id": "release-2026-08", "ciphertext_sha256": digest,
+                "canonical_public_key_sha256": "b" * 64,
+                "public_identity_matched": True, "signature_verified": True,
+                "plaintext_persisted": False, "media_ejected": True,
+            }), encoding="utf-8")
+            with self.assertRaisesRegex(SystemExit, "active signing identity"):
+                handoff.add_key_copy(Namespace(
+                    record=record, media_label="USB-A", ciphertext=ciphertext,
+                    verified_at="2026-09-02", recovery_tested_at="2026-09-02",
+                    copy_evidence_file=copy, recovery_evidence_file=recovery))
 
     def test_external_record_rejects_unproven_narrative(self):
         with tempfile.TemporaryDirectory() as directory:

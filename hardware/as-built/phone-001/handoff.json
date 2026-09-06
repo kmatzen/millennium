@@ -10,6 +10,10 @@
   },
   "offline_signing_key_copies": [],
   "playtest_record": "playtest-last-line-2.1.0.json",
+  "release_signing_key": {
+    "canonical_public_key_sha256": "581a1ff72d1867b3dfb3b1ffc5521308ac646878050f1c4c12739e0dedaf7348",
+    "key_id": "release-2026-08"
+  },
   "schema": 1,
   "server_state_backup": {
     "completed_at": "2026-09-06T00:08:14+00:00",

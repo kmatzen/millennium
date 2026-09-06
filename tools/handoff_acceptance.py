@@ -8,6 +8,8 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import re
+import subprocess
 import tempfile
 
 
@@ -45,6 +47,18 @@ def file_evidence(path):
     return {"path": str(path), "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
 
 
+def public_key_identity(path):
+    try:
+        result = subprocess.run(
+            ["openssl", "pkey", "-pubin", "-in", str(path.resolve()),
+             "-outform", "DER"], check=True, stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise SystemExit("cannot read signing public key: %s" % exc)
+    return hashlib.sha256(result.stdout).hexdigest()
+
+
 def load_module(name, path):
     spec = importlib.util.spec_from_file_location(name, path)
     module = importlib.util.module_from_spec(spec)
@@ -77,6 +91,11 @@ def template(args):
         "created_at": now(),
         "as_built_record": args.as_built_record,
         "playtest_record": args.playtest_record,
+        "release_signing_key": {
+            "key_id": args.signing_key_id,
+            "canonical_public_key_sha256": public_key_identity(
+                args.signing_public_key),
+        },
         "wifi_clients": {
             platform: {"passed": None, "date": None,
                        "portal_evidence": None, "outcome_evidence": None}
@@ -142,11 +161,36 @@ def add_key_copy(args):
     digest = hashlib.sha256(ciphertext.read_bytes()).hexdigest()
 
     def change(value):
+        signing_key = value.get("release_signing_key", {})
+        key_id = signing_key.get("key_id")
+        public_identity = signing_key.get("canonical_public_key_sha256")
+        try:
+            copy = read(args.copy_evidence_file)
+            recovery = read(args.recovery_evidence_file)
+        except (OSError, json.JSONDecodeError) as exc:
+            raise SystemExit("invalid signing-key evidence: %s" % exc)
+        if (not key_id or not re.fullmatch(r"[0-9a-f]{64}", public_identity or "")
+                or copy.get("operation") != "offline-media-copy"
+                or copy.get("passed") is not True or copy.get("key_id") != key_id
+                or copy.get("ciphertext_sha256") != digest
+                or recovery.get("operation") != "recovery-drill"
+                or recovery.get("passed") is not True
+                or recovery.get("key_id") != key_id
+                or recovery.get("ciphertext_sha256") != digest
+                or recovery.get("canonical_public_key_sha256") != public_identity
+                or recovery.get("public_identity_matched") is not True
+                or recovery.get("signature_verified") is not True
+                or recovery.get("plaintext_persisted") is not False
+                or recovery.get("media_ejected") is not True):
+            raise SystemExit(
+                "key evidence does not prove recovery of the active signing identity")
         copies = value.setdefault("offline_signing_key_copies", [])
         if any(item.get("media_label") == args.media_label for item in copies):
             raise SystemExit("media label already recorded")
         copies.append({
             "media_label": args.media_label,
+            "key_id": key_id,
+            "canonical_public_key_sha256": public_identity,
             "ciphertext_sha256": digest,
             "physically_distinct": True,
             "verified_at": args.verified_at,
@@ -221,9 +265,16 @@ def omissions(value, record_path, check_linked=True):
                 or not valid_evidence(item.get("portal_evidence"), record_path, check_linked)
                 or not valid_evidence(item.get("outcome_evidence"), record_path, check_linked)):
             missing.append("wifi_clients." + platform)
+    signing_key = value.get("release_signing_key", {})
+    key_id = signing_key.get("key_id")
+    public_identity = signing_key.get("canonical_public_key_sha256", "")
+    if not key_id or not re.fullmatch(r"[0-9a-f]{64}", public_identity):
+        missing.append("release_signing_key")
     copies = value.get("offline_signing_key_copies", [])
     usable = [item for item in copies
               if item.get("media_label") and item.get("ciphertext_sha256")
+              and item.get("key_id") == key_id
+              and item.get("canonical_public_key_sha256") == public_identity
               and item.get("physically_distinct") is True and item.get("verified_at")
               and item.get("recovery_tested_at")
               and valid_evidence(item.get("copy_evidence"), record_path, check_linked)
@@ -285,6 +336,8 @@ def main():
     make.add_argument("--device-id", required=True)
     make.add_argument("--as-built-record", required=True)
     make.add_argument("--playtest-record", required=True)
+    make.add_argument("--signing-key-id", required=True)
+    make.add_argument("--signing-public-key", type=Path, required=True)
     make.add_argument("--output", type=Path, required=True)
     make.set_defaults(function=template)
     wifi = commands.add_parser("record-wifi")
