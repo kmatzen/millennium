@@ -220,10 +220,10 @@ Before handing over a phone:
 - Alert on phones that have not checked in, repeated signature failures,
   rollback, or a firmware recovery attempt.
 
-Full operating-system image updates are a separate phase. Application and MCU
-OTA should be proven first; unattended OS A/B updates require partition-level
-boot selection and a boot-count watchdog rather than the application symlink
-mechanism above.
+Full operating-system image updates use a separate partition-level A/B path;
+they cannot reuse the application symlink mechanism above. The Zero 2 W design,
+migration boundary, signed-image format, one-shot boot contract, and physical
+acceptance matrix are specified in [OS_AB_OTA.md](OS_AB_OTA.md).
 
 ## Implementation and provisioning commands
 

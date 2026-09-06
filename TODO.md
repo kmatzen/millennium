@@ -42,6 +42,35 @@ as an unattended appliance. Items are ordered by priority.
     from a mobile browser without maintainer help, while an untrusted setup
     client cannot reach administrative services or recover stored credentials.
 
+- [ ] Add fail-safe full operating-system OTA updates.
+  - [ ] Build a supported NetworkManager-based Raspberry Pi OS image for the
+    Zero 2 W with redundant boot/root slots and a separate persistent-data
+    partition; do not repartition the deployed Bullseye system in place.
+  - [ ] Use the Raspberry Pi firmware's one-shot `tryboot` A/B mechanism so an
+    uncommitted image automatically falls back after a failed or interrupted
+    boot without requiring network access.
+  - [ ] Authenticate the OS image manifest and every boot/root payload before
+    writing only inactive slots; bind model, partition layout, source commit,
+    monotonically increasing sequence, minimum compatible application/MCU
+    versions, and exact sizes and hashes into the signature.
+  - [ ] Preserve per-device identity, NetworkManager profiles, setup secret,
+    maintenance credentials, story state, logs required for diagnosis, and OTA
+    anti-rollback state outside the replaceable root filesystems.
+  - [ ] Commit the new boot slot only after bounded checks prove the daemon,
+    both MCUs, audio, SIP, local controls, update endpoint, and maintenance
+    tunnel are healthy; otherwise record failure and return to the prior slot.
+  - [ ] Rate-limit and quarantine failed OS images, respect calls and
+    maintenance windows, expose owner-safe status, and retain a signed recovery
+    image that can be written by a maintainer.
+  - [ ] Exercise download, inactive-slot write, pre-reboot, first boot, health
+    commit, and rollback in QEMU and by physically removing power on the
+    production-equivalent Zero 2 W image.
+  - [ ] Reimage the production phone only from locally attached recovery media,
+    restore its per-device state, and prove both A/B directions plus recovery
+    before handoff.
+  - Done when a bad, truncated, or power-interrupted OS release cannot replace
+    the last bootable slot and a healthy signed OS update commits unattended.
+
 - [x] Secure the management API.
   - [x] Bind administrative endpoints to loopback or a Unix socket by default.
   - [x] Expose remote administration only through the authenticated maintenance path.
