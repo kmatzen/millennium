@@ -1,0 +1,60 @@
+{
+  "artifact_directory": "/Volumes/UEBuild/millennium-images/zero2w-ab-1.0.0-31eda51-unapproved",
+  "board_model": "Raspberry Pi Zero 2 W",
+  "completed_at": "2026-09-06T10:53:36Z",
+  "embedded_firmware": {
+    "build_identity": "0f9093be5263",
+    "display_sha256": "511518a53c5ad37bb75b774c2f00b04c713877f136a7699ff15211ca92018440",
+    "keypad_sha256": "928e4c8da74746ae4107771443d0467b893101308ee224e0bbc712016dc82564",
+    "matches_reproducibly_rebuilt_source_artifacts": true
+  },
+  "embedded_health_gate": {
+    "audio_pcm_write_required": true,
+    "independent_zero_drop_diagnostics_required": [
+      "keypad",
+      "display"
+    ],
+    "maintenance_tunnel_minimum_active_seconds": 95,
+    "named_serial_health_required": true,
+    "named_sip_health_required": true,
+    "valid_local_control_state_required": true
+  },
+  "image": {
+    "compressed_sha256": "baa2a108ebb6af2e13646f4a4a043ba6b8ebdffbfec2bc4579bd97279d798a66",
+    "compressed_size": 444638424,
+    "expanded_sha256": "7eca956c1d94bc0cd706a9152aae78262bafb2163d113959448df076469ba128",
+    "expanded_size": 15636365312,
+    "filename": "millennium-zero2w-ab.img.zst"
+  },
+  "key": {
+    "canonical_public_key_sha256": "581a1ff72d1867b3dfb3b1ffc5521308ac646878050f1c4c12739e0dedaf7348",
+    "id": "release-2026-08",
+    "private_key_plaintext_persisted": false,
+    "temporary_ram_disk_ejected": true
+  },
+  "manifest": {
+    "filename": "recovery-manifest.json",
+    "sha256": "2cf77459a9c8b3ae12b3376605c14a1d42e4b07d7e801bf595d999bc56e7bed4",
+    "signature_filename": "recovery-manifest.json.sig",
+    "signature_sha256": "44515e1584e9a7c75448401c467eac565d533ea19b0bcbdf0817e73efacdfec2",
+    "signature_verified": true
+  },
+  "operation": "production-recovery-artifact-build",
+  "passed": true,
+  "physical_boot_approved": false,
+  "physical_media_readback_verified": false,
+  "schema": 1,
+  "source_commit": "31eda512ab94cf7d9959451673e2674d44516270",
+  "status": "software-verified; retained as explicitly unapproved pending physical recovery write and Zero 2 W boot",
+  "supersedes_source_commit": "5a9eef204a1fb5d71f5c8a1888e35a963d01164f",
+  "supersession_reason": "The prior candidate embedded stale checked-in MCU artifacts with build identity e0fe59960549. Reproducibility CI rebuilt and refreshed both artifacts; this candidate embeds the exact refreshed 0f9093be5263 keypad and display images.",
+  "verification": {
+    "all_compressed_streams_passed": true,
+    "boot_slots_byte_identical": true,
+    "embedded_agent_matches_source": true,
+    "mbr_ab_contract_passed": true,
+    "production_rootfs_minimality_passed": true,
+    "raw_boot_content_contract_passed": true
+  },
+  "version": "1.0.0"
+}

@@ -342,3 +342,25 @@ the Zstandard stream before atomic publication. Encrypted Restic snapshot
 `869fd021` captured the recovery store, and a fresh restore stream reproduced
 the exact image SHA-256 without staging a plaintext archive. Exact evidence is
 in `evidence/zero2w-recovery-retention-5a9eef2-2026-09-06.json`.
+
+The `5a9eef2` candidate was subsequently superseded when the pinned firmware
+reproducibility job proved that its checked-in Alpha and Beta HEX files still
+carried the older build identity `e0fe59960549`. Both firmwares were rebuilt in
+the pinned toolchain and refreshed with build identity `0f9093be5263`. A clean
+native ARM64 image was then built from commit
+`31eda512ab94cf7d9959451673e2674d44516270`. Its embedded keypad and display
+firmwares exactly match the refreshed source artifacts with SHA-256 values
+`928e4c8da74746ae4107771443d0467b893101308ee224e0bbc712016dc82564` and
+`511518a53c5ad37bb75b774c2f00b04c713877f136a7699ff15211ca92018440`.
+The full MBR A/B, raw boot-content, minimal-rootfs, embedded-source, health-gate,
+firmware-identity, and compressed-stream checks passed. The canonical manifest
+binds compressed image SHA-256
+`baa2a108ebb6af2e13646f4a4a043ba6b8ebdffbfec2bc4579bd97279d798a66`
+to expanded SHA-256
+`7eca956c1d94bc0cd706a9152aae78262bafb2163d113959448df076469ba128`.
+It was signed with the active `release-2026-08` key recovered only on a
+disposable RAM disk; the public identity and signature were independently
+verified and the RAM disk was ejected. This candidate remains explicitly
+`unapproved` pending dedicated-media readback and a physical Zero 2 W boot.
+Exact evidence is in
+`evidence/zero2w-recovery-artifact-31eda51-2026-09-06.json`.
