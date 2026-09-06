@@ -72,6 +72,28 @@ shared-mount-generator contract tests. It proves that every declared shared
 path is linked into `local-fs.target`; it does not claim that the `virt` guest
 booted Raspberry Pi firmware or the Zero 2 W disk image.
 
+## Exact production-image boot
+
+- [x] Boot the expanded, factory-seeded MBR A/B production image as the QEMU
+  system disk rather than copying selected files into a generic guest.
+- [x] Exercise its real system slot, persistent partition, shared-state
+  generator, mount graph, service accounts, D-Bus and resolver startup.
+- [x] Inject the `virt` machine's `/dev/vda*` slot identities only through
+  ephemeral initramfs `/run` udev rules; never modify the image under test.
+- [x] Fail on the directory-permission regressions observed on physical cards
+  and retain the full serial transcript plus a machine-readable fidelity
+  statement.
+
+Acceptance: set `MILLENNIUM_QEMU_EXACT_IMAGE`,
+`MILLENNIUM_QEMU_EXACT_KERNEL`, and `MILLENNIUM_QEMU_EXACT_INITRD`, then run
+`tools/qemu/qemu.sh exact-image-test`.
+
+This is exact for the disk bytes, partitioning, arm64 userspace and systemd
+startup graph. It is not firmware or board emulation: QEMU `virt` uses a
+generic transport kernel because no QEMU machine models the Zero 2 W's exact
+BCM2710A1 board, VideoCore firmware, SD electrical path, Wi-Fi, USB topology or
+power behavior. Those remain physical acceptance gates.
+
 ## Networking and onboarding
 
 - [x] Provide a simulated NetworkManager/radio boundary for first boot, hidden

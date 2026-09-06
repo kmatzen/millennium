@@ -1,0 +1,195 @@
+#!/usr/bin/env python3
+"""Boot an exact Millennium A/B disk image and assert early appliance health.
+
+QEMU's ``virt`` board cannot emulate a Zero 2 W.  This harness deliberately
+uses a generic arm64 kernel/initramfs only as a transport for the exact image's
+userspace, partition table, system slot, persistent slot and systemd graph.
+It injects QEMU-only udev aliases in /run; the image itself is never modified.
+"""
+
+from __future__ import annotations
+
+import argparse
+from datetime import datetime, timezone
+import json
+from pathlib import Path
+import re
+import select
+import shutil
+import socket
+import subprocess
+import tempfile
+import time
+
+
+PASS_MARKER = "MILLENNIUM_EXACT_IMAGE_PASS"
+FAIL_MARKER = "MILLENNIUM_EXACT_IMAGE_FAIL"
+FORBIDDEN = (
+    "Failed to start dbus.service",
+    "Failed to start systemd-resolved.service",
+    "dbus-daemon: Permission denied",
+    "systemd-resolved: Permission denied",
+    "Failed to open /etc/systemd/resolved.conf: Permission denied",
+)
+ANSI_ESCAPE = re.compile(r"\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07]*(?:\x07|\x1b\\))")
+
+
+def normalized_console(data: bytes | bytearray) -> str:
+    """Remove terminal control sequences before matching boot evidence."""
+    return ANSI_ESCAPE.sub("", data.decode(errors="replace")).replace("\r", "")
+
+
+def require_program(name: str) -> str:
+    path = shutil.which(name)
+    if not path:
+        raise SystemExit(f"missing required program: {name}")
+    return path
+
+
+def shell_commands() -> bytes:
+    rules = (
+        'KERNEL=="vda1", SYMLINK+="disk/by-slot/bootconfig"',
+        'KERNEL=="vda2", SYMLINK+="disk/by-slot/active/boot"',
+        'KERNEL=="vda5", SYMLINK+="disk/by-slot/active/system"',
+        'KERNEL=="vda7", SYMLINK+="disk/by-slot/persistent"',
+    )
+    unit = (
+        "[Unit]",
+        "Description=QEMU exact-image acceptance",
+        "Requires=dbus.service systemd-resolved.service persistent.mount",
+        "After=dbus.service systemd-resolved.service persistent.mount local-fs.target",
+        "[Service]",
+        "Type=oneshot",
+        "ExecStart=/bin/sh -c 'systemctl is-active --quiet dbus.service && "
+        "systemctl is-active --quiet systemd-resolved.service && "
+        "mountpoint -q /persistent && "
+        "runuser -u messagebus -- test -x /usr/bin/dbus-daemon && "
+        "runuser -u systemd-resolve -- test -r /etc/systemd/resolved.conf && "
+        # Octal-encode the suffixes so the serial echo of this injected unit
+        # cannot itself contain either result marker.
+        "printf \"MILLENNIUM_EXACT_IMAGE_\\120\\101\\123\\123\\n\" "
+        ">/dev/console || "
+        "printf \"MILLENNIUM_EXACT_IMAGE_\\106\\101\\111\\114\\n\" "
+        ">/dev/console'",
+    )
+    quote = lambda value: "'" + value.replace("'", "'\\''") + "'"
+    commands = [
+        "mkdir -p /run/udev/rules.d /run/systemd/system/multi-user.target.wants",
+        "printf '%s\\n' " + " ".join(map(quote, rules))
+        + " > /run/udev/rules.d/99-qemu-slot.rules",
+        "printf '%s\\n' " + " ".join(map(quote, unit))
+        + " > /run/systemd/system/qemu-exact-accept.service",
+        "ln -s ../qemu-exact-accept.service "
+        "/run/systemd/system/multi-user.target.wants/qemu-exact-accept.service",
+        "exec /sbin/init",
+    ]
+    return ("\n".join(commands) + "\n").encode()
+
+
+def connect_serial(path: Path, deadline: float) -> socket.socket:
+    while time.monotonic() < deadline:
+        client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        try:
+            client.connect(str(path))
+            client.setblocking(False)
+            return client
+        except (FileNotFoundError, ConnectionRefusedError):
+            client.close()
+            time.sleep(0.1)
+    raise TimeoutError("QEMU serial socket did not become available")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--image", type=Path, required=True)
+    parser.add_argument("--kernel", type=Path, required=True)
+    parser.add_argument("--initrd", type=Path, required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--timeout", type=int, default=300)
+    args = parser.parse_args()
+    for path in (args.image, args.kernel, args.initrd):
+        if not path.is_file():
+            raise SystemExit(f"missing input: {path}")
+    args.output.mkdir(parents=True, exist_ok=True)
+
+    qemu = require_program("qemu-system-aarch64")
+    qemu_img = require_program("qemu-img")
+    with tempfile.TemporaryDirectory(prefix="millennium-exact-qemu-") as raw:
+        work = Path(raw)
+        overlay = work / "overlay.qcow2"
+        serial_path = work / "serial.sock"
+        subprocess.run([
+            qemu_img, "create", "-q", "-f", "qcow2", "-F", "raw",
+            "-b", str(args.image.resolve()), str(overlay),
+        ], check=True)
+        command = [
+            qemu, "-machine", "virt", "-cpu", "cortex-a72", "-smp", "4",
+            "-m", "1024", "-kernel", str(args.kernel), "-initrd",
+            str(args.initrd), "-append",
+            "root=/dev/vda5 rw console=ttyAMA0 init=/bin/sh",
+            "-drive", f"file={overlay},if=none,id=disk0,format=qcow2",
+            "-device", "virtio-blk-pci,drive=disk0", "-netdev",
+            "user,id=net0", "-device", "virtio-net-pci,netdev=net0",
+            "-display", "none", "-serial",
+            f"unix:{serial_path},server=on,wait=off", "-monitor", "none",
+        ]
+        process = subprocess.Popen(command)
+        deadline = time.monotonic() + args.timeout
+        transcript = bytearray()
+        result = "timeout"
+        try:
+            client = connect_serial(serial_path, deadline)
+            with client:
+                injected = False
+                while time.monotonic() < deadline:
+                    readable, _, _ = select.select([client], [], [], 0.25)
+                    if readable:
+                        chunk = client.recv(65536)
+                        if not chunk:
+                            break
+                        transcript.extend(chunk)
+                    text = normalized_console(transcript)
+                    if not injected and "# " in text:
+                        client.sendall(shell_commands())
+                        injected = True
+                    if PASS_MARKER in text:
+                        result = "pass"
+                        break
+                    if FAIL_MARKER in text or any(item in text for item in FORBIDDEN):
+                        result = "fail"
+                        break
+                    if process.poll() is not None:
+                        result = "qemu-exited"
+                        break
+        finally:
+            process.terminate()
+            try:
+                process.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait()
+
+    log_path = args.output / "console.log"
+    log_path.write_bytes(transcript)
+    record = {
+        "schema": 1,
+        "result": result,
+        "image": str(args.image.resolve()),
+        "kernel": str(args.kernel.resolve()),
+        "initrd": str(args.initrd.resolve()),
+        "completed_at": datetime.now(timezone.utc).replace(
+            microsecond=0).isoformat().replace("+00:00", "Z"),
+        "qemu_machine": "virt",
+        "exact_image_userspace": True,
+        "raspberry_pi_firmware_emulated": False,
+        "physical_hardware_claimed": False,
+        "console_log": str(log_path.resolve()),
+    }
+    (args.output / "result.json").write_text(
+        json.dumps(record, indent=2, sort_keys=True) + "\n")
+    print(json.dumps(record, sort_keys=True))
+    return 0 if result == "pass" else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -470,6 +470,19 @@ stop_vm() {
     printf 'VM stopped\n'
 }
 
+exact_image_test() {
+    local image=${MILLENNIUM_QEMU_EXACT_IMAGE:-}
+    local kernel=${MILLENNIUM_QEMU_EXACT_KERNEL:-}
+    local initrd=${MILLENNIUM_QEMU_EXACT_INITRD:-}
+    test -n "$image" || die "set MILLENNIUM_QEMU_EXACT_IMAGE to the expanded production image"
+    test -n "$kernel" || die "set MILLENNIUM_QEMU_EXACT_KERNEL to a QEMU-virt arm64 kernel"
+    test -n "$initrd" || die "set MILLENNIUM_QEMU_EXACT_INITRD to its initramfs"
+    mkdir -p "$STATE_DIR/exact-image"
+    python3 "$SCRIPT_DIR/exact_image_test.py" \
+        --image "$image" --kernel "$kernel" --initrd "$initrd" \
+        --output "$STATE_DIR/exact-image"
+}
+
 case ${1:-help} in
     fetch) fetch_image ;;
     init) init_disk ;;
@@ -491,6 +504,7 @@ case ${1:-help} in
     os-ota-test) os_ota_test ;;
     wifi-test) wifi_test ;;
     experience-test) experience_test ;;
+    exact-image-test) exact_image_test ;;
     full-test) full_test ;;
     collect-artifacts) collect_artifacts "${2:-}" ;;
     status)

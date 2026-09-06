@@ -17,12 +17,13 @@ QEMU's stable `virt` machine is used instead. USB enumeration, ALSA channel
 routing, Wi-Fi radio/AP behavior, Arduino flashing, coin-validator electrical
 timing, and the physical display still require a real-phone hardware test.
 
-The lab also does not boot the production MBR A/B recovery image. Accept that
-image only after booting its exact bytes on a Zero 2 W and verifying the
-read-only active root plus every partition-7 shared bind mount, as documented
-in `host/os_image/README.md`. The QEMU OS test runs the generator and
-factory-seed contract tests; those checks are not substitutes for that hardware
-gate.
+The lab has two complementary machines. The everyday cloud guest supports fast
+development, OTA fault injection and peripheral co-simulation. The
+`exact-image-test` boots the expanded factory image itself and exercises its
+real MBR A/B layout, system slot, persistent partition, shared mounts and early
+services. QEMU-only slot aliases are injected into `/run`; the tested image is
+not altered. A physical Zero 2 W must still verify firmware selection,
+read-only-root behavior, SD I/O, radios, USB, audio and power interruption.
 
 ## Requirements
 
@@ -30,12 +31,13 @@ gate.
 - QEMU with AArch64 and UEFI support (`brew install qemu` on macOS;
   `apt install qemu-system-arm qemu-efi-aarch64 qemu-utils` on Debian)
 - Python 3, OpenSSH, curl, tar, and socat
-- about 2 GB RAM and 2 GB free disk space (the VM disk grows on demand)
+- about 2 GB RAM and 2 GB free disk space for the cloud lab; exact-image tests
+  additionally require the expanded production image (currently about 15 GB)
 
-The guest is Debian arm64. The Pi Zero 2 CPU supports AArch64, but the current
-production image is armv7. QEMU therefore validates application, service,
-network, update, and protocol behavior—not armv7 ABI compatibility. Keep the
-existing armv7 release build and real-device smoke test as release gates.
+Both the cloud guest and current production image use Debian arm64. The cloud
+guest validates application, service, network, update, and protocol behavior;
+the exact-image test additionally validates the assembled production userspace
+and disk layout. Keep the real-device smoke test as a release gate.
 
 ## First boot
 
@@ -95,6 +97,7 @@ tools/qemu/qemu.sh ota-fault-test
 tools/qemu/qemu.sh os-ota-test
 tools/qemu/qemu.sh wifi-test
 tools/qemu/qemu.sh experience-test
+tools/qemu/qemu.sh exact-image-test
 tools/qemu/qemu.sh full-test
 tools/qemu/qemu.sh stop
 ```
@@ -156,6 +159,31 @@ quarantine, health commit, persistent anti-rollback state, and both selector
 directions using test-only virtual block files. Raspberry Pi firmware behavior
 remains a physical Zero 2 W acceptance gate.
 
+## Exact production-image test
+
+Provide the expanded image and a generic arm64 QEMU `virt` kernel/initramfs:
+
+```sh
+export MILLENNIUM_QEMU_EXACT_IMAGE=/path/to/millennium-zero2w-ab-phone-001.img
+export MILLENNIUM_QEMU_EXACT_KERNEL=/path/to/vmlinuz-arm64
+export MILLENNIUM_QEMU_EXACT_INITRD=/path/to/initrd.img-arm64
+tools/qemu/qemu.sh exact-image-test
+```
+
+The harness creates a disposable copy-on-write overlay, boots partition 5,
+injects `/dev/vda1`, `vda2`, `vda5`, and `vda7` as the production slot names
+through ephemeral udev rules, and starts the image's own systemd. It requires
+the persistent/shared mount graph, D-Bus and resolver to start under their real
+service accounts. It fails on the permission errors previously observed on the
+physical image and writes `console.log` plus `result.json` under
+`$MILLENNIUM_QEMU_STATE/exact-image/`.
+
+The output explicitly records `raspberry_pi_firmware_emulated: false` and
+`physical_hardware_claimed: false`. QEMU has no exact Zero 2 W machine, so this
+test closes userspace/image-assembly gaps without pretending to validate the
+VideoCore boot chain, BCM2710A1 peripherals, native SD/USB/Wi-Fi behavior or
+brownouts.
+
 `wifi-test` exercises the NetworkManager boundary through deterministic radio
 faults, validates captive-portal behavior for the major platform probes, and
 checks the setup firewall, service sandbox, atomic credential storage, rollback,
@@ -198,6 +226,6 @@ emits a timestamped `full-test-result.json` whose
 The QEMU lab complements rather than replaces these release gates:
 
 1. host unit/scenario/content tests;
-2. armv7 release compilation and signed OTA verification;
+2. arm64 release compilation and signed OTA verification;
 3. this ARM VM appliance smoke test;
 4. a real phone smoke test for USB, audio, Wi-Fi, firmware, and peripherals.
