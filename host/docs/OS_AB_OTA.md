@@ -201,3 +201,20 @@ the unchanged old slot or to a fully verified new slot—never an ambiguous or
 unbootable state. Only after that matrix passes may `phone-001` be migrated by
 swapping in the prepared recovery card and restoring its allowlisted
 per-device state.
+
+## Whole-disk recovery artifact
+
+Retain the compressed whole-disk image separately from the normal boot/root OTA
+payloads. Create its canonical manifest with `tools/build_recovery_image.py`.
+The manifest binds the compressed and expanded sizes and SHA-256 digests, full
+source commit, signing-key ID, supported board model, architecture, exact MBR
+partition sizes, and A/B slot map. Sign `recovery-manifest.json` with the active
+offline release key and retain `recovery-manifest.json.sig` beside the image.
+
+Before writing recovery media, verify the signature with `openssl pkeyutl
+-verify -rawin -pubin`, verify the compressed digest, run `zstd -t`, stream the
+expanded image to the OS-identified removable whole disk, flush it, read the
+complete disk back, and compare the expanded digest. Never infer the target
+from its current disk number alone and never write an internal disk. Restore
+only the allowlisted per-device state after the image and partition contract
+have passed independent verification.
