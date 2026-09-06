@@ -22,6 +22,15 @@ mmdebstrap:
   customize-hooks:
     - |
       set -eu
+      # The upstream family layer supports EEPROM-equipped Pi models and pulls
+      # a diagnostics/development tool chain. Zero 2 W has no bootloader EEPROM;
+      # retain raspi-utils-core but remove that unused production payload.
+      chroot "$1" env DEBIAN_FRONTEND=noninteractive apt-get purge -y \
+        rpi-eeprom raspi-utils raspi-utils-dt raspi-utils-eeprom raspi-utils-otp \
+        raspinfo flashrom device-tree-compiler binutils
+      chroot "$1" env DEBIAN_FRONTEND=noninteractive apt-get autoremove -y --purge
+    - |
+      set -eu
       test -x "$1/usr/sbin/NetworkManager"
       chroot "$1" systemctl disable systemd-networkd.service systemd-networkd-wait-online.service iwd.service 2>/dev/null || true
       chroot "$1" systemctl enable NetworkManager.service NetworkManager-wait-online.service ssh.service nftables.service

@@ -60,6 +60,10 @@ Also inspect `autoboot.txt`, `slot.map`, the NetworkManager profile, enabled
 units, account name, SSH policy, and deployed application payload. A successful
 partition check alone is not a production release gate.
 
+Run `tools/audit_zero2w_rootfs.py` against the generated root and package
+manifest. It rejects compiler/binutils, EEPROM and device-tree tooling that is
+irrelevant to Zero 2 W, VCS/source residue, package caches, and temporary files.
+
 The optional upstream Image Description Provisioning document is omitted for
 this target because its schema rejects DOS logical partitions. The raw image is
 still constructed by `genimage`, checked by `sfdisk`, and independently checked

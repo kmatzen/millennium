@@ -16,6 +16,10 @@ locale:
 ieee80211:
   regdom: US
 
+rpisec:
+  # Zero 2 W has no bootloader EEPROM. Do not enable that generic Pi path.
+  eepromupd: n
+
 artefact:
   version: 1.0.0
 
