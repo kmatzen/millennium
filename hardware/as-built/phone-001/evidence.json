@@ -28,7 +28,7 @@
     "architecture": "armv7l",
     "hostname": "raspberrypi",
     "machine_id_sha256": "38d4ed85c0bf94de95b54f59285b25ef647b6a882600f419e00aac9d527a0612",
-    "source_commit": "unknown"
+    "source_commit": "906c58682097e128473c29db49ce1f4ed5b03a6a"
   },
   "installed_artifacts": {
     "content_manifest": {
@@ -40,8 +40,8 @@
       "sha256": "5dab000d8408ed497432fd52248c8671156ef764d4f7426e56df3d31e9b4b0a2"
     },
     "host_binary": {
-      "identity": "sequence 9, millennium-daemon 0.4.0",
-      "sha256": "e07eaab73dfa273b93df46b17ec8b1dd9ef1e3fb2d0fa6ee556e0b7be96276c8"
+      "identity": "sequence 11, millennium-daemon 0.4.0, source 906c58682097e128473c29db49ce1f4ed5b03a6a",
+      "sha256": "434c7706de1fa581011c2eccd7794f8a3d244b80c0cb9686322aca9cbd9e7fdd"
     },
     "keypad_hex": {
       "identity": "keypad 0.4.0 protocol 2 build e0fe59960549",
@@ -133,5 +133,5 @@
       "passed": null
     }
   },
-  "updated_at": "2026-09-05T23:12:56+00:00"
+  "updated_at": "2026-09-06T00:05:35+00:00"
 }

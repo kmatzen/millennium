@@ -8,50 +8,19 @@
     "network_description": null,
     "passed": null
   },
-  "offline_signing_key_copies": [
-    {
-      "ciphertext_sha256": "0d4b59b1b3ea3d9e9a6563ce033e8e3c6f8fa926a86c65ce1976c8c906f3b8ff",
-      "copy_evidence": {
-        "path": "/Users/kmatzen/git/millennium/hardware/as-built/phone-001/evidence/key-copy-sd-eee0e3ae-2026-09-05.json",
-        "sha256": "160d745f053a0ca3496b27a1222e5e4ab595743f5233493b79931f32ca787664"
-      },
-      "media_label": "SD-EEE0E3AE",
-      "physically_distinct": true,
-      "recovery_evidence": {
-        "path": "/Users/kmatzen/git/millennium/hardware/as-built/phone-001/evidence/key-recovery-sd-eee0e3ae-2026-09-05.json",
-        "sha256": "26163e5f386ca76c570d80897f0032e5a088585f423aa9c9e867bb34a646f7e8"
-      },
-      "recovery_tested_at": "2026-09-05",
-      "verified_at": "2026-09-05"
-    },
-    {
-      "ciphertext_sha256": "0d4b59b1b3ea3d9e9a6563ce033e8e3c6f8fa926a86c65ce1976c8c906f3b8ff",
-      "copy_evidence": {
-        "path": "/Users/kmatzen/git/millennium/hardware/as-built/phone-001/evidence/key-copy-ueb-68d6c050-2026-09-05.json",
-        "sha256": "d9eac6629039d9c954014680941d55f5eff79842ebcff43b7204775154d6d0f5"
-      },
-      "media_label": "NVME-68D6C050",
-      "physically_distinct": true,
-      "recovery_evidence": {
-        "path": "/Users/kmatzen/git/millennium/hardware/as-built/phone-001/evidence/key-recovery-ueb-68d6c050-2026-09-05.json",
-        "sha256": "768ab485c39d02d809eeb6e1a2b67f2d5900e5ea500cf40f1cbad20546b57b6e"
-      },
-      "recovery_tested_at": "2026-09-05",
-      "verified_at": "2026-09-05"
-    }
-  ],
+  "offline_signing_key_copies": [],
   "playtest_record": "playtest-last-line-2.1.0.json",
   "schema": 1,
   "server_state_backup": {
-    "completed_at": "2026-09-02T05:29:54+00:00",
+    "completed_at": "2026-09-06T00:08:14+00:00",
     "evidence": {
-      "path": "/Users/kmatzen/git/millennium/hardware/as-built/phone-001/server-state-backup-2026-09-02.json",
-      "sha256": "5e90ebe19caf986619155138aa46e4bbf186e6205fa0271cfca202147bcf16a1"
+      "path": "/Users/kmatzen/git/millennium/hardware/as-built/phone-001/server-state-backup-2026-09-06.json",
+      "sha256": "4fad4df38351adddef6e424f4486eb89724b8c0a7a4f65a636786043a5c0ae06"
     },
-    "snapshot_id": "f5472258"
+    "snapshot_id": "e317f630"
   },
   "status": "incomplete",
-  "updated_at": "2026-09-05T23:30:01+00:00",
+  "updated_at": "2026-09-06T00:08:59+00:00",
   "wifi_clients": {
     "android": {
       "date": null,

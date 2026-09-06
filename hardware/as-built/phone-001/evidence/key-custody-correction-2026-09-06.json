@@ -1,0 +1,35 @@
+{
+  "schema": 1,
+  "operation": "signing-key-custody-correction",
+  "completed_at": "2026-09-06T00:05:35Z",
+  "passed": true,
+  "active_key": {
+    "key_id": "release-2026-08",
+    "canonical_public_key_sha256": "581a1ff72d1867b3dfb3b1ffc5521308ac646878050f1c4c12739e0dedaf7348",
+    "ciphertext_sha256": "a94302f82874284020aeca7b3ccc7543fb014e4207d4268e17aaa1b8aea9ccad",
+    "ciphertext_recovered_from": "anima restricted signing backup",
+    "ram_disk_recovery_verified": true,
+    "production_signature_verified": true,
+    "local_restricted_vault_repaired": true
+  },
+  "legacy_key": {
+    "key_id": "legacy-primary",
+    "canonical_public_key_sha256": "46d4ea8e2e8cf261816953b5c64f907840a5da84f50c3127011d4bbe1d77c946",
+    "ciphertext_sha256": "0d4b59b1b3ea3d9e9a6563ce033e8e3c6f8fa926a86c65ce1976c8c906f3b8ff",
+    "preserved_in_local_vault": true,
+    "removable_media": [
+      "SD-EEE0E3AE",
+      "NVME-68D6C050"
+    ]
+  },
+  "corrective_actions": {
+    "stable_manifest_restored_to_sequence_9_before_recovery": true,
+    "invalid_sequence_10_activated": false,
+    "incorrect_handoff_entries_removed": true,
+    "incorrect_todo_completion_reopened": true,
+    "active_key_offline_copies_required": 2,
+    "active_key_offline_copies_verified": 0
+  },
+  "plaintext_persisted": false,
+  "ram_disk_destroyed": true
+}

@@ -1,0 +1,26 @@
+{
+  "completed_at": "2026-09-06T00:08:14+00:00",
+  "operation": "millennium-server-state-backup",
+  "passed": true,
+  "paths": [
+    "selfhosted/millennium-updates",
+    ".config/doorman",
+    ".config/systemd/user/doormand.service",
+    ".config/systemd/user/millennium-backup-pull.service",
+    ".config/systemd/user/millennium-backup-pull.timer",
+    ".config/systemd/user/millennium-metrics-pull.service",
+    ".config/systemd/user/millennium-metrics-pull.timer",
+    ".local/bin/doormand",
+    ".local/bin/millennium-backup-pull",
+    ".local/bin/millennium-metrics-pull",
+    ".ssh/authorized_keys",
+    ".local/share/millennium-recovery"
+  ],
+  "plaintext_archive_staged": false,
+  "repository": "restricted-restic",
+  "restore_stream_verified": true,
+  "schema": 1,
+  "server_id": "anima",
+  "snapshot_id": "e317f630",
+  "phone_snapshot_id": "24a6aabb"
+}

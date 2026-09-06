@@ -1,0 +1,48 @@
+{
+  "schema": 1,
+  "operation": "source-attested-production-rollout",
+  "completed_at": "2026-09-06T00:05:35Z",
+  "passed": true,
+  "device_id": "phone-001",
+  "release": {
+    "version": "0.4.0",
+    "sequence": 11,
+    "source_commit": "906c58682097e128473c29db49ce1f4ed5b03a6a",
+    "architecture": "armv7l",
+    "key_id": "release-2026-08",
+    "manifest_sha256": "0a98566d716a18e56b259dc13419e6cf385bdb327ada15ec3fe204c29673eac9",
+    "manifest_signature_sha256": "3df91670c04fb807efa65fae1c248de1a58f39804c65da8e25ead9e21cb91699",
+    "bundle_sha256": "cf601128a2b0e9f92ce92fa1759691d87b8f80485bb0343608893cef2fc2a73a",
+    "daemon_sha256": "434c7706de1fa581011c2eccd7794f8a3d244b80c0cb9686322aca9cbd9e7fdd",
+    "keypad_sha256": "f1692bb35d07b759428723cd3ec4257eaa3520f6eb91f9aeec5cd3bc472de273",
+    "display_sha256": "5dab000d8408ed497432fd52248c8671156ef764d4f7426e56df3d31e9b4b0a2"
+  },
+  "phone_verification": {
+    "manifest_signature_accepted": true,
+    "ota_terminal_state": "committed",
+    "current_release": "/opt/millennium/releases/00000011-0.4.0",
+    "previous_release": "/opt/millennium/releases/00000009-0.4.0",
+    "daemon_version_source_matched": true,
+    "health_http_status": 200,
+    "overall_health": "HEALTHY"
+  },
+  "hil": {
+    "checked_at": "2026-09-06T00:05:35+00:00",
+    "passed": true,
+    "checks_passed": 8,
+    "checks_total": 8
+  },
+  "backup": {
+    "phone_snapshot_id": "24a6aabb",
+    "server_state_snapshot_id": "e317f630",
+    "restore_stream_verified": true,
+    "completed_at": "2026-09-06T00:08:14+00:00"
+  },
+  "superseded_attempt": {
+    "sequence": 10,
+    "activated": false,
+    "reason": "signed with legacy primary key while labeled release-2026-08",
+    "stable_pointer_restored_before_active-key recovery": true,
+    "immutable_release_directory_retained_unreferenced": true
+  }
+}

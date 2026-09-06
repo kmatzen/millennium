@@ -3,7 +3,7 @@
   "operation": "recovery-drill",
   "passed": true,
   "completed_at": "2026-09-05T23:23:42Z",
-  "key_id": "release-2026-08",
+  "key_id": "legacy-primary",
   "media_id": "sd-eee0e3ae",
   "media_volume_uuid": "EEE0E3AE-2A6F-37D3-8498-B7AE4AB4D163",
   "operator": "kmatzen with Codex",

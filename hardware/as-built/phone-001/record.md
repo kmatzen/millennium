@@ -247,14 +247,35 @@ streamed back through Restic and its allowlisted contents were verified without
 staging a plaintext archive. Exact evidence is in
 `server-state-backup-2026-09-02.json`.
 
-The release signing key now has two verified encrypted offline copies on
-physically distinct removable media. On 2026-09-05, `SD-EEE0E3AE` and
-`NVME-68D6C050` each received the same AES-256-CBC/PBKDF2 ciphertext (SHA-256
-`0d4b59b1b3ea3d9e9a6563ce033e8e3c6f8fa926a86c65ce1976c8c906f3b8ff`).
-Each copy was independently decrypted using the macOS Keychain secret only
-into a disposable APFS RAM disk, matched against the production public key,
-and used to produce a successfully verified Ed25519 challenge signature. The
-RAM disks were destroyed and both removable devices were safely ejected.
-Copy and recovery evidence is in `evidence/key-copy-*-2026-09-05.json` and
-`evidence/key-recovery-*-2026-09-05.json`; custody metadata is registered in
-`handoff.json`.
+The two removable copies made on 2026-09-05 were later found to contain the
+legacy `primary` key, not the active `release-2026-08` key. Their recovery
+drills were mechanically successful, but the validation compared them with a
+mislabeled local public key instead of the key selected by the production
+manifest. The records now identify those copies as `legacy-primary`, and they
+have been removed from `handoff.json`; they do not satisfy release-key custody.
+
+The original active-key AES ciphertext was recovered from anima with its
+original SHA-256 `a94302f82874284020aeca7b3ccc7543fb014e4207d4268e17aaa1b8aea9ccad`.
+It was decrypted only on a disposable RAM disk using the Keychain secret and
+matched the production canonical public-key identity
+`581a1ff72d1867b3dfb3b1ffc5521308ac646878050f1c4c12739e0dedaf7348`.
+The local restricted vault was repaired without deleting the legacy backup.
+Two new removable copies of this active ciphertext remain required. Exact
+findings are in `evidence/key-custody-correction-2026-09-06.json`.
+
+The OTA format was hardened so every new signed bundle contains the full
+source commit and rejects unknown, dirty, missing, or daemon-mismatched source
+identities. A first sequence-10 publication was rejected by the phone because
+it exposed the key-label error above; it never activated, and the stable
+pointer was immediately restored to sequence 9. The immutable, unreferenced
+sequence-10 directory was retained as audit evidence rather than overwritten.
+
+Sequence 11 was rebuilt from commit
+`906c58682097e128473c29db49ce1f4ed5b03a6a`, signed with the recovered active
+key, accepted by the phone, and committed through the rollback-protected OTA
+path on 2026-09-06 UTC. Sequence 9 remains the rollback release. The active
+daemon SHA-256 is
+`434c7706de1fa581011c2eccd7794f8a3d244b80c0cb9686322aca9cbd9e7fdd`;
+the unchanged MCU images retain their previously attested hashes. A post-rollout
+HIL run passed all eight gates at `2026-09-06T00:05:35Z`. Exact evidence is in
+`evidence/sequence-11-source-attested-rollout-2026-09-06.json`.

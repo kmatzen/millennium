@@ -2,7 +2,7 @@
   "ciphertext_sha256": "0d4b59b1b3ea3d9e9a6563ce033e8e3c6f8fa926a86c65ce1976c8c906f3b8ff",
   "destination": "/Volumes/UEBuild/millennium-signing/release-2026-08/ueb-68d6c050/release-2026-08-2026-09-01.pem.aes256",
   "instruction": "Eject and store this media separately; perform the documented recovery drill before handoff.",
-  "key_id": "release-2026-08",
+  "key_id": "legacy-primary",
   "media_id": "ueb-68d6c050",
   "operation": "offline-media-copy",
   "passed": true,
