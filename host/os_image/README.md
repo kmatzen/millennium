@@ -64,6 +64,13 @@ Run `tools/audit_zero2w_rootfs.py` against the generated root and package
 manifest. It rejects compiler/binutils, EEPROM and device-tree tooling that is
 irrelevant to Zero 2 W, VCS/source residue, package caches, and temporary files.
 
+For a new physical phone, generate all per-device secrets in a memory-backed
+staging directory and run `tools/factory_seed_zero2w.py` on a copy of the raw
+image. It seeds both system slots and the official shared/persistent paths,
+checks the declared sharing contract, applies fixed ownership and modes, and
+writes a privacy-safe provisioning record. Never publish or retain the seeded
+whole-disk image: it contains the device's private host and tunnel keys.
+
 The optional upstream Image Description Provisioning document is omitted for
 this target because its schema rejects DOS logical partitions. The raw image is
 still constructed by `genimage`, checked by `sfdisk`, and independently checked
