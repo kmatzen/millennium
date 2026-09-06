@@ -46,7 +46,7 @@ as an unattended appliance. Items are ordered by priority.
   - [ ] Build a supported NetworkManager-based Raspberry Pi OS image for the
     Zero 2 W with redundant boot/root slots and a separate persistent-data
     partition; do not repartition the deployed Bullseye system in place.
-  - [ ] Use the Raspberry Pi firmware's one-shot `tryboot` A/B mechanism so an
+  - [x] Use the Raspberry Pi firmware's one-shot `tryboot` A/B mechanism so an
     uncommitted image automatically falls back after a failed or interrupted
     boot without requiring network access.
   - [x] Authenticate the OS image manifest and every compressed and expanded

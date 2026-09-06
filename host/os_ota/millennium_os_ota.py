@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import re
 import stat
+import struct
 import subprocess
 import tempfile
 from urllib.parse import urlparse
@@ -20,6 +21,10 @@ class OsOtaError(Exception):
 HEX64 = re.compile(r"[0-9a-f]{64}")
 HEX40 = re.compile(r"[0-9a-f]{40}")
 IDENTIFIER = re.compile(r"[A-Za-z0-9._-]{1,64}")
+REQUIRED_BOOT_HEALTH = frozenset({
+    "filesystems", "daemon", "keypad_mcu", "display_mcu", "audio", "sip",
+    "local_controls", "update_endpoint", "maintenance_tunnel",
+})
 
 
 def sha256(path):
@@ -258,3 +263,137 @@ def write_inactive_images(manifest, downloads, targets, active_paths, journal,
     transaction["phase"] = "candidate-written"
     atomic_json(journal, transaction)
     return transaction
+
+
+def read_bootloader_integer(path):
+    try:
+        value = Path(path).read_bytes()
+    except OSError as exc:
+        raise OsOtaError("cannot read firmware boot state") from exc
+    if len(value) == 4:
+        return struct.unpack(">I", value)[0]
+    try:
+        text = value.rstrip(b"\0\r\n").decode("ascii")
+        if text and text.isdigit():
+            return int(text)
+    except UnicodeDecodeError:
+        pass
+    raise OsOtaError("invalid firmware boot-state encoding")
+
+
+def render_autoboot(normal_partition, try_partition):
+    if (not isinstance(normal_partition, int) or not isinstance(try_partition, int)
+            or not 1 <= normal_partition <= 63 or not 1 <= try_partition <= 63
+            or normal_partition == try_partition):
+        raise OsOtaError("invalid or overlapping boot partitions")
+    value = ("[all]\ntryboot_a_b=1\nboot_partition=%d\n"
+             "[tryboot]\nboot_partition=%d\n" %
+             (normal_partition, try_partition))
+    if len(value.encode("ascii")) > 512:
+        raise OsOtaError("autoboot selector exceeds firmware limit")
+    return value
+
+
+def parse_autoboot(value):
+    match = re.fullmatch(
+        r"\[all\]\ntryboot_a_b=1\nboot_partition=([0-9]{1,2})\n"
+        r"\[tryboot\]\nboot_partition=([0-9]{1,2})\n", value)
+    if not match:
+        raise OsOtaError("autoboot selector has unexpected directives")
+    normal, candidate = (int(match.group(1)), int(match.group(2)))
+    render_autoboot(normal, candidate)
+    return normal, candidate
+
+
+def atomic_text(path, value):
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary = tempfile.mkstemp(prefix=".autoboot-", dir=path.parent)
+    try:
+        with os.fdopen(descriptor, "w", encoding="ascii", newline="\n") as stream:
+            stream.write(value)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+        directory = os.open(path.parent, os.O_RDONLY)
+        try:
+            os.fsync(directory)
+        finally:
+            os.close(directory)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+
+
+def read_journal(path):
+    try:
+        value = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise OsOtaError("missing or invalid OS transaction journal") from exc
+    if value.get("schema") != 1 or value.get("operation") != "os-slot-write":
+        raise OsOtaError("unexpected OS transaction journal")
+    return value
+
+
+def arm_tryboot(selector_path, journal_path, normal_partition,
+                candidate_partition, reboot=False, runner=subprocess.run):
+    journal = read_journal(journal_path)
+    if journal.get("phase") != "candidate-written":
+        raise OsOtaError("inactive images are not durably verified")
+    selector = render_autoboot(normal_partition, candidate_partition)
+    atomic_text(selector_path, selector)
+    if parse_autoboot(Path(selector_path).read_text(encoding="ascii")) != (
+            normal_partition, candidate_partition):
+        raise OsOtaError("autoboot selector readback failed")
+    journal["normal_boot_partition"] = normal_partition
+    journal["candidate_boot_partition"] = candidate_partition
+    journal["phase"] = "tryboot-armed"
+    atomic_json(journal_path, journal)
+    if reboot:
+        result = runner(["reboot", "0 tryboot"], check=False)
+        if result.returncode:
+            raise OsOtaError("cannot request one-shot tryboot")
+    return journal
+
+
+def record_boot_health(journal_path, checks):
+    journal = read_journal(journal_path)
+    if journal.get("phase") != "tryboot-armed":
+        raise OsOtaError("candidate boot is not armed")
+    if set(checks) != REQUIRED_BOOT_HEALTH or not all(
+            value is True for value in checks.values()):
+        raise OsOtaError("candidate boot health gate is incomplete or failed")
+    journal["health_checks"] = dict(sorted(checks.items()))
+    journal["phase"] = "health-passed"
+    atomic_json(journal_path, journal)
+    return journal
+
+
+def commit_tryboot(selector_path, journal_path, boot_partition, tryboot):
+    journal = read_journal(journal_path)
+    if journal.get("phase") != "health-passed":
+        raise OsOtaError("candidate health has not passed")
+    normal = journal.get("normal_boot_partition")
+    candidate = journal.get("candidate_boot_partition")
+    if tryboot != 1 or boot_partition != candidate:
+        raise OsOtaError("refusing commit outside the expected one-shot candidate boot")
+    current = parse_autoboot(Path(selector_path).read_text(encoding="ascii"))
+    if current != (normal, candidate):
+        raise OsOtaError("autoboot selector changed during candidate transaction")
+    atomic_text(selector_path, render_autoboot(candidate, normal))
+    if parse_autoboot(Path(selector_path).read_text(encoding="ascii")) != (
+            candidate, normal):
+        raise OsOtaError("committed autoboot selector readback failed")
+    journal["phase"] = "committed"
+    journal["active_boot_partition"] = candidate
+    atomic_json(journal_path, journal)
+    return journal
+
+
+def commit_tryboot_from_device_tree(selector_path, journal_path,
+                                    partition_path, tryboot_path):
+    return commit_tryboot(
+        selector_path, journal_path,
+        read_bootloader_integer(partition_path),
+        read_bootloader_integer(tryboot_path),
+    )

@@ -206,6 +206,99 @@ class OsOtaTests(unittest.TestCase):
         self.assertEqual({name: path.read_bytes() for name, path in targets.items()},
                          before)
 
+    def tryboot_journal(self):
+        journal = self.root / "journal.json"
+        os_ota.atomic_json(journal, {
+            "schema": 1, "operation": "os-slot-write", "sequence": 12,
+            "version": "2026.09.0", "source_commit": "a" * 40,
+            "layout_id": "zero2w-ab-v1", "phase": "candidate-written",
+        })
+        return journal
+
+    def test_device_tree_boot_state_accepts_binary_and_ascii(self):
+        binary = self.root / "binary"
+        ascii_value = self.root / "ascii"
+        binary.write_bytes(bytes.fromhex("00000003"))
+        ascii_value.write_bytes(b"1\0")
+        self.assertEqual(os_ota.read_bootloader_integer(binary), 3)
+        self.assertEqual(os_ota.read_bootloader_integer(ascii_value), 1)
+        ascii_value.write_bytes(b"not-a-number")
+        with self.assertRaisesRegex(os_ota.OsOtaError, "encoding"):
+            os_ota.read_bootloader_integer(ascii_value)
+
+    def test_autoboot_parser_rejects_extra_directives(self):
+        value = os_ota.render_autoboot(2, 3)
+        self.assertEqual(os_ota.parse_autoboot(value), (2, 3))
+        with self.assertRaisesRegex(os_ota.OsOtaError, "unexpected"):
+            os_ota.parse_autoboot(value + "gpu_mem=16\n")
+        with self.assertRaisesRegex(os_ota.OsOtaError, "overlapping"):
+            os_ota.render_autoboot(2, 2)
+
+    def test_tryboot_arms_only_after_durable_candidate(self):
+        journal = self.tryboot_journal()
+        selector = self.root / "autoboot.txt"
+        calls = []
+
+        class Result:
+            returncode = 0
+
+        value = os_ota.arm_tryboot(
+            selector, journal, 2, 3, reboot=True,
+            runner=lambda arguments, check: calls.append(arguments) or Result())
+        self.assertEqual(value["phase"], "tryboot-armed")
+        self.assertEqual(os_ota.parse_autoboot(selector.read_text()), (2, 3))
+        self.assertEqual(calls, [["reboot", "0 tryboot"]])
+
+    def test_tryboot_commit_requires_every_health_check(self):
+        journal = self.tryboot_journal()
+        selector = self.root / "autoboot.txt"
+        os_ota.arm_tryboot(selector, journal, 2, 3)
+        checks = {name: True for name in os_ota.REQUIRED_BOOT_HEALTH}
+        checks.pop("audio")
+        with self.assertRaisesRegex(os_ota.OsOtaError, "incomplete"):
+            os_ota.record_boot_health(journal, checks)
+        checks["audio"] = False
+        with self.assertRaisesRegex(os_ota.OsOtaError, "failed"):
+            os_ota.record_boot_health(journal, checks)
+
+    def test_tryboot_commit_swaps_normal_and_candidate(self):
+        journal = self.tryboot_journal()
+        selector = self.root / "autoboot.txt"
+        os_ota.arm_tryboot(selector, journal, 2, 3)
+        checks = {name: True for name in os_ota.REQUIRED_BOOT_HEALTH}
+        os_ota.record_boot_health(journal, checks)
+        with self.assertRaisesRegex(os_ota.OsOtaError, "expected one-shot"):
+            os_ota.commit_tryboot(selector, journal, 3, 0)
+        value = os_ota.commit_tryboot(selector, journal, 3, 1)
+        self.assertEqual(value["phase"], "committed")
+        self.assertEqual(os_ota.parse_autoboot(selector.read_text()), (3, 2))
+
+    def test_tryboot_commit_rejects_wrong_partition_or_changed_selector(self):
+        journal = self.tryboot_journal()
+        selector = self.root / "autoboot.txt"
+        os_ota.arm_tryboot(selector, journal, 2, 3)
+        checks = {name: True for name in os_ota.REQUIRED_BOOT_HEALTH}
+        os_ota.record_boot_health(journal, checks)
+        with self.assertRaisesRegex(os_ota.OsOtaError, "expected one-shot"):
+            os_ota.commit_tryboot(selector, journal, 2, 1)
+        selector.write_text(os_ota.render_autoboot(4, 3))
+        with self.assertRaisesRegex(os_ota.OsOtaError, "changed"):
+            os_ota.commit_tryboot(selector, journal, 3, 1)
+
+    def test_tryboot_commit_reads_firmware_device_tree_state(self):
+        journal = self.tryboot_journal()
+        selector = self.root / "autoboot.txt"
+        partition = self.root / "partition"
+        tryboot = self.root / "tryboot"
+        partition.write_bytes(bytes.fromhex("00000003"))
+        tryboot.write_bytes(bytes.fromhex("00000001"))
+        os_ota.arm_tryboot(selector, journal, 2, 3)
+        os_ota.record_boot_health(
+            journal, {name: True for name in os_ota.REQUIRED_BOOT_HEALTH})
+        value = os_ota.commit_tryboot_from_device_tree(
+            selector, journal, partition, tryboot)
+        self.assertEqual(value["active_boot_partition"], 3)
+
 
 if __name__ == "__main__":
     unittest.main()

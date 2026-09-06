@@ -94,6 +94,16 @@ persists each phase through an fsynced atomic journal. The final
 `candidate-written` phase proves only that inactive bytes are durable; it does
 not select tryboot or authorize a reboot.
 
+Boot selection is implemented as a second, separately gated primitive. It
+generates and strictly parses a sub-512-byte `autoboot.txt` containing only
+`tryboot_a_b` and the normal/candidate partition numbers, writes and reads it
+back atomically, journals `tryboot-armed`, and invokes `reboot "0 tryboot"` as
+a fixed argument vector. Commit requires all nine health checks, reads both the
+actual boot partition and tryboot flag from firmware device-tree properties,
+and refuses to swap the selector unless they identify the expected one-shot
+candidate boot. Without that commit, Raspberry Pi firmware clears the try flag
+and returns to the unchanged normal partition on the next reset.
+
 ## Transaction and boot commit
 
 1. Refuse while a call, coin transaction, content save, or another updater is
