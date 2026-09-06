@@ -25,6 +25,10 @@ def canonical(value):
     return (json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n").encode()
 
 
+def utc_timestamp():
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+
 def sha256_file(path):
     digest = hashlib.sha256()
     size = 0
@@ -303,11 +307,12 @@ def main():
     image = manifest["image"]
     if target["size_bytes"] < image["expanded_size"]:
         raise SystemExit("target is smaller than the signed recovery image")
+    started_at = utc_timestamp()
     summary = {
         "schema": 1,
         "operation": "recovery-media-write" if args.write else "recovery-media-preflight",
         "passed": True,
-        "completed_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+        "started_at": started_at,
         "key_id": manifest["key_id"],
         "source_commit": manifest["source_commit"],
         "image": image,
@@ -332,6 +337,7 @@ def main():
         finally:
             os.close(target_fd)
         summary["expanded_write_verified"] = True
+    summary["completed_at"] = utc_timestamp()
     if args.evidence:
         if args.evidence.exists():
             raise SystemExit("refusing to overwrite existing evidence")

@@ -1,0 +1,26 @@
+{
+  "completed_at": "2026-09-06T21:18:03+00:00",
+  "compressed_image_verified": true,
+  "expanded_write_verified": true,
+  "image": {
+    "compressed_sha256": "b584b827e9574575c7be65d8729818c465d5d95a7caf22f47e508c6e2e10c397",
+    "compressed_size": 445078924,
+    "compression": "zstd",
+    "expanded_sha256": "2cd7be17c6cb4711e880c81e630beb50a08b4122cf043fea703a1357eedaf08a",
+    "expanded_size": 15636365312,
+    "filename": "millennium-zero2w-ab-phone-001.img.zst"
+  },
+  "key_id": "release-2026-08",
+  "operation": "recovery-media-write",
+  "passed": true,
+  "readback_sha256": "2cd7be17c6cb4711e880c81e630beb50a08b4122cf043fea703a1357eedaf08a",
+  "schema": 1,
+  "signature_verified": true,
+  "source_commit": "2ad5179b0b2de4958a34b845f2db60775e317e07",
+  "target": {
+    "device_identifier": "disk12",
+    "path": "/dev/disk12",
+    "size_bytes": 63864569856,
+    "transport": "USB"
+  }
+}

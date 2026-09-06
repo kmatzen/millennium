@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import plistlib
 import subprocess
+import sys
 import tempfile
 import unittest
 from unittest import mock
@@ -151,6 +152,49 @@ class RecoveryMediaTests(unittest.TestCase):
         value = {"schema": 1, "kind": "millennium-recovery-image"}
         self.assertEqual(MODULE.canonical(value),
                          b'{"kind":"millennium-recovery-image","schema":1}\n')
+
+    def test_completion_timestamp_is_captured_after_write_and_readback(self):
+        manifest = {
+            "key_id": "test", "source_commit": "a" * 40,
+            "image": {"expanded_size": 1400, "expanded_sha256": "b" * 64},
+        }
+        target = {
+            "device_identifier": "disk12", "path": "/dev/disk12",
+            "raw_path": "/dev/rdisk12", "size_bytes": 32_000_000_000,
+            "transport": "USB",
+        }
+        events = []
+
+        def timestamp():
+            events.append("timestamp")
+            return "start" if len(events) == 1 else "finish"
+
+        def readback(*unused):
+            events.append("readback")
+            return "b" * 64
+
+        with tempfile.TemporaryDirectory() as temporary, \
+             mock.patch.object(sys, "argv", [
+                 "write_recovery_media.py", "--manifest", "manifest",
+                 "--signature", "signature", "--public-key", "public",
+                 "--image", "image.zst", "--target", "/dev/disk12",
+                 "--write", "--confirm-device", "disk12", "--evidence",
+                 str(Path(temporary) / "evidence.json")]), \
+             mock.patch.object(MODULE, "verified_manifest", return_value=manifest), \
+             mock.patch.object(MODULE, "identify_target", return_value=target), \
+             mock.patch.object(MODULE, "reject_protected_target"), \
+             mock.patch.object(MODULE, "unmount_target"), \
+             mock.patch.object(MODULE, "open_target", return_value=42), \
+             mock.patch.object(MODULE, "stream_image"), \
+             mock.patch.object(MODULE, "verify_readback", side_effect=readback), \
+             mock.patch.object(MODULE, "utc_timestamp", side_effect=timestamp), \
+             mock.patch.object(MODULE.os, "geteuid", return_value=0), \
+             mock.patch.object(MODULE.os, "close"):
+            MODULE.main()
+            evidence = json.loads((Path(temporary) / "evidence.json").read_text())
+        self.assertEqual(events, ["timestamp", "readback", "timestamp"])
+        self.assertEqual(evidence["started_at"], "start")
+        self.assertEqual(evidence["completed_at"], "finish")
 
 
 if __name__ == "__main__":

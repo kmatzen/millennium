@@ -26,6 +26,14 @@ capacity, and removable status immediately before writing it.
 
 ## 1. Write and verify the corrected recovery card
 
+**Completed 2026-09-06.** macOS identified the dedicated 63.9 GB removable
+card as `/dev/disk12`. The signed `2ad5179` image was written, flushed, and
+read back over its complete 15,636,365,312-byte image length. The readback
+matched the signed expanded SHA-256
+`2cd7be17c6cb4711e880c81e630beb50a08b4122cf043fea703a1357eedaf08a`.
+The card was then ejected and is safe to remove. Evidence is retained in
+`evidence/recovery-media-phone001-2ad5179.json`.
+
 The earlier `/dev/disk10` write/readback passed byte-for-byte, but its v3 image
 failed physical boot acceptance and is quarantined. It must not be redeployed.
 This step therefore remains open for the corrected `2ad5179` candidate.

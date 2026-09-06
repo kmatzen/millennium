@@ -430,9 +430,21 @@ verified. The signed, factory-seeded candidate is retained on `anima` at
 `b584b827e9574575c7be65d8729818c465d5d95a7caf22f47e508c6e2e10c397`
 and expanded SHA-256
 `2cd7be17c6cb4711e880c81e630beb50a08b4122cf043fea703a1357eedaf08a`.
-It remains unapproved and has not yet been written to recovery media or booted
-on the physical Zero 2 W. Exact evidence is in
+It remains unapproved and has not yet been booted on the physical Zero 2 W.
+On 2026-09-06, macOS identified the dedicated 63.9 GB removable USB card as
+`/dev/disk12`. The recovery writer verified the manifest signature and
+compressed image, wrote and flushed all 15,636,365,312 bytes, then read back
+the complete image length. The readback reproduced signed expanded SHA-256
+`2cd7be17c6cb4711e880c81e630beb50a08b4122cf043fea703a1357eedaf08a`,
+and the card was ejected. The evidence file has SHA-256
+`4bfc40e007a2a59085b83ee032b5d42aacd8a6932fe1ede2d64a3e6fbba74a28`.
+Its `completed_at` value reflects operation start because of a writer timestamp
+defect discovered immediately afterward; the file was emitted at
+2026-09-06T21:26:05Z, and the writer now records both start and true completion
+for future evidence. Exact build evidence is in
 `evidence/zero2w-recovery-seeded-artifact-2ad5179-2026-09-06.json`.
+Exact media evidence is in
+`evidence/recovery-media-phone001-2ad5179.json`.
 Encrypted Restic snapshot `7ff8a7d2` includes the retained artifact and passed
 an immediate restore-stream listing without staging a plaintext archive.
 The same artifact was copied directly from `anima` to `UEBuild`; all three
