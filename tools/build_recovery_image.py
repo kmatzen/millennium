@@ -118,10 +118,12 @@ def main():
     if any(not model.strip() or len(model.encode()) > 128 for model in args.board_model):
         raise SystemExit("invalid board model")
     image = compressed_metadata(args.image)
-    args.output_dir.mkdir(parents=True, exist_ok=False)
+    args.output_dir.mkdir(parents=True, exist_ok=True)
     manifest = args.output_dir / "recovery-manifest.json"
-    manifest.write_bytes(canonical(build_manifest(args, image)))
     signature = args.output_dir / "recovery-manifest.json.sig"
+    if manifest.exists() or signature.exists():
+        raise SystemExit("refusing to overwrite an existing recovery manifest")
+    manifest.write_bytes(canonical(build_manifest(args, image)))
     if args.private_key:
         sign(args.private_key, manifest, signature)
     print(json.dumps({"manifest": str(manifest),
