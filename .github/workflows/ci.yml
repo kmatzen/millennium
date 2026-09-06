@@ -134,8 +134,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run source-level PCB guardrails
-        working-directory: pcb
-        run: make netlist-sync footprint-parity pinouts footprints
+        run: |
+          docker run --rm --volume "$PWD:/work" --workdir /work/pcb \
+            --entrypoint /bin/bash kicad/kicad:9.0.9 -euc '
+              python3 check_netlist_sync.py phonev6.kicad_sch phonev6.kicad_pcb
+              python3 check_footprint_parity.py phonev6.kicad_sch phonev6.kicad_pcb
+              python3 check_pinouts.py phonev6.kicad_sch
+              python3 check_footprints.py phonev6.kicad_sch
+            '
       - name: Run ERC and DRC with pinned KiCad
         run: |
           docker run --rm --volume "$PWD:/work" --workdir /work/pcb kicad/kicad:9.0.9 sch erc phonev6.kicad_sch --output erc_report.txt --severity-error --exit-code-violations
