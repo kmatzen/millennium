@@ -28,7 +28,8 @@ mkdir -p "$payload/usr/local/bin" "$payload/usr/local/libexec" \
     "$payload/etc/systemd/system/daemon.service.d" \
     "$payload/etc/systemd/system" "$payload/etc/sudoers.d" \
     "$payload/etc/rpi-image-gen/slot-shared.d" \
-    "$payload/usr/lib/sysusers.d" "$payload/opt/millennium/releases/bootstrap/host" \
+    "$payload/usr/lib/sysusers.d" "$payload/usr/lib/systemd/system-generators" \
+    "$payload/opt/millennium/releases/bootstrap/host" \
     "$payload/opt/millennium/releases/bootstrap/arduino" \
     "$payload/opt/millennium/releases/bootstrap/ota" \
     "$payload/var/lib/millennium/content/releases" "$payload/var/log/millennium"
@@ -78,6 +79,8 @@ printf '[Service]\nUser=millennium\nGroup=millennium\n' \
     >"$payload/etc/systemd/system/daemon.service.d/30-user.conf"
 install -m 0644 "$host/systemd/millennium-wifi.sysusers" \
     "$payload/usr/lib/sysusers.d/millennium-wifi.conf"
+install -m 0755 "$repo/host/os_image/slot-shared-generator" \
+    "$payload/usr/lib/systemd/system-generators/slot-shared-generator"
 install -m 0440 "$host/systemd/millennium-ota-sudoers" \
     "$payload/etc/sudoers.d/millennium-ota"
 install -m 0644 "$host/ota/ota.conf.example" "$payload/etc/millennium/ota.conf"

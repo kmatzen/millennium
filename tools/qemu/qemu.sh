@@ -279,7 +279,11 @@ ota_fault_test() {
 
 os_ota_test() {
     running || die "start and provision the VM before os-ota-test"
-    "${SSH[@]}" 'cd /tmp/millennium-src && python3 -m unittest host.tests.test_os_ota host.tests.test_persistent_state'
+    "${SSH[@]}" 'cd /tmp/millennium-src && python3 -m unittest \
+        host.tests.test_os_ota \
+        host.tests.test_persistent_state \
+        tools.tests.test_factory_seed_zero2w \
+        tools.tests.test_slot_shared_generator'
 }
 
 wifi_test() {
@@ -313,7 +317,7 @@ result = {"schema": 1, "passed": True, "physical_hardware_claimed": False,
           "completed_at": datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat(),
           "acceptance": ["virtual-mcu-unit", "appliance-smoke", "lifecycle", "power-recovery",
                          "peripheral-faults", "signed-ota", "ota-faults", "wifi-onboarding", "offline-experience",
-                         "evidence-export"]}
+                         "production-image-contracts", "evidence-export"]}
 pathlib.Path(sys.argv[1]).write_text(json.dumps(result, indent=2, sort_keys=True) + "\n")
 PY
     printf 'PASS: full QEMU software lab\n%s\n' "$artifact"

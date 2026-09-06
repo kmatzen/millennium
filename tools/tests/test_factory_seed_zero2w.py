@@ -42,6 +42,25 @@ class FactorySeedTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "machine-id"):
                 MODULE.validate_staging(staging)
 
+    def test_machine_id_with_extra_newline_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            staging = self.make_staging(directory)
+            (staging / "etc/machine-id").write_text("a" * 32 + "\n\n")
+            with self.assertRaisesRegex(ValueError, "machine-id"):
+                MODULE.validate_staging(staging)
+
+    def test_admin_token_is_group_readable_by_daemon(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "source"
+            destination = root / "destination"
+            source.mkdir()
+            (source / "admin-token").write_text("secret\n")
+            with mock.patch.object(MODULE.os, "chown"):
+                MODULE.overlay_config(source, destination)
+            self.assertEqual(stat.S_IMODE((destination / "admin-token").stat().st_mode),
+                             0o640)
+
     def test_links_are_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
             staging = self.make_staging(directory)

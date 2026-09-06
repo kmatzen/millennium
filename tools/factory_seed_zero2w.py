@@ -77,8 +77,8 @@ def validate_tree(path):
 def validate_staging(staging):
     staging = Path(staging)
     validate_tree(staging)
-    machine_id = (staging / "etc/machine-id").read_text().strip()
-    if not re.fullmatch(r"[0-9a-f]{32}", machine_id):
+    machine_id_raw = (staging / "etc/machine-id").read_bytes()
+    if not re.fullmatch(rb"[0-9a-f]{32}\n", machine_id_raw):
         raise ValueError("invalid machine-id")
     ssh = staging / "etc/ssh"
     for name in HOST_KEYS:
@@ -124,12 +124,14 @@ def copy_file(source, destination, mode, uid=0, gid=0):
 def overlay_config(source, destination):
     destination = Path(destination)
     destination.mkdir(parents=True, exist_ok=True)
-    secret = {"admin-token", "maintenance-known-hosts", "maintenance-tunnel-key",
+    secret = {"maintenance-known-hosts", "maintenance-tunnel-key",
               "maintenance-tunnel.conf", "wifi-setup-password"}
     for item in Path(source).iterdir():
         if not item.is_file():
             raise ValueError("device configuration must contain files only")
-        copy_file(item, destination / item.name, 0o600 if item.name in secret else 0o644,
+        mode = 0o640 if item.name == "admin-token" else (
+            0o600 if item.name in secret else 0o644)
+        copy_file(item, destination / item.name, mode,
                   0, 1000)
     os.chown(destination, 0, 1000)
     os.chmod(destination, 0o750)

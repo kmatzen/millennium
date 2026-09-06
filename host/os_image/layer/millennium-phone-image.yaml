@@ -85,6 +85,7 @@ mmdebstrap:
         exit 1
       }
       cp -a "$payload/." "$1/"
+      install -d -o millennium -g millennium -m 0700 "$1/var/lib/millennium/wifi"
       chroot "$1" systemctl enable daemon.service millennium-firewall.service
       chroot "$1" systemctl enable millennium-monitor.timer millennium-hil-smoke.timer
       chroot "$1" systemctl enable millennium-physical-interruption-reconcile.service

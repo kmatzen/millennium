@@ -81,6 +81,30 @@ Also inspect `autoboot.txt`, `slot.map`, the NetworkManager profile, enabled
 units, account name, SSH policy, and deployed application payload. A successful
 partition check alone is not a production release gate.
 
+The built root filesystem must contain the project-owned
+`/usr/lib/systemd/system-generators/slot-shared-generator`. Its regression test
+proves that every `Path=` declaration creates both a mount unit and a
+`local-fs.target.requires` link:
+
+```sh
+python3 -m unittest tools.tests.test_slot_shared_generator
+```
+
+After booting the exact recovery image on a Zero 2 W, verify the runtime mount
+topology before accepting any application health result:
+
+```sh
+findmnt -no SOURCE,OPTIONS /
+findmnt -no SOURCE,OPTIONS /etc/millennium
+findmnt -no SOURCE,OPTIONS /etc/ssh
+findmnt -no SOURCE,OPTIONS /etc/NetworkManager/system-connections
+findmnt -no SOURCE,OPTIONS /var/lib/millennium
+```
+
+The root source must be the active system slot and include `ro`. Every shared
+path must be backed by the persistent partition and include `rw`. QEMU's
+generic `virt` guest does not satisfy this physical-image gate.
+
 Run `tools/audit_zero2w_rootfs.py` against the generated root and package
 manifest. It rejects compiler/binutils, EEPROM and device-tree tooling that is
 irrelevant to Zero 2 W, VCS/source residue, package caches, and temporary files.

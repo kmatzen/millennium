@@ -17,6 +17,13 @@ QEMU's stable `virt` machine is used instead. USB enumeration, ALSA channel
 routing, Wi-Fi radio/AP behavior, Arduino flashing, coin-validator electrical
 timing, and the physical display still require a real-phone hardware test.
 
+The lab also does not boot the production MBR A/B recovery image. Accept that
+image only after booting its exact bytes on a Zero 2 W and verifying the
+read-only active root plus every partition-7 shared bind mount, as documented
+in `host/os_image/README.md`. The QEMU OS test runs the generator and
+factory-seed contract tests; those checks are not substitutes for that hardware
+gate.
+
 ## Requirements
 
 - macOS arm64 or Linux

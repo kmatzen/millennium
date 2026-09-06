@@ -67,6 +67,11 @@ Acceptance: `tools/qemu/qemu.sh ota-test` and
 
 Acceptance: `tools/qemu/qemu.sh os-ota-test`.
 
+This acceptance command also runs the production factory-seeding and
+shared-mount-generator contract tests. It proves that every declared shared
+path is linked into `local-fs.target`; it does not claim that the `virt` guest
+booted Raspberry Pi firmware or the Zero 2 W disk image.
+
 ## Networking and onboarding
 
 - [x] Provide a simulated NetworkManager/radio boundary for first boot, hidden
