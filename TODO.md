@@ -3,6 +3,10 @@
 This list captures the work required to make the phone safe and maintainable
 as an unattended appliance. Items are ordered by priority.
 
+The remaining physical and human acceptance work is sequenced in
+`hardware/as-built/phone-001/NEXT_PHYSICAL_SESSION.md` so it can be completed
+with one assembled-hardware session and without repeating the network wiring.
+
 ## P0 — Required before handoff
 
 - [ ] Add owner-friendly Wi-Fi onboarding and recovery.
