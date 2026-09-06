@@ -44,3 +44,13 @@ class Zero2WImageLayerTests(unittest.TestCase):
 
         self.assertNotIn('cp -a "$payload/." "$1/"', text)
         self.assertIn('--no-same-owner --no-overwrite-dir', text)
+
+    def test_upstream_overlay_directory_metadata_is_normalized_last(self) -> None:
+        text = LAYER.read_text()
+        cleanup_text = text[text.index("  cleanup-hooks:"):]
+
+        self.assertIn(
+            'find "$1/etc" "$1/usr" -xdev -type d -uid 1000',
+            cleanup_text,
+        )
+        self.assertIn('-exec chown 0:0 {} + -exec chmod o+rx {} +', cleanup_text)

@@ -124,6 +124,16 @@ mmdebstrap:
   cleanup-hooks:
     - |
       set -eu
+      # Upstream runner overlays are applied after this layer's customize
+      # hooks. Their workspace directory metadata must never become appliance
+      # system-directory metadata. No user-owned directory is valid below
+      # /etc or /usr in the immutable system slot.
+      find "$1/etc" "$1/usr" -xdev -type d -uid 1000 \
+        -exec chown 0:0 {} + -exec chmod o+rx {} +
+      if test -d "$1/bootfs"; then
+        chown 0:0 "$1/bootfs"
+        chmod 0755 "$1/bootfs"
+      fi
       install -D -m 0755 "$SRCROOT/slot-shared-generator" \
         "$1/usr/lib/systemd/system-generators/slot-shared-generator"
       cmp "$SRCROOT/slot-shared-generator" \
