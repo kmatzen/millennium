@@ -157,7 +157,7 @@ The daemon reads configuration from `/etc/millennium/daemon.conf`. See `host/dae
 | `card.admin_tokens` | *(empty)* | Random 16-digit dedicated-card tokens for administration |
 | `web_server.enabled` | `true` | Enable the web dashboard |
 | `web_server.port` | `80` | Web dashboard port |
-| `system.source_dir` | `/home/matzen/millennium` | Source directory for OTA updates |
+| `system.source_dir` | `/home/millennium/millennium` | Development-only source directory |
 
 ---
 

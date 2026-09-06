@@ -285,13 +285,13 @@ sudo host/ota/provision_maintenance.sh \
 
 # maintenance server; use the device key printed by the phone
 sudo tools/register_maintenance_device.sh phone-001 DEVICE_PUBLIC_KEY 10.77.0.2
-ssh matzen@10.77.0.2
+ssh millennium@10.77.0.2
 ```
 
 Where UDP WireGuard ingress is unavailable, the phone can instead maintain a
 restricted outbound reverse SSH tunnel. The server key must be authorized with
 `restrict,port-forwarding,permitlisten="127.0.0.1:22022"`; administrators then
-connect to the server and use `ssh -p 22022 matzen@127.0.0.1`. The phone accepts
+connect to the server and use `ssh -p 22022 millennium@127.0.0.1`. The phone accepts
 no new public inbound port and systemd automatically reconnects the tunnel.
 
 `maintenance.kmatzen.com` must be a DNS-only A/AAAA record pointing at the
@@ -326,7 +326,7 @@ python3 tools/external_maintenance_audit.py audit \
   --baseline private-operations/home-network-baseline.json \
   --ssh /path/to/fido-capable/ssh --identity ~/.ssh/maintainer-key \
   --jump-host maintenance.kmatzen.com --jump-user kmatzen --jump-port 2223 \
-  --server-id anima --phone-user matzen --phone-port 22022 \
+  --server-id anima --phone-user millennium --phone-port 22022 \
   --device-id phone-001 --network-description "cellular hotspot" \
   --output private-operations/external-maintenance.json
 ```
@@ -343,7 +343,7 @@ trusted display, and run:
 
 ```bash
 sudo python3 /path/to/repair_maintenance_access.py \
-  --user matzen --key-file /media/KEY.pub \
+  --user millennium --key-file /media/KEY.pub \
   --fingerprint SHA256:EXPECTED_FINGERPRINT
 ```
 

@@ -1806,7 +1806,7 @@ struct http_response web_server_handle_api_update(const struct http_request* req
     }
 
     /* #118: Non-blocking - don't block web server for minutes */
-    source_dir = config_get_string(config_get_instance(), "system.source_dir", "/home/matzen/millennium");
+    source_dir = config_get_string(config_get_instance(), "system.source_dir", "/home/millennium/millennium");
     rc = updater_apply_async(source_dir);
 
     if (rc == 0 && updater_is_applying()) {

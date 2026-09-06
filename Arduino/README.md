@@ -86,7 +86,7 @@ If hex not pushed: `VIA_SCP=1`.
 If `arduino-cli` is not in your `PATH`:
 
 ```bash
-make build ARDUINO_CLI=/home/matzen/bin/arduino-cli
+make build ARDUINO_CLI=/home/millennium/bin/arduino-cli
 ```
 
 ### Verifying a Build

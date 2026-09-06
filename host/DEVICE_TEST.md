@@ -20,7 +20,7 @@ The daemon serves the HTTP API on **port 80**.
 
 ## Prerequisites
 
-- Daemon running on the device (`ssh matzen@$PI 'sudo systemctl status daemon.service'`)
+- Daemon running on the device (`ssh millennium@$PI 'sudo systemctl status daemon.service'`)
 - Device reachable on the network (port 80 for the HTTP API)
 
 ## Run API Tests (from your machine)
@@ -46,15 +46,15 @@ make api-test
 SSH into the device and run locally (no networking flakiness):
 
 ```bash
-ssh matzen@raspberrypi.local 'cd millennium/host && make api-test'
+ssh millennium@raspberrypi.local 'cd millennium/host && make api-test'
 ```
 
 ## Troubleshooting
 
 If tests fail with "Cannot reach":
 
-1. Check the daemon is running: `ssh matzen@$PI 'sudo systemctl status daemon.service'`
-2. Verify port 80 is listening: `ssh matzen@$PI 'ss -tlnp | grep ":80 "'`
+1. Check the daemon is running: `ssh millennium@$PI 'sudo systemctl status daemon.service'`
+2. Verify port 80 is listening: `ssh millennium@$PI 'ss -tlnp | grep ":80 "'`
 3. Confirm network connectivity: `curl -s http://$PI/api/health`
 4. If `raspberrypi.local` doesn't resolve, the Pi may be powered off or on a new
    IP — find it via the router's DHCP table or the `arp -a` OUI grep above.
