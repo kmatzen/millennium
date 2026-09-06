@@ -263,8 +263,18 @@ The local restricted vault was repaired without deleting the legacy backup.
 The generic local public-key path now contains the active key, while the
 legacy public and private files were preserved under explicit
 `legacy-primary-*` names; no plaintext active private key is stored there.
-Two new removable copies of this active ciphertext remain required. Exact
+Two new removable copies of this active ciphertext were required. Exact
 findings are in `evidence/key-custody-correction-2026-09-06.json`.
+
+The first corrected active-key removable copy was created on `SD-EEE0E3AE` on
+2026-09-06 without overwriting its preserved legacy copy or Raspberry Pi boot
+files. Ciphertext SHA-256 `a94302f82874284020aeca7b3ccc7543fb014e4207d4268e17aaa1b8aea9ccad`
+was verified on the card, recovered only into an APFS RAM disk, matched the
+active canonical public identity `581a1ff72d1867b3dfb3b1ffc5521308ac646878050f1c4c12739e0dedaf7348`,
+and produced a verified disposable Ed25519 signature. The RAM disk was
+destroyed and the SD card safely ejected. Exact evidence is in
+`evidence/key-copy-active-sd-eee0e3ae-2026-09-06.json` and
+`evidence/key-recovery-active-sd-eee0e3ae-2026-09-06.json`.
 
 The OTA format was hardened so every new signed bundle contains the full
 source commit and rejects unknown, dirty, missing, or daemon-mismatched source

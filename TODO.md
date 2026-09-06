@@ -143,8 +143,8 @@ as an unattended appliance. Items are ordered by priority.
     signing key on separate media, as required by the lifecycle procedure.
     - [x] Provide an OS-verified removable-media copier that rejects internal
       disks and overwrites, verifies the ciphertext, and records media custody.
-    - [ ] Create, recovery-test, and eject the first encrypted removable-media
-      copy of the active `release-2026-08` key.
+    - [x] Create, recovery-test, and eject the first encrypted removable-media
+      copy of the active `release-2026-08` key (`SD-EEE0E3AE`, 2026-09-06).
     - [ ] Repeat the verified copy and recovery drill on a second physically
       distinct removable device.
   - [x] Perform and document a recovery drill.

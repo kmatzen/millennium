@@ -8,7 +8,25 @@
     "network_description": null,
     "passed": null
   },
-  "offline_signing_key_copies": [],
+  "offline_signing_key_copies": [
+    {
+      "canonical_public_key_sha256": "581a1ff72d1867b3dfb3b1ffc5521308ac646878050f1c4c12739e0dedaf7348",
+      "ciphertext_sha256": "a94302f82874284020aeca7b3ccc7543fb014e4207d4268e17aaa1b8aea9ccad",
+      "copy_evidence": {
+        "path": "/Users/kmatzen/git/millennium/hardware/as-built/phone-001/evidence/key-copy-active-sd-eee0e3ae-2026-09-06.json",
+        "sha256": "ea2e448d0b3b3104df6474a2fc06fda1a89a43549f2e09461f987d5a9b3d2eb1"
+      },
+      "key_id": "release-2026-08",
+      "media_label": "SD-EEE0E3AE",
+      "physically_distinct": true,
+      "recovery_evidence": {
+        "path": "/Users/kmatzen/git/millennium/hardware/as-built/phone-001/evidence/key-recovery-active-sd-eee0e3ae-2026-09-06.json",
+        "sha256": "2a18ad36eea8b0d4a1ca8bb55222db23dfabbc83d90861280cfdbf1da57b114e"
+      },
+      "recovery_tested_at": "2026-09-06",
+      "verified_at": "2026-09-06"
+    }
+  ],
   "playtest_record": "playtest-last-line-2.1.0.json",
   "release_signing_key": {
     "canonical_public_key_sha256": "581a1ff72d1867b3dfb3b1ffc5521308ac646878050f1c4c12739e0dedaf7348",
@@ -24,7 +42,7 @@
     "snapshot_id": "e317f630"
   },
   "status": "incomplete",
-  "updated_at": "2026-09-06T00:08:59+00:00",
+  "updated_at": "2026-09-06T00:30:49+00:00",
   "wifi_clients": {
     "android": {
       "date": null,
