@@ -126,6 +126,15 @@ jobs:
         working-directory: Arduino
         run: make clean build ARDUINO_CLI=/tmp/arduino-cli
 
+      - name: Upload reproducible firmware candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware-rebuild
+          path: |
+            Arduino/build/keypad/keypad.ino.hex
+            Arduino/build/display/display.ino.hex
+          retention-days: 1
+
       - name: Verify checked-in firmware is current
         run: git diff --exit-code -- Arduino/build/keypad/keypad.ino.hex Arduino/build/display/display.ino.hex
 
@@ -144,8 +153,8 @@ jobs:
             '
       - name: Run ERC and DRC with pinned KiCad
         run: |
-          docker run --rm --volume "$PWD:/work" --workdir /work/pcb kicad/kicad:9.0.9 sch erc phonev6.kicad_sch --output erc_report.txt --severity-error --exit-code-violations
-          docker run --rm --volume "$PWD:/work" --workdir /work/pcb kicad/kicad:9.0.9 pcb drc phonev6.kicad_pcb --output drc_report.txt --severity-error --exit-code-violations
+          docker run --rm --volume "$PWD:/work" --workdir /work/pcb kicad/kicad:9.0.9 kicad-cli sch erc phonev6.kicad_sch --output erc_report.txt --severity-error --exit-code-violations
+          docker run --rm --volume "$PWD:/work" --workdir /work/pcb kicad/kicad:9.0.9 kicad-cli pcb drc phonev6.kicad_pcb --output drc_report.txt --severity-error --exit-code-violations
 
   release-evidence:
     needs: [production-build, firmware, pcb, sanitizers]
