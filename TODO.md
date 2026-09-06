@@ -136,17 +136,17 @@ as an unattended appliance. Items are ordered by priority.
   - [x] Never fall back from signed OTA when the worker or trust key is unavailable.
   - [x] Replace remaining shell-interpolated commands with argument-vector execution.
 
-- [ ] Add signing-key lifecycle support.
+- [x] Add signing-key lifecycle support.
   - [x] Support key IDs and multiple trusted public keys during rotation.
   - [x] Document revocation and emergency recovery.
-  - [ ] Maintain two currently verified encrypted offline copies of the private
+  - [x] Maintain two currently verified encrypted offline copies of the private
     signing key on separate media, as required by the lifecycle procedure.
     - [x] Provide an OS-verified removable-media copier that rejects internal
       disks and overwrites, verifies the ciphertext, and records media custody.
     - [x] Create, recovery-test, and eject the first encrypted removable-media
       copy of the active `release-2026-08` key (`SD-EEE0E3AE`, 2026-09-06).
-    - [ ] Repeat the verified copy and recovery drill on a second physically
-      distinct removable device.
+    - [x] Repeat the verified copy and recovery drill on a second physically
+      distinct removable device (`NVME-68D6C050`, 2026-09-06).
   - [x] Perform and document a recovery drill.
 
 - [x] Expand CI into a reproducible release pipeline.

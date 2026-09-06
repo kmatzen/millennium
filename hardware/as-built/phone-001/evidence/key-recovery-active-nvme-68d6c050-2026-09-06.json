@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "operation": "recovery-drill",
+  "passed": true,
+  "completed_at": "2026-09-06T00:45:00Z",
+  "key_id": "release-2026-08",
+  "media_id": "active-nvme-68d6c050",
+  "media_volume_uuid": "68D6C050-587F-455B-B0B0-77DC06AC40E8",
+  "operator": "kmatzen with Codex",
+  "method": "AES-256-CBC PBKDF2, 600000 iterations; secret retrieved directly from macOS Keychain without display",
+  "ciphertext_sha256": "a94302f82874284020aeca7b3ccc7543fb014e4207d4268e17aaa1b8aea9ccad",
+  "canonical_public_key_sha256": "581a1ff72d1867b3dfb3b1ffc5521308ac646878050f1c4c12739e0dedaf7348",
+  "public_identity_matched": true,
+  "disposable_signature_sha256": "9c0606e1b2b1181a6718f9d7fe7799d67f437a97268b2975ac15f9c948260082",
+  "signature_verified": true,
+  "plaintext_location": "temporary APFS RAM disk",
+  "plaintext_persisted": false,
+  "ram_device": "disk13",
+  "cleanup_completed_at": "2026-09-06T00:45:28Z",
+  "cleanup_required": false,
+  "media_ejected": true
+}

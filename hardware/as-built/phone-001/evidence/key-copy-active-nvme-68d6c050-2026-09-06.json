@@ -1,0 +1,17 @@
+{
+  "ciphertext_sha256": "a94302f82874284020aeca7b3ccc7543fb014e4207d4268e17aaa1b8aea9ccad",
+  "destination": "/Volumes/UEBuild/millennium-signing/release-2026-08/active-nvme-68d6c050/release-2026-08-2026-08-31.pem.aes256",
+  "instruction": "Eject and store this media separately; perform the documented recovery drill before handoff.",
+  "key_id": "release-2026-08",
+  "media_id": "active-nvme-68d6c050",
+  "operation": "offline-media-copy",
+  "passed": true,
+  "schema": 1,
+  "verified_at": "2026-09-06T00:42:45+00:00",
+  "volume": {
+    "device_identifier": "disk12s1",
+    "mount_point": "/Volumes/UEBuild",
+    "volume_name": "UEBuild",
+    "volume_uuid": "68D6C050-587F-455B-B0B0-77DC06AC40E8"
+  }
+}

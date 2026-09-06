@@ -276,6 +276,15 @@ destroyed and the SD card safely ejected. Exact evidence is in
 `evidence/key-copy-active-sd-eee0e3ae-2026-09-06.json` and
 `evidence/key-recovery-active-sd-eee0e3ae-2026-09-06.json`.
 
+The second corrected copy was created on the physically distinct 512.1 GB
+`NVME-68D6C050` volume UUID `68D6C050-587F-455B-B0B0-77DC06AC40E8` on
+2026-09-06. Its ciphertext matched the first copy and restricted vault, its
+RAM-disk recovery matched the same active canonical public identity, and its
+fresh disposable Ed25519 signature verified. The RAM disk was destroyed and
+the NVMe was safely ejected. Exact evidence is in
+`evidence/key-copy-active-nvme-68d6c050-2026-09-06.json` and
+`evidence/key-recovery-active-nvme-68d6c050-2026-09-06.json`.
+
 The OTA format was hardened so every new signed bundle contains the full
 source commit and rejects unknown, dirty, missing, or daemon-mismatched source
 identities. A first sequence-10 publication was rejected by the phone because
