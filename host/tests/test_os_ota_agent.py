@@ -116,6 +116,68 @@ class OsOtaAgentTests(unittest.TestCase):
             with self.assertRaisesRegex(AGENT.AgentError, "stable normal boot"):
                 AGENT.boot_partitions(config)
 
+    def test_service_must_be_active_beyond_connection_window(self):
+        active = mock.Mock(return_value=mock.Mock(returncode=0, stdout="50000000\n"))
+        with mock.patch.object(AGENT.time, "monotonic", return_value=150):
+            self.assertTrue(AGENT.service_stably_active("tunnel.service", 95, active))
+        active.assert_any_call(
+            ["systemctl", "is-active", "--quiet", "tunnel.service"],
+            stdout=AGENT.subprocess.DEVNULL, stderr=AGENT.subprocess.DEVNULL)
+
+    def test_audio_health_opens_and_writes_pcm_device(self):
+        observed = {}
+        real_mkstemp = tempfile.mkstemp
+
+        def play(arguments, **_kwargs):
+            observed["frames"] = Path(arguments[-1]).read_bytes()
+            return mock.Mock(returncode=0)
+
+        with mock.patch.object(AGENT.tempfile, "mkstemp",
+                               side_effect=lambda **_kwargs:
+                               real_mkstemp(dir=self.root, suffix=".wav")):
+            self.assertTrue(AGENT.audio_health(play))
+        self.assertGreater(len(observed["frames"]), 44)
+
+    def health_payloads(self, keypad_drops=0, display_drops=0):
+        return [
+            {"current_state": 1, "sip_registered": 1},
+            {"overall_status": "HEALTHY", "checks": {
+                "serial_connection": {"status": "HEALTHY"},
+                "sip_connection": {"status": "HEALTHY"},
+            }},
+            {"gauges": {
+                "mcu_protocol_version": 2,
+                "arduino_i2c_drops_keypad": keypad_drops,
+                "arduino_i2c_drops_display": display_drops,
+            }},
+            {"version": "0.4.0"},
+        ]
+
+    def test_collect_health_requires_independent_mcu_liveness(self):
+        config = dict(AGENT.DEFAULTS)
+        config["maintenance_stable_seconds"] = 95
+        with mock.patch.object(AGENT, "read_json_url",
+                               side_effect=self.health_payloads()), \
+                mock.patch.object(AGENT.Path, "exists", return_value=True), \
+                mock.patch.object(AGENT, "filesystem_health", return_value=True), \
+                mock.patch.object(AGENT, "service_active", return_value=True), \
+                mock.patch.object(AGENT, "service_stably_active", return_value=True), \
+                mock.patch.object(AGENT, "audio_health", return_value=True), \
+                mock.patch.object(AGENT, "fetch", return_value=b"manifest"):
+            self.assertTrue(all(AGENT.collect_health(config).values()))
+
+        with mock.patch.object(AGENT, "read_json_url",
+                               side_effect=self.health_payloads(keypad_drops=1)), \
+                mock.patch.object(AGENT.Path, "exists", return_value=True), \
+                mock.patch.object(AGENT, "filesystem_health", return_value=True), \
+                mock.patch.object(AGENT, "service_active", return_value=True), \
+                mock.patch.object(AGENT, "service_stably_active", return_value=True), \
+                mock.patch.object(AGENT, "audio_health", return_value=True), \
+                mock.patch.object(AGENT, "fetch", return_value=b"manifest"):
+            checks = AGENT.collect_health(config)
+        self.assertFalse(checks["keypad_mcu"])
+        self.assertFalse(checks["local_controls"])
+
 
 if __name__ == "__main__":
     unittest.main()

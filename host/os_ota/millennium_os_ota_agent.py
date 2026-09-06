@@ -13,6 +13,7 @@ import tempfile
 import time
 import urllib.error
 import urllib.request
+import wave
 
 import millennium_os_ota as ota
 
@@ -48,6 +49,7 @@ DEFAULTS = {
     "install_window_start": "02:00",
     "install_window_end": "05:00",
     "health_timeout_seconds": "180",
+    "maintenance_stable_seconds": "95",
     "failure_backoff_seconds": "3600",
     "max_failure_attempts": "3",
     "phone_state_url": "http://127.0.0.1:8081/api/state",
@@ -79,8 +81,8 @@ def load_config(path):
             if key not in DEFAULTS or not value:
                 raise AgentError("unknown or empty OS OTA config field: " + key)
             result[key] = value
-    for key in ("health_timeout_seconds", "failure_backoff_seconds",
-                "max_failure_attempts"):
+    for key in ("health_timeout_seconds", "maintenance_stable_seconds",
+                "failure_backoff_seconds", "max_failure_attempts"):
         try:
             result[key] = int(result[key])
         except ValueError as exc:
@@ -90,6 +92,7 @@ def load_config(path):
         raise AgentError("invalid automatic OS OTA setting")
     result["automatic"] = automatic in ("1", "true", "yes", "on")
     if (result["health_timeout_seconds"] < 1
+            or result["maintenance_stable_seconds"] < 1
             or result["failure_backoff_seconds"] < 1
             or result["max_failure_attempts"] < 1):
         raise AgentError("OS OTA numeric settings must be positive")
@@ -400,6 +403,48 @@ def service_active(name, runner=subprocess.run):
                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
 
 
+def service_stably_active(name, minimum_seconds, runner=subprocess.run):
+    if not service_active(name, runner):
+        return False
+    result = runner([
+        "systemctl", "show", "--property=ActiveEnterTimestampMonotonic",
+        "--value", name,
+    ], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+    try:
+        active_at = int(result.stdout.strip()) / 1_000_000
+    except (AttributeError, ValueError):
+        return False
+    return result.returncode == 0 and active_at > 0 and time.monotonic() - active_at >= minimum_seconds
+
+
+def named_health_is_healthy(health, name):
+    return health.get("checks", {}).get(name, {}).get("status") == "HEALTHY"
+
+
+def metric_value(metrics, name):
+    value = metrics.get("gauges", {}).get(name)
+    return value if isinstance(value, (int, float)) and not isinstance(value, bool) else None
+
+
+def audio_health(runner=subprocess.run):
+    descriptor, filename = tempfile.mkstemp(prefix="millennium-audio-health-",
+                                             suffix=".wav", dir="/run")
+    os.close(descriptor)
+    try:
+        with wave.open(filename, "wb") as sound:
+            sound.setnchannels(1)
+            sound.setsampwidth(2)
+            sound.setframerate(8000)
+            sound.writeframes(b"\0" * 1600)  # 100 ms of silence
+        result = runner(["aplay", "--quiet", filename], timeout=5,
+                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return result.returncode == 0
+    except (OSError, subprocess.SubprocessError, wave.Error):
+        return False
+    finally:
+        Path(filename).unlink(missing_ok=True)
+
+
 def filesystem_health(config):
     return (os.path.ismount("/persistent") and os.path.ismount("/bootfs")
             and os.access("/persistent", os.W_OK) and os.access("/bootfs", os.W_OK))
@@ -411,23 +456,33 @@ def collect_health(config):
         health = read_json_url(config["health_url"], allow_http_error=True)
         metrics = read_json_url(config["metrics_url"])
         version = read_json_url(config["version_url"])
-        protocol = metrics.get("gauges", {}).get("mcu_protocol_version") == 2
-        keypad = Path(config["keypad_device"]).exists() and protocol
-        display = Path(config["display_device"]).exists() and protocol
+        protocol = metric_value(metrics, "mcu_protocol_version") == 2
+        serial = named_health_is_healthy(health, "serial_connection")
+        sip = named_health_is_healthy(health, "sip_connection")
+        keypad = (Path(config["keypad_device"]).exists() and protocol
+                  and metric_value(metrics, "arduino_i2c_drops_keypad") == 0)
+        display = (Path(config["display_device"]).exists() and protocol
+                   and metric_value(metrics, "arduino_i2c_drops_display") == 0)
+        state_value = state.get("current_state")
         endpoint = fetch(config["manifest_url"], MAX_MANIFEST)
         return {
             "filesystems": filesystem_health(config),
             "daemon": (service_active("daemon.service")
                        and bool(version.get("version"))
-                       and health.get("overall_status") in ("HEALTHY", "WARNING")),
+                       and health.get("overall_status") in ("HEALTHY", "WARNING")
+                       and serial and sip),
             "keypad_mcu": keypad,
             "display_mcu": display,
-            "audio": subprocess.run(["aplay", "-l"], stdout=subprocess.DEVNULL,
-                                    stderr=subprocess.DEVNULL).returncode == 0,
-            "sip": state.get("sip_registered") == 1,
-            "local_controls": keypad and display and isinstance(state.get("current_state"), int),
+            "audio": audio_health(),
+            "sip": sip and state.get("sip_registered") == 1,
+            "local_controls": (keypad and display and serial
+                               and isinstance(state_value, int)
+                               and not isinstance(state_value, bool)
+                               and 1 <= state_value <= 4),
             "update_endpoint": bool(endpoint),
-            "maintenance_tunnel": service_active("millennium-maintenance-tunnel.service"),
+            "maintenance_tunnel": service_stably_active(
+                "millennium-maintenance-tunnel.service",
+                config["maintenance_stable_seconds"]),
         }
     except Exception:
         return {name: False for name in ota.REQUIRED_BOOT_HEALTH}
