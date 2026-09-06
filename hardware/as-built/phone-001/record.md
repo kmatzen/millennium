@@ -334,3 +334,11 @@ was signed with the same RAM-only `release-2026-08` procedure. This replacement
 also remains explicitly unapproved pending a dedicated-media readback and real
 Zero 2 W boot. Exact evidence is in
 `evidence/zero2w-recovery-artifact-5a9eef2-2026-09-06.json`.
+
+The replacement candidate was then copied into a new, non-overwriting,
+restricted directory on `anima`. The destination independently verified every
+transferred hash, the canonical Ed25519 public-key identity and signature, and
+the Zstandard stream before atomic publication. Encrypted Restic snapshot
+`869fd021` captured the recovery store, and a fresh restore stream reproduced
+the exact image SHA-256 without staging a plaintext archive. Exact evidence is
+in `evidence/zero2w-recovery-retention-5a9eef2-2026-09-06.json`.
