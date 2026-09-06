@@ -43,7 +43,7 @@ as an unattended appliance. Items are ordered by priority.
     client cannot reach administrative services or recover stored credentials.
 
 - [ ] Add fail-safe full operating-system OTA updates.
-  - [ ] Build a supported NetworkManager-based Raspberry Pi OS image for the
+  - [x] Build a supported NetworkManager-based Raspberry Pi OS image for the
     Zero 2 W with redundant boot/root slots and a separate persistent-data
     partition; do not repartition the deployed Bullseye system in place.
   - [x] Use the Raspberry Pi firmware's one-shot `tryboot` A/B mechanism so an
@@ -61,6 +61,12 @@ as an unattended appliance. Items are ordered by priority.
   - [ ] Commit the new boot slot only after bounded checks prove the daemon,
     both MCUs, audio, SIP, local controls, update endpoint, and maintenance
     tunnel are healthy; otherwise record failure and return to the prior slot.
+    - [x] Implement and software-verify the bounded gate, including an actual
+      ALSA PCM write, fresh independent Alpha/Beta diagnostics, named daemon
+      health, and reverse-tunnel stability beyond its SSH failure window.
+    - [ ] Boot the signed candidate on the production-equivalent Zero 2 W and
+      prove a healthy physical candidate commits while each failed gate returns
+      to the prior slot.
   - [ ] Rate-limit and quarantine failed OS images, respect calls and
     maintenance windows, expose owner-safe status, and retain a signed recovery
     image that can be written by a maintainer.
