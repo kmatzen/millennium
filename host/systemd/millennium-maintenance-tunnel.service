@@ -2,6 +2,9 @@
 Description=Millennium outbound maintenance tunnel
 Wants=network-online.target
 After=network-online.target
+ConditionPathExists=/etc/millennium/maintenance-tunnel.conf
+ConditionPathExists=/etc/millennium/maintenance-tunnel-key
+ConditionPathExists=/etc/millennium/maintenance-known-hosts
 
 [Service]
 Type=simple

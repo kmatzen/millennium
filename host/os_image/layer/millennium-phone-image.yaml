@@ -15,6 +15,10 @@ mmdebstrap:
     - ca-certificates
     - alsa-utils
     - python3
+    - dnsmasq-base
+    - openssl
+    - sudo
+    - avrdude
   customize-hooks:
     - |
       set -eu
@@ -31,3 +35,20 @@ mmdebstrap:
       [device]
       wifi.scan-rand-mac-address=yes
       EOF
+    - |
+      set -eu
+      payload="$SRCROOT/payload/rootfs"
+      test -x "$payload/usr/local/bin/millennium-daemon" || {
+        echo "missing staged Millennium image payload; run tools/stage_zero2w_image_payload.sh" >&2
+        exit 1
+      }
+      cp -a "$payload/." "$1/"
+      chroot "$1" systemctl enable daemon.service millennium-firewall.service
+      chroot "$1" systemctl enable millennium-monitor.timer millennium-hil-smoke.timer
+      chroot "$1" systemctl enable millennium-physical-interruption-reconcile.service
+      chroot "$1" systemctl enable millennium-maintenance-tunnel.service
+      chroot "$1" systemctl enable millennium-update-recover.service
+      chroot "$1" systemctl enable millennium-update-check.timer millennium-update-apply.timer
+      chroot "$1" systemctl enable millennium-wifi-bootstrap.service millennium-wifi-helper.service
+      chroot "$1" systemctl enable millennium-wifi-portal.service millennium-wifi-recovery.path
+      chroot "$1" chown -R millennium:millennium /var/lib/millennium /var/log/millennium

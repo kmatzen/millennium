@@ -39,6 +39,7 @@ host/web_auth_tests
 host/daemon-override.conf.tmp
 host/audio/out/
 tools/qemu/state
+host/os_image/payload
 
 # TLC scratch output. `make tla-check` and friends write a states/ directory
 # next to the spec on every run (fingerprint and state-queue files). It is
