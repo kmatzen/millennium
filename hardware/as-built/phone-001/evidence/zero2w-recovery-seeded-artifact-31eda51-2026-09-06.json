@@ -1,0 +1,43 @@
+{
+  "artifact": {
+    "anima_directory": "/home/kmatzen/.local/share/millennium-recovery/images/zero2w-ab-1.0.0-31eda51-phone001",
+    "compressed_sha256": "780b17b745644b691eb723fe9fb00f66972507ddf8ec48e8b091547abe54688f",
+    "compressed_size": 447531237,
+    "expanded_sha256": "b2d605cc2b5bd008dfa50530abdc5b52f3e081234f95bf54c633f720bdf4f673",
+    "expanded_size": 15636365312,
+    "filename": "millennium-zero2w-ab-phone-001.img.zst",
+    "manifest_sha256": "408e64313b85f5e028f38cd8762f74643ef0bf9fa41bb754bbb8169af891bd19",
+    "signature_sha256": "acf459675332e4bdf87db5ec09a14398291ec4e6e1b9f0f432cada3aac797ec9"
+  },
+  "completed_at": "2026-09-06T17:58:46Z",
+  "factory_provision": {
+    "authorized_keys_sha256": "1c832bac0d97cb4e1577e419d0f428cbc03d4f8f702b7ba0b1882496ac6e3b32",
+    "device_id": "phone-001",
+    "evidence_sha256": "cb51c18769f6dbce7d481add5228ef6dc026bf7822d72c70d59592c57cf675f6",
+    "machine_id_sha256": "d00196ad91a01ce540bf4208ff334c56f043a999e4f6d7cee5b2e4239b2793ec",
+    "maintenance_tunnel_key_sha256": "7123128cd06723027461343aaa25f9b24860a8157653d81c3a15deeca8121a01",
+    "ssh_host_ed25519_sha256": "87107da333da56e116fe7871370f13cc27558ab2ddfe4833a69831ce111725f2"
+  },
+  "operation": "production-recovery-artifact-factory-seed",
+  "passed": true,
+  "physical_boot_approved": false,
+  "rebuild_host": "anima",
+  "schema": 1,
+  "signing": {
+    "key_id": "release-2026-08",
+    "plaintext_location": "temporary APFS RAM disk",
+    "plaintext_persisted": false,
+    "public_identity_matched": true,
+    "ram_device": "disk14",
+    "ram_device_ejected": true,
+    "signature_verified_on_anima": true,
+    "signature_verified_on_mac": true
+  },
+  "source_commit": "31eda512ab94cf7d9959451673e2674d44516270",
+  "verification": {
+    "both_system_slots_remounted_read_only": true,
+    "compressed_stream_verified": true,
+    "persistent_partition_remounted_read_only": true,
+    "wifi_handoff_retained_separately_on_anima": true
+  }
+}

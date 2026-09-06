@@ -13,6 +13,7 @@ import shutil
 import stat
 import subprocess
 import tempfile
+import time
 
 
 HOST_KEYS = (
@@ -29,6 +30,29 @@ REQUIRED_CONFIG = (
 
 def run(arguments, **kwargs):
     return subprocess.run(arguments, check=True, **kwargs)
+
+
+def ensure_block_device(path, sys_block=Path("/sys/class/block")):
+    """Create a container-visible node for a kernel-known loop partition."""
+    path = Path(path)
+    if path.exists():
+        if not stat.S_ISBLK(path.stat().st_mode):
+            raise ValueError("partition path is not a block device: " + str(path))
+        return
+    identity = sys_block / path.name / "dev"
+    for _ in range(50):
+        try:
+            value = identity.read_text().strip()
+            break
+        except FileNotFoundError:
+            time.sleep(0.1)
+    else:
+        raise ValueError("kernel did not expose loop partition: " + path.name)
+    match = re.fullmatch(r"([0-9]+):([0-9]+)", value)
+    if not match:
+        raise ValueError("invalid kernel block-device identity: " + value)
+    major, minor = (int(part) for part in match.groups())
+    os.mknod(path, stat.S_IFBLK | 0o600, os.makedev(major, minor))
 
 
 def sha256(path):
@@ -192,7 +216,9 @@ def mounted_image(image):
     try:
         for path, number in zip(mounts, (5, 6, 7)):
             path.mkdir()
-            run(["mount", "-o", "rw,nosuid,nodev,noexec", loop + "p" + str(number),
+            partition = loop + "p" + str(number)
+            ensure_block_device(partition)
+            run(["mount", "-o", "rw,nosuid,nodev,noexec", partition,
                  str(path)])
         yield mounts
         run(["sync"])

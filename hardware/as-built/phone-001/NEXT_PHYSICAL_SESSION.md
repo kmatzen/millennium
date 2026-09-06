@@ -27,10 +27,11 @@ the builder, retained images, and signing-key backup.
 This step passed on 2026-09-06 using macOS whole disk `/dev/disk10`, a 63.9 GB
 USB removable SD card. The writer retained exclusive raw-device access through
 the write and complete readback, and the observed expanded SHA-256 matched the
-signed value `7eca956c1d94bc0cd706a9152aae78262bafb2163d113959448df076469ba128`.
+signed phone-001 value
+`b2d605cc2b5bd008dfa50530abdc5b52f3e081234f95bf54c633f720bdf4f673`.
 The card was then ejected. Exact evidence is in
-`evidence/recovery-media-31eda51.json`. Do not repeat this step unless the card
-is damaged or intentionally replaced.
+`evidence/recovery-media-phone001-31eda51.json`. Do not repeat this step unless
+the card is damaged or intentionally replaced.
 
 The reproducible procedure remains below for disaster recovery.
 
@@ -38,7 +39,7 @@ The approved software candidate is intentionally named `unapproved` until this
 section and its physical boot both pass:
 
 ```text
-/Volumes/UEBuild/millennium-images/zero2w-ab-1.0.0-31eda51-unapproved
+/Volumes/UEBuild/millennium-images/zero2w-ab-1.0.0-31eda51-phone001-unapproved
 ```
 
 Attach only the dedicated recovery card, identify its current whole-disk name
@@ -46,16 +47,16 @@ with `diskutil list external physical`, and run the preflight first:
 
 ```bash
 python3 tools/write_recovery_media.py \
-  --manifest /Volumes/UEBuild/millennium-images/zero2w-ab-1.0.0-31eda51-unapproved/recovery-manifest.json \
-  --signature /Volumes/UEBuild/millennium-images/zero2w-ab-1.0.0-31eda51-unapproved/recovery-manifest.json.sig \
+  --manifest /Volumes/UEBuild/millennium-images/zero2w-ab-1.0.0-31eda51-phone001-unapproved/recovery-manifest.json \
+  --signature /Volumes/UEBuild/millennium-images/zero2w-ab-1.0.0-31eda51-phone001-unapproved/recovery-manifest.json.sig \
   --public-key host/ota/keys/release-2026-08.pem \
-  --image /Volumes/UEBuild/millennium-images/zero2w-ab-1.0.0-31eda51-unapproved/millennium-zero2w-ab.img.zst \
+  --image /Volumes/UEBuild/millennium-images/zero2w-ab-1.0.0-31eda51-phone001-unapproved/millennium-zero2w-ab-phone-001.img.zst \
   --target /dev/diskN
 ```
 
 Read the reported identity, confirm it is the dedicated removable card, and
 only then rerun with `sudo`, `--write`, `--confirm-device diskN`, and
-`--evidence hardware/as-built/phone-001/evidence/recovery-media-31eda51.json`.
+`--evidence hardware/as-built/phone-001/evidence/recovery-media-phone001-31eda51.json`.
 The writer verifies the signed manifest, writes the expansion, flushes it, and
 hashes a complete image-length readback. Eject the card after it passes.
 

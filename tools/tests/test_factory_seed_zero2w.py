@@ -1,8 +1,10 @@
 import importlib.util
 import os
 from pathlib import Path
+import stat
 import tempfile
 import unittest
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -61,6 +63,29 @@ class FactorySeedTests(unittest.TestCase):
             self.assertTrue((destination / "packaged-link").is_symlink())
             self.assertEqual((destination / "packaged-link").readlink(),
                              Path("/usr/share/example"))
+
+    def test_creates_kernel_reported_loop_partition_node(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            device = root / "dev" / "loop9p5"
+            device.parent.mkdir()
+            identity = root / "sys" / "loop9p5"
+            identity.mkdir(parents=True)
+            (identity / "dev").write_text("7:45\n")
+            with mock.patch.object(MODULE.os, "mknod") as mknod:
+                MODULE.ensure_block_device(device, root / "sys")
+            mode = mknod.call_args.args[1]
+            self.assertTrue(stat.S_ISBLK(mode))
+            self.assertEqual(mknod.call_args.args[2], os.makedev(7, 45))
+
+    def test_rejects_invalid_kernel_block_identity(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            identity = root / "sys" / "loop9p5"
+            identity.mkdir(parents=True)
+            (identity / "dev").write_text("not-a-device\n")
+            with self.assertRaisesRegex(ValueError, "invalid kernel"):
+                MODULE.ensure_block_device(root / "dev" / "loop9p5", root / "sys")
 
 
 if __name__ == "__main__":

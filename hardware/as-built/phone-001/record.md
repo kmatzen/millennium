@@ -385,3 +385,33 @@ The card was safely ejected immediately afterward. This closes media creation
 and byte-for-byte readback only; the candidate remains `unapproved` until it
 boots and passes its health gates on the physical production-equivalent Zero
 2 W. Exact evidence is in `evidence/recovery-media-31eda51.json`.
+
+The first physical boot rejected that generic candidate operationally. It
+appeared at `192.168.8.239` and served SSH, but neither the approved maintainer
+key nor the intended appliance health endpoint was available. Offline ext4
+inspection proved the image had no `factory-provision.json`, an empty
+`authorized_keys`, and a residual `root@millennium-qemu` public host key. It
+was therefore never a deployable phone-001 recovery image despite its valid
+software signature and media digest. Exact rejection evidence is in
+`evidence/recovery-generic-boot-rejection-31eda51-2026-09-06.json`.
+
+A corrected candidate was rebuilt on `anima` from the same verified software
+image and the newest pre-reimage phone backup. Factory provisioning installed
+fresh phone-001 machine and SSH host identities, the approved hardware-backed
+maintainer key, the active update trust root, maintenance tunnel state, and a
+new per-device Wi-Fi onboarding secret. Both system slots and the persistent
+partition were independently remounted read-only in a network-disabled
+container and their identities matched the factory record. The canonical
+manifest binds compressed SHA-256
+`780b17b745644b691eb723fe9fb00f66972507ddf8ec48e8b091547abe54688f`
+to expanded SHA-256
+`b2d605cc2b5bd008dfa50530abdc5b52f3e081234f95bf54c633f720bdf4f673`.
+It was signed on a temporary APFS RAM disk with `release-2026-08`, verified on
+both the Mac and `anima`, and the RAM disk was ejected. Anima atomically retains
+the candidate and separately protects the owner Wi-Fi handoff record. A second
+exclusive write and complete 15,636,365,312-byte readback on `/dev/disk10`
+reproduced the signed expanded digest, after which the card was ejected. The
+candidate remains `unapproved` pending its corrected physical Zero 2 W boot.
+Exact build evidence is in
+`evidence/zero2w-recovery-seeded-artifact-31eda51-2026-09-06.json`; media
+evidence is in `evidence/recovery-media-phone001-31eda51.json`.

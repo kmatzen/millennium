@@ -1,0 +1,21 @@
+{
+  "completed_at": "2026-09-06T17:58:46Z",
+  "generic_image_expanded_sha256": "7eca956c1d94bc0cd706a9152aae78262bafb2163d113959448df076469ba128",
+  "network_observation": {
+    "address": "192.168.8.239",
+    "health_endpoint_8081_reachable": false,
+    "ssh_host_ed25519_fingerprint": "SHA256:10VhNyW6yJrLH2GHjez0f0QUNl1ksnmaQC8L9RmQAes",
+    "ssh_listening": true
+  },
+  "offline_persistent_partition": {
+    "authorized_keys": "empty",
+    "factory_provision_json": "missing",
+    "residual_public_host_key_comment": "root@millennium-qemu"
+  },
+  "operation": "physical-recovery-candidate-rejection",
+  "passed": true,
+  "reason": "The signed generic image was software-valid but lacked required phone-001 factory provisioning.",
+  "schema": 1,
+  "source_commit": "31eda512ab94cf7d9959451673e2674d44516270",
+  "status": "rejected; do not deploy"
+}
