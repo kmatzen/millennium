@@ -81,6 +81,8 @@ def ownership(path, uid, gid, directory_mode=None, file_mode=None):
     items = [path] + list(path.rglob("*")) if path.is_dir() else [path]
     for item in items:
         os.chown(item, uid, gid, follow_symlinks=False)
+        if item.is_symlink():
+            continue
         if item.is_dir() and directory_mode is not None:
             os.chmod(item, directory_mode)
         elif item.is_file() and file_mode is not None:
@@ -109,11 +111,12 @@ def overlay_config(source, destination):
     os.chmod(destination, 0o750)
 
 
-def replace_tree(source, destination, uid, gid, directory_mode, file_mode):
+def replace_tree(source, destination, uid, gid, directory_mode, file_mode,
+                 preserve_symlinks=False):
     destination = Path(destination)
     if destination.exists():
         shutil.rmtree(destination)
-    shutil.copytree(source, destination)
+    shutil.copytree(source, destination, symlinks=preserve_symlinks)
     ownership(destination, uid, gid, directory_mode, file_mode)
 
 
@@ -148,7 +151,8 @@ def seed_mounted(staging, system_a, system_b, persistent, source_commit):
     replace_tree(Path(system_a) / "etc/ssh", persistent / "shared/etc/ssh",
                  0, 0, 0o755,
                  lambda item: 0o600 if item.name.startswith("ssh_host_")
-                 and not item.name.endswith(".pub") else 0o644)
+                 and not item.name.endswith(".pub") else 0o644,
+                 preserve_symlinks=True)
     replace_tree(Path(system_a) / "etc/millennium",
                  persistent / "shared/etc/millennium", 0, 1000, 0o750,
                  lambda item: stat.S_IMODE(item.stat().st_mode))

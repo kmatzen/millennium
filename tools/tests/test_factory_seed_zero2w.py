@@ -1,4 +1,5 @@
 import importlib.util
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -45,6 +46,21 @@ class FactorySeedTests(unittest.TestCase):
             (staging / "escape").symlink_to("/etc/passwd")
             with self.assertRaisesRegex(ValueError, "link or special"):
                 MODULE.validate_staging(staging)
+
+    def test_trusted_image_links_can_be_preserved(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "source"
+            destination = root / "destination"
+            source.mkdir()
+            (source / "config").write_text("value\n")
+            (source / "packaged-link").symlink_to("/usr/share/example")
+            MODULE.replace_tree(source, destination, os.getuid(), os.getgid(), 0o755,
+                                lambda unused: 0o644,
+                                preserve_symlinks=True)
+            self.assertTrue((destination / "packaged-link").is_symlink())
+            self.assertEqual((destination / "packaged-link").readlink(),
+                             Path("/usr/share/example"))
 
 
 if __name__ == "__main__":
