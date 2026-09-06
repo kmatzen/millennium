@@ -201,6 +201,11 @@ def protected_disks(image_path, system):
     return set()
 
 
+def reject_protected_target(target, image_path, system):
+    if target["device_identifier"] in protected_disks(image_path, system):
+        raise SystemExit("refusing to write the running system disk or source-image disk")
+
+
 def unmount_target(target, system):
     if system == "Darwin":
         run([DISKUTIL, "unmountDisk", target])
@@ -294,8 +299,7 @@ def main():
                                  args.public_key, args.image)
     system = platform.system()
     target = identify_target(args.target, system)
-    if target["device_identifier"] in protected_disks(args.image, system):
-        raise SystemExit("refusing to write the running system disk or source-image disk")
+    reject_protected_target(target, args.image, system)
     image = manifest["image"]
     if target["size_bytes"] < image["expanded_size"]:
         raise SystemExit("target is smaller than the signed recovery image")

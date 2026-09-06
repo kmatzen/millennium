@@ -97,6 +97,19 @@ class RecoveryMediaTests(unittest.TestCase):
             self.assertEqual(MODULE.darwin_containing_disks(Path("/tmp/image.zst")),
                              {"disk12"})
 
+    def test_rejects_disk_containing_source_image(self):
+        target = {"device_identifier": "disk6"}
+        with mock.patch.object(MODULE, "protected_disks", return_value={"disk1", "disk6"}):
+            with self.assertRaisesRegex(SystemExit, "source-image disk"):
+                MODULE.reject_protected_target(target, Path("/Volumes/UEBuild/image.zst"),
+                                               "Darwin")
+
+    def test_allows_distinct_recovery_disk(self):
+        target = {"device_identifier": "disk12"}
+        with mock.patch.object(MODULE, "protected_disks", return_value={"disk1", "disk6"}):
+            MODULE.reject_protected_target(target, Path("/Volumes/UEBuild/image.zst"),
+                                           "Darwin")
+
     def test_readback_hashes_exact_image_length(self):
         with tempfile.TemporaryDirectory() as temporary:
             target = Path(temporary) / "disk"
