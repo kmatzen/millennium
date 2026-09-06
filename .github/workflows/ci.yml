@@ -97,6 +97,24 @@ jobs:
         working-directory: host
         run: make daemon pjsip-smoke && ./pjsip_smoke "" ""
 
+      - name: Stage runtime assets for systemd verification
+        run: |
+          sudo install -d /usr/local/bin /usr/local/libexec
+          sudo install -m 0755 host/daemon /usr/local/bin/millennium-daemon
+          sudo install -m 0755 host/monitoring/millennium_backup.sh /usr/local/libexec/millennium-backup
+          sudo install -m 0755 host/monitoring/millennium_hil_smoke.py /usr/local/libexec/millennium-hil-smoke
+          sudo install -m 0755 host/ota/millennium_maintenance_tunnel.sh /usr/local/libexec/millennium-maintenance-tunnel
+          sudo install -m 0755 host/monitoring/millennium_monitor.py /usr/local/libexec/millennium-monitor
+          sudo install -m 0755 host/os_ota/millennium_os_ota_agent.py /usr/local/libexec/millennium-os-ota
+          sudo install -m 0755 host/monitoring/millennium_physical_interruption.py /usr/local/libexec/millennium-physical-interruption
+          sudo install -m 0755 host/ota/millennium_ota.py /usr/local/libexec/millennium-ota
+          sudo install -m 0755 host/wifi/millennium_wifi_bootstrap.py /usr/local/libexec/millennium-wifi-bootstrap
+          sudo install -m 0755 host/wifi/millennium_wifi_helper.py /usr/local/libexec/millennium-wifi-helper
+          sudo install -m 0755 host/wifi/millennium_wifi_portal.py /usr/local/libexec/millennium-wifi-portal
+          install -d "$HOME/.local/bin"
+          install -m 0755 host/monitoring/millennium_metrics_pull.sh "$HOME/.local/bin/millennium-metrics-pull"
+          ln -s "$GITHUB_WORKSPACE" "$HOME/millennium"
+
       - name: Validate shell and systemd assets
         run: |
           find . -type f -name '*.sh' -print0 | xargs -0 shellcheck
