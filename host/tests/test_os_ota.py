@@ -6,6 +6,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 
 
@@ -298,6 +299,80 @@ class OsOtaTests(unittest.TestCase):
         value = os_ota.commit_tryboot_from_device_tree(
             selector, journal, partition, tryboot)
         self.assertEqual(value["active_boot_partition"], 3)
+
+    def test_installation_gate_respects_busy_work_and_window(self):
+        at_one_am = time.struct_time((2026, 9, 6, 1, 0, 0, 6, 249, -1))
+        ready = {name: False for name in os_ota.BUSY_REASONS}
+        self.assertTrue(os_ota.installation_gate(
+            ready, "00:30", "02:00", at_one_am)["allowed"])
+        ready["active_call"] = True
+        blocked = os_ota.installation_gate(
+            ready, "00:30", "02:00", at_one_am)
+        self.assertEqual(blocked["reason"], "device-busy")
+        ready["active_call"] = False
+        outside = os_ota.installation_gate(
+            ready, "02:00", "03:00", at_one_am)
+        self.assertEqual(outside["reason"], "outside-maintenance-window")
+        self.assertTrue(os_ota.installation_gate(
+            ready, "23:00", "02:00", at_one_am)["allowed"])
+
+    def test_failed_os_release_backs_off_quarantines_and_clears(self):
+        manifest = json.loads((self.build() / "manifest.json").read_text())
+        first = os_ota.record_failure(
+            self.root / "state", manifest, "health-failed", now=100,
+            base_delay=10, maximum_attempts=2)
+        self.assertFalse(first["quarantined"])
+        self.assertEqual(os_ota.retry_status(
+            self.root / "state", manifest, now=105)["reason"], "backoff")
+        self.assertTrue(os_ota.retry_status(
+            self.root / "state", manifest, now=110)["allowed"])
+        second = os_ota.record_failure(
+            self.root / "state", manifest, "health-failed", now=111,
+            base_delay=10, maximum_attempts=2)
+        self.assertTrue(second["quarantined"])
+        self.assertEqual(os_ota.retry_status(
+            self.root / "state", manifest, now=999)["reason"], "quarantined")
+        os_ota.clear_failure(self.root / "state", manifest)
+        self.assertTrue(os_ota.retry_status(
+            self.root / "state", manifest, now=999)["allowed"])
+
+    def test_failed_candidate_records_checks_and_never_commits(self):
+        output = self.build()
+        manifest = json.loads((output / "manifest.json").read_text())
+        journal = self.tryboot_journal()
+        selector = self.root / "autoboot.txt"
+        os_ota.arm_tryboot(selector, journal, 2, 3)
+        checks = {name: True for name in os_ota.REQUIRED_BOOT_HEALTH}
+        checks["display_mcu"] = False
+        failed = os_ota.reject_boot_health(
+            journal, checks, self.root / "state", manifest,
+            "health-failed", now=100)
+        self.assertEqual(failed["phase"], "health-failed")
+        self.assertEqual(failed["failed_checks"], ["display_mcu"])
+        with self.assertRaisesRegex(os_ota.OsOtaError, "health has not passed"):
+            os_ota.commit_tryboot(selector, journal, 3, 1)
+        self.assertEqual(os_ota.parse_autoboot(selector.read_text()), (2, 3))
+
+    def test_successful_commit_persists_anti_rollback_sequence(self):
+        journal = self.tryboot_journal()
+        selector = self.root / "autoboot.txt"
+        installed = self.root / "installed-sequence"
+        os_ota.arm_tryboot(selector, journal, 2, 3)
+        os_ota.record_boot_health(
+            journal, {name: True for name in os_ota.REQUIRED_BOOT_HEALTH})
+        os_ota.commit_tryboot(selector, journal, 3, 1, installed)
+        self.assertEqual(installed.read_text(), "12\n")
+
+    def test_owner_status_does_not_expose_internal_failure_detail(self):
+        status = os_ota.owner_safe_status(
+            {"phase": "tryboot-armed", "sequence": 12,
+             "version": "2026.09.0", "inactive_targets": {"root": "/dev/mmc"}},
+            {"attempts": 3, "retry_after": 200, "quarantined": True,
+             "error_code": "secret-path-/etc"})
+        self.assertEqual(status["state"], "quarantined")
+        self.assertTrue(status["action_required"])
+        self.assertNotIn("inactive_targets", status)
+        self.assertNotIn("error_code", status)
 
 
 if __name__ == "__main__":

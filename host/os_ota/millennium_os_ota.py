@@ -11,6 +11,7 @@ import stat
 import struct
 import subprocess
 import tempfile
+import time
 from urllib.parse import urlparse
 
 
@@ -25,6 +26,8 @@ REQUIRED_BOOT_HEALTH = frozenset({
     "filesystems", "daemon", "keypad_mcu", "display_mcu", "audio", "sip",
     "local_controls", "update_endpoint", "maintenance_tunnel",
 })
+BUSY_REASONS = frozenset({"active_call", "coin_transaction", "content_save",
+                          "maintenance_session", "other_update"})
 
 
 def sha256(path):
@@ -157,6 +160,130 @@ def atomic_json(path, value):
             os.unlink(temporary)
 
 
+def manifest_identity_digest(manifest):
+    """Stable release identity used for failure quarantine and status."""
+    encoded = json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode()
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def parse_clock(value):
+    try:
+        hour, minute = (int(part) for part in value.split(":"))
+    except (AttributeError, TypeError, ValueError):
+        raise OsOtaError("invalid OS maintenance-window time")
+    if hour not in range(24) or minute not in range(60):
+        raise OsOtaError("invalid OS maintenance-window time")
+    return hour * 60 + minute
+
+
+def within_maintenance_window(start, end, now=None):
+    current_time = now or time.localtime()
+    current = current_time.tm_hour * 60 + current_time.tm_min
+    beginning, ending = parse_clock(start), parse_clock(end)
+    if beginning == ending:
+        return True
+    if beginning < ending:
+        return beginning <= current < ending
+    return current >= beginning or current < ending
+
+
+def installation_gate(busy, window_start, window_end, now=None,
+                      override_window=False):
+    unknown = set(busy) - BUSY_REASONS
+    if unknown:
+        raise OsOtaError("unknown OS installation busy reason")
+    active = sorted(reason for reason, value in busy.items() if value is True)
+    if any(value not in (True, False) for value in busy.values()):
+        raise OsOtaError("invalid OS installation busy state")
+    if active:
+        return {"allowed": False, "reason": "device-busy", "busy": active}
+    if not override_window and not within_maintenance_window(
+            window_start, window_end, now):
+        return {"allowed": False, "reason": "outside-maintenance-window",
+                "busy": []}
+    return {"allowed": True, "reason": "ready", "busy": []}
+
+
+def failure_path(state_dir, digest):
+    if not isinstance(digest, str) or not HEX64.fullmatch(digest):
+        raise OsOtaError("invalid OS manifest failure identity")
+    return Path(state_dir) / "failures" / (digest + ".json")
+
+
+def read_failure(state_dir, digest):
+    try:
+        value = json.loads(failure_path(state_dir, digest).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if value.get("schema") != 1 or value.get("manifest_sha256") != digest:
+        return None
+    return value
+
+
+def record_failure(state_dir, manifest, error_code, now=None,
+                   base_delay=3600, maximum_attempts=3):
+    if not _identifier(error_code):
+        raise OsOtaError("invalid OS failure code")
+    if base_delay < 1 or maximum_attempts < 1:
+        raise OsOtaError("invalid OS retry policy")
+    digest = manifest_identity_digest(manifest)
+    prior = read_failure(state_dir, digest) or {}
+    attempts = min(int(prior.get("attempts", 0)) + 1, maximum_attempts)
+    timestamp = int(time.time() if now is None else now)
+    delay = base_delay * (2 ** min(attempts - 1, 8))
+    value = {
+        "schema": 1, "manifest_sha256": digest,
+        "sequence": manifest["sequence"], "version": manifest["version"],
+        "attempts": attempts, "maximum_attempts": maximum_attempts,
+        "last_failure": timestamp, "retry_after": timestamp + delay,
+        "quarantined": attempts >= maximum_attempts,
+        "error_code": error_code,
+    }
+    atomic_json(failure_path(state_dir, digest), value)
+    return value
+
+
+def retry_status(state_dir, manifest, now=None):
+    failure = read_failure(state_dir, manifest_identity_digest(manifest))
+    if not failure:
+        return {"allowed": True, "reason": "not-failed"}
+    if failure["quarantined"]:
+        return {"allowed": False, "reason": "quarantined",
+                "attempts": failure["attempts"]}
+    timestamp = int(time.time() if now is None else now)
+    if timestamp < failure["retry_after"]:
+        return {"allowed": False, "reason": "backoff",
+                "retry_after": failure["retry_after"],
+                "attempts": failure["attempts"]}
+    return {"allowed": True, "reason": "retry",
+            "attempts": failure["attempts"]}
+
+
+def clear_failure(state_dir, manifest):
+    path = failure_path(state_dir, manifest_identity_digest(manifest))
+    try:
+        path.unlink()
+    except FileNotFoundError:
+        pass
+
+
+def owner_safe_status(journal=None, failure=None, gate=None):
+    """Return status that deliberately excludes paths, URLs and error details."""
+    value = {"schema": 1, "state": "idle", "action_required": False}
+    if journal:
+        value.update({"state": journal.get("phase", "unknown"),
+                      "sequence": journal.get("sequence"),
+                      "version": journal.get("version")})
+    if gate and not gate.get("allowed", False):
+        value.update({"state": "deferred", "reason": gate.get("reason")})
+    if failure:
+        value.update({"state": "quarantined" if failure.get("quarantined") else "backoff",
+                      "attempts": failure.get("attempts"),
+                      "retry_after": failure.get("retry_after"),
+                      "action_required": bool(failure.get("quarantined"))})
+    return {key: item for key, item in value.items() if item is not None}
+
+
 def _same_device(first, second):
     try:
         return os.path.samefile(first, second)
@@ -250,6 +377,7 @@ def write_inactive_images(manifest, downloads, targets, active_paths, journal,
         "schema": 1, "operation": "os-slot-write",
         "sequence": manifest["sequence"], "version": manifest["version"],
         "source_commit": manifest["source_commit"], "layout_id": manifest["layout_id"],
+        "manifest_sha256": manifest_identity_digest(manifest),
         "phase": "verified-downloads", "inactive_targets": {
             name: str(path) for name, path in resolved.items()
         },
@@ -369,7 +497,37 @@ def record_boot_health(journal_path, checks):
     return journal
 
 
-def commit_tryboot(selector_path, journal_path, boot_partition, tryboot):
+def reject_boot_health(journal_path, checks, state_dir, manifest, error_code,
+                       now=None, base_delay=3600, maximum_attempts=3):
+    journal = read_journal(journal_path)
+    if journal.get("phase") != "tryboot-armed":
+        raise OsOtaError("candidate boot is not armed")
+    if set(checks) != REQUIRED_BOOT_HEALTH or any(
+            value not in (True, False) for value in checks.values()):
+        raise OsOtaError("candidate boot health result is incomplete")
+    digest = manifest_identity_digest(manifest)
+    recorded = journal.get("manifest_sha256")
+    if recorded is not None and recorded != digest:
+        raise OsOtaError("candidate manifest does not match transaction")
+    failure = record_failure(state_dir, manifest, error_code, now,
+                             base_delay, maximum_attempts)
+    journal["health_checks"] = dict(sorted(checks.items()))
+    journal["failed_checks"] = sorted(name for name, passed in checks.items()
+                                      if not passed)
+    journal["failure"] = {
+        "manifest_sha256": digest,
+        "attempts": failure["attempts"],
+        "retry_after": failure["retry_after"],
+        "quarantined": failure["quarantined"],
+        "error_code": failure["error_code"],
+    }
+    journal["phase"] = "health-failed"
+    atomic_json(journal_path, journal)
+    return journal
+
+
+def commit_tryboot(selector_path, journal_path, boot_partition, tryboot,
+                   installed_sequence_path=None):
     journal = read_journal(journal_path)
     if journal.get("phase") != "health-passed":
         raise OsOtaError("candidate health has not passed")
@@ -386,14 +544,18 @@ def commit_tryboot(selector_path, journal_path, boot_partition, tryboot):
         raise OsOtaError("committed autoboot selector readback failed")
     journal["phase"] = "committed"
     journal["active_boot_partition"] = candidate
+    if installed_sequence_path is not None:
+        atomic_text(installed_sequence_path, "%d\n" % journal["sequence"])
     atomic_json(journal_path, journal)
     return journal
 
 
 def commit_tryboot_from_device_tree(selector_path, journal_path,
-                                    partition_path, tryboot_path):
+                                    partition_path, tryboot_path,
+                                    installed_sequence_path=None):
     return commit_tryboot(
         selector_path, journal_path,
         read_bootloader_integer(partition_path),
         read_bootloader_integer(tryboot_path),
+        installed_sequence_path,
     )

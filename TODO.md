@@ -55,7 +55,7 @@ as an unattended appliance. Items are ordered by priority.
     versions, rollout controls, and exact sizes and hashes into the signature.
   - [x] Stream verified images only to inactive slots, read them back, and
     reject overlap with the active boot/root devices before changing boot state.
-  - [ ] Preserve per-device identity, NetworkManager profiles, setup secret,
+  - [x] Preserve per-device identity, NetworkManager profiles, setup secret,
     maintenance credentials, story state, logs required for diagnosis, and OTA
     anti-rollback state outside the replaceable root filesystems.
   - [ ] Commit the new boot slot only after bounded checks prove the daemon,
@@ -64,6 +64,11 @@ as an unattended appliance. Items are ordered by priority.
   - [ ] Rate-limit and quarantine failed OS images, respect calls and
     maintenance windows, expose owner-safe status, and retain a signed recovery
     image that can be written by a maintainer.
+    - [x] Implement digest-scoped exponential backoff, bounded retry quarantine,
+      busy-device and maintenance-window gates, administrative clearing, and
+      privacy-safe owner status.
+    - [ ] Produce, sign, retain, and recovery-write a production-equivalent
+      recovery image.
   - [ ] Exercise download, inactive-slot write, pre-reboot, first boot, health
     commit, and rollback in QEMU and by physically removing power on the
     production-equivalent Zero 2 W image.
@@ -271,7 +276,7 @@ A release is ready for an inexperienced end user only when:
 - [ ] Power and network interruption tests recover safely.
 - [x] Remote maintenance works through the known domain without inbound home-network access.
 - [x] Monitoring reports the phone's health and alerts on loss of contact.
-- [ ] Signing keys, server state, and recovery instructions have currently
+- [x] Signing keys, server state, and recovery instructions have currently
   verified tested backups.
 - [ ] A first-time caller can discover and complete the primary experience without instruction from the owner.
 - [ ] Story interruption, timeout, repeat-play, offline, and return-visit paths have been playtested.

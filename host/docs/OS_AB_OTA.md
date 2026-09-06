@@ -104,6 +104,22 @@ and refuses to swap the selector unless they identify the expected one-shot
 candidate boot. Without that commit, Raspberry Pi firmware clears the try flag
 and returns to the unchanged normal partition on the next reset.
 
+OS rollout policy is enforced independently of image validity. Installation is
+deferred whenever a call, coin transaction, content save, maintenance session,
+or another update is active and outside the configured maintenance window.
+Failures are keyed by canonical manifest SHA-256, receive exponential retry
+delay, and become quarantined after the configured attempt count. A privileged
+maintenance action may explicitly clear one manifest's failure record.
+Owner-facing status reports only release, phase, retry timing, and whether
+maintenance is required; it omits device paths, URLs, detailed errors, and
+credentials.
+
+A candidate health failure durably records every check and the failed subset,
+updates the digest-scoped retry record, and leaves the normal selector
+unchanged. A successful candidate commit writes the installed OS sequence to
+persistent state before journaling completion, preserving anti-rollback state
+across root-slot replacement.
+
 ## Transaction and boot commit
 
 1. Refuse while a call, coin transaction, content save, or another updater is
