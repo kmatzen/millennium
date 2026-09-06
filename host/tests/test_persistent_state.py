@@ -3,6 +3,8 @@
 import copy
 import importlib.util
 from pathlib import Path
+import os
+import tempfile
 import unittest
 
 
@@ -63,6 +65,77 @@ class PersistentStateTests(unittest.TestCase):
                  if entry["target"] == target)["mode"] = "0755"
             with self.assertRaisesRegex(persistent.PersistentStateError, "too broad"):
                 persistent.validate(value)
+
+    def make_staging(self, root):
+        staging = root / "staging"
+        destination = root / "persist"
+        staging.mkdir()
+        destination.mkdir()
+        for entry in self.value["entries"]:
+            source = staging / entry["target"].lstrip("/")
+            source.parent.mkdir(parents=True, exist_ok=True)
+            if entry["kind"] == "directory":
+                source.mkdir(exist_ok=True)
+                (source / "sample").write_text(entry["target"], encoding="utf-8")
+            else:
+                source.write_text(entry["target"], encoding="utf-8")
+        return staging, destination
+
+    def test_seed_and_verify_copies_only_allowlisted_state(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            staging, destination = self.make_staging(root)
+            unrelated = staging / "opt/millennium/current/daemon"
+            unrelated.parent.mkdir(parents=True)
+            unrelated.write_text("replaceable", encoding="utf-8")
+            record = persistent.seed_persistent_state(
+                self.value, staging, destination, apply_ownership=False)
+            self.assertEqual(len(record["entries"]), len(self.value["entries"]))
+            self.assertFalse((destination / "opt").exists())
+            persistent.verify_persistent_state(
+                self.value, destination, check_ownership=False)
+
+    def test_seed_refuses_nonempty_destination(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            staging, destination = self.make_staging(root)
+            (destination / "unexpected").write_text("data")
+            with self.assertRaisesRegex(persistent.PersistentStateError, "not empty"):
+                persistent.seed_persistent_state(
+                    self.value, staging, destination, apply_ownership=False)
+
+    def test_seed_rejects_escaping_symlink(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            staging, destination = self.make_staging(root)
+            source = staging / "home/matzen/.ssh"
+            (source / "escape").symlink_to("/etc/passwd")
+            with self.assertRaisesRegex(persistent.PersistentStateError, "escapes"):
+                persistent.seed_persistent_state(
+                    self.value, staging, destination, apply_ownership=False)
+
+    def test_verify_detects_content_and_mode_changes(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            staging, destination = self.make_staging(root)
+            persistent.seed_persistent_state(
+                self.value, staging, destination, apply_ownership=False)
+            target = destination / "identity/machine-id"
+            os.chmod(target, 0o644)
+            target.write_text("changed", encoding="utf-8")
+            os.chmod(target, 0o444)
+            with self.assertRaisesRegex(persistent.PersistentStateError, "content"):
+                persistent.verify_persistent_state(
+                    self.value, destination, check_ownership=False)
+            # Reseed a clean destination to test the declared top-level mode.
+            clean = root / "clean"
+            clean.mkdir()
+            persistent.seed_persistent_state(
+                self.value, staging, clean, apply_ownership=False)
+            os.chmod(clean / "identity/machine-id", 0o600)
+            with self.assertRaisesRegex(persistent.PersistentStateError, "mode"):
+                persistent.verify_persistent_state(
+                    self.value, clean, check_ownership=False)
 
 
 if __name__ == "__main__":

@@ -2,9 +2,13 @@
 """Validate and render the Millennium A/B persistent-state contract."""
 
 import argparse
+import hashlib
 import json
+import os
 from pathlib import Path, PurePosixPath
 import re
+import shutil
+import stat
 
 
 class PersistentStateError(Exception):
@@ -138,18 +142,177 @@ def render_tmpfiles(value):
     return "\n".join(lines) + "\n"
 
 
+def _inside(path, root):
+    try:
+        path.resolve().relative_to(root.resolve())
+        return True
+    except ValueError:
+        return False
+
+
+def validate_source_tree(path):
+    path = Path(path)
+    if path.is_symlink():
+        raise PersistentStateError("top-level persistent source cannot be a symlink")
+    for item in [path] + list(path.rglob("*")):
+        info = item.lstat()
+        if stat.S_ISLNK(info.st_mode):
+            target = Path(os.readlink(item))
+            resolved = (item.parent / target).resolve() if not target.is_absolute() else target
+            if not _inside(resolved, path):
+                raise PersistentStateError("persistent source symlink escapes its entry")
+        elif not (stat.S_ISREG(info.st_mode) or stat.S_ISDIR(info.st_mode)):
+            raise PersistentStateError("persistent source contains a special file")
+
+
+def tree_digest(path):
+    path = Path(path)
+    digest = hashlib.sha256()
+    items = [path] if path.is_file() else [path] + sorted(path.rglob("*"))
+    for item in items:
+        relative = "." if item == path else item.relative_to(path).as_posix()
+        info = item.lstat()
+        digest.update(relative.encode("utf-8") + b"\0")
+        digest.update((info.st_mode & 0o7777).to_bytes(2, "big"))
+        digest.update(info.st_uid.to_bytes(4, "big"))
+        digest.update(info.st_gid.to_bytes(4, "big"))
+        if stat.S_ISLNK(info.st_mode):
+            digest.update(b"L" + os.readlink(item).encode("utf-8"))
+        elif stat.S_ISDIR(info.st_mode):
+            digest.update(b"D")
+        else:
+            digest.update(b"F")
+            with item.open("rb") as stream:
+                for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                    digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _preserve_tree_ownership(source, destination):
+    """Copy numeric ownership without following links in a validated tree."""
+    source = Path(source)
+    destination = Path(destination)
+    source_items = [source] if source.is_file() else [source] + list(source.rglob("*"))
+    for source_item in source_items:
+        relative = Path() if source_item == source else source_item.relative_to(source)
+        destination_item = destination / relative
+        info = source_item.lstat()
+        os.chown(destination_item, info.st_uid, info.st_gid, follow_symlinks=False)
+
+
+def _apply_identity(path, entry, ownership):
+    os.chmod(path, int(entry["mode"], 8), follow_symlinks=False)
+    if ownership:
+        os.chown(path, entry["uid"], entry["gid"], follow_symlinks=False)
+
+
+def seed_persistent_state(value, staging_root, persistent_root,
+                          apply_ownership=True):
+    validate(value)
+    staging_root = Path(staging_root).resolve()
+    persistent_root = Path(persistent_root).resolve()
+    if not staging_root.is_dir() or not persistent_root.is_dir():
+        raise PersistentStateError("staging and persistent roots must exist")
+    existing = {item.name for item in persistent_root.iterdir()}
+    if existing - {"lost+found"}:
+        raise PersistentStateError("persistent destination is not empty")
+    if apply_ownership and os.geteuid() != 0:
+        raise PersistentStateError("root is required to preserve persistent ownership")
+    inventory = []
+    for entry in sorted(value["entries"], key=lambda item: item["target"]):
+        source = staging_root / entry["target"].lstrip("/")
+        destination = persistent_root / entry["source"]
+        if not source.exists():
+            raise PersistentStateError("missing staged persistent source: %s" %
+                                       entry["target"])
+        if ((entry["kind"] == "file") != source.is_file()
+                or (entry["kind"] == "directory") != source.is_dir()):
+            raise PersistentStateError("staged persistent source kind mismatch")
+        validate_source_tree(source)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        if destination.exists() or destination.is_symlink():
+            raise PersistentStateError("persistent destination collision")
+        if entry["kind"] == "directory":
+            shutil.copytree(source, destination, symlinks=True)
+        else:
+            shutil.copy2(source, destination, follow_symlinks=False)
+        if apply_ownership:
+            _preserve_tree_ownership(source, destination)
+        _apply_identity(destination, entry, apply_ownership)
+        inventory.append({
+            "source": entry["source"], "target": entry["target"],
+            "kind": entry["kind"], "mode": entry["mode"],
+            "uid": entry["uid"], "gid": entry["gid"],
+            "sha256": tree_digest(destination),
+        })
+    record = {
+        "schema": 1, "operation": "persistent-state-seed",
+        "state_schema": value["state_schema"],
+        "filesystem_label": value["filesystem_label"],
+        "entries": inventory,
+    }
+    record_path = persistent_root / ".millennium-state.json"
+    record_path.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n",
+                           encoding="utf-8")
+    os.chmod(record_path, 0o600)
+    return record
+
+
+def verify_persistent_state(value, persistent_root, check_ownership=True):
+    validate(value)
+    persistent_root = Path(persistent_root).resolve()
+    try:
+        record = json.loads((persistent_root / ".millennium-state.json").read_text(
+            encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise PersistentStateError("persistent-state inventory is missing or invalid") from exc
+    expected_entries = {entry["source"]: entry for entry in value["entries"]}
+    recorded = {entry.get("source"): entry for entry in record.get("entries", [])}
+    if (record.get("schema") != 1 or record.get("operation") != "persistent-state-seed"
+            or record.get("state_schema") != value["state_schema"]
+            or record.get("filesystem_label") != value["filesystem_label"]
+            or len(record.get("entries", [])) != len(expected_entries)
+            or set(recorded) != set(expected_entries)):
+        raise PersistentStateError("persistent-state inventory does not match contract")
+    for source, entry in expected_entries.items():
+        path = persistent_root / source
+        if not path.exists() or path.is_symlink():
+            raise PersistentStateError("persistent entry is missing")
+        info = path.stat()
+        if ((entry["kind"] == "file") != path.is_file()
+                or (entry["kind"] == "directory") != path.is_dir()
+                or stat.S_IMODE(info.st_mode) != int(entry["mode"], 8)):
+            raise PersistentStateError("persistent entry kind or mode changed")
+        if check_ownership and (info.st_uid != entry["uid"] or info.st_gid != entry["gid"]):
+            raise PersistentStateError("persistent entry ownership changed")
+        if tree_digest(path) != recorded[source].get("sha256"):
+            raise PersistentStateError("persistent entry content changed since staging")
+    return record
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("contract", type=Path)
     parser.add_argument("--fstab", type=Path)
     parser.add_argument("--tmpfiles", type=Path)
+    parser.add_argument("--seed-from", type=Path)
+    parser.add_argument("--persistent-root", type=Path)
+    parser.add_argument("--verify-root", type=Path)
     args = parser.parse_args()
     value = validate(load(args.contract))
     if args.fstab:
         args.fstab.write_text(render_fstab(value), encoding="utf-8")
     if args.tmpfiles:
         args.tmpfiles.write_text(render_tmpfiles(value), encoding="utf-8")
-    if not args.fstab and not args.tmpfiles:
+    if bool(args.seed_from) != bool(args.persistent_root):
+        parser.error("--seed-from and --persistent-root must be used together")
+    if args.seed_from:
+        seed_persistent_state(value, args.seed_from, args.persistent_root)
+        print("SEEDED: persistent-state contract %d" % value["state_schema"])
+    if args.verify_root:
+        verify_persistent_state(value, args.verify_root)
+        print("VERIFIED: persistent-state contract %d" % value["state_schema"])
+    if not any((args.fstab, args.tmpfiles, args.seed_from, args.verify_root)):
         print("VALID: persistent-state contract %d" % value["state_schema"])
 
 

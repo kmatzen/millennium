@@ -151,6 +151,24 @@ same generated bind-mount fragment and empty target paths. The factory image
 builder seeds unique identities and credentials into `MILLENNIUM-DATA`; the
 slot images never contain those values.
 
+Seed a newly formatted, otherwise empty data filesystem from an offline staging
+root, then independently verify its content inventory before image release:
+
+```sh
+sudo python3 host/os_ota/persistent_state.py \
+  host/os_ota/persistent-state.json \
+  --seed-from /mnt/device-staging --persistent-root /mnt/millennium-data
+sudo python3 host/os_ota/persistent_state.py \
+  host/os_ota/persistent-state.json \
+  --verify-root /mnt/millennium-data
+```
+
+Seeding copies only contract-allowlisted targets, rejects a nonempty destination,
+escaping links and special files, preserves numeric ownership throughout each
+tree, reapplies declared top-level modes/owners, and records a mode-, ownership-,
+and content-bound SHA-256 inventory. Verification fails if any entry, type,
+permission, ownership, or byte changes after staging.
+
 ## Verification plan
 
 Software tests must model torn downloads, decompression errors, short writes,
