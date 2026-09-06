@@ -24,7 +24,19 @@ class RootfsAuditTests(unittest.TestCase):
     def test_clean_runtime_root_passes(self):
         temporary, root, manifest = self.fixture()
         try:
+            (root / "var/cache/apt/archives").mkdir(parents=True)
+            (root / "var/cache/apt/archives/lock").touch()
             MODULE.audit(root, manifest)
+        finally:
+            temporary.cleanup()
+
+    def test_cached_package_is_rejected(self):
+        temporary, root, manifest = self.fixture()
+        try:
+            (root / "var/cache/apt/archives").mkdir(parents=True)
+            (root / "var/cache/apt/archives/package.deb").write_bytes(b"deb")
+            with self.assertRaisesRegex(ValueError, "apt package cache"):
+                MODULE.audit(root, manifest)
         finally:
             temporary.cleanup()
 

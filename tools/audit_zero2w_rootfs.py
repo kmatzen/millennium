@@ -42,7 +42,10 @@ def audit(root, manifest):
     if temporary.is_dir() and any(temporary.iterdir()):
         failures.append("target /tmp is not empty")
     apt_cache = root / "var/cache/apt/archives"
-    if apt_cache.is_dir() and any(item.is_file() for item in apt_cache.rglob("*")):
+    cached = [item for item in apt_cache.rglob("*") if item.is_file()
+              and not (item.name == "lock" and item.stat().st_size == 0)] \
+        if apt_cache.is_dir() else []
+    if cached:
         failures.append("apt package cache is not empty")
     application = root / "opt/millennium"
     if (application / ".git").exists() or any(application.rglob(".git")):
