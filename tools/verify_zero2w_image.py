@@ -3,12 +3,17 @@
 
 import argparse
 from dataclasses import dataclass
+import fcntl
 from pathlib import Path
 import struct
+import sys
 
 
 SECTOR = 512
 EXTENDED_TYPES = {0x05, 0x0F, 0x85}
+DARWIN_BLOCK_SIZE = 0x40046418
+DARWIN_BLOCK_COUNT = 0x40086419
+LINUX_BLOCK_SIZE_BYTES = 0x80081272
 
 
 @dataclass(frozen=True)
@@ -69,6 +74,23 @@ def read_partitions(path):
     return sorted(partitions, key=lambda part: part.number)
 
 
+def media_size(path):
+    size = path.stat().st_size
+    if size:
+        return size
+    with path.open("rb", buffering=0) as image:
+        if sys.platform == "darwin":
+            block_size = struct.unpack("I", fcntl.ioctl(
+                image.fileno(), DARWIN_BLOCK_SIZE, bytes(4)))[0]
+            block_count = struct.unpack("Q", fcntl.ioctl(
+                image.fileno(), DARWIN_BLOCK_COUNT, bytes(8)))[0]
+            return block_size * block_count
+        if sys.platform.startswith("linux"):
+            return struct.unpack("Q", fcntl.ioctl(
+                image.fileno(), LINUX_BLOCK_SIZE_BYTES, bytes(8)))[0]
+    raise ValueError("cannot determine block-device size")
+
+
 def verify(path):
     partitions = read_partitions(path)
     expected_types = [0x0C, 0x0C, 0x0C, 0x0F, 0x83, 0x83, 0x83]
@@ -83,7 +105,7 @@ def verify(path):
             raise ValueError(f"partitions {left.number} and {right.number} overlap")
     if partitions[3].start > partitions[4].start or partitions[3].end < partitions[-1].end:
         raise ValueError("logical partitions are outside the extended container")
-    image_sectors = path.stat().st_size // SECTOR
+    image_sectors = media_size(path) // SECTOR
     if partitions[-1].end > image_sectors:
         raise ValueError("partition extends beyond the image")
     for part in partitions:
