@@ -25,11 +25,11 @@ class PersistentStateTests(unittest.TestCase):
         first = persistent.render_fstab(self.value)
         second = persistent.render_fstab(self.value)
         self.assertEqual(first, second)
-        self.assertIn("LABEL=MILLENNIUM-DATA /persist ext4", first)
-        self.assertIn("/persist/etc/NetworkManager/system-connections", first)
+        self.assertIn("LABEL=PERSISTENT /persistent ext4", first)
+        self.assertIn("/persistent/etc/NetworkManager/system-connections", first)
         tmpfiles = persistent.render_tmpfiles(self.value)
         self.assertIn("/etc/ssh/ssh_host_ed25519_key 0600", tmpfiles)
-        self.assertIn("/home/matzen/.ssh 0700 1000 1000", tmpfiles)
+        self.assertIn("/home/millennium/.ssh 0700 1000 1000", tmpfiles)
         self.assertIn("/etc/millennium 0750 0 1000", tmpfiles)
         self.assertIn("/var/lib/millennium 0700 1000 1000", tmpfiles)
 
@@ -59,7 +59,7 @@ class PersistentStateTests(unittest.TestCase):
     def test_permissive_secret_modes_are_rejected(self):
         for target in ("/etc/ssh/ssh_host_ed25519_key",
                        "/etc/NetworkManager/system-connections",
-                       "/home/matzen/.ssh"):
+                       "/home/millennium/.ssh"):
             value = copy.deepcopy(self.value)
             next(entry for entry in value["entries"]
                  if entry["target"] == target)["mode"] = "0755"
@@ -108,7 +108,7 @@ class PersistentStateTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as name:
             root = Path(name)
             staging, destination = self.make_staging(root)
-            source = staging / "home/matzen/.ssh"
+            source = staging / "home/millennium/.ssh"
             (source / "escape").symlink_to("/etc/passwd")
             with self.assertRaisesRegex(persistent.PersistentStateError, "escapes"):
                 persistent.seed_persistent_state(

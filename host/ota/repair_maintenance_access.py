@@ -75,7 +75,7 @@ def write_evidence(path, value):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--user", default="matzen")
+    parser.add_argument("--user", default="millennium")
     parser.add_argument("--key-file", type=Path, required=True)
     parser.add_argument("--fingerprint", required=True,
                         help="expected SHA256:... fingerprint, verified before install")

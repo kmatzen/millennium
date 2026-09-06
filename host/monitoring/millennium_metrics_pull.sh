@@ -7,7 +7,7 @@ config_root="${MILLENNIUM_BACKUP_CONFIG_ROOT:-$HOME/.config/millennium-backup}"
 output="${MILLENNIUM_METRICS_OUTPUT:-$HOME/selfhosted/prometheus/node-exporter-textfile/millennium-phone.prom}"
 phone_host="${MILLENNIUM_BACKUP_PHONE_HOST:-127.0.0.1}"
 phone_port="${MILLENNIUM_BACKUP_PHONE_PORT:-22022}"
-phone_user="${MILLENNIUM_BACKUP_PHONE_USER:-matzen}"
+phone_user="${MILLENNIUM_BACKUP_PHONE_USER:-millennium}"
 output_dir="$(dirname "$output")"
 temporary="$(mktemp "$output_dir/.millennium-phone.XXXXXX")"
 trap 'rm -f "$temporary"' EXIT

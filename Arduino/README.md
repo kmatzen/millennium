@@ -73,7 +73,7 @@ bootloader open for several seconds, so there is no tight window to hit. Require
 ```bash
 ./Arduino/deploy_display.sh [user@host]   # flash Beta (display)
 ./Arduino/deploy_keypad.sh  [user@host]   # flash Alpha (keypad)
-# Default host: matzen@millennium-phone.local
+# Default host: millennium@millennium-phone.local
 
 # Or via make:
 make deploy_display

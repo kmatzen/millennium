@@ -4,7 +4,7 @@
 # Uses GPIO17/GEN0 (pin 11) to assert Arduino Alpha's reset pin directly.
 #
 # Usage: ./deploy_keypad.sh [user@host]
-#   Default host: matzen@millennium-phone.local
+#   Default host: millennium@millennium-phone.local
 #
 # Env: BRANCH=      deploy specific branch on remote
 #      REPO_DIR=    repo path on remote (default: millennium)
@@ -13,7 +13,7 @@
 
 set -e
 
-REMOTE="${1:-matzen@millennium-phone.local}"
+REMOTE="${1:-millennium@millennium-phone.local}"
 REPO_DIR="${REPO_DIR:-millennium}"
 BRANCH="${BRANCH:-}"
 SKIP_BUILD="${SKIP_BUILD:-0}"

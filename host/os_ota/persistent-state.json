@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "state_schema": 1,
-  "filesystem_label": "MILLENNIUM-DATA",
-  "mount_point": "/persist",
+  "filesystem_label": "PERSISTENT",
+  "mount_point": "/persistent",
   "entries": [
     {
       "source": "identity/machine-id",
@@ -61,8 +61,8 @@
       "gid": 0
     },
     {
-      "source": "home/matzen/.ssh",
-      "target": "/home/matzen/.ssh",
+      "source": "home/millennium/.ssh",
+      "target": "/home/millennium/.ssh",
       "kind": "directory",
       "mode": "0700",
       "uid": 1000,

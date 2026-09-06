@@ -29,4 +29,4 @@ PublicKey = $PUBLIC_KEY
 AllowedIPs = $IP/32
 EOF
 wg set "$INTERFACE" peer "$PUBLIC_KEY" allowed-ips "$IP/32"
-echo "Registered $NAME. From this server: ssh matzen@$IP"
+echo "Registered $NAME. From this server: ssh millennium@$IP"

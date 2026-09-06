@@ -8,7 +8,7 @@ config_root="${MILLENNIUM_BACKUP_CONFIG_ROOT:-$HOME/.config/millennium-backup}"
 repository="${MILLENNIUM_BACKUP_REPOSITORY:-$HOME/backups/millennium/phone-001-restic}"
 phone_host="${MILLENNIUM_BACKUP_PHONE_HOST:-127.0.0.1}"
 phone_port="${MILLENNIUM_BACKUP_PHONE_PORT:-22022}"
-phone_user="${MILLENNIUM_BACKUP_PHONE_USER:-matzen}"
+phone_user="${MILLENNIUM_BACKUP_PHONE_USER:-millennium}"
 export RESTIC_PASSWORD_FILE="${RESTIC_PASSWORD_FILE:-$config_root/restic-password}"
 
 ssh_args=(

@@ -11,7 +11,7 @@ ADDRESS=""
 ENDPOINT="maintenance.kmatzen.com:51820"
 ALLOWED_IPS="10.77.0.0/24"
 MAINTAINER_KEY=""
-MAINTENANCE_USER="matzen"
+MAINTENANCE_USER="millennium"
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --server-key) SERVER_KEY="${2:-}"; shift 2 ;;

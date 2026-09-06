@@ -164,7 +164,7 @@ mount targets, relative non-traversing persistent sources, unique non-overlappin
 paths, fixed entry kinds, numeric owners, and restrictive modes for private
 keys, Wi-Fi profiles, and maintainer SSH files. Both root slots receive the
 same generated bind-mount fragment and empty target paths. The factory image
-builder seeds unique identities and credentials into `MILLENNIUM-DATA`; the
+builder seeds unique identities and credentials into `PERSISTENT`; the
 slot images never contain those values.
 
 Seed a newly formatted, otherwise empty data filesystem from an offline staging

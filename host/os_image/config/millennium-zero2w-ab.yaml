@@ -1,0 +1,32 @@
+include:
+  file: trixie-minbase.yaml
+
+device:
+  layer: rpizero2w
+  hostname: millennium-phone
+  user1: millennium
+  user1sudo: none
+
+ssh:
+  pubkey_only: y
+
+locale:
+  timezone: America/Los_Angeles
+
+ieee80211:
+  regdom: US
+
+artefact:
+  version: 1.0.0
+
+image:
+  layer: image-rota
+  boot_part_size: 256M
+  system_part_size: 3G
+  data_part_size: 8G
+  rootfs_type: ext4
+  pmap: clear
+  name: millennium-zero2w-ab
+
+layer:
+  appliance: millennium-phone-image

@@ -23,7 +23,7 @@ REQUIRED_TARGETS = frozenset({
     "/etc/ssh/ssh_host_rsa_key.pub",
     "/etc/millennium",
     "/etc/NetworkManager/system-connections",
-    "/home/matzen/.ssh",
+    "/home/millennium/.ssh",
     "/var/lib/millennium",
     "/var/log/millennium",
 })

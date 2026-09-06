@@ -47,7 +47,7 @@ install_display: build/display/display.ino.hex
 
 # Deploy to Pi via GPIO reset (build on Mac, sync, flash on Pi).
 # Requires raspi-gpio and avrdude on the Pi.
-DEPLOY_HOST ?= matzen@millennium-phone.local
+DEPLOY_HOST ?= millennium@millennium-phone.local
 
 deploy_display: build/display/display.ino.hex
 	./deploy_display.sh $(DEPLOY_HOST)

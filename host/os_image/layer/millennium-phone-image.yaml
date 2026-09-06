@@ -1,0 +1,33 @@
+# METABEGIN
+# X-Env-Layer-Name: millennium-phone-image
+# X-Env-Layer-Category: application
+# X-Env-Layer-Desc: Millennium phone base appliance and NetworkManager authority.
+# X-Env-Layer-Version: 1.0.0
+# X-Env-Layer-Requires: systemd-min
+# METAEND
+---
+mmdebstrap:
+  packages:
+    - network-manager
+    - openssh-server
+    - nftables
+    - curl
+    - ca-certificates
+    - alsa-utils
+    - python3
+  customize-hooks:
+    - |
+      set -eu
+      test -x "$1/usr/sbin/NetworkManager"
+      chroot "$1" systemctl disable systemd-networkd.service systemd-networkd-wait-online.service iwd.service 2>/dev/null || true
+      chroot "$1" systemctl enable NetworkManager.service NetworkManager-wait-online.service ssh.service nftables.service
+      install -d -m 0700 "$1/etc/NetworkManager/system-connections"
+      install -d -m 0755 "$1/etc/NetworkManager/conf.d"
+      cat > "$1/etc/NetworkManager/conf.d/10-millennium.conf" <<'EOF'
+      [main]
+      plugins=keyfile
+      rc-manager=symlink
+
+      [device]
+      wifi.scan-rand-mac-address=yes
+      EOF

@@ -24,7 +24,7 @@ class ExternalMaintenanceAuditTests(unittest.TestCase):
             jump_user=None, jump_port=None, server_id="anima",
             secret=root / "secret", baseline=root / "baseline.json",
             output=root / "audit.json", device_id="phone-001",
-            phone_user="matzen", phone_port=22022,
+            phone_user="millennium", phone_port=22022,
             network_description="cellular hotspot")
 
     def make_secret(self, root):

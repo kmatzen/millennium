@@ -430,7 +430,8 @@ provision() {
     wait_ready
     local tar_metadata=()
     test "$(uname -s)" = Darwin && tar_metadata+=(--no-xattrs)
-    COPYFILE_DISABLE=1 tar "${tar_metadata[@]}" --exclude=.git --exclude='tools/qemu/state' --exclude='*.o' \
+    COPYFILE_DISABLE=1 tar "${tar_metadata[@]}" --exclude=.git \
+        --exclude='./tools/qemu/state' --exclude='tools/qemu/state' --exclude='*.o' \
         --exclude=host/daemon --exclude=host/simulator -C "$REPO_DIR" -czf - . | \
         "${SSH[@]}" 'rm -rf /tmp/millennium-src && mkdir /tmp/millennium-src && tar -xzf - -C /tmp/millennium-src'
     "${SSH[@]}" sudo /tmp/millennium-src/tools/qemu/provision-guest.sh /tmp/millennium-src | tee "$STATE_DIR/provision.log"
