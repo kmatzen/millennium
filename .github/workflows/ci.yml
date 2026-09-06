@@ -153,8 +153,8 @@ jobs:
             '
       - name: Run ERC and DRC with pinned KiCad
         run: |
-          docker run --rm --volume "$PWD:/work" --workdir /work/pcb kicad/kicad:9.0.9 kicad-cli sch erc phonev6.kicad_sch --output erc_report.txt --severity-error --exit-code-violations
-          docker run --rm --volume "$PWD:/work" --workdir /work/pcb kicad/kicad:9.0.9 kicad-cli pcb drc phonev6.kicad_pcb --output drc_report.txt --severity-error --exit-code-violations
+          docker run --rm --volume "$PWD:/work:ro" --workdir /work/pcb kicad/kicad:9.0.9 kicad-cli sch erc phonev6.kicad_sch --output /tmp/erc_report.txt --severity-error --exit-code-violations
+          docker run --rm --volume "$PWD:/work:ro" --workdir /work/pcb kicad/kicad:9.0.9 kicad-cli pcb drc phonev6.kicad_pcb --output /tmp/drc_report.txt --severity-error --exit-code-violations
 
   release-evidence:
     needs: [production-build, firmware, pcb, sanitizers]
