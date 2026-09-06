@@ -125,6 +125,32 @@ and returns to the unchanged normal partition on the next reset.
    manifest digest, and quarantines it under the same retry policy as
    application OTA.
 
+## Persistent state contract
+
+`host/os_ota/persistent-state.json` is the versioned allowlist for data that
+survives a root-slot replacement. It includes the machine and SSH host
+identities, Millennium configuration and setup secret, NetworkManager profiles,
+the maintainer's SSH identity directory, application/story/OTA state, and
+diagnostic logs. It intentionally excludes `/opt/millennium`, `/usr`, `/boot`,
+and other replaceable software trees.
+
+Generate the image's mount and creation fragments with:
+
+```sh
+python3 host/os_ota/persistent_state.py \
+  host/os_ota/persistent-state.json \
+  --fstab build/os-image/fstab.millennium \
+  --tmpfiles build/os-image/millennium-persist.conf
+```
+
+The generator requires the exact identity/state target set, absolute normalized
+mount targets, relative non-traversing persistent sources, unique non-overlapping
+paths, fixed entry kinds, numeric owners, and restrictive modes for private
+keys, Wi-Fi profiles, and maintainer SSH files. Both root slots receive the
+same generated bind-mount fragment and empty target paths. The factory image
+builder seeds unique identities and credentials into `MILLENNIUM-DATA`; the
+slot images never contain those values.
+
 ## Verification plan
 
 Software tests must model torn downloads, decompression errors, short writes,

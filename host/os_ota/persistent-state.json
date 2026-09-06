@@ -1,0 +1,88 @@
+{
+  "schema": 1,
+  "state_schema": 1,
+  "filesystem_label": "MILLENNIUM-DATA",
+  "mount_point": "/persist",
+  "entries": [
+    {
+      "source": "identity/machine-id",
+      "target": "/etc/machine-id",
+      "kind": "file",
+      "mode": "0444",
+      "uid": 0,
+      "gid": 0
+    },
+    {
+      "source": "identity/ssh/ssh_host_ed25519_key",
+      "target": "/etc/ssh/ssh_host_ed25519_key",
+      "kind": "file",
+      "mode": "0600",
+      "uid": 0,
+      "gid": 0
+    },
+    {
+      "source": "identity/ssh/ssh_host_ed25519_key.pub",
+      "target": "/etc/ssh/ssh_host_ed25519_key.pub",
+      "kind": "file",
+      "mode": "0644",
+      "uid": 0,
+      "gid": 0
+    },
+    {
+      "source": "identity/ssh/ssh_host_rsa_key",
+      "target": "/etc/ssh/ssh_host_rsa_key",
+      "kind": "file",
+      "mode": "0600",
+      "uid": 0,
+      "gid": 0
+    },
+    {
+      "source": "identity/ssh/ssh_host_rsa_key.pub",
+      "target": "/etc/ssh/ssh_host_rsa_key.pub",
+      "kind": "file",
+      "mode": "0644",
+      "uid": 0,
+      "gid": 0
+    },
+    {
+      "source": "etc/millennium",
+      "target": "/etc/millennium",
+      "kind": "directory",
+      "mode": "0750",
+      "uid": 0,
+      "gid": 1000
+    },
+    {
+      "source": "etc/NetworkManager/system-connections",
+      "target": "/etc/NetworkManager/system-connections",
+      "kind": "directory",
+      "mode": "0700",
+      "uid": 0,
+      "gid": 0
+    },
+    {
+      "source": "home/matzen/.ssh",
+      "target": "/home/matzen/.ssh",
+      "kind": "directory",
+      "mode": "0700",
+      "uid": 1000,
+      "gid": 1000
+    },
+    {
+      "source": "var/lib/millennium",
+      "target": "/var/lib/millennium",
+      "kind": "directory",
+      "mode": "0700",
+      "uid": 1000,
+      "gid": 1000
+    },
+    {
+      "source": "var/log/millennium",
+      "target": "/var/log/millennium",
+      "kind": "directory",
+      "mode": "0750",
+      "uid": 1000,
+      "gid": 1000
+    }
+  ]
+}
