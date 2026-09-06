@@ -13,6 +13,7 @@ import subprocess
 import tempfile
 import time
 from urllib.parse import urlparse
+from urllib.request import urlopen
 
 
 class OsOtaError(Exception):
@@ -127,6 +128,57 @@ def verify_image(path, metadata):
     if size != metadata["expanded_size"] or digest.hexdigest() != metadata[
             "expanded_sha256"]:
         raise OsOtaError("expanded OS image verification failed")
+
+
+def download_verified_images(manifest, staging_dir, opener=urlopen):
+    """Atomically stage signed-size-bounded HTTPS payloads before slot writes."""
+    staging_dir = Path(staging_dir)
+    staging_dir.mkdir(parents=True, exist_ok=True)
+    completed = {}
+    for name in ("root", "boot"):
+        metadata = manifest["images"][name]
+        parsed = urlparse(metadata["url"])
+        if parsed.scheme != "https" or not parsed.netloc:
+            raise OsOtaError("insecure OS image URL: " + name)
+        destination = staging_dir / (name + "-" + metadata["compressed_sha256"] + ".img.gz")
+        temporary = staging_dir / (destination.name + ".part")
+        if destination.exists():
+            verify_image(destination, metadata)
+            completed[name] = destination
+            continue
+        temporary.unlink(missing_ok=True)
+        digest = hashlib.sha256()
+        size = 0
+        try:
+            with opener(metadata["url"], timeout=60) as response, temporary.open("xb") as output:
+                while True:
+                    chunk = response.read(1024 * 1024)
+                    if not chunk:
+                        break
+                    size += len(chunk)
+                    if size > metadata["compressed_size"]:
+                        raise OsOtaError("compressed OS image exceeds signed size")
+                    output.write(chunk)
+                    digest.update(chunk)
+                output.flush()
+                os.fsync(output.fileno())
+            if (size != metadata["compressed_size"]
+                    or digest.hexdigest() != metadata["compressed_sha256"]):
+                raise OsOtaError("downloaded OS image verification failed")
+            os.replace(temporary, destination)
+            directory = os.open(staging_dir, os.O_RDONLY)
+            try:
+                os.fsync(directory)
+            finally:
+                os.close(directory)
+            verify_image(destination, metadata)
+            completed[name] = destination
+        except Exception as exc:
+            temporary.unlink(missing_ok=True)
+            if isinstance(exc, OsOtaError):
+                raise
+            raise OsOtaError("OS image download failed: " + name) from exc
+    return completed
 
 
 def load_verified_manifest(manifest_path, signature_path, public_key, expected):

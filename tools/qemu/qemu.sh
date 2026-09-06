@@ -25,7 +25,8 @@ running() {
     local pid
     pid=$(cat "$STATE_DIR/qemu.pid")
     [[ "$pid" =~ ^[0-9]+$ ]] || return 1
-    kill -0 "$pid" 2>/dev/null || ps -p "$pid" -o comm= 2>/dev/null | grep -q 'qemu-system-aarch64'
+    kill -0 "$pid" 2>/dev/null || return 1
+    ps -p "$pid" -o command= 2>/dev/null | grep -q '[q]emu-system-aarch64'
 }
 
 monitor_command() {
@@ -271,6 +272,11 @@ ota_fault_test() {
     "${SSH[@]}" sudo /tmp/millennium-src/tools/qemu/ota-fault-test-guest.sh /tmp/millennium-src
 }
 
+os_ota_test() {
+    running || die "start and provision the VM before os-ota-test"
+    "${SSH[@]}" 'cd /tmp/millennium-src && python3 -m unittest host.tests.test_os_ota host.tests.test_persistent_state'
+}
+
 wifi_test() {
     running || die "start and provision the VM before wifi-test"
     "${SSH[@]}" sudo /tmp/millennium-src/tools/qemu/wifi-test-guest.sh /tmp/millennium-src
@@ -288,6 +294,7 @@ full_test() {
     "$SCRIPT_DIR/peripheral-fault-test.sh"
     ota_test
     ota_fault_test
+    os_ota_test
     wifi_test
     experience_test
     local artifact
@@ -462,6 +469,7 @@ case ${1:-help} in
     peripheral-fault-test) "$SCRIPT_DIR/peripheral-fault-test.sh" ;;
     ota-test) ota_test ;;
     ota-fault-test) ota_fault_test ;;
+    os-ota-test) os_ota_test ;;
     wifi-test) wifi_test ;;
     experience-test) experience_test ;;
     full-test) full_test ;;
@@ -486,6 +494,6 @@ case ${1:-help} in
         printf 'fresh overlay created; previous disk retained as a timestamped backup\n'
         ;;
     help|*)
-        printf 'usage: %s {fetch|init|start|wait|provision|stop|power-cut|pause|resume|restart-virtual-mcu|network|checkpoint|lifecycle-test|recovery-test|peripheral-fault-test|ota-test|ota-fault-test|wifi-test|experience-test|full-test|collect-artifacts|status|ssh|logs|token|tunnel|display|peripherals|key|hook|coin|card|fault|reset-mcu|smoke|reset}\n' "$0"
+        printf 'usage: %s {fetch|init|start|wait|provision|stop|power-cut|pause|resume|restart-virtual-mcu|network|checkpoint|lifecycle-test|recovery-test|peripheral-fault-test|ota-test|ota-fault-test|os-ota-test|wifi-test|experience-test|full-test|collect-artifacts|status|ssh|logs|token|tunnel|display|peripherals|key|hook|coin|card|fault|reset-mcu|smoke|reset}\n' "$0"
         ;;
 esac

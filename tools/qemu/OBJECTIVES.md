@@ -54,6 +54,19 @@ Acceptance: `python3 tools/qemu/test_virtual_mcu.py` and
 Acceptance: `tools/qemu/qemu.sh ota-test` and
 `tools/qemu/qemu.sh ota-fault-test`.
 
+## Full operating-system OTA state machine
+
+- [x] Exercise atomic HTTPS staging, interrupted and truncated downloads,
+  inactive boot/root writes, readback, and pre-reboot selection in the ARM64
+  guest.
+- [x] Exercise candidate-health failure, unchanged normal-slot fallback,
+  digest-scoped backoff/quarantine, explicit retry, successful health commit,
+  and persistent anti-rollback sequence state.
+- [x] Keep Raspberry Pi firmware selection, SD-card electrical behavior, and
+  physical power cuts explicitly outside QEMU claims.
+
+Acceptance: `tools/qemu/qemu.sh os-ota-test`.
+
 ## Networking and onboarding
 
 - [x] Provide a simulated NetworkManager/radio boundary for first boot, hidden

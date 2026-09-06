@@ -117,6 +117,75 @@ class OsOtaTests(unittest.TestCase):
         with self.assertRaisesRegex(os_ota.OsOtaError, "expanded"):
             os_ota.verify_image(boot, value["images"]["boot"])
 
+    def test_https_downloads_stage_atomically_and_verify(self):
+        output = self.build()
+        manifest = json.loads((output / "manifest.json").read_text())
+        payloads = {
+            manifest["images"][name]["url"]: next(output.glob(name + "-*.img.gz")).read_bytes()
+            for name in ("boot", "root")
+        }
+
+        class Response:
+            def __init__(self, data):
+                self.data = data
+                self.offset = 0
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *unused):
+                return False
+
+            def read(self, size):
+                value = self.data[self.offset:self.offset + size]
+                self.offset += len(value)
+                return value
+
+        staged = self.root / "staged"
+        result = os_ota.download_verified_images(
+            manifest, staged, opener=lambda url, timeout: Response(payloads[url]))
+        self.assertEqual(set(result), {"boot", "root"})
+        self.assertFalse(list(staged.glob("*.part")))
+        for name, path in result.items():
+            os_ota.verify_image(path, manifest["images"][name])
+
+    def test_interrupted_or_truncated_download_never_becomes_staged(self):
+        output = self.build()
+        manifest = json.loads((output / "manifest.json").read_text())
+        root_url = manifest["images"]["root"]["url"]
+        root_data = next(output.glob("root-*.img.gz")).read_bytes()
+
+        class Interrupted:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *unused):
+                return False
+
+            def read(self, size):
+                raise ConnectionError("simulated network removal")
+
+        staged = self.root / "staged"
+        with self.assertRaisesRegex(os_ota.OsOtaError, "download failed"):
+            os_ota.download_verified_images(
+                manifest, staged, opener=lambda url, timeout: Interrupted())
+        self.assertFalse(list(staged.iterdir()))
+
+        class Truncated(Interrupted):
+            def __init__(self):
+                self.once = True
+
+            def read(self, size):
+                if self.once:
+                    self.once = False
+                    return root_data[:max(1, len(root_data) // 2)]
+                return b""
+
+        with self.assertRaisesRegex(os_ota.OsOtaError, "verification failed"):
+            os_ota.download_verified_images(
+                manifest, staged, opener=lambda url, timeout: Truncated())
+        self.assertFalse(list(staged.iterdir()))
+
     def test_inactive_slots_are_written_synced_and_read_back(self):
         output = self.build()
         value = json.loads((output / "manifest.json").read_text())
@@ -373,6 +442,62 @@ class OsOtaTests(unittest.TestCase):
         self.assertTrue(status["action_required"])
         self.assertNotIn("inactive_targets", status)
         self.assertNotIn("error_code", status)
+
+    def test_end_to_end_failed_candidate_falls_back_then_healthy_retry_commits(self):
+        output = self.build()
+        manifest = json.loads((output / "manifest.json").read_text())
+        payloads = {
+            manifest["images"][name]["url"]: next(output.glob(name + "-*.img.gz")).read_bytes()
+            for name in ("boot", "root")
+        }
+
+        class Response:
+            def __init__(self, data):
+                self.data = data
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *unused):
+                return False
+
+            def read(self, size):
+                value, self.data = self.data[:size], self.data[size:]
+                return value
+
+        downloads = os_ota.download_verified_images(
+            manifest, self.root / "staged",
+            opener=lambda url, timeout: Response(payloads[url]))
+        targets = {name: self.root / ("inactive-" + name) for name in ("boot", "root")}
+        active = {name: self.root / ("active-" + name) for name in ("boot", "root")}
+        for path in list(targets.values()) + list(active.values()):
+            path.write_bytes(b"old-slot-sentinel" * 4096)
+        old = {name: path.read_bytes() for name, path in active.items()}
+        journal = self.root / "journal.json"
+        selector = self.root / "autoboot.txt"
+        os_ota.write_inactive_images(
+            manifest, downloads, targets, active, journal, allow_regular=True)
+        os_ota.arm_tryboot(selector, journal, 2, 3)
+        checks = {name: True for name in os_ota.REQUIRED_BOOT_HEALTH}
+        checks["sip"] = False
+        os_ota.reject_boot_health(
+            journal, checks, self.root / "state", manifest,
+            "health-failed", now=100, base_delay=1)
+        # Firmware's one-shot flag is gone after the candidate boot; the normal
+        # selector and both old active payloads remain unchanged.
+        self.assertEqual(os_ota.parse_autoboot(selector.read_text()), (2, 3))
+        self.assertEqual({name: path.read_bytes() for name, path in active.items()}, old)
+
+        os_ota.clear_failure(self.root / "state", manifest)
+        os_ota.write_inactive_images(
+            manifest, downloads, targets, active, journal, allow_regular=True)
+        os_ota.arm_tryboot(selector, journal, 2, 3)
+        os_ota.record_boot_health(
+            journal, {name: True for name in os_ota.REQUIRED_BOOT_HEALTH})
+        installed = self.root / "installed-sequence"
+        os_ota.commit_tryboot(selector, journal, 3, 1, installed)
+        self.assertEqual(os_ota.parse_autoboot(selector.read_text()), (3, 2))
+        self.assertEqual(installed.read_text(), "12\n")
 
 
 if __name__ == "__main__":

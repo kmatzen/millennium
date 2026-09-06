@@ -85,6 +85,7 @@ tools/qemu/qemu.sh power-cut
 tools/qemu/qemu.sh collect-artifacts my-test-run
 tools/qemu/qemu.sh ota-test
 tools/qemu/qemu.sh ota-fault-test
+tools/qemu/qemu.sh os-ota-test
 tools/qemu/qemu.sh wifi-test
 tools/qemu/qemu.sh experience-test
 tools/qemu/qemu.sh full-test
@@ -140,6 +141,13 @@ and are not production credentials. `ota-test` signs and commits a release
 through the real worker and attests both virtual MCU roles. `ota-fault-test`
 exercises loss, corruption, withdrawal, quarantine, interrupted activation,
 rollback, and active-link invariants.
+
+`os-ota-test` runs the full signed OS state machine inside the ARM64 guest. It
+covers atomic HTTPS staging and interrupted/truncated downloads, inactive-slot
+write/readback, pre-reboot selection, failed candidate fallback, digest-scoped
+quarantine, health commit, persistent anti-rollback state, and both selector
+directions using test-only virtual block files. Raspberry Pi firmware behavior
+remains a physical Zero 2 W acceptance gate.
 
 `wifi-test` exercises the NetworkManager boundary through deterministic radio
 faults, validates captive-portal behavior for the major platform probes, and

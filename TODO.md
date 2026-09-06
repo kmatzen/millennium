@@ -72,6 +72,12 @@ as an unattended appliance. Items are ordered by priority.
   - [ ] Exercise download, inactive-slot write, pre-reboot, first boot, health
     commit, and rollback in QEMU and by physically removing power on the
     production-equivalent Zero 2 W image.
+    - [x] Exercise the complete signed OS state machine in the ARM64 QEMU guest,
+      including interrupted/truncated download, failed-candidate fallback,
+      quarantine, retry, and healthy commit without claiming Pi firmware
+      fidelity.
+    - [ ] Repeat the matrix on the production-equivalent Zero 2 W image with
+      measured physical power removal at every journal boundary.
   - [ ] Reimage the production phone only from locally attached recovery media,
     restore its per-device state, and prove both A/B directions plus recovery
     before handoff.
