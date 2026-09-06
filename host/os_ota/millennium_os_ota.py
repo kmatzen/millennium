@@ -4,9 +4,12 @@
 import gzip
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
+import stat
 import subprocess
+import tempfile
 from urllib.parse import urlparse
 
 
@@ -126,3 +129,132 @@ def load_verified_manifest(manifest_path, signature_path, public_key, expected):
         raise OsOtaError("invalid OS manifest JSON") from exc
     validate_manifest(value, expected)
     return value
+
+
+def atomic_json(path, value):
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary = tempfile.mkstemp(prefix=".os-ota-", dir=path.parent)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+            json.dump(value, stream, sort_keys=True)
+            stream.write("\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+        directory = os.open(path.parent, os.O_RDONLY)
+        try:
+            os.fsync(directory)
+        finally:
+            os.close(directory)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+
+
+def _same_device(first, second):
+    try:
+        return os.path.samefile(first, second)
+    except FileNotFoundError:
+        return False
+
+
+def validate_inactive_targets(targets, active_paths, allow_regular=False):
+    if set(targets) != {"boot", "root"} or set(active_paths) != {"boot", "root"}:
+        raise OsOtaError("complete active and inactive boot/root paths are required")
+    resolved = {}
+    for name, value in targets.items():
+        path = Path(value)
+        if path.is_symlink() or not path.exists():
+            raise OsOtaError("inactive %s target is missing or a symlink" % name)
+        mode = path.stat().st_mode
+        if not stat.S_ISBLK(mode) and not (allow_regular and stat.S_ISREG(mode)):
+            raise OsOtaError("inactive %s target is not a block device" % name)
+        resolved[name] = path.resolve()
+    if _same_device(resolved["boot"], resolved["root"]):
+        raise OsOtaError("inactive boot and root targets overlap")
+    for target_name, target in resolved.items():
+        for active_name, active in active_paths.items():
+            if _same_device(target, Path(active)):
+                raise OsOtaError("inactive %s target overlaps active %s" %
+                                 (target_name, active_name))
+    return resolved
+
+
+def target_capacity(path):
+    try:
+        with Path(path).open("rb", buffering=0) as stream:
+            return os.lseek(stream.fileno(), 0, os.SEEK_END)
+    except OSError as exc:
+        raise OsOtaError("cannot determine inactive target capacity") from exc
+
+
+def write_verified_image(source, metadata, target, allow_regular=False):
+    source = Path(source)
+    target = Path(target)
+    verify_image(source, metadata)
+    mode = target.stat().st_mode
+    if stat.S_ISREG(mode) and not allow_regular:
+        raise OsOtaError("regular-file OS target is test-only")
+    if target_capacity(target) < metadata["expanded_size"]:
+        raise OsOtaError("inactive target is smaller than signed image")
+    digest = hashlib.sha256()
+    written = 0
+    try:
+        with gzip.open(source, "rb") as encoded, target.open("r+b", buffering=0) as output:
+            while True:
+                chunk = encoded.read(1024 * 1024)
+                if not chunk:
+                    break
+                written += len(chunk)
+                if written > metadata["expanded_size"]:
+                    raise OsOtaError("expanded OS image exceeds signed size")
+                output.write(chunk)
+                digest.update(chunk)
+            output.flush()
+            os.fsync(output.fileno())
+    except (OSError, EOFError) as exc:
+        raise OsOtaError("inactive-slot write failed") from exc
+    if (written != metadata["expanded_size"]
+            or digest.hexdigest() != metadata["expanded_sha256"]):
+        raise OsOtaError("written OS image does not match signed metadata")
+    readback = hashlib.sha256()
+    remaining = metadata["expanded_size"]
+    with target.open("rb", buffering=0) as stream:
+        while remaining:
+            chunk = stream.read(min(1024 * 1024, remaining))
+            if not chunk:
+                raise OsOtaError("short read while verifying inactive slot")
+            remaining -= len(chunk)
+            readback.update(chunk)
+    if readback.hexdigest() != metadata["expanded_sha256"]:
+        raise OsOtaError("inactive-slot readback verification failed")
+
+
+def write_inactive_images(manifest, downloads, targets, active_paths, journal,
+                          allow_regular=False):
+    if set(downloads) != {"boot", "root"}:
+        raise OsOtaError("both downloaded OS images are required")
+    resolved = validate_inactive_targets(targets, active_paths, allow_regular)
+    # Validate both sources before changing either inactive target.
+    for name in ("root", "boot"):
+        verify_image(downloads[name], manifest["images"][name])
+        if target_capacity(resolved[name]) < manifest["images"][name]["expanded_size"]:
+            raise OsOtaError("inactive %s target is smaller than signed image" % name)
+    transaction = {
+        "schema": 1, "operation": "os-slot-write",
+        "sequence": manifest["sequence"], "version": manifest["version"],
+        "source_commit": manifest["source_commit"], "layout_id": manifest["layout_id"],
+        "phase": "verified-downloads", "inactive_targets": {
+            name: str(path) for name, path in resolved.items()
+        },
+    }
+    atomic_json(journal, transaction)
+    for name in ("root", "boot"):
+        write_verified_image(downloads[name], manifest["images"][name],
+                             resolved[name], allow_regular)
+        transaction["phase"] = name + "-written-and-readback-verified"
+        atomic_json(journal, transaction)
+    transaction["phase"] = "candidate-written"
+    atomic_json(journal, transaction)
+    return transaction

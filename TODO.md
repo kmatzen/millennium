@@ -53,7 +53,7 @@ as an unattended appliance. Items are ordered by priority.
     boot/root payload; bind model, partition layout, source commit,
     monotonically increasing sequence, minimum compatible application/MCU
     versions, rollout controls, and exact sizes and hashes into the signature.
-  - [ ] Stream verified images only to inactive slots, read them back, and
+  - [x] Stream verified images only to inactive slots, read them back, and
     reject overlap with the active boot/root devices before changing boot state.
   - [ ] Preserve per-device identity, NetworkManager profiles, setup secret,
     maintenance credentials, story state, logs required for diagnosis, and OTA

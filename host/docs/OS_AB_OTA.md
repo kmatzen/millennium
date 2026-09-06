@@ -85,6 +85,15 @@ and expanded payload sizes and hashes. The block-device writer and tryboot
 transaction deliberately remain a separate gate: validating an image never
 implies permission to select or write a device.
 
+The same module now provides the inactive-slot write primitive. It validates
+both downloads before the first write, rejects symlinks, rejects a boot/root
+alias and any target that aliases an active device, requires real block devices
+unless the explicit test-only regular-file mode is selected, hashes while
+writing, calls `fsync`, reads back exactly the signed expanded length, and
+persists each phase through an fsynced atomic journal. The final
+`candidate-written` phase proves only that inactive bytes are durable; it does
+not select tryboot or authorize a reboot.
+
 ## Transaction and boot commit
 
 1. Refuse while a call, coin transaction, content save, or another updater is

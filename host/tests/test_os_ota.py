@@ -116,6 +116,96 @@ class OsOtaTests(unittest.TestCase):
         with self.assertRaisesRegex(os_ota.OsOtaError, "expanded"):
             os_ota.verify_image(boot, value["images"]["boot"])
 
+    def test_inactive_slots_are_written_synced_and_read_back(self):
+        output = self.build()
+        value = json.loads((output / "manifest.json").read_text())
+        downloads = {name: next(output.glob(name + "-*.img.gz"))
+                     for name in ("boot", "root")}
+        targets = {name: self.root / ("inactive-" + name)
+                   for name in ("boot", "root")}
+        active = {name: self.root / ("active-" + name)
+                  for name in ("boot", "root")}
+        for path in list(targets.values()) + list(active.values()):
+            path.write_bytes(b"unused" * 4096)
+        journal = self.root / "journal.json"
+        transaction = os_ota.write_inactive_images(
+            value, downloads, targets, active, journal, allow_regular=True)
+        self.assertEqual(transaction["phase"], "candidate-written")
+        self.assertEqual(json.loads(journal.read_text())["phase"],
+                         "candidate-written")
+        self.assertEqual(targets["boot"].read_bytes()[:self.boot.stat().st_size],
+                         self.boot.read_bytes())
+        self.assertEqual(targets["root"].read_bytes()[:self.rootfs.stat().st_size],
+                         self.rootfs.read_bytes())
+
+    def test_active_target_overlap_is_rejected_before_writing(self):
+        output = self.build()
+        value = json.loads((output / "manifest.json").read_text())
+        downloads = {name: next(output.glob(name + "-*.img.gz"))
+                     for name in ("boot", "root")}
+        shared = self.root / "shared"
+        inactive_root = self.root / "inactive-root"
+        shared.write_bytes(b"active" * 4096)
+        inactive_root.write_bytes(b"inactive" * 4096)
+        before = shared.read_bytes()
+        with self.assertRaisesRegex(os_ota.OsOtaError, "overlaps active"):
+            os_ota.write_inactive_images(
+                value, downloads, {"boot": shared, "root": inactive_root},
+                {"boot": shared, "root": self.rootfs}, self.root / "journal",
+                allow_regular=True)
+        self.assertEqual(shared.read_bytes(), before)
+
+    def test_all_downloads_verify_before_first_target_write(self):
+        output = self.build()
+        value = json.loads((output / "manifest.json").read_text())
+        downloads = {name: next(output.glob(name + "-*.img.gz"))
+                     for name in ("boot", "root")}
+        downloads["boot"].write_bytes(downloads["boot"].read_bytes() + b"bad")
+        targets = {name: self.root / ("inactive-" + name)
+                   for name in ("boot", "root")}
+        active = {name: self.root / ("active-" + name)
+                  for name in ("boot", "root")}
+        for path in list(targets.values()) + list(active.values()):
+            path.write_bytes((str(path) + " sentinel").encode() * 1024)
+        before = {name: path.read_bytes() for name, path in targets.items()}
+        with self.assertRaisesRegex(os_ota.OsOtaError, "compressed"):
+            os_ota.write_inactive_images(
+                value, downloads, targets, active, self.root / "journal",
+                allow_regular=True)
+        self.assertEqual({name: path.read_bytes() for name, path in targets.items()},
+                         before)
+        self.assertFalse((self.root / "journal").exists())
+
+    def test_production_writer_rejects_regular_files(self):
+        target = self.root / "target"
+        active = self.root / "active"
+        target.write_bytes(b"target")
+        active.write_bytes(b"active")
+        with self.assertRaisesRegex(os_ota.OsOtaError, "block device"):
+            os_ota.validate_inactive_targets(
+                {"boot": target, "root": self.rootfs},
+                {"boot": active, "root": self.boot})
+
+    def test_target_capacity_is_checked_before_any_write(self):
+        output = self.build()
+        value = json.loads((output / "manifest.json").read_text())
+        downloads = {name: next(output.glob(name + "-*.img.gz"))
+                     for name in ("boot", "root")}
+        targets = {"boot": self.root / "tiny", "root": self.root / "large"}
+        active = {"boot": self.root / "active-boot",
+                  "root": self.root / "active-root"}
+        targets["boot"].write_bytes(b"tiny")
+        targets["root"].write_bytes(b"root sentinel" * 4096)
+        active["boot"].write_bytes(b"active boot")
+        active["root"].write_bytes(b"active root")
+        before = {name: path.read_bytes() for name, path in targets.items()}
+        with self.assertRaisesRegex(os_ota.OsOtaError, "smaller"):
+            os_ota.write_inactive_images(
+                value, downloads, targets, active, self.root / "journal",
+                allow_regular=True)
+        self.assertEqual({name: path.read_bytes() for name, path in targets.items()},
+                         before)
+
 
 if __name__ == "__main__":
     unittest.main()
