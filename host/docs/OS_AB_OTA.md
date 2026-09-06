@@ -65,6 +65,26 @@ streams decompression into the inactive slot while hashing the uncompressed
 bytes, then reads the inactive slot back and verifies it before changing boot
 state. It must never write the active boot or root partition.
 
+The implemented manifest builder and validation primitives are:
+
+```sh
+python3 tools/build_os_release.py \
+  --sequence 1 --version 2026.09.0 \
+  --base-url https://updates.kmatzen.com/millennium/os \
+  --boot-image boot.img --root-image root.img \
+  --layout-id zero2w-ab-v1 \
+  --board-model "Raspberry Pi Zero 2 W Rev 1.0" \
+  --minimum-application-version 0.4.0 --minimum-mcu-version 0.4.0 \
+  --persistent-state-schema 1 --private-key /run/keys/release.pem \
+  --output-dir /tmp/millennium-os-release
+```
+
+`host/os_ota/millennium_os_ota.py` verifies the detached Ed25519 signature,
+device/channel/rollout compatibility, monotonic sequence, and both compressed
+and expanded payload sizes and hashes. The block-device writer and tryboot
+transaction deliberately remain a separate gate: validating an image never
+implies permission to select or write a device.
+
 ## Transaction and boot commit
 
 1. Refuse while a call, coin transaction, content save, or another updater is
