@@ -11,7 +11,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y libasound2-dev
@@ -59,7 +59,7 @@ jobs:
   compile-check-clang:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y libasound2-dev clang
@@ -71,7 +71,7 @@ jobs:
   production-build:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install pinned build dependencies
         run: |
@@ -122,7 +122,7 @@ jobs:
           sudo nft --check --file host/firewall/millennium.nft
 
       - name: Upload production daemon
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: production-daemon
           path: host/daemon
@@ -130,7 +130,7 @@ jobs:
   firmware:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install pinned Arduino CLI and AVR core
         run: |
@@ -145,7 +145,7 @@ jobs:
         run: make clean build ARDUINO_CLI=/tmp/arduino-cli
 
       - name: Upload reproducible firmware candidate
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: firmware-rebuild
           path: |
@@ -159,7 +159,7 @@ jobs:
   pcb:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Run source-level PCB guardrails
         run: |
           docker run --rm --volume "$PWD:/work" --workdir /work/pcb \
@@ -180,14 +180,14 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
         with:
           name: production-daemon
           path: build/production
       - name: Generate checksums, provenance, and SPDX SBOM
         run: python3 tools/release_evidence.py --output-dir build/evidence --daemon build/production/daemon
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: release-evidence
           path: build/evidence
@@ -202,7 +202,7 @@ jobs:
   sanitizers:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y libasound2-dev clang
@@ -222,7 +222,7 @@ jobs:
   proofs:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # gcc-multilib supplies the 32-bit libc headers. cbmc-parsers passes --32
       # deliberately, to model the Pi's 32-bit userland rather than the runner's
@@ -266,16 +266,16 @@ jobs:
   models:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '21'
 
       - name: Cache tla2tools.jar
         id: cache-tla
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: host/tla2tools.jar
           key: tla2tools-v1
