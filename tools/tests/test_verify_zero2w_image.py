@@ -14,6 +14,14 @@ SPEC.loader.exec_module(MODULE)
 
 
 class VerifyZero2WImageTests(unittest.TestCase):
+    def test_region_comparison_detects_match_and_difference(self):
+        with tempfile.NamedTemporaryFile() as image:
+            image.write(b"boot-a" + b"boot-a" + b"changed")
+            image.flush()
+            path = Path(image.name)
+            self.assertTrue(MODULE.regions_equal(path, 0, 6, 6, chunk_size=2))
+            self.assertFalse(MODULE.regions_equal(path, 0, 12, 6, chunk_size=2))
+
     def test_regular_file_size(self):
         with tempfile.NamedTemporaryFile() as image:
             image.truncate(4096)

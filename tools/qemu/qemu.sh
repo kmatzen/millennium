@@ -12,6 +12,7 @@ IMAGE_URL=${MILLENNIUM_QEMU_IMAGE_URL:-https://cloud.debian.org/images/cloud/boo
 BASE_IMAGE="$STATE_DIR/debian-12-arm64.qcow2"
 DISK_IMAGE="$STATE_DIR/millennium.qcow2"
 SSH_PORT=${MILLENNIUM_QEMU_SSH_PORT:-2222}
+DISK_SIZE=${MILLENNIUM_QEMU_DISK_SIZE:-16G}
 SSH_KEY="$STATE_DIR/id_ed25519"
 SSH=(ssh -i "$SSH_KEY" -p "$SSH_PORT" -o BatchMode=yes -o ConnectTimeout=15 \
     -o ConnectionAttempts=1 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 \
@@ -374,9 +375,12 @@ fetch_image() {
 
 init_disk() {
     need qemu-img "install QEMU"
+    [[ "$DISK_SIZE" =~ ^[1-9][0-9]*[GM]$ ]] || \
+        die "MILLENNIUM_QEMU_DISK_SIZE must be a positive whole number of G or M"
     fetch_image
     make_seed
-    test -f "$DISK_IMAGE" || qemu-img create -f qcow2 -F qcow2 -b "$BASE_IMAGE" "$DISK_IMAGE" 16G
+    test -f "$DISK_IMAGE" || qemu-img create -f qcow2 -F qcow2 \
+        -b "$BASE_IMAGE" "$DISK_IMAGE" "$DISK_SIZE"
 }
 
 start_vm() {

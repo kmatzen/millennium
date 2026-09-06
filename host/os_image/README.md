@@ -13,7 +13,7 @@ build files do not belong in the output.
 
 | Number | Purpose | Format/type |
 | --- | --- | --- |
-| 1 | boot control (`bootcode.bin`, `start.elf` marker, `autoboot.txt`) | FAT32 primary |
+| 1 | boot control (`bootcode.bin`, `start.elf`, `autoboot.txt`) | FAT32 primary |
 | 2 | boot A | FAT32 primary |
 | 3 | boot B | FAT32 primary |
 | 4 | logical-partition container | MBR extended |
@@ -39,10 +39,11 @@ creates all four active/other aliases deterministically for partitions 2/5 and
 
 Zero 2 W's BCM2837 boot ROM loads `bootcode.bin` from the first FAT partition
 before the second-stage firmware can process `autoboot.txt`. The preparation
-transform therefore copies the pinned boot payload's `bootcode.bin` and a
-zero-length `start.elf` bootability marker into BOOTCONFIG. The real GPU
-firmware is loaded from the A/B partition chosen by `autoboot.txt`; a missing
-`bootcode.bin` fails the build.
+transform therefore copies the pinned boot payload's real `bootcode.bin` and
+`start.elf` into BOOTCONFIG. The selected A/B partition contains the same GPU
+firmware plus the kernel and initramfs. Missing or empty firmware fails the
+build; the independent verifier also proves the selector and selected-slot
+copies match.
 
 ## Build
 
@@ -72,6 +73,7 @@ writing removable media:
 
 ```sh
 python3 tools/verify_zero2w_image.py \
+  --boot-content \
   image-work/image-millennium-zero2w-ab/millennium-zero2w-ab.img
 ```
 

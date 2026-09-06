@@ -68,9 +68,12 @@ def prepare(source, output):
         'bootcode="${fs}/boot/firmware/bootcode.bin"\n'
         '[ -s "$bootcode" ] || { echo "missing Zero 2 W bootcode.bin" >&2; exit 1; }\n'
         'cp -- "$bootcode" "${genimg_in}/bootcode.bin"\n\n\n'
-        '# Presence of start.elf marks BOOTCONFIG as bootable to pre-2711 firmware;\n'
-        '# its contents are loaded from the partition selected by autoboot.txt.\n'
-        ': > "${genimg_in}/boot-start.elf"\n\n\n'
+        '# Keep BOOTCONFIG independently classifiable as bootable. Do not rely on\n'
+        '# an empty marker: copy the real pinned GPU firmware required by the\n'
+        '# documented pre-Pi-4 boot-partition contract.\n'
+        'start_elf="${fs}/boot/firmware/start.elf"\n'
+        '[ -s "$start_elf" ] || { echo "missing Zero 2 W start.elf" >&2; exit 1; }\n'
+        'cp -- "$start_elf" "${genimg_in}/boot-start.elf"\n\n\n'
         '# Write genimage template')
 
     slot_post = output / "image/gpt/ab_userdata/slot-post-process.sh"

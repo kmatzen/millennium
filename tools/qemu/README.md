@@ -163,8 +163,11 @@ tools/qemu/qemu.sh start
 ```
 
 Reset is recoverable: the previous overlay is renamed with a timestamp instead
-of deleted. The downloaded base image is retained. To change ports or state
-location, set `MILLENNIUM_QEMU_SSH_PORT` or `MILLENNIUM_QEMU_STATE`.
+of deleted. The downloaded base image is retained. To change ports, state
+location, or the size of a newly created overlay, set
+`MILLENNIUM_QEMU_SSH_PORT`, `MILLENNIUM_QEMU_STATE`, or
+`MILLENNIUM_QEMU_DISK_SIZE` (for example, `64G`). The size setting never
+resizes an existing disk.
 
 If boot fails, inspect `tools/qemu/state/console.log`. If the
 daemon fails, use `qemu.sh logs` and `qemu.sh ssh systemctl status daemon`.

@@ -51,10 +51,23 @@ mmdebstrap:
       # Its initramfs hook copies /boot/slot.map, so create it before forcing
       # regeneration of every installed kernel's initramfs.
       test -x "$1/usr/bin/rpi-slot-static"
-      install -m 0644 "$SRCROOT/host/os_image/slot.map" "$1/boot/slot.map"
-      install -D -m 0755 "$SRCROOT/host/os_image/89-millennium-mbr-slots" \
+      install -m 0644 "$SRCROOT/slot.map" "$1/boot/slot.map"
+      install -D -m 0755 "$SRCROOT/89-millennium-mbr-slots" \
         "$1/etc/initramfs-tools/scripts/local-premount/89-millennium-mbr-slots"
-      chroot "$1" update-initramfs -u -k all
+      # The pinned Trixie package set can configure the kernel before
+      # initramfs-tools. In that order the kernel postinst legitimately skips
+      # archive creation, so `update-initramfs -u -k all` has nothing to update.
+      # Create each missing archive explicitly; the packaged raspi-firmware
+      # post-update hook also copies the newest v8 archive to initramfs8.
+      for modules in "$1"/lib/modules/*; do
+        test -d "$modules" || continue
+        version=${modules##*/}
+        if test -e "$1/var/lib/initramfs-tools/$version"; then
+          chroot "$1" update-initramfs -u -k "$version"
+        else
+          chroot "$1" update-initramfs -c -k "$version"
+        fi
+      done
       found=0
       for initramfs in "$1"/boot/firmware/initramfs*; do
         test -f "$initramfs" || continue

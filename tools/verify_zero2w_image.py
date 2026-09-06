@@ -4,9 +4,13 @@
 import argparse
 from dataclasses import dataclass
 import fcntl
+import hashlib
 from pathlib import Path
+import shutil
 import struct
+import subprocess
 import sys
+import tempfile
 
 
 SECTOR = 512
@@ -114,11 +118,127 @@ def verify(path):
     print("Zero 2 W A/B MBR contract: PASS")
 
 
+def regions_equal(path, left, right, length, chunk_size=1024 * 1024):
+    """Compare two non-overlapping image regions without loading them whole."""
+    with path.open("rb") as image:
+        remaining = length
+        offset = 0
+        while remaining:
+            size = min(chunk_size, remaining)
+            image.seek(left + offset)
+            a = image.read(size)
+            image.seek(right + offset)
+            b = image.read(size)
+            if len(a) != size or len(b) != size or a != b:
+                return False
+            remaining -= size
+            offset += size
+    return True
+
+
+def fat_copy(image, partition, name, destination):
+    tool = shutil.which("mcopy")
+    if tool is None:
+        raise ValueError("mcopy is required for --boot-content (install mtools)")
+    offset = partition.start * SECTOR
+    result = subprocess.run(
+        [tool, "-n", "-i", f"{image}@@{offset}", f"::{name}", str(destination)],
+        text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if result.returncode:
+        raise ValueError(f"p{partition.number} missing {name}: {result.stderr.strip()}")
+
+
+def require_size(path, minimum):
+    if path.stat().st_size < minimum:
+        raise ValueError(f"{path.name} is empty or implausibly small")
+
+
+def digest(path):
+    value = hashlib.sha256()
+    with path.open("rb") as stream:
+        for block in iter(lambda: stream.read(1024 * 1024), b""):
+            value.update(block)
+    return value.hexdigest()
+
+
+def verify_boot_content(path):
+    partitions = read_partitions(path)
+    parts = {part.number: part for part in partitions}
+    boot_bytes = parts[2].sectors * SECTOR
+    if parts[3].sectors != parts[2].sectors or not regions_equal(
+            path, parts[2].start * SECTOR, parts[3].start * SECTOR, boot_bytes):
+        raise ValueError("boot A and boot B are not byte-identical")
+
+    with tempfile.TemporaryDirectory(prefix="zero2w-boot-verify-") as directory:
+        root = Path(directory)
+        wanted = {
+            1: ("autoboot.txt", "bootcode.bin", "start.elf"),
+            2: ("bootcode.bin", "start.elf", "kernel8.img", "initramfs8",
+                "bcm2710-rpi-zero-2-w.dtb", "config.txt", "cmdline.txt", "slot.map"),
+        }
+        copied = {}
+        for number, names in wanted.items():
+            for name in names:
+                target = root / f"p{number}-{name}"
+                fat_copy(path, parts[number], name, target)
+                copied[number, name] = target
+
+        for number in (1, 2):
+            require_size(copied[number, "bootcode.bin"], 32 * 1024)
+            require_size(copied[number, "start.elf"], 512 * 1024)
+        for name, minimum in (("kernel8.img", 1024 * 1024),
+                              ("initramfs8", 1024 * 1024),
+                              ("bcm2710-rpi-zero-2-w.dtb", 1024)):
+            require_size(copied[2, name], minimum)
+        for name in ("bootcode.bin", "start.elf"):
+            if digest(copied[1, name]) != digest(copied[2, name]):
+                raise ValueError(f"BOOTCONFIG {name} differs from boot-slot firmware")
+
+        autoboot = copied[1, "autoboot.txt"].read_text(encoding="ascii")
+        expected = ("[all]\ntryboot_a_b=1\nboot_partition=2\n"
+                    "[tryboot]\nboot_partition=3\n")
+        if autoboot != expected:
+            raise ValueError("unexpected initial autoboot.txt selector")
+        cmdline = copied[2, "cmdline.txt"].read_text(encoding="ascii").strip()
+        for item in ("root=/dev/disk/by-slot/active/system", "rootwait",
+                     "console=serial0,115200"):
+            if item not in cmdline.split():
+                raise ValueError(f"cmdline.txt missing {item}")
+        config = copied[2, "config.txt"].read_text(encoding="ascii")
+        for item in ("auto_initramfs=1", "[pi02]", "enable_uart=1",
+                     "uart_2ndstage=1"):
+            if item not in config:
+                raise ValueError(f"config.txt missing {item}")
+        expected_map = "a.boot=::2\na.system=::5\nb.boot=::3\nb.system=::6\n"
+        if copied[2, "slot.map"].read_text(encoding="ascii") != expected_map:
+            raise ValueError("unexpected boot-slot map")
+
+        lsinitramfs = shutil.which("lsinitramfs")
+        if lsinitramfs is None:
+            raise ValueError("lsinitramfs is required for --boot-content")
+        result = subprocess.run(
+            [lsinitramfs, str(copied[2, "initramfs8"])], text=True,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if result.returncode:
+            raise ValueError(f"cannot inspect initramfs8: {result.stderr.strip()}")
+        members = set(result.stdout.splitlines())
+        required = {"boot/slot.map",
+                    "scripts/local-premount/89-millennium-mbr-slots"}
+        missing = sorted(required - members)
+        if missing:
+            raise ValueError("initramfs8 missing: " + ", ".join(missing))
+    print("Zero 2 W raw boot-content contract: PASS")
+
+
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument("--boot-content", action="store_true")
     parser.add_argument("image", type=Path)
     args = parser.parse_args()
-    verify(args.image.resolve())
+    image = args.image.resolve()
+    verify(image)
+    if args.boot_content:
+        verify_boot_content(image)
 
 
 if __name__ == "__main__":
