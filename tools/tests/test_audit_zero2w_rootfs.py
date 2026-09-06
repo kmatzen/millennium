@@ -17,6 +17,10 @@ class RootfsAuditTests(unittest.TestCase):
         root = Path(temporary.name) / "root"
         (root / "tmp").mkdir(parents=True)
         (root / "opt/millennium").mkdir(parents=True)
+        for name in MODULE.REQUIRED_OS_OTA_PATHS:
+            path = root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("fixture\n", encoding="utf-8")
         manifest = Path(temporary.name) / "manifest"
         manifest.write_text(package_lines, encoding="utf-8")
         return temporary, root, manifest
@@ -36,6 +40,15 @@ class RootfsAuditTests(unittest.TestCase):
             (root / "var/cache/apt/archives").mkdir(parents=True)
             (root / "var/cache/apt/archives/package.deb").write_bytes(b"deb")
             with self.assertRaisesRegex(ValueError, "apt package cache"):
+                MODULE.audit(root, manifest)
+        finally:
+            temporary.cleanup()
+
+    def test_missing_os_ota_runtime_is_rejected(self):
+        temporary, root, manifest = self.fixture()
+        try:
+            (root / "usr/local/libexec/millennium-os-ota").unlink()
+            with self.assertRaisesRegex(ValueError, "missing OS OTA runtime"):
                 MODULE.audit(root, manifest)
         finally:
             temporary.cleanup()

@@ -38,6 +38,22 @@ points at the other slot. Do not infer the active slot from symlink state; read
 the boot partition selected by firmware from device tree and cross-check the
 mounted root PARTUUID.
 
+On BCM2837 devices such as Zero 2 W, BOOTCONFIG also contains the pinned
+`bootcode.bin` and a zero-length `start.elf` bootability marker. The boot ROM
+loads `bootcode.bin` from the first FAT partition; the marker allows that
+second stage to process `autoboot.txt` and load the real firmware from the
+selected A/B boot partition.
+
+The MBR target cannot use the upstream GPT-label mapper. Its four-entry static
+`slot.map` must be embedded in every initramfs at `/boot/slot.map`; the build
+regenerates all initramfs images after installing the map and fails unless
+archive inspection proves the file is present. Without that early-boot copy,
+the missing active-root alias intentionally triggers the fail-safe reboot.
+Immediately before the safety check, `89-millennium-mbr-slots` reads the
+firmware-selected partition and creates the fixed MBR active/other aliases.
+This removes dependence on GPT labels and early udev classification while
+remaining fail-closed for any unexpected partition or missing block device.
+
 Raspberry Pi documents `autoboot.txt`, `boot_partition`, `tryboot_a_b`, the
 one-shot `reboot '0 tryboot'` flow, and the device-tree boot selection fields in
 its official configuration reference:
@@ -72,7 +88,7 @@ python3 tools/build_os_release.py \
   --sequence 1 --version 2026.09.0 \
   --base-url https://updates.kmatzen.com/millennium/os \
   --boot-image boot.img --root-image root.img \
-  --layout-id zero2w-ab-v1 \
+  --layout-id zero2w-ab-mbr-v1 \
   --board-model "Raspberry Pi Zero 2 W Rev 1.0" \
   --minimum-application-version 0.4.0 --minimum-mcu-version 0.4.0 \
   --persistent-state-schema 1 --private-key /run/keys/release.pem \
@@ -84,6 +100,15 @@ device/channel/rollout compatibility, monotonic sequence, and both compressed
 and expanded payload sizes and hashes. The block-device writer and tryboot
 transaction deliberately remain a separate gate: validating an image never
 implies permission to select or write a device.
+
+`host/os_ota/millennium_os_ota_agent.py` is the installed production
+orchestrator. Separate systemd timers check and apply releases, while boot-time
+recovery and health services reconcile interrupted writes, recognize firmware
+fallback, and commit a one-shot candidate only after all nine checks pass. It
+uses the image runtime's `/bootfs` mount and `/dev/disk/by-slot/{active,other}`
+aliases, resolves inactive aliases before entering the symlink-rejecting block
+writer, and derives direction from the current validated selector so both
+A-to-B and B-to-A rotations use the same code path.
 
 The same module now provides the inactive-slot write primitive. It validates
 both downloads before the first write, rejects symlinks, rejects a boot/root

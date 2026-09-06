@@ -1,0 +1,15 @@
+[Unit]
+Description=Commit or reject a one-shot Millennium OS candidate boot
+After=network-online.target daemon.service millennium-maintenance-tunnel.service
+Wants=network-online.target daemon.service millennium-maintenance-tunnel.service
+ConditionPathExists=/var/lib/millennium/os-ota/transaction.json
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/libexec/millennium-os-ota boot-health
+User=root
+Group=root
+TimeoutStartSec=5min
+
+[Install]
+WantedBy=multi-user.target

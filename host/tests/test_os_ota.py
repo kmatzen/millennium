@@ -8,6 +8,7 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -430,6 +431,59 @@ class OsOtaTests(unittest.TestCase):
         os_ota.record_boot_health(
             journal, {name: True for name in os_ota.REQUIRED_BOOT_HEALTH})
         os_ota.commit_tryboot(selector, journal, 3, 1, installed)
+        self.assertEqual(installed.read_text(), "12\n")
+
+    def test_power_loss_before_selector_swap_restores_prior_sequence(self):
+        journal = self.tryboot_journal()
+        selector = self.root / "autoboot.txt"
+        installed = self.root / "installed-sequence"
+        installed.write_text("7\n")
+        os_ota.arm_tryboot(selector, journal, 2, 3)
+        os_ota.record_boot_health(
+            journal, {name: True for name in os_ota.REQUIRED_BOOT_HEALTH})
+        original = os_ota.atomic_text
+
+        def interrupt(path, value):
+            if Path(path) == selector:
+                raise OSError("simulated power loss")
+            return original(path, value)
+
+        with mock.patch.object(os_ota, "atomic_text", side_effect=interrupt):
+            with self.assertRaisesRegex(OSError, "power loss"):
+                os_ota.commit_tryboot(selector, journal, 3, 1, installed)
+        self.assertEqual(os_ota.read_journal(journal)["phase"], "commit-intent")
+        self.assertEqual(installed.read_text(), "12\n")
+        value = os_ota.reconcile_commit(selector, journal, 2, 0, installed)
+        self.assertEqual(value["phase"], "commit-interrupted")
+        self.assertEqual(installed.read_text(), "7\n")
+        self.assertEqual(os_ota.parse_autoboot(selector.read_text()), (2, 3))
+
+    def test_power_loss_after_selector_swap_finalizes_commit(self):
+        journal = self.tryboot_journal()
+        selector = self.root / "autoboot.txt"
+        installed = self.root / "installed-sequence"
+        installed.write_text("7\n")
+        os_ota.arm_tryboot(selector, journal, 2, 3)
+        os_ota.record_boot_health(
+            journal, {name: True for name in os_ota.REQUIRED_BOOT_HEALTH})
+        original = os_ota.atomic_json
+        writes = 0
+
+        def interrupt(path, value):
+            nonlocal writes
+            writes += 1
+            if writes == 2:
+                raise OSError("simulated power loss")
+            return original(path, value)
+
+        with mock.patch.object(os_ota, "atomic_json", side_effect=interrupt):
+            with self.assertRaisesRegex(OSError, "power loss"):
+                os_ota.commit_tryboot(selector, journal, 3, 1, installed)
+        self.assertEqual(os_ota.read_journal(journal)["phase"], "commit-intent")
+        self.assertEqual(os_ota.parse_autoboot(selector.read_text()), (3, 2))
+        value = os_ota.reconcile_commit(selector, journal, 3, 0, installed)
+        self.assertEqual(value["phase"], "committed")
+        self.assertTrue(value["reconciled"])
         self.assertEqual(installed.read_text(), "12\n")
 
     def test_owner_status_does_not_expose_internal_failure_detail(self):

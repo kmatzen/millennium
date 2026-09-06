@@ -50,6 +50,7 @@ for source in \
     "$host/monitoring/millennium_backup_export.sh:millennium-backup-export" \
     "$host/monitoring/millennium_hil_smoke.py:millennium-hil-smoke" \
     "$host/monitoring/millennium_physical_interruption.py:millennium-physical-interruption" \
+    "$host/os_ota/millennium_os_ota_agent.py:millennium-os-ota" \
     "$host/ota/millennium_maintenance_tunnel.sh:millennium-maintenance-tunnel" \
     "$host/ota/repair_maintenance_access.py:millennium-repair-maintenance-access" \
     "$host/wifi/millennium_wifi.py:millennium_wifi.py" \
@@ -59,9 +60,15 @@ for source in \
     "$host/wifi/provision_wifi.py:millennium-wifi-provision"; do
     install -m 0755 "${source%%:*}" "$payload/usr/local/libexec/${source##*:}"
 done
+install -m 0644 "$host/os_ota/millennium_os_ota.py" \
+    "$payload/usr/local/libexec/millennium_os_ota.py"
 
 install -m 0644 "$host/systemd/daemon.service" "$payload/etc/systemd/system/daemon.service"
 for unit in "$host"/systemd/millennium-{firewall,monitor,hil-smoke,physical-interruption-reconcile,maintenance-tunnel,update-check,update-apply,update-auto-apply,update-recover,wifi-bootstrap,wifi-helper,wifi-portal,wifi-recovery}.{service,timer,path}; do
+    test -f "$unit" || continue
+    install -m 0644 "$unit" "$payload/etc/systemd/system/"
+done
+for unit in "$host"/systemd/millennium-os-update-{check,apply,recover,boot-health}.{service,timer}; do
     test -f "$unit" || continue
     install -m 0644 "$unit" "$payload/etc/systemd/system/"
 done
@@ -74,6 +81,8 @@ install -m 0644 "$host/systemd/millennium-wifi.sysusers" \
 install -m 0440 "$host/systemd/millennium-ota-sudoers" \
     "$payload/etc/sudoers.d/millennium-ota"
 install -m 0644 "$host/ota/ota.conf.example" "$payload/etc/millennium/ota.conf"
+install -m 0644 "$host/os_ota/os-ota.conf.example" \
+    "$payload/etc/millennium/os-ota.conf"
 
 install -m 0755 "$host/daemon" \
     "$payload/opt/millennium/releases/bootstrap/host/millennium-daemon"

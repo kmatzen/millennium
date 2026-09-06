@@ -1,0 +1,11 @@
+[Unit]
+Description=Apply pending Millennium OS updates while the phone is idle
+
+[Timer]
+OnBootSec=45min
+OnUnitActiveSec=1h
+RandomizedDelaySec=10min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

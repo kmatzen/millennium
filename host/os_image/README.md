@@ -13,7 +13,7 @@ build files do not belong in the output.
 
 | Number | Purpose | Format/type |
 | --- | --- | --- |
-| 1 | boot control (`autoboot.txt`) | FAT32 primary |
+| 1 | boot control (`bootcode.bin`, `start.elf` marker, `autoboot.txt`) | FAT32 primary |
 | 2 | boot A | FAT32 primary |
 | 3 | boot B | FAT32 primary |
 | 4 | logical-partition container | MBR extended |
@@ -24,6 +24,25 @@ build files do not belong in the output.
 The static slot map is `a.boot=::2`, `a.system=::5`, `b.boot=::3`, and
 `b.system=::6`. Persistent data uses the upstream `PERSISTENT` filesystem and
 `/persistent` mount contract.
+
+Because MBR partitions do not provide GPT partition labels, the image layer
+installs that static map at `/boot/slot.map` before regenerating every
+initramfs, then proves each generated archive contains it. The copy on each
+boot FAT partition is retained for runtime inspection; the embedded copy is
+what lets early boot create `/dev/disk/by-slot/{active,other}` before mounting
+the root filesystem.
+
+The image also embeds `89-millennium-mbr-slots` immediately before the
+upstream root safety check. It reads the firmware-selected boot partition and
+creates all four active/other aliases deterministically for partitions 2/5 and
+3/6. Any other partition or missing block device still fails closed.
+
+Zero 2 W's BCM2837 boot ROM loads `bootcode.bin` from the first FAT partition
+before the second-stage firmware can process `autoboot.txt`. The preparation
+transform therefore copies the pinned boot payload's `bootcode.bin` and a
+zero-length `start.elf` bootability marker into BOOTCONFIG. The real GPU
+firmware is loaded from the A/B partition chosen by `autoboot.txt`; a missing
+`bootcode.bin` fails the build.
 
 ## Build
 

@@ -590,16 +590,69 @@ def commit_tryboot(selector_path, journal_path, boot_partition, tryboot,
     current = parse_autoboot(Path(selector_path).read_text(encoding="ascii"))
     if current != (normal, candidate):
         raise OsOtaError("autoboot selector changed during candidate transaction")
+    previous_sequence = 0
+    if installed_sequence_path is not None:
+        try:
+            previous_sequence = int(Path(installed_sequence_path).read_text().strip())
+        except (OSError, ValueError):
+            previous_sequence = 0
+        if previous_sequence < 0:
+            raise OsOtaError("invalid installed OS sequence")
+    journal["previous_installed_sequence"] = previous_sequence
+    journal["phase"] = "commit-intent"
+    atomic_json(journal_path, journal)
+    # Persist anti-rollback state first. A power loss before the selector swap
+    # leaves the old slot active and reconcile_commit() restores the prior
+    # sequence; after the swap, both boot choice and anti-rollback are valid.
+    if installed_sequence_path is not None:
+        atomic_text(installed_sequence_path, "%d\n" % journal["sequence"])
     atomic_text(selector_path, render_autoboot(candidate, normal))
     if parse_autoboot(Path(selector_path).read_text(encoding="ascii")) != (
             candidate, normal):
         raise OsOtaError("committed autoboot selector readback failed")
     journal["phase"] = "committed"
     journal["active_boot_partition"] = candidate
-    if installed_sequence_path is not None:
-        atomic_text(installed_sequence_path, "%d\n" % journal["sequence"])
     atomic_json(journal_path, journal)
     return journal
+
+
+def reconcile_commit(selector_path, journal_path, boot_partition, tryboot,
+                     installed_sequence_path):
+    """Resolve a power cut at any boundary of the final commit transaction."""
+    journal = read_journal(journal_path)
+    if journal.get("phase") != "commit-intent":
+        raise OsOtaError("OS transaction has no interrupted commit")
+    normal = journal.get("normal_boot_partition")
+    candidate = journal.get("candidate_boot_partition")
+    previous = journal.get("previous_installed_sequence")
+    if not isinstance(previous, int) or previous < 0:
+        raise OsOtaError("interrupted commit lacks prior anti-rollback state")
+    selector = parse_autoboot(Path(selector_path).read_text(encoding="ascii"))
+    if (selector, boot_partition, tryboot) == ((candidate, normal), candidate, 0):
+        atomic_text(installed_sequence_path, "%d\n" % journal["sequence"])
+        journal["phase"] = "committed"
+        journal["active_boot_partition"] = candidate
+        journal["reconciled"] = True
+        atomic_json(journal_path, journal)
+        return journal
+    if (selector, boot_partition, tryboot) == ((normal, candidate), normal, 0):
+        atomic_text(installed_sequence_path, "%d\n" % previous)
+        journal["phase"] = "commit-interrupted"
+        journal["reconciled"] = True
+        atomic_json(journal_path, journal)
+        return journal
+    raise OsOtaError("ambiguous firmware state after interrupted OS commit")
+
+
+def reconcile_commit_from_device_tree(selector_path, journal_path,
+                                      partition_path, tryboot_path,
+                                      installed_sequence_path):
+    return reconcile_commit(
+        selector_path, journal_path,
+        read_bootloader_integer(partition_path),
+        read_bootloader_integer(tryboot_path),
+        installed_sequence_path,
+    )
 
 
 def commit_tryboot_from_device_tree(selector_path, journal_path,

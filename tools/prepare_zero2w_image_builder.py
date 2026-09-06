@@ -52,6 +52,26 @@ def prepare(source, output):
             'partition-table-type = "mbr"\n      extended-partition = 4\n      fill = true')
         replace_count(layout, "partition-type-uuid = F", "partition-type = 0x0c", 3)
         replace_count(layout, "partition-type-uuid = L", "partition-type = 0x83", 3)
+        replace_once(
+            layout,
+            '      file "autoboot.txt" { image = "autoboot.txt" }',
+            '      file "autoboot.txt" { image = "autoboot.txt" }\n'
+            '      file "bootcode.bin" { image = "bootcode.bin" }\n'
+            '      file "start.elf" { image = "boot-start.elf" }')
+
+    pre_image = output / "image/gpt/ab_userdata/pre-image.sh"
+    replace_once(
+        pre_image,
+        'EOF\n\n\n# Write genimage template',
+        'EOF\n\n\n# BCM2837 boot ROM (including Zero 2 W) must load the second-stage bootloader\n'
+        '# from the first FAT partition before that code can process autoboot.txt.\n'
+        'bootcode="${fs}/boot/firmware/bootcode.bin"\n'
+        '[ -s "$bootcode" ] || { echo "missing Zero 2 W bootcode.bin" >&2; exit 1; }\n'
+        'cp -- "$bootcode" "${genimg_in}/bootcode.bin"\n\n\n'
+        '# Presence of start.elf marks BOOTCONFIG as bootable to pre-2711 firmware;\n'
+        '# its contents are loaded from the partition selected by autoboot.txt.\n'
+        ': > "${genimg_in}/boot-start.elf"\n\n\n'
+        '# Write genimage template')
 
     slot_post = output / "image/gpt/ab_userdata/slot-post-process.sh"
     replace_once(

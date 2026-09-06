@@ -1,0 +1,15 @@
+[Unit]
+Description=Reconcile an interrupted Millennium OS slot write
+DefaultDependencies=no
+After=persistent.mount bootfs.mount
+Before=daemon.service
+ConditionPathExists=/var/lib/millennium/os-ota/transaction.json
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/libexec/millennium-os-ota recover
+User=root
+Group=root
+
+[Install]
+WantedBy=multi-user.target

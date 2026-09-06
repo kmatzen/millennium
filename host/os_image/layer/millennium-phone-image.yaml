@@ -46,6 +46,26 @@ mmdebstrap:
       EOF
     - |
       set -eu
+      # The static slot mapper is mandatory after converting the upstream GPT
+      # layout to MBR: DOS partitions have no PARTLABELs for the label mapper.
+      # Its initramfs hook copies /boot/slot.map, so create it before forcing
+      # regeneration of every installed kernel's initramfs.
+      test -x "$1/usr/bin/rpi-slot-static"
+      install -m 0644 "$SRCROOT/host/os_image/slot.map" "$1/boot/slot.map"
+      install -D -m 0755 "$SRCROOT/host/os_image/89-millennium-mbr-slots" \
+        "$1/etc/initramfs-tools/scripts/local-premount/89-millennium-mbr-slots"
+      chroot "$1" update-initramfs -u -k all
+      found=0
+      for initramfs in "$1"/boot/firmware/initramfs*; do
+        test -f "$initramfs" || continue
+        found=1
+        chroot "$1" lsinitramfs "${initramfs#$1}" | grep -qx 'boot/slot.map'
+        chroot "$1" lsinitramfs "${initramfs#$1}" | \
+          grep -qx 'scripts/local-premount/89-millennium-mbr-slots'
+      done
+      test "$found" -eq 1
+    - |
+      set -eu
       payload="$SRCROOT/payload/rootfs"
       test -x "$payload/usr/local/bin/millennium-daemon" || {
         echo "missing staged Millennium image payload; run tools/stage_zero2w_image_payload.sh" >&2
@@ -58,6 +78,9 @@ mmdebstrap:
       chroot "$1" systemctl enable millennium-maintenance-tunnel.service
       chroot "$1" systemctl enable millennium-update-recover.service
       chroot "$1" systemctl enable millennium-update-check.timer millennium-update-apply.timer
+      chroot "$1" systemctl enable millennium-os-update-recover.service
+      chroot "$1" systemctl enable millennium-os-update-boot-health.service
+      chroot "$1" systemctl enable millennium-os-update-check.timer millennium-os-update-apply.timer
       chroot "$1" systemctl enable millennium-wifi-bootstrap.service millennium-wifi-helper.service
       chroot "$1" systemctl enable millennium-wifi-portal.service millennium-wifi-recovery.path
       chroot "$1" chown -R millennium:millennium /var/lib/millennium /var/log/millennium

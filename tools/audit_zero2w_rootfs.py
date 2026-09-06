@@ -18,6 +18,19 @@ FORBIDDEN_BINARIES = (
     "usr/bin/dtc", "usr/sbin/flashrom",
 )
 
+REQUIRED_OS_OTA_PATHS = (
+    "boot/slot.map",
+    "etc/millennium/os-ota.conf",
+    "usr/local/libexec/millennium-os-ota",
+    "usr/local/libexec/millennium_os_ota.py",
+    "etc/systemd/system/millennium-os-update-check.service",
+    "etc/systemd/system/millennium-os-update-check.timer",
+    "etc/systemd/system/millennium-os-update-apply.service",
+    "etc/systemd/system/millennium-os-update-apply.timer",
+    "etc/systemd/system/millennium-os-update-recover.service",
+    "etc/systemd/system/millennium-os-update-boot-health.service",
+)
+
 
 def packages(path):
     result = set()
@@ -38,6 +51,9 @@ def audit(root, manifest):
     binaries = [path for path in FORBIDDEN_BINARIES if (root / path).exists()]
     if binaries:
         failures.append("forbidden binaries: " + ", ".join(binaries))
+    missing = [path for path in REQUIRED_OS_OTA_PATHS if not (root / path).is_file()]
+    if missing:
+        failures.append("missing OS OTA runtime: " + ", ".join(missing))
     temporary = root / "tmp"
     if temporary.is_dir() and any(temporary.iterdir()):
         failures.append("target /tmp is not empty")

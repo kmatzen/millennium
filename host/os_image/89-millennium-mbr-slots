@@ -1,0 +1,25 @@
+#!/bin/sh
+# Deterministic early A/B aliases for the validated Zero 2 W MBR layout.
+case ${1:-} in prereqs) echo ""; exit 0 ;; esac
+set -eu
+read_dt_u32() {
+    # shellcheck disable=SC2046,SC2312
+    set -- $(od -An -tu1 -N4 "$1" 2>/dev/null)
+    [ "$#" -eq 4 ] || return 1
+    echo $(( $1 * 16777216 + $2 * 65536 + $3 * 256 + $4 ))
+}
+partition=$(read_dt_u32 /proc/device-tree/chosen/bootloader/partition) || exit 1
+case "$partition" in
+    2) active_boot=2; active_system=5; other_boot=3; other_system=6 ;;
+    3) active_boot=3; active_system=6; other_boot=2; other_system=5 ;;
+    *) echo "FATAL: unexpected Millennium boot partition $partition" >&2; exit 1 ;;
+esac
+for number in "$active_boot" "$active_system" "$other_boot" "$other_system"; do
+    [ -b "/dev/mmcblk0p$number" ] || exit 1
+done
+mkdir -p /dev/disk/by-slot/active /dev/disk/by-slot/other
+ln -sfn "../../../mmcblk0p$active_boot" /dev/disk/by-slot/active/boot
+ln -sfn "../../../mmcblk0p$active_system" /dev/disk/by-slot/active/system
+ln -sfn "../../../mmcblk0p$other_boot" /dev/disk/by-slot/other/boot
+ln -sfn "../../../mmcblk0p$other_system" /dev/disk/by-slot/other/system
+echo "Millennium MBR slots: boot=$active_boot system=$active_system" >&2

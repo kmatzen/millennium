@@ -1,0 +1,11 @@
+[Unit]
+Description=Apply a pending signed Millennium operating-system update
+After=network-online.target daemon.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/libexec/millennium-os-ota auto-apply
+User=root
+Group=root
+TimeoutStartSec=90min
