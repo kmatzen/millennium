@@ -85,7 +85,11 @@ mmdebstrap:
         exit 1
       }
       cp -a "$payload/." "$1/"
-      install -d -o millennium -g millennium -m 0700 "$1/var/lib/millennium/wifi"
+      # This hook executes on the build host, where the target-only
+      # `millennium` account need not exist. Create the directory without a
+      # named owner here; the target-side recursive chown below assigns the
+      # account after the payload and directory are in place.
+      install -d -m 0700 "$1/var/lib/millennium/wifi"
       chroot "$1" systemctl enable daemon.service millennium-firewall.service
       chroot "$1" systemctl enable millennium-monitor.timer millennium-hil-smoke.timer
       chroot "$1" systemctl enable millennium-physical-interruption-reconcile.service
@@ -98,3 +102,14 @@ mmdebstrap:
       chroot "$1" systemctl enable millennium-wifi-bootstrap.service millennium-wifi-helper.service
       chroot "$1" systemctl enable millennium-wifi-portal.service millennium-wifi-recovery.path
       chroot "$1" chown -R millennium:millennium /var/lib/millennium /var/log/millennium
+  # image-rota's runner installs its upstream generator during a later
+  # customize hook. Reinstall the project version during cleanup so the final
+  # filesystem always contains the implementation that activates its emitted
+  # mount units through local-fs.target.requires.
+  cleanup-hooks:
+    - |
+      set -eu
+      install -D -m 0755 "$SRCROOT/slot-shared-generator" \
+        "$1/usr/lib/systemd/system-generators/slot-shared-generator"
+      cmp "$SRCROOT/slot-shared-generator" \
+        "$1/usr/lib/systemd/system-generators/slot-shared-generator"
