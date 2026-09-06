@@ -131,6 +131,14 @@ instructions. The service refuses to acknowledge overall backup success if a
 required path is missing or restore verification fails. Its latest evidence is
 `~/.config/millennium-backup/server-state-last.json`.
 
+Each phone stream carries a unique per-run Restic tag. If SSH fails after
+Restic observes EOF, the wrapper resolves only snapshots with that run tag and
+forgets their explicit IDs, preventing an empty or truncated stdin snapshot
+from appearing valid. A successful phone snapshot is dumped back through
+`tar -t` before retention or acknowledgement. The independent server-state
+backup still runs when the phone is unavailable, but the combined service
+correctly remains failed until both required legs succeed.
+
 Install the backup-host components and recovery documentation with permissions
 that keep the Restic credential private:
 

@@ -1,0 +1,22 @@
+{
+  "backup_host": "anima",
+  "completed_at": "2026-09-06T21:06:15Z",
+  "installed_script_sha256": "efe5929fbbf9720bc0ce1a319a3e74f2f4235228d88d7b533f5a1b28275eed3c",
+  "operation": "backup-failed-export-cleanup",
+  "passed": true,
+  "phone_export": {
+    "failure": "reverse tunnel refused connection on loopback port 22022",
+    "incomplete_snapshot_id": "59a73394",
+    "incomplete_snapshot_removed": true,
+    "valid_snapshots_after": 8,
+    "valid_snapshots_before": 8
+  },
+  "schema": 1,
+  "server_state": {
+    "backup_continued_after_phone_failure": true,
+    "plaintext_archive_staged": false,
+    "restore_stream_verified": true,
+    "snapshot_id": "93cb6f42"
+  },
+  "source_commit": "458c8d1"
+}

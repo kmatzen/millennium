@@ -439,6 +439,15 @@ The same artifact was copied directly from `anima` to `UEBuild`; all three
 recorded hashes and the Ed25519 manifest signature verified locally without
 using laptop internal storage.
 
+The backup puller was hardened after a disconnected phone caused Restic to
+commit a zero-byte stdin snapshot before shell `pipefail` observed the SSH
+failure. Each run now has a unique tag, failed snapshots are removed by exact
+ID, saved phone archives are restore-stream checked before acknowledgement,
+and server-state backup proceeds independently. A live phone-offline test on
+`anima` removed incomplete snapshot `59a73394`, kept the valid phone snapshot
+count at eight, and created restore-verified server snapshot `93cb6f42`. Exact
+evidence is in `evidence/backup-failed-export-cleanup-2026-09-06.json`.
+
 The same signing ceremony caught a separate custody-label defect before
 signing: the `0d4b59...` ciphertext in `/data/backups` derives a public key
 that does not match the active `release-2026-08` trust root. The verified
