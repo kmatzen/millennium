@@ -1,0 +1,38 @@
+{
+  "artifact_directory": "/Volumes/UEBuild/millennium-images/zero2w-ab-1.0.0-25c2729-unapproved",
+  "board_model": "Raspberry Pi Zero 2 W",
+  "completed_at": "2026-09-06T09:06:44Z",
+  "image": {
+    "compressed_sha256": "65f151829a5270356a624a0441fedfbf5962dfca3c1e0c6e49742957bca66062",
+    "compressed_size": 444616057,
+    "expanded_sha256": "e2f47663aab50b3dd15dc72cadc06acedcc8eaabcb2b37fb6dbbdfc4d0b81ef7",
+    "expanded_size": 15636365312,
+    "filename": "millennium-zero2w-ab.img.zst"
+  },
+  "key": {
+    "canonical_public_key_sha256": "581a1ff72d1867b3dfb3b1ffc5521308ac646878050f1c4c12739e0dedaf7348",
+    "id": "release-2026-08",
+    "private_key_plaintext_persisted": false,
+    "temporary_ram_disk_ejected": true
+  },
+  "manifest": {
+    "filename": "recovery-manifest.json",
+    "sha256": "44660e9ea24db1e84ba1f42c7045a4d99e3dae746fa7125919db10aa790f1bfa",
+    "signature_filename": "recovery-manifest.json.sig",
+    "signature_sha256": "1331f3b135def3d93bec2ba7954039c45e1344a20c4dae3575ee50a5ba139fec",
+    "signature_verified": true
+  },
+  "operation": "production-recovery-artifact-build",
+  "passed": true,
+  "physical_boot_approved": false,
+  "physical_media_readback_verified": false,
+  "recovery_writer": {
+    "live_source_disk_guard_verified": true,
+    "path": "tools/write_recovery_media.py",
+    "unit_tests_passed": true
+  },
+  "schema": 1,
+  "source_commit": "25c27294725467dd679711a8d8e2ce8dd49af5e0",
+  "status": "software-verified; retained as explicitly unapproved pending physical recovery write and Zero 2 W boot",
+  "version": "1.0.0"
+}

@@ -67,8 +67,11 @@ as an unattended appliance. Items are ordered by priority.
     - [x] Implement digest-scoped exponential backoff, bounded retry quarantine,
       busy-device and maintenance-window gates, administrative clearing, and
       privacy-safe owner status.
-    - [ ] Produce, sign, retain, and recovery-write a production-equivalent
-      recovery image.
+    - [x] Produce, sign, and retain a software-verified production-equivalent
+      recovery image, with its exact compressed and expanded hashes bound to
+      the active release key. Keep it explicitly unapproved until physical boot.
+    - [ ] Write the retained image to OS-identified removable recovery media,
+      verify its full readback, and boot it on the production-equivalent Zero 2 W.
   - [ ] Exercise download, inactive-slot write, pre-reboot, first boot, health
     commit, and rollback in QEMU and by physically removing power on the
     production-equivalent Zero 2 W image.

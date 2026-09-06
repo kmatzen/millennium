@@ -243,3 +243,30 @@ complete disk back, and compare the expanded digest. Never infer the target
 from its current disk number alone and never write an internal disk. Restore
 only the allowlisted per-device state after the image and partition contract
 have passed independent verification.
+
+`tools/write_recovery_media.py` enforces that procedure. Run it first without
+`--write` to verify the signed artifact and inspect the OS-reported target. To
+write, rerun as root with `--write` and `--confirm-device` set to the exact
+device identifier printed by the preflight. The command accepts only an
+explicit removable whole disk, never a partition; rejects internal, undersized,
+read-only, virtual, running-system, and source-image targets; verifies the
+canonical manifest signature, compressed hash, and Zstandard stream; flushes
+the expanded image; and hashes the complete image-length readback. Use
+`--evidence` to retain the machine-readable result.
+
+```bash
+python3 tools/write_recovery_media.py \
+  --manifest /path/to/recovery-manifest.json \
+  --signature /path/to/recovery-manifest.json.sig \
+  --public-key /path/to/update-signing-key.pem \
+  --image /path/to/millennium-zero2w-ab.img.zst \
+  --target /dev/diskN
+
+sudo python3 tools/write_recovery_media.py \
+  --manifest /path/to/recovery-manifest.json \
+  --signature /path/to/recovery-manifest.json.sig \
+  --public-key /path/to/update-signing-key.pem \
+  --image /path/to/millennium-zero2w-ab.img.zst \
+  --target /dev/diskN --write --confirm-device diskN \
+  --evidence /path/to/recovery-media-write.json
+```

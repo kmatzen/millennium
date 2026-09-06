@@ -301,3 +301,15 @@ daemon SHA-256 is
 the unchanged MCU images retain their previously attested hashes. A post-rollout
 HIL run passed all eight gates at `2026-09-06T00:05:35Z`. Exact evidence is in
 `evidence/sequence-11-source-attested-rollout-2026-09-06.json`.
+
+On 2026-09-06 a fresh Zero 2 W whole-disk A/B recovery candidate was built from
+source commit `25c27294725467dd679711a8d8e2ce8dd49af5e0`. Its canonical manifest
+binds the 444616057-byte Zstandard image and 15636365312-byte expansion, exact
+MBR partition layout, board model, architecture, and key ID. The manifest was
+signed with `release-2026-08` using a private key recovered only on a volatile
+RAM disk; independent verification matched canonical public-key identity
+`581a1ff72d1867b3dfb3b1ffc5521308ac646878050f1c4c12739e0dedaf7348`, and
+the plaintext workspace was destroyed. The artifact remains explicitly named
+`unapproved`: it has not yet been written to dedicated recovery media, read
+back, or booted on a physical Zero 2 W. Exact hashes and scope are in
+`evidence/zero2w-recovery-artifact-25c2729-2026-09-06.json`.
