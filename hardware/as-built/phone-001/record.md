@@ -415,3 +415,34 @@ candidate remains `unapproved` pending its corrected physical Zero 2 W boot.
 Exact build evidence is in
 `evidence/zero2w-recovery-seeded-artifact-31eda51-2026-09-06.json`; media
 evidence is in `evidence/recovery-media-phone001-31eda51.json`.
+
+That candidate's physical boot exposed an upstream image-generator ordering
+defect: the upstream shared-state generator overwrote the project generator
+after payload staging, leaving generated mount units outside
+`local-fs.target.requires`. A new candidate was built from source commit
+`2ad5179b0b2de4958a34b845f2db60775e317e07`; its final cleanup hook installs
+and byte-compares the project generator after the upstream overlay. The raw
+image, boot contents, production minimality, ARM64 payload, Wi-Fi-state mode,
+and all six activated shared mounts passed independent checks. Both seeded
+system slots and the persistent partition were then remounted read-only and
+verified. The signed, factory-seeded candidate is retained on `anima` at
+`zero2w-ab-1.0.0-2ad5179-phone001-unapproved`, with compressed SHA-256
+`b584b827e9574575c7be65d8729818c465d5d95a7caf22f47e508c6e2e10c397`
+and expanded SHA-256
+`2cd7be17c6cb4711e880c81e630beb50a08b4122cf043fea703a1357eedaf08a`.
+It remains unapproved and has not yet been written to recovery media or booted
+on the physical Zero 2 W. Exact evidence is in
+`evidence/zero2w-recovery-seeded-artifact-2ad5179-2026-09-06.json`.
+Encrypted Restic snapshot `7ff8a7d2` includes the retained artifact and passed
+an immediate restore-stream listing without staging a plaintext archive.
+The same artifact was copied directly from `anima` to `UEBuild`; all three
+recorded hashes and the Ed25519 manifest signature verified locally without
+using laptop internal storage.
+
+The same signing ceremony caught a separate custody-label defect before
+signing: the `0d4b59...` ciphertext in `/data/backups` derives a public key
+that does not match the active `release-2026-08` trust root. The verified
+`a94302...` copy was used instead. The mismatched ciphertext was hash-verified
+and renamed in place with a `quarantined-key-mismatch` suffix; it must not be
+used unless its identity is deliberately reclassified. See
+`evidence/signing-vault-mismatch-2026-09-06.json`.

@@ -1,0 +1,76 @@
+{
+  "artifact": {
+    "anima_directory": "/home/kmatzen/.local/share/millennium-recovery/images/zero2w-ab-1.0.0-2ad5179-phone001-unapproved",
+    "compressed_sha256": "b584b827e9574575c7be65d8729818c465d5d95a7caf22f47e508c6e2e10c397",
+    "compressed_size": 445078924,
+    "expanded_sha256": "2cd7be17c6cb4711e880c81e630beb50a08b4122cf043fea703a1357eedaf08a",
+    "expanded_size": 15636365312,
+    "factory_provision_sha256": "f52f2f5885fe6725883dd2ae8c69910536cbe2ae2f34ec56a708a503a1d5c429",
+    "filename": "millennium-zero2w-ab-phone-001.img.zst",
+    "manifest_sha256": "8a215235f6e36ab27ae4aa647d597fa3c38239b175d860567da5e737e69b2764",
+    "signature_sha256": "4450c2c53391b8e42c9423ac6b3264c54c210e8dc4a695e502a5f5a4aa65e8c5"
+  },
+  "backup": {
+    "completed_at": "2026-09-06T20:58:30Z",
+    "incomplete_phone_snapshot_removed": "01f35c0c89a2",
+    "plaintext_archive_staged": false,
+    "repository": "restricted-restic",
+    "restore_stream_verified": true,
+    "server_state_snapshot_id": "7ff8a7d2"
+  },
+  "build": {
+    "architecture": "arm64",
+    "build_container": "millennium-image-f285b36-d",
+    "build_exit_code": 0,
+    "build_finished_at": "2026-09-06T20:37:53Z",
+    "build_host": "anima",
+    "build_storage": "/data3",
+    "pinned_rpi_image_gen_commit": "3f2c916086ad70197945bfc50ef953c1f6035f10"
+  },
+  "completed_at": "2026-09-06T20:46:36Z",
+  "external_copy": {
+    "compressed_hash_verified": true,
+    "manifest_hash_verified": true,
+    "path": "/Volumes/UEBuild/millennium-images/zero2w-ab-1.0.0-2ad5179-phone001-unapproved",
+    "signature_hash_verified": true,
+    "signature_verified": true
+  },
+  "factory_provision": {
+    "authorized_keys_sha256": "0c883e42ed0fc082247f05787a5a8ab660db6defb59bfc0b6390c00909033159",
+    "device_id": "phone-001",
+    "machine_id_sha256": "3ac81f8c297084dbe825bea0ee44124fec3d7439ef033f74e4a79f19045f59aa",
+    "maintenance_tunnel_key_sha256": "7123128cd06723027461343aaa25f9b24860a8157653d81c3a15deeca8121a01",
+    "ssh_host_ed25519_sha256": "87107da333da56e116fe7871370f13cc27558ab2ddfe4833a69831ce111725f2"
+  },
+  "operation": "production-recovery-artifact-factory-seed",
+  "passed": true,
+  "physical_boot_approved": false,
+  "recovery_media_written": false,
+  "schema": 1,
+  "signing": {
+    "active_ciphertext_sha256": "a94302f82874284020aeca7b3ccc7543fb014e4207d4268e17aaa1b8aea9ccad",
+    "key_id": "release-2026-08",
+    "plaintext_location": "temporary APFS RAM disk",
+    "plaintext_persisted": false,
+    "public_key_der_sha256": "581a1ff72d1867b3dfb3b1ffc5521308ac646878050f1c4c12739e0dedaf7348",
+    "public_identity_matched": true,
+    "ram_device": "disk12",
+    "ram_device_ejected": true,
+    "signature_verified_on_anima": true,
+    "signature_verified_on_mac": true
+  },
+  "source_commit": "2ad5179b0b2de4958a34b845f2db60775e317e07",
+  "verification": {
+    "both_system_slots_remounted_read_only": true,
+    "expanded_stream_verified_independently": true,
+    "generator_matches_project_in_both_slots": true,
+    "generator_required_mount_links_per_slot": 6,
+    "persistent_partition_remounted_read_only": true,
+    "production_rootfs_minimality": true,
+    "raw_boot_content_contract": true,
+    "raw_mbr_partition_contract": true,
+    "uebuild_copy_verified": true,
+    "wifi_state_mode": "0700",
+    "wifi_state_owner": "1000:1000"
+  }
+}

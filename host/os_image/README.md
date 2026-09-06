@@ -84,10 +84,14 @@ partition check alone is not a production release gate.
 The built root filesystem must contain the project-owned
 `/usr/lib/systemd/system-generators/slot-shared-generator`. Its regression test
 proves that every `Path=` declaration creates both a mount unit and a
-`local-fs.target.requires` link:
+`local-fs.target.requires` link. The image-layer test also proves that the
+project generator is reinstalled during cleanup, after the upstream image
+overlay would otherwise replace it:
 
 ```sh
-python3 -m unittest tools.tests.test_slot_shared_generator
+python3 -m unittest \
+  tools.tests.test_slot_shared_generator \
+  tools.tests.test_zero2w_image_layer
 ```
 
 After booting the exact recovery image on a Zero 2 W, verify the runtime mount

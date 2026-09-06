@@ -283,6 +283,7 @@ os_ota_test() {
         host.tests.test_os_ota \
         host.tests.test_persistent_state \
         tools.tests.test_factory_seed_zero2w \
+        tools.tests.test_zero2w_image_layer \
         tools.tests.test_slot_shared_generator'
 }
 

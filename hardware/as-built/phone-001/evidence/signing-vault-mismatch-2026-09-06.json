@@ -1,0 +1,22 @@
+{
+  "active_copy": {
+    "ciphertext_path": "/home/kmatzen/backups/millennium/signing/release-2026-08-private.pem.aes256",
+    "ciphertext_sha256": "a94302f82874284020aeca7b3ccc7543fb014e4207d4268e17aaa1b8aea9ccad",
+    "public_key_der_sha256": "581a1ff72d1867b3dfb3b1ffc5521308ac646878050f1c4c12739e0dedaf7348",
+    "recovery_and_signature_verified": true
+  },
+  "completed_at": "2026-09-06T20:46:36Z",
+  "key_id": "release-2026-08",
+  "operation": "signing-vault-identity-audit",
+  "passed": false,
+  "schema": 1,
+  "stale_copy": {
+    "ciphertext_path": "/data/backups/millennium-signing-vault/release-2026-08-2026-09-01.pem.aes256.quarantined-key-mismatch",
+    "ciphertext_sha256": "0d4b59b1b3ea3d9e9a6563ce033e8e3c6f8fa926a86c65ce1976c8c906f3b8ff",
+    "derived_public_key_der_sha256_from_prior_audit": "46d4ea8e2e8cf261816953b5c64f907840a5da84f50c3127011d4bbe1d77c946",
+    "matches_active_public_key": false,
+    "quarantine_method": "renamed in place after before-and-after ciphertext hash verification",
+    "quarantined": true
+  },
+  "statement": "A pre-signing canonical DER comparison rejected the stale vault ciphertext before any release signature was produced. The active a94302 copy then matched the repository trust root and signed a manifest that verified independently on macOS and anima. The stale copy was preserved byte-for-byte under an explicit quarantine filename."
+}

@@ -22,24 +22,30 @@ steps may be replaced by QEMU evidence.
 Do **not** use `/dev/disk11` or the `UEBuild` volume as recovery media. It holds
 the builder, retained images, and signing-key backup.
 
-## 1. Recovery card created and verified
+## 1. Write and verify the corrected recovery card
 
-This step passed on 2026-09-06 using macOS whole disk `/dev/disk10`, a 63.9 GB
-USB removable SD card. The writer retained exclusive raw-device access through
-the write and complete readback, and the observed expanded SHA-256 matched the
-signed phone-001 value
-`b2d605cc2b5bd008dfa50530abdc5b52f3e081234f95bf54c633f720bdf4f673`.
-The card was then ejected. Exact evidence is in
-`evidence/recovery-media-phone001-31eda51.json`. Do not repeat this step unless
-the card is damaged or intentionally replaced.
+The earlier `/dev/disk10` write/readback passed byte-for-byte, but its v3 image
+failed physical boot acceptance and is quarantined. It must not be redeployed.
+This step therefore remains open for the corrected `2ad5179` candidate.
 
-The reproducible procedure remains below for disaster recovery.
-
-The approved software candidate is intentionally named `unapproved` until this
-section and its physical boot both pass:
+The corrected factory-seeded artifact is retained on `anima` at:
 
 ```text
-/Volumes/UEBuild/millennium-images/zero2w-ab-1.0.0-31eda51-phone001-unapproved
+/home/kmatzen/.local/share/millennium-recovery/images/zero2w-ab-1.0.0-2ad5179-phone001-unapproved
+```
+
+Its signed expanded SHA-256 is
+`2cd7be17c6cb4711e880c81e630beb50a08b4122cf043fea703a1357eedaf08a`.
+That restricted directory was copied directly to the attached `UEBuild` volume
+and its compressed, manifest, and signature hashes plus Ed25519 signature were
+verified locally. The seeded image was not placed on the laptop's constrained
+internal disk.
+
+The software-verified candidate is intentionally named `unapproved` until the
+media write/readback and physical boot both pass:
+
+```text
+/Volumes/UEBuild/millennium-images/zero2w-ab-1.0.0-2ad5179-phone001-unapproved
 ```
 
 Attach only the dedicated recovery card, identify its current whole-disk name
@@ -47,16 +53,16 @@ with `diskutil list external physical`, and run the preflight first:
 
 ```bash
 python3 tools/write_recovery_media.py \
-  --manifest /Volumes/UEBuild/millennium-images/zero2w-ab-1.0.0-31eda51-phone001-unapproved/recovery-manifest.json \
-  --signature /Volumes/UEBuild/millennium-images/zero2w-ab-1.0.0-31eda51-phone001-unapproved/recovery-manifest.json.sig \
+  --manifest /Volumes/UEBuild/millennium-images/zero2w-ab-1.0.0-2ad5179-phone001-unapproved/recovery-manifest.json \
+  --signature /Volumes/UEBuild/millennium-images/zero2w-ab-1.0.0-2ad5179-phone001-unapproved/recovery-manifest.json.sig \
   --public-key host/ota/keys/release-2026-08.pem \
-  --image /Volumes/UEBuild/millennium-images/zero2w-ab-1.0.0-31eda51-phone001-unapproved/millennium-zero2w-ab-phone-001.img.zst \
+  --image /Volumes/UEBuild/millennium-images/zero2w-ab-1.0.0-2ad5179-phone001-unapproved/millennium-zero2w-ab-phone-001.img.zst \
   --target /dev/diskN
 ```
 
 Read the reported identity, confirm it is the dedicated removable card, and
 only then rerun with `sudo`, `--write`, `--confirm-device diskN`, and
-`--evidence hardware/as-built/phone-001/evidence/recovery-media-phone001-31eda51.json`.
+`--evidence hardware/as-built/phone-001/evidence/recovery-media-phone001-2ad5179.json`.
 The writer verifies the signed manifest, writes the expansion, flushes it, and
 hashes a complete image-length readback. Eject the card after it passes.
 
