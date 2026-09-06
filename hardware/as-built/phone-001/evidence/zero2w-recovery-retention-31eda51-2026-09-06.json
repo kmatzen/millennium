@@ -1,0 +1,33 @@
+{
+  "artifact": {
+    "image_sha256": "baa2a108ebb6af2e13646f4a4a043ba6b8ebdffbfec2bc4579bd97279d798a66",
+    "manifest_sha256": "2cf77459a9c8b3ae12b3376605c14a1d42e4b07d7e801bf595d999bc56e7bed4",
+    "signature_sha256": "44515e1584e9a7c75448401c467eac565d533ea19b0bcbdf0817e73efacdfec2"
+  },
+  "completed_at": "2026-09-06T10:58:04Z",
+  "operation": "production-recovery-artifact-retention",
+  "passed": true,
+  "primary_copy": {
+    "directory": "/Volumes/UEBuild/millennium-images/zero2w-ab-1.0.0-31eda51-unapproved",
+    "medium": "NVME-68D6C050"
+  },
+  "schema": 1,
+  "secondary_copy": {
+    "directory": "/home/kmatzen/.local/share/millennium-recovery/images/zero2w-ab-1.0.0-31eda51",
+    "host": "anima",
+    "public_key_identity_verified": true,
+    "signature_verified": true,
+    "transfer_hashes_verified": true,
+    "zstd_integrity_verified": true
+  },
+  "source_commit": "31eda512ab94cf7d9959451673e2674d44516270",
+  "supersedes_source_commit": "5a9eef204a1fb5d71f5c8a1888e35a963d01164f",
+  "verified_backup": {
+    "encrypted": true,
+    "plaintext_archive_staged": false,
+    "repository": "restricted-restic",
+    "restore_stream_image_sha256": "baa2a108ebb6af2e13646f4a4a043ba6b8ebdffbfec2bc4579bd97279d798a66",
+    "restore_stream_verified": true,
+    "snapshot_id": "050a82a0"
+  }
+}

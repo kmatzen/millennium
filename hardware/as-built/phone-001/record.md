@@ -364,3 +364,13 @@ verified and the RAM disk was ejected. This candidate remains explicitly
 `unapproved` pending dedicated-media readback and a physical Zero 2 W boot.
 Exact evidence is in
 `evidence/zero2w-recovery-artifact-31eda51-2026-09-06.json`.
+
+The `31eda51` candidate was copied into a new, non-overwriting restricted
+directory on `anima`. The destination independently verified the transferred
+hashes, active Ed25519 public-key identity, manifest signature, and Zstandard
+stream before atomic publication. Encrypted Restic snapshot `050a82a0`
+captured the server recovery store without staging a plaintext archive. A
+fresh restore stream from that snapshot reproduced compressed image SHA-256
+`baa2a108ebb6af2e13646f4a4a043ba6b8ebdffbfec2bc4579bd97279d798a66`.
+Exact evidence is in
+`evidence/zero2w-recovery-retention-31eda51-2026-09-06.json`.
