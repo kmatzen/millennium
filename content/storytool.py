@@ -21,6 +21,18 @@ class StoryError(ValueError):
     pass
 
 
+def ignored_filesystem_metadata(path):
+    """Return true for metadata sidecars that are never narrative assets."""
+    return path.name == ".DS_Store" or path.name.startswith("._")
+
+
+def media_files(media_dir):
+    if not media_dir.is_dir():
+        return []
+    return [path for path in media_dir.iterdir()
+            if not ignored_filesystem_metadata(path)]
+
+
 def canonical(value):
     return (json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n").encode()
 
@@ -191,7 +203,12 @@ def validate(story, root):
             errors.append(f"scene {name}: dead end is not marked as an ending")
 
     media_dir = root / "media"
-    present_media = {path.name for path in media_dir.iterdir()} if media_dir.is_dir() else set()
+    media_entries = media_files(media_dir)
+    for path in sorted(media_entries):
+        if not path.is_file() or path.is_symlink():
+            errors.append(f"unsupported media entry: media/{path.name}")
+    present_media = {path.name for path in media_entries
+                     if path.is_file() and not path.is_symlink()}
     for filename in sorted(referenced_media - present_media):
         errors.append(f"missing media: media/{filename}")
     for filename in sorted(present_media - referenced_media):
@@ -371,7 +388,7 @@ def package(story_path, output, private_key=None, key_id="primary"):
         (stage / "story.mst").write_bytes(compile_runtime(story))
         if (root / "media").is_dir():
             (stage / "media").mkdir()
-            for source in sorted((root / "media").iterdir()):
+            for source in sorted(media_files(root / "media")):
                 (stage / "media" / source.name).write_bytes(source.read_bytes())
         with archive.open("wb") as raw:
             with gzip.GzipFile(filename="", mode="wb", fileobj=raw, mtime=0) as compressed:

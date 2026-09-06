@@ -5,6 +5,8 @@ import importlib.util
 import io
 import json
 from pathlib import Path
+import shutil
+import tarfile
 import tempfile
 import unittest
 
@@ -55,9 +57,23 @@ class StoryToolTests(unittest.TestCase):
             archive_a = next(Path(first).glob("*.tar.gz"))
             archive_b = next(Path(second).glob("*.tar.gz"))
             self.assertEqual(archive_a.read_bytes(), archive_b.read_bytes())
-            import tarfile
             with tarfile.open(archive_a) as bundle:
                 self.assertIn("story.mst", bundle.getnames())
+
+    def test_macos_metadata_is_not_treated_as_story_media(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "last_line"
+            shutil.copytree(STORY_PATH.parent, root)
+            (root / "media" / "._invitation.wav").write_bytes(b"appledouble")
+            (root / "media" / ".DS_Store").write_bytes(b"finder")
+            story_path = root / "story.json"
+            self.assertEqual(TOOL.validate(TOOL.load_story(story_path), root), [])
+            output = Path(directory) / "output"
+            TOOL.package(story_path, output)
+            with tarfile.open(next(output.glob("*.tar.gz"))) as bundle:
+                self.assertFalse(any(Path(name).name.startswith("._")
+                                     or Path(name).name == ".DS_Store"
+                                     for name in bundle.getnames()))
 
     def test_explore_is_unique_and_honors_persistent_conditions(self):
         paths = TOOL.explore_paths(self.story)
