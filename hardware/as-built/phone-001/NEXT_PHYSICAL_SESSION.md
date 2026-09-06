@@ -19,8 +19,10 @@ steps may be replaced by QEMU evidence.
 - a cellular hotspot or other network that is genuinely outside the home ISP;
 - two first-time callers who have not read the story documentation.
 
-Do **not** use `/dev/disk11` or the `UEBuild` volume as recovery media. It holds
-the builder, retained images, and signing-key backup.
+Do **not** use the 512 GB `UEBuild` volume as recovery media, regardless of the
+`/dev/diskN` number macOS assigns it. It holds the builder, retained images, and
+signing-key backup. Identify the recovery card by its reported media name,
+capacity, and removable status immediately before writing it.
 
 ## 1. Write and verify the corrected recovery card
 
