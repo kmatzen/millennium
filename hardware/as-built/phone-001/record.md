@@ -321,3 +321,16 @@ snapshot `e51ac235` then captured the server recovery store without staging a
 plaintext archive; a fresh restore stream reproduced the exact whole-image
 SHA-256. Exact evidence is in
 `evidence/zero2w-recovery-retention-25c2729-2026-09-06.json`.
+
+The `25c2729` candidate was subsequently superseded after auditing its
+first-boot health gate. Source commit
+`5a9eef204a1fb5d71f5c8a1888e35a963d01164f` requires an actual bounded ALSA
+PCM write, fresh zero-drop diagnostics from both Alpha and Beta, named serial
+and SIP health, a valid local-control state, and 95 seconds of continuous
+reverse-tunnel service activity—past SSH's complete server-alive failure
+window. A fresh whole-disk image built from that commit passed the raw MBR,
+boot-content, minimal-rootfs, embedded-source, and compressed-stream checks and
+was signed with the same RAM-only `release-2026-08` procedure. This replacement
+also remains explicitly unapproved pending a dedicated-media readback and real
+Zero 2 W boot. Exact evidence is in
+`evidence/zero2w-recovery-artifact-5a9eef2-2026-09-06.json`.

@@ -1,0 +1,53 @@
+{
+  "artifact_directory": "/Volumes/UEBuild/millennium-images/zero2w-ab-1.0.0-5a9eef2-unapproved",
+  "board_model": "Raspberry Pi Zero 2 W",
+  "completed_at": "2026-09-06T09:49:13Z",
+  "embedded_health_gate": {
+    "audio_pcm_write_required": true,
+    "independent_zero_drop_diagnostics_required": [
+      "keypad",
+      "display"
+    ],
+    "maintenance_tunnel_minimum_active_seconds": 95,
+    "named_serial_health_required": true,
+    "named_sip_health_required": true,
+    "valid_local_control_state_required": true
+  },
+  "image": {
+    "compressed_sha256": "141a3f81c742f24caca06e56c33a588f0829b88451905e4154e14634b31f2a9a",
+    "compressed_size": 444633026,
+    "expanded_sha256": "4f653c3fd61c79a4d277e942da5b509df0d0ddab686ee0c54c8350ea8ef3fa47",
+    "expanded_size": 15636365312,
+    "filename": "millennium-zero2w-ab.img.zst"
+  },
+  "key": {
+    "canonical_public_key_sha256": "581a1ff72d1867b3dfb3b1ffc5521308ac646878050f1c4c12739e0dedaf7348",
+    "id": "release-2026-08",
+    "private_key_plaintext_persisted": false,
+    "temporary_ram_disk_ejected": true
+  },
+  "manifest": {
+    "filename": "recovery-manifest.json",
+    "sha256": "77e3eea349bf33a9dcc0f7bb5263c6771b15a642ecee378b0fd4f23d3d3a1da7",
+    "signature_filename": "recovery-manifest.json.sig",
+    "signature_sha256": "5c93eff15f269bbe9ef8b3ec733aab4f2594931acafbe87085616888e0619307",
+    "signature_verified": true
+  },
+  "operation": "production-recovery-artifact-build",
+  "passed": true,
+  "physical_boot_approved": false,
+  "physical_media_readback_verified": false,
+  "schema": 1,
+  "source_commit": "5a9eef204a1fb5d71f5c8a1888e35a963d01164f",
+  "status": "software-verified; retained as explicitly unapproved pending physical recovery write and Zero 2 W boot",
+  "supersedes_source_commit": "25c27294725467dd679711a8d8e2ce8dd49af5e0",
+  "verification": {
+    "all_compressed_streams_passed": true,
+    "boot_slots_byte_identical": true,
+    "embedded_agent_matches_source": true,
+    "mbr_ab_contract_passed": true,
+    "production_rootfs_minimality_passed": true,
+    "raw_boot_content_contract_passed": true
+  },
+  "version": "1.0.0"
+}
