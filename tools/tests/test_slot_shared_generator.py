@@ -19,8 +19,12 @@ class SlotSharedGeneratorTests(unittest.TestCase):
             conf.mkdir()
             tools.mkdir()
             (conf / "millennium.conf").write_text(
-                "Version=1\nPath=/etc/millennium\n"
-                "Path=/etc/NetworkManager/system-connections\n",
+                "Version=1\n"
+                "Path=/etc/millennium\n"
+                "Path=/etc/ssh\n"
+                "Path=/etc/NetworkManager/system-connections\n"
+                "Path=/var/lib/millennium\n"
+                "Path=/var/log/millennium\n",
                 encoding="utf-8")
             escape = tools / "systemd-escape"
             escape.write_text(
@@ -33,8 +37,13 @@ class SlotSharedGeneratorTests(unittest.TestCase):
             environment["PATH"] = str(tools) + os.pathsep + environment["PATH"]
             subprocess.run([str(GENERATOR), str(output)], check=True, env=environment)
 
-            names = ("etc-millennium.mount",
-                     r"etc-NetworkManager-system\x2dconnections.mount")
+            names = (
+                "etc-millennium.mount",
+                "etc-ssh.mount",
+                r"etc-NetworkManager-system\x2dconnections.mount",
+                "var-lib-millennium.mount",
+                "var-log-millennium.mount",
+            )
             for name in names:
                 unit = output / name
                 dependency = output / "local-fs.target.requires" / name

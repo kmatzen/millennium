@@ -62,6 +62,13 @@ with one assembled-hardware session and without repeating the network wiring.
   - [x] Preserve per-device identity, NetworkManager profiles, setup secret,
     maintenance credentials, story state, logs required for diagnosis, and OTA
     anti-rollback state outside the replaceable root filesystems.
+    - [x] Make the image-owned shared-state generator link every declared mount
+      into `local-fs.target`, and regression-test the generated dependencies.
+    - [x] Reject non-canonical machine IDs and provision the daemon token with
+      the exact ownership and group-readable mode required at runtime.
+    - [ ] On the rebuilt physical image, prove `/` is read-only and every
+      declared `/etc`, `/var`, and identity path is writable from partition 7
+      before accepting daemon, Wi-Fi, SSH, or OTA health.
   - [ ] Commit the new boot slot only after bounded checks prove the daemon,
     both MCUs, audio, SIP, local controls, update endpoint, and maintenance
     tunnel are healthy; otherwise record failure and return to the prior slot.
@@ -82,7 +89,9 @@ with one assembled-hardware session and without repeating the network wiring.
       the active release key. Keep it explicitly unapproved until physical boot.
     - [x] Write the retained image to OS-identified removable recovery media and
       verify its full image-length readback against the signed expanded digest.
-    - [ ] Boot the verified recovery media on the production-equivalent Zero 2 W.
+    - [ ] Boot a non-quarantined verified recovery image on the
+      production-equivalent Zero 2 W; the physically booted v3 artifact is
+      retained as failed evidence and must not be redeployed.
   - [ ] Exercise download, inactive-slot write, pre-reboot, first boot, health
     commit, and rollback in QEMU and by physically removing power on the
     production-equivalent Zero 2 W image.
