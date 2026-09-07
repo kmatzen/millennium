@@ -91,8 +91,11 @@ with one assembled-hardware session and without repeating the network wiring.
     - [x] Produce, sign, and retain a software-verified production-equivalent
       recovery image, with its exact compressed and expanded hashes bound to
       the active release key. Keep it explicitly unapproved until physical boot.
-    - [x] Write the retained image to OS-identified removable recovery media and
-      verify its full image-length readback against the signed expanded digest.
+    - [ ] Write the current `7f94bdd` retained image to OS-identified removable
+      recovery media and verify its full image-length readback against the
+      signed expanded digest.
+      - [x] Preserve the completed write/readback evidence for the rejected
+        predecessor images without treating it as acceptance of this candidate.
     - [ ] Boot a non-quarantined verified recovery image on the
       production-equivalent Zero 2 W; the physically booted v3 artifact is
       retained as failed evidence and must not be redeployed.
