@@ -339,6 +339,7 @@ os_ota_test() {
     "${SSH[@]}" 'cd /tmp/millennium-src && python3 -m unittest \
         host.tests.test_os_ota \
         host.tests.test_persistent_state \
+        tools.tests.test_admin_token_permissions \
         tools.tests.test_factory_seed_zero2w \
         tools.tests.test_zero2w_image_layer \
         tools.tests.test_slot_shared_generator'

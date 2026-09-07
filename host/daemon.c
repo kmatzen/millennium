@@ -58,6 +58,7 @@ static const char *state_file_path = NULL;
 static int load_admin_token(const char* path, char* token, size_t token_size) {
     FILE* file;
     struct stat st;
+    mode_t permissions;
     size_t len;
     if (!path || !path[0] || !token || token_size < 2) return 0;
     token[0] = '\0';
@@ -65,9 +66,19 @@ static int load_admin_token(const char* path, char* token, size_t token_size) {
         logger_errorf_with_category("WebServer", "Cannot stat admin token file %s", path);
         return 0;
     }
-    if ((st.st_mode & (S_IRWXG | S_IRWXO)) != 0) {
+    permissions = st.st_mode & (S_IRWXU | S_IRWXG | S_IRWXO);
+    if (!S_ISREG(st.st_mode)) {
         logger_errorf_with_category("WebServer",
-            "Admin token file %s must not be accessible by group or others", path);
+            "Admin token path %s must be a regular file", path);
+        return 0;
+    }
+    if ((permissions & S_IROTH) != 0 ||
+        (permissions & (S_IWGRP | S_IXGRP | S_IWOTH | S_IXOTH)) != 0 ||
+        (permissions & S_IRUSR) == 0 ||
+        ((permissions & S_IRGRP) != 0 && st.st_gid != getegid())) {
+        logger_errorf_with_category("WebServer",
+            "Admin token file %s must be owner-readable and accessible only "
+            "to its owner and, when group-readable, the daemon group", path);
         return 0;
     }
     file = fopen(path, "r");
