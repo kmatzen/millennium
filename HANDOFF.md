@@ -9,6 +9,10 @@ Zero 2 W, radio, USB, audio, power, or first-time-user requirement.
 - Working branch: `fix/startup-segv-no-serial`.
 - The production image source commit is `c0427f2`; subsequent commits harden
   QEMU and begin the lifetime downloadable-experience system.
+- `387c87c` contains the completed downloadable-experience subsystem plus the
+  physical-image fixes for `wpasupplicant` and the monitor collector directory;
+  `6b2c366` records the rejected `2ad5179` physical boot. Both are pushed to
+  `origin/main`. Use `6b2c366` as the exact source identity for the next image.
 - Latest completed downloadable-experience commits:
   - `f53b54c` — generated package/catalog schemas and compatibility metadata;
   - `d35f4fa` — deterministic schema-2 packages, bounded extraction, exact file
@@ -41,13 +45,12 @@ tested and `physical_hardware_claimed: false`.
 
 ## Immediate execution order
 
-1. Review and commit the completed downloadable-experience implementation and
-   its owner controls. The content unit suite passes, and the QEMU lifecycle
-   suite now covers signed activation, catalog compromise, origin loss,
-   ENOSPC, withdrawal, worker restart, and abrupt VM power cuts at both durable
-   activation journal phases. The latest reusable QEMU state is
-   `/Volumes/UEBuild/millennium-exact-image-qemu/goal-state-20260907T1919Z`
-   on SSH port 2234.
+1. Build, sign, factory-seed, write, fully read back, and physically boot a new
+   phone-001 recovery candidate from exact source `6b2c366`. The `2ad5179`
+   card booted but is rejected: it omitted `wpasupplicant` and the monitor
+   collector directory. Before rerunning health, attach both Arduino MCUs and
+   provide the phone a route with working DNS. Exact rejection evidence is in
+   `hardware/as-built/phone-001/evidence/physical-boot-rejection-2ad5179-2026-09-07.json`.
 2. Publish the immutable release objects and signed stable/beta/device-group
    catalogs with `content/publish_catalog.py` after completing the offline
    content/catalog signing ceremony. FIDO-authenticated access to `anima` is
