@@ -19,7 +19,11 @@ class ExactImageHarnessTests(unittest.TestCase):
             'vda2", SYMLINK+="disk/by-slot/active/boot',
             'vda5", SYMLINK+="disk/by-slot/active/system',
             'vda7", SYMLINK+="disk/by-slot/persistent',
-            "Requires=dbus.service systemd-resolved.service persistent.mount",
+            "boot-firmware.mount bootfs.mount nftables.service",
+            "millennium-firewall.service",
+            "systemctl is-active --quiet boot-firmware.mount",
+            "systemctl is-active --quiet bootfs.mount",
+            "systemctl is-active --quiet nftables.service",
             "runuser -u messagebus -- test -x /usr/bin/dbus-daemon",
             "runuser -u systemd-resolve -- test -r /etc/systemd/resolved.conf",
         ):
@@ -33,6 +37,8 @@ class ExactImageHarnessTests(unittest.TestCase):
         forbidden = "\n".join(MODULE.FORBIDDEN)
         self.assertIn("Failed to start dbus.service", forbidden)
         self.assertIn("resolved.conf: Permission denied", forbidden)
+        self.assertIn("Failed to mount bootfs.mount", forbidden)
+        self.assertIn("Failed to start millennium-firewall.service", forbidden)
 
     def test_console_normalization_preserves_failure_text(self):
         console = (

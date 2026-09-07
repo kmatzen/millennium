@@ -30,6 +30,10 @@ FORBIDDEN = (
     "dbus-daemon: Permission denied",
     "systemd-resolved: Permission denied",
     "Failed to open /etc/systemd/resolved.conf: Permission denied",
+    "Failed to mount boot-firmware.mount",
+    "Failed to mount bootfs.mount",
+    "Failed to start nftables.service",
+    "Failed to start millennium-firewall.service",
 )
 ANSI_ESCAPE = re.compile(r"\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07]*(?:\x07|\x1b\\))")
 
@@ -56,13 +60,23 @@ def shell_commands() -> bytes:
     unit = (
         "[Unit]",
         "Description=QEMU exact-image acceptance",
-        "Requires=dbus.service systemd-resolved.service persistent.mount",
-        "After=dbus.service systemd-resolved.service persistent.mount local-fs.target",
+        "Requires=dbus.service systemd-resolved.service persistent.mount "
+        "boot-firmware.mount bootfs.mount nftables.service "
+        "millennium-firewall.service",
+        "After=dbus.service systemd-resolved.service persistent.mount "
+        "boot-firmware.mount bootfs.mount nftables.service "
+        "millennium-firewall.service local-fs.target",
         "[Service]",
         "Type=oneshot",
         "ExecStart=/bin/sh -c 'systemctl is-active --quiet dbus.service && "
         "systemctl is-active --quiet systemd-resolved.service && "
+        "systemctl is-active --quiet boot-firmware.mount && "
+        "systemctl is-active --quiet bootfs.mount && "
+        "systemctl is-active --quiet nftables.service && "
+        "systemctl is-active --quiet millennium-firewall.service && "
         "mountpoint -q /persistent && "
+        "mountpoint -q /boot/firmware && "
+        "mountpoint -q /bootfs && "
         "runuser -u messagebus -- test -x /usr/bin/dbus-daemon && "
         "runuser -u systemd-resolve -- test -r /etc/systemd/resolved.conf && "
         # Octal-encode the suffixes so the serial echo of this injected unit

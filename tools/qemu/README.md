@@ -166,7 +166,13 @@ remains a physical Zero 2 W acceptance gate.
 
 ## Exact production-image test
 
-Provide the expanded image and a generic arm64 QEMU `virt` kernel/initramfs:
+Provide the expanded image and a generic arm64 QEMU `virt` kernel/initramfs.
+The initramfs must carry the modules needed before the image's system slot is
+mounted: `fat`, `vfat`, `nls_ascii`, `nls_cp437`, `nls_iso8859_1`, and
+`nf_tables` (including their dependencies). A minimal cloud initramfs often
+omits these because its own root disk does not need them; the exact-image test
+will reject that transport rather than silently skipping production mounts or
+firewall startup.
 
 ```sh
 export MILLENNIUM_QEMU_EXACT_IMAGE=/path/to/millennium-zero2w-ab-phone-001.img
@@ -178,8 +184,9 @@ tools/qemu/qemu.sh exact-image-test
 The harness creates a disposable copy-on-write overlay, boots partition 5,
 injects `/dev/vda1`, `vda2`, `vda5`, and `vda7` as the production slot names
 through ephemeral udev rules, and starts the image's own systemd. It requires
-the persistent/shared mount graph, D-Bus and resolver to start under their real
-service accounts. It fails on the permission errors previously observed on the
+the persistent/shared mount graph, both FAT boot partitions, D-Bus, resolver,
+nftables, and the Millennium firewall to start under their real service
+accounts. It fails on the permission errors previously observed on the
 physical image and writes `console.log` plus `result.json` under
 `$MILLENNIUM_QEMU_STATE/exact-image/`.
 
