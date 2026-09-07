@@ -462,7 +462,14 @@ and preventing the setup AP from starting. The monitor unit also failed its
 mount namespace because `/var/lib/node_exporter/textfile_collector` had not
 been created. This candidate remains rejected and must not be approved or
 redeployed. Exact evidence is in
-`evidence/physical-boot-rejection-2ad5179-2026-09-07.json`.
+`evidence/physical-boot-rejection-2ad5179-2026-09-07.json`. The same read-only
+session proved the active system slot was mounted read-only and partition 7
+backed writable `/persistent`, `/etc/millennium`, and `/var/lib/millennium`.
+The daemon and maintenance tunnel did not reach healthy steady state: neither
+Arduino was attached, so the configured Beta serial path was absent, and the
+isolated Mac-to-phone Ethernet link did not resolve the public maintenance
+hostname. Those are incomplete-test-fixture conditions, not approvals or
+additional image regressions.
 
 The backup puller was hardened after a disconnected phone caused Restic to
 commit a zero-byte stdin snapshot before shell `pipefail` observed the SSH
