@@ -428,8 +428,10 @@ slots and persistent storage. The corrected artifact is retained only on
 SHA-256 `994eb3d83bc898f267017497f9b5c14dabb0358a56117ec198126f0e0b775e60`
 and expanded SHA-256
 `b37ab43d14da59b887f336f10252f4e7b0607c8ec04532b66a7797901a5970a5`.
-It was signed on a disposable APFS RAM disk, verified on macOS and `anima`,
-and remains unapproved pending recovery-media write/readback and physical boot.
+It was signed on a disposable APFS RAM disk and verified on macOS and `anima`.
+A bounded copy on external `UEBuild` passed all four hashes, signature, and
+Zstandard integrity checks without using laptop internal storage. It remains
+unapproved pending recovery-media write/readback and physical boot.
 Exact evidence is in
 `evidence/zero2w-recovery-seeded-artifact-7f94bdd-2026-09-07.json`.
 

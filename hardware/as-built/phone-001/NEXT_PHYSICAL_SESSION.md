@@ -82,14 +82,16 @@ its signed expanded SHA-256 is
 `b37ab43d14da59b887f336f10252f4e7b0607c8ec04532b66a7797901a5970a5`.
 The Ed25519 signature and Zstandard stream were independently verified on
 `anima`; the signing operation and active public-key identity were also
-verified on macOS. The image remains only on `anima`, per the storage
-constraint, and has not yet been written to recovery media.
+verified on macOS. A bounded copy is staged on the external `UEBuild` volume;
+its four hashes, signature, and Zstandard stream were reverified without
+placing the image on the laptop's internal disk. It has not yet been written
+to recovery media.
 
 The software-verified candidate is intentionally named `unapproved` until the
 media write/readback and physical boot both pass:
 
 ```text
-/home/kmatzen/.local/share/millennium-recovery/images/zero2w-ab-1.0.0-7f94bdd-phone001-unapproved
+/Volumes/UEBuild/millennium-images/zero2w-ab-1.0.0-7f94bdd-phone001-unapproved
 ```
 
 Shut down the currently booted rejected image, remove its dedicated recovery

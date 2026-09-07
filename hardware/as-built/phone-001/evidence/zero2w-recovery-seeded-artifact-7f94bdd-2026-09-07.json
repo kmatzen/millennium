@@ -11,6 +11,15 @@
     "signature_sha256": "6264249a882e94770e0457a3a56ed218935a211e4c5123002af47a8134e6ed62"
   },
   "completed_at": "2026-09-07T22:28:00Z",
+  "external_copy": {
+    "compressed_hash_verified": true,
+    "manifest_hash_verified": true,
+    "path": "/Volumes/UEBuild/millennium-images/zero2w-ab-1.0.0-7f94bdd-phone001-unapproved",
+    "public_key_hash_verified": true,
+    "signature_hash_verified": true,
+    "signature_verified": true,
+    "zstandard_stream_verified": true
+  },
   "factory_provision": {
     "authorized_keys_sha256": "0c883e42ed0fc082247f05787a5a8ab660db6defb59bfc0b6390c00909033159",
     "device_id": "phone-001",
@@ -52,6 +61,7 @@
     "production_rootfs_minimality": true,
     "raw_boot_content_contract": true,
     "raw_mbr_partition_contract": true,
+    "uebuild_copy_verified": true,
     "wifi_bootstrap_dependency_in_both_slots": true,
     "wpasupplicant_in_both_slots": true
   }
