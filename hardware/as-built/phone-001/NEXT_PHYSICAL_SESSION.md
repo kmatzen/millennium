@@ -36,7 +36,8 @@ The card was then ejected and is safe to remove. Evidence is retained in
 
 The earlier `/dev/disk10` write/readback passed byte-for-byte, but its v3 image
 failed physical boot acceptance and is quarantined. It must not be redeployed.
-This step therefore remains open for the corrected `2ad5179` candidate.
+The corrected `2ad5179` media write is complete; only its physical boot approval
+remains open.
 
 The corrected factory-seeded artifact is retained on `anima` at:
 
@@ -58,8 +59,10 @@ media write/readback and physical boot both pass:
 /Volumes/UEBuild/millennium-images/zero2w-ab-1.0.0-2ad5179-phone001-unapproved
 ```
 
-Attach only the dedicated recovery card, identify its current whole-disk name
-with `diskutil list external physical`, and run the preflight first:
+Do not rewrite the verified card merely to repeat this completed step. If the
+card must be replaced or its custody/readback evidence becomes invalid, attach
+only the dedicated replacement, identify its current whole-disk name with
+`diskutil list external physical`, and run the preflight first:
 
 ```bash
 python3 tools/write_recovery_media.py \
