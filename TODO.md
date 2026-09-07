@@ -258,6 +258,41 @@ with one assembled-hardware session and without repeating the network wiring.
   - [x] Define content ratings and safeguards appropriate for the phone's expected audience and location.
   - [x] Keep a fallback experience available when the network or external services are unavailable.
 
+- [ ] Add a signed downloadable-experience catalog for lifetime expansion.
+  - [x] Preserve the security boundary: native C plugins ship only in signed
+    daemon releases; ordinary downloadable experiences are data packages run
+    through a constrained, versioned capability API.
+  - [x] Document the distribution, package, lifecycle, owner experience,
+    recovery, privacy, and release-gate design in
+    `host/docs/DOWNLOADABLE_EXPERIENCES.md`.
+  - [ ] Define and generate signed catalog and experience-package schemas,
+    compatibility metadata, ratings, quotas, and capability declarations.
+  - [ ] Publish immutable packages and channel catalogs through
+    `updates.kmatzen.com`, with stable/beta/device-group rollout, holds,
+    withdrawal, and an emergency signed denylist.
+  - [ ] Extend the authoring tool to produce deterministic packages and reject
+    unsafe paths, missing media, invalid graphs, incompatible schemas, and
+    excessive resource use.
+  - [ ] Implement periodic catalog polling, staged download, signature and hash
+    verification, safe extraction, eligibility checks, and idle-only atomic
+    activation.
+  - [ ] Retain a known-good version and permanent offline fallback; add automatic
+    rollback, digest quarantine, state migration, and bounded garbage collection.
+  - [ ] Ensure interruption at download, extraction, validation, activation,
+    migration, or cleanup leaves a bootable and selectable known-good package.
+  - [ ] Add an authenticated owner view for installed experiences, ratings,
+    update health, storage, enable/disable, and fallback selection; keep advanced
+    controls behind the restricted maintenance path.
+  - [ ] Add privacy-preserving package health and engagement metrics without
+    uploading speech, credentials, free-form input, or reconstructable histories.
+  - [ ] Test malicious archives, compromised transport, signature/key failures,
+    compatibility, disk-full, withdrawal, network loss, restart, rollback, and
+    power interruption in unit tests and QEMU.
+  - [ ] Complete real-phone audio, display, peripheral, storage, owner-usability,
+    and staged production acceptance.
+  - Done when the phone can safely gain, update, disable, withdraw, and roll back
+    experiences for its installed life without reflashing or expert owner action.
+
 - [x] Convert long Arduino operations to nonblocking state machines.
   - [x] Add deadlines and transaction IDs to VFD and coin-validator operations.
   - [x] Reset the watchdog only when forward progress is made.
