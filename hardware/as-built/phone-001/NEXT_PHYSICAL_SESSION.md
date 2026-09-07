@@ -72,24 +72,28 @@ It is now rejected evidence and must not be redeployed. Build, sign, write, and
 fully read back a newer candidate containing both source fixes before resuming
 physical boot approval.
 
-The corrected factory-seeded artifact is retained on `anima` at:
+The superseded `2ad5179` artifact remains rejected. The newer factory-seeded
+and signed artifact containing the Wi-Fi package, monitor tmpfiles, daemon
+token-permission, and active trust-root corrections is retained on `anima` at:
 
 ```text
-/home/kmatzen/.local/share/millennium-recovery/images/zero2w-ab-1.0.0-2ad5179-phone001-unapproved
+/home/kmatzen/.local/share/millennium-recovery/images/zero2w-ab-1.0.0-7f94bdd-phone001-unapproved
 ```
 
-Its signed expanded SHA-256 is
-`2cd7be17c6cb4711e880c81e630beb50a08b4122cf043fea703a1357eedaf08a`.
-That restricted directory was copied directly to the attached `UEBuild` volume
-and its compressed, manifest, and signature hashes plus Ed25519 signature were
-verified locally. The seeded image was not placed on the laptop's constrained
-internal disk.
+Its signed compressed SHA-256 is
+`994eb3d83bc898f267017497f9b5c14dabb0358a56117ec198126f0e0b775e60` and
+its signed expanded SHA-256 is
+`b37ab43d14da59b887f336f10252f4e7b0607c8ec04532b66a7797901a5970a5`.
+The Ed25519 signature and Zstandard stream were independently verified on
+`anima`; the signing operation and active public-key identity were also
+verified on macOS. The image remains only on `anima`, per the storage
+constraint, and has not yet been written to recovery media.
 
 The software-verified candidate is intentionally named `unapproved` until the
 media write/readback and physical boot both pass:
 
 ```text
-/Volumes/UEBuild/millennium-images/zero2w-ab-1.0.0-2ad5179-phone001-unapproved
+/home/kmatzen/.local/share/millennium-recovery/images/zero2w-ab-1.0.0-7f94bdd-phone001-unapproved
 ```
 
 Do not rewrite the verified card merely to repeat this completed step. If the

@@ -1,0 +1,58 @@
+{
+  "artifact": {
+    "anima_directory": "/home/kmatzen/.local/share/millennium-recovery/images/zero2w-ab-1.0.0-7f94bdd-phone001-unapproved",
+    "compressed_sha256": "994eb3d83bc898f267017497f9b5c14dabb0358a56117ec198126f0e0b775e60",
+    "compressed_size": 369492245,
+    "expanded_sha256": "b37ab43d14da59b887f336f10252f4e7b0607c8ec04532b66a7797901a5970a5",
+    "expanded_size": 15636365312,
+    "factory_provision_sha256": "495ded3ecfb4e438af11e5dc7cdd11df3961d2de15ab5e4ac772d846025c0df9",
+    "filename": "millennium-zero2w-ab-phone-001.img.zst",
+    "manifest_sha256": "15aa90630646bc29149dd6f9752a257c2cd817014aba8848090d886c08d1a4cc",
+    "signature_sha256": "6264249a882e94770e0457a3a56ed218935a211e4c5123002af47a8134e6ed62"
+  },
+  "completed_at": "2026-09-07T22:28:00Z",
+  "factory_provision": {
+    "authorized_keys_sha256": "0c883e42ed0fc082247f05787a5a8ab660db6defb59bfc0b6390c00909033159",
+    "device_id": "phone-001",
+    "machine_id_sha256": "3ac81f8c297084dbe825bea0ee44124fec3d7439ef033f74e4a79f19045f59aa",
+    "maintenance_tunnel_key_sha256": "7123128cd06723027461343aaa25f9b24860a8157653d81c3a15deeca8121a01",
+    "ssh_host_ed25519_sha256": "87107da333da56e116fe7871370f13cc27558ab2ddfe4833a69831ce111725f2"
+  },
+  "operation": "production-recovery-artifact-factory-seed",
+  "passed": true,
+  "physical_boot_approved": false,
+  "recovery_media_written": false,
+  "schema": 1,
+  "signing": {
+    "active_ciphertext_sha256": "a94302f82874284020aeca7b3ccc7543fb014e4207d4268e17aaa1b8aea9ccad",
+    "key_id": "release-2026-08",
+    "plaintext_location": "temporary APFS RAM disk",
+    "plaintext_persisted": false,
+    "public_key_der_sha256": "581a1ff72d1867b3dfb3b1ffc5521308ac646878050f1c4c12739e0dedaf7348",
+    "public_identity_matched": true,
+    "ram_device_ejected": true,
+    "signature_verified_on_anima": true,
+    "signature_verified_on_mac": true
+  },
+  "source_commit": "7f94bdd03c5623eb2588776bc8d909c294ca84fa",
+  "trust_root_correction": {
+    "corrected_candidate_public_key_der_sha256": "581a1ff72d1867b3dfb3b1ffc5521308ac646878050f1c4c12739e0dedaf7348",
+    "inherited_legacy_public_key_der_sha256": "46d4ea8e2e8cf261816953b5c64f907840a5da84f50c3127011d4bbe1d77c946",
+    "legacy_candidate_quarantined": true,
+    "legacy_candidate_signature_created": false,
+    "rejected_anima_directory": "/home/kmatzen/.local/share/millennium-recovery/images/zero2w-ab-1.0.0-7f94bdd-phone001-legacy-key-rejected"
+  },
+  "verification": {
+    "active_trust_root_in_both_system_slots": true,
+    "active_trust_root_in_persistent_partition": true,
+    "both_system_slots_remounted_read_only": true,
+    "expanded_stream_verified_independently": true,
+    "monitor_tmpfiles_contract_in_both_slots": true,
+    "persistent_partition_remounted_read_only": true,
+    "production_rootfs_minimality": true,
+    "raw_boot_content_contract": true,
+    "raw_mbr_partition_contract": true,
+    "wifi_bootstrap_dependency_in_both_slots": true,
+    "wpasupplicant_in_both_slots": true
+  }
+}

@@ -416,6 +416,23 @@ Exact build evidence is in
 `evidence/zero2w-recovery-seeded-artifact-31eda51-2026-09-06.json`; media
 evidence is in `evidence/recovery-media-phone001-31eda51.json`.
 
+The `2ad5179` physical boot subsequently exposed the missing `wpasupplicant`
+package and monitor collector creation defect. Source `7f94bdd03c5623eb2588776bc8d909c294ca84fa`
+fixes both defects and the factory-token runtime permission mismatch. A clean
+ARM64 image build on `anima` passed the production-rootfs, A/B MBR, and raw
+boot-content contracts. Factory seeding preserved phone-001 identity while a
+pre-signing audit caught and quarantined an inherited legacy update trust root.
+A fresh seed installed the active `release-2026-08` public key in both system
+slots and persistent storage. The corrected artifact is retained only on
+`anima` at `zero2w-ab-1.0.0-7f94bdd-phone001-unapproved`, with compressed
+SHA-256 `994eb3d83bc898f267017497f9b5c14dabb0358a56117ec198126f0e0b775e60`
+and expanded SHA-256
+`b37ab43d14da59b887f336f10252f4e7b0607c8ec04532b66a7797901a5970a5`.
+It was signed on a disposable APFS RAM disk, verified on macOS and `anima`,
+and remains unapproved pending recovery-media write/readback and physical boot.
+Exact evidence is in
+`evidence/zero2w-recovery-seeded-artifact-7f94bdd-2026-09-07.json`.
+
 That candidate's physical boot exposed an upstream image-generator ordering
 defect: the upstream shared-state generator overwrote the project generator
 after payload staging, leaving generated mount units outside
