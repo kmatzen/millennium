@@ -16,6 +16,7 @@ sequence=$((installed + 1))
 rm -rf "$BUILD"
 install -d -m 0700 "$BUILD"
 python3 "$SOURCE/tools/build_ota_release.py" \
+    --source-commit "$(<"$SOURCE/.millennium-source-commit")" \
     --sequence "$sequence" \
     --base-url https://127.0.0.1:18080/lab \
     --daemon "$SOURCE/host/daemon" \

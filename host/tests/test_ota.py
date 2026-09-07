@@ -4,6 +4,7 @@ import importlib.util
 import io
 import json
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -38,10 +39,17 @@ def write_identity_hex(path, role, version="0.4.0", build="test-build"):
 class OtaTests(unittest.TestCase):
     @staticmethod
     def source_commit():
-        return subprocess.run(
+        result = subprocess.run(
             ["git", "-C", str(ROOT), "rev-parse", "HEAD"], check=True,
-            stdout=subprocess.PIPE, text=True,
-        ).stdout.strip()
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True,
+        ) if (ROOT / ".git").exists() else None
+        if result:
+            return result.stdout.strip()
+        exported = ROOT / ".millennium-source-commit"
+        commit = exported.read_text().strip() if exported.is_file() else ""
+        if not re.fullmatch(r"[0-9a-f]{40}", commit):
+            raise RuntimeError("cannot determine test source commit")
+        return commit
 
     def test_network_loss_during_manifest_download_preserves_pending_release(self):
         with tempfile.TemporaryDirectory() as name:

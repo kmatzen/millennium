@@ -2,6 +2,18 @@
 set -eu
 
 SOURCE=${1:-/tmp/millennium-src}
+SOURCE_COMMIT=$(cat "$SOURCE/.millennium-source-commit")
+case "$SOURCE_COMMIT" in
+    *[!0-9a-f]*|'')
+        printf 'invalid QEMU source commit identity\n' >&2
+        exit 1
+        ;;
+esac
+test "${#SOURCE_COMMIT}" -eq 40 || {
+    printf 'invalid QEMU source commit identity\n' >&2
+    exit 1
+}
+SOURCE_COMMIT_SHORT=$(printf '%s' "$SOURCE_COMMIT" | cut -c1-12)
 if ! PKG_CONFIG_PATH=/opt/pjproject/lib/pkgconfig pkg-config --exists libpjproject; then
     rm -rf /tmp/pjproject
     git clone --quiet --filter=blob:none https://github.com/pjsip/pjproject.git /tmp/pjproject
@@ -17,7 +29,7 @@ fi
 export PKG_CONFIG_PATH=/opt/pjproject/lib/pkgconfig
 cd "$SOURCE/host"
 make clean
-make daemon GIT_HASH="qemu-$(sed -n '1p' "$SOURCE/VERSION")"
+make daemon GIT_HASH="$SOURCE_COMMIT_SHORT"
 
 install -d -m 0755 /etc/millennium /var/lib/millennium /var/log/millennium
 install -m 0755 daemon /usr/local/bin/millennium-daemon

@@ -102,6 +102,15 @@ class ProtocolTest(unittest.TestCase):
             hardware.manage("fault", "validator verify-clear")
             self.assertFalse(hardware.snapshot()["peripherals"]["coin_validator"]["verify_failed"])
 
+    def test_new_host_session_or_hello_resets_critical_replay_window(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as directory:
+            mcu = MCU.VirtualMCU("serial", "control", str(
+                pathlib.Path(directory) / "state.json"))
+            mcu.critical_seen.extend(((MCU.DISPLAY, 1), (MCU.COIN_CONTROL, 2)))
+            mcu.begin_host_session()
+            self.assertEqual(list(mcu.critical_seen), [])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -160,28 +160,8 @@ recovery_test() {
     die "restored guest did not regain daemon API and MCU protocol health"
 }
 
-collect_artifacts() {
-    running || die "VM is not running"
-    local name=${1:-$(date -u +%Y%m%dT%H%M%SZ)}
-    [[ "$name" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$ ]] || die "invalid artifact name"
-    local output="$STATE_DIR/artifacts/$name"
-    mkdir -p "$output"
-    for file in display.json mcu.log console.log provision.log; do
-        test -f "$STATE_DIR/$file" && cp "$STATE_DIR/$file" "$output/$file"
-    done
-    "${SSH[@]}" sudo journalctl -u daemon.service --no-pager > "$output/daemon-journal.log"
-    "${SSH[@]}" curl --silent --show-error http://127.0.0.1:8080/metrics > "$output/metrics.prom" || true
-    "${SSH[@]}" curl --silent --show-error http://127.0.0.1:8081/api/health > "$output/health.json" || true
-    "${SSH[@]}" curl --silent --output /dev/null --write-out '%{http_code}' \
-        http://127.0.0.1:8081/api/health > "$output/health-http-status.txt" || true
-    python3 "$SCRIPT_DIR/virtual_mcu.py" send --control "$STATE_DIR/control.sock" status > "$output/peripherals.json"
-    "${SSH[@]}" sudo cat /var/lib/millennium/state > "$output/daemon-state.txt" 2>/dev/null || true
-    "${SSH[@]}" sudo cat /var/lib/millennium/story-state > "$output/story-state.txt" 2>/dev/null || true
-    "${SSH[@]}" sudo cat /var/lib/millennium/ota/status.json > "$output/ota-status.json" 2>/dev/null || true
-    "${SSH[@]}" sudo cat /var/log/millennium/qemu-flash.log > "$output/ota-flash.log" 2>/dev/null || true
-    "${SSH[@]}" sudo journalctl -u millennium-update-recover.service --no-pager > "$output/ota-recovery-journal.log" 2>/dev/null || true
-    "${SSH[@]}" sha256sum /var/lib/millennium/content/current/story.mst \
-        /var/lib/millennium/content/current/story.json > "$output/content-sha256.txt" 2>/dev/null || true
+write_artifact_summary() {
+    local output=$1
     python3 - "$output" <<'PY'
 import datetime, hashlib, json, pathlib, sys
 root = pathlib.Path(sys.argv[1])
@@ -195,6 +175,35 @@ summary = {"schema": 1, "kind": "qemu-software-evidence",
            "files": files}
 (root / "summary.json").write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n")
 PY
+}
+
+collect_artifacts() {
+    running || die "VM is not running"
+    local name=${1:-$(date -u +%Y%m%dT%H%M%SZ)}
+    [[ "$name" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$ ]] || die "invalid artifact name"
+    local output="$STATE_DIR/artifacts/$name"
+    mkdir -p "$output"
+    for file in display.json mcu.log console.log provision.log; do
+        test -f "$STATE_DIR/$file" && cp "$STATE_DIR/$file" "$output/$file"
+    done
+    if test -f "$STATE_DIR/exact-image/result.json"; then
+        cp "$STATE_DIR/exact-image/result.json" "$output/exact-image-result.json"
+        cp "$STATE_DIR/exact-image/console.log" "$output/exact-image-console.log"
+    fi
+    "${SSH[@]}" sudo journalctl -u daemon.service --no-pager > "$output/daemon-journal.log"
+    "${SSH[@]}" curl --silent --show-error http://127.0.0.1:8080/metrics > "$output/metrics.prom" || true
+    "${SSH[@]}" curl --silent --show-error http://127.0.0.1:8081/api/health > "$output/health.json" || true
+    "${SSH[@]}" curl --silent --output /dev/null --write-out '%{http_code}' \
+        http://127.0.0.1:8081/api/health > "$output/health-http-status.txt" || true
+    python3 "$SCRIPT_DIR/virtual_mcu.py" send --control "$STATE_DIR/control.sock" status > "$output/peripherals.json"
+    "${SSH[@]}" sudo cat /var/lib/millennium/state > "$output/daemon-state.txt" 2>/dev/null || true
+    "${SSH[@]}" sudo cat /var/lib/millennium/story-state > "$output/story-state.txt" 2>/dev/null || true
+    "${SSH[@]}" sudo cat /var/lib/millennium/ota/status.json > "$output/ota-status.json" 2>/dev/null || true
+    "${SSH[@]}" sudo cat /var/log/millennium/qemu-flash.log > "$output/ota-flash.log" 2>/dev/null || true
+    "${SSH[@]}" sudo journalctl -u millennium-update-recover.service --no-pager > "$output/ota-recovery-journal.log" 2>/dev/null || true
+    "${SSH[@]}" sha256sum /var/lib/millennium/content/current/story.mst \
+        /var/lib/millennium/content/current/story.json > "$output/content-sha256.txt" 2>/dev/null || true
+    write_artifact_summary "$output"
     printf '%s\n' "$output"
 }
 
@@ -212,10 +221,11 @@ wait_display() {
 experience_test() {
     running || die "start and provision the VM before experience-test"
     python3 "$SCRIPT_DIR/virtual_mcu.py" send --control "$STATE_DIR/control.sock" hook down >/dev/null
+    sleep 1
     "${SSH[@]}" sudo rm -f /var/lib/millennium/story-state
     # The token expansion intentionally happens in the single-quoted remote shell.
     # shellcheck disable=SC2016
-    "${SSH[@]}" 'token=$(sudo cat /etc/millennium/admin-token); curl --fail --silent --request POST --header "Content-Type: application/json" --header "Authorization: Bearer $token" --data '\''{"action":"activate_plugin","plugin":"Story Mode"}'\'' http://127.0.0.1:8081/api/control >/dev/null'
+    "${SSH[@]}" 'token=$(sudo cat /etc/millennium/admin-token); curl --fail --silent --request POST --header "Content-Type: application/json" --header "Authorization: Bearer $token" --data '\''{"action":"activate_plugin","plugin":"Story Mode"}'\'' http://127.0.0.1:8081/api/control | grep -Fq '\''"success":true'\'''
     wait_display "THIS CALL IS FOR"
     network_link down >/dev/null
     trap 'network_link up >/dev/null 2>&1 || true' EXIT
@@ -293,8 +303,21 @@ wifi_test() {
 }
 
 full_test() {
-    local run
+    local run exact_image_ran=false exact_inputs=0
     run="full-$(date -u +%Y%m%dT%H%M%SZ)"
+    for value in "${MILLENNIUM_QEMU_EXACT_IMAGE:-}" \
+        "${MILLENNIUM_QEMU_EXACT_KERNEL:-}" \
+        "${MILLENNIUM_QEMU_EXACT_INITRD:-}"; do
+        test -n "$value" && exact_inputs=$((exact_inputs + 1))
+    done
+    test "$exact_inputs" -eq 0 || test "$exact_inputs" -eq 3 || \
+        die "set all three MILLENNIUM_QEMU_EXACT_{IMAGE,KERNEL,INITRD} variables"
+    rm -f "$STATE_DIR/exact-image/result.json" \
+        "$STATE_DIR/exact-image/console.log"
+    if test "$exact_inputs" -eq 3; then
+        exact_image_test
+        exact_image_ran=true
+    fi
     if ! running; then
         start_vm
     fi
@@ -308,19 +331,25 @@ full_test() {
     os_ota_test
     wifi_test
     experience_test
-    local artifact
-    artifact=$(collect_artifacts "$run")
     lifecycle_test
     recovery_test
-    python3 - "$artifact/full-test-result.json" <<'PY'
+    local artifact
+    artifact=$(collect_artifacts "$run")
+    python3 - "$artifact/full-test-result.json" "$exact_image_ran" <<'PY'
 import datetime, json, pathlib, sys
+acceptance = ["virtual-mcu-unit", "appliance-smoke", "lifecycle", "power-recovery",
+              "peripheral-faults", "signed-ota", "ota-faults", "wifi-onboarding",
+              "offline-experience", "production-image-contracts", "evidence-export"]
+exact_image = sys.argv[2] == "true"
+if exact_image:
+    acceptance.append("exact-production-image-userspace")
 result = {"schema": 1, "passed": True, "physical_hardware_claimed": False,
+          "exact_production_image_tested": exact_image,
           "completed_at": datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat(),
-          "acceptance": ["virtual-mcu-unit", "appliance-smoke", "lifecycle", "power-recovery",
-                         "peripheral-faults", "signed-ota", "ota-faults", "wifi-onboarding", "offline-experience",
-                         "production-image-contracts", "evidence-export"]}
+          "acceptance": acceptance}
 pathlib.Path(sys.argv[1]).write_text(json.dumps(result, indent=2, sort_keys=True) + "\n")
 PY
+    write_artifact_summary "$artifact"
     printf 'PASS: full QEMU software lab\n%s\n' "$artifact"
 }
 
@@ -444,12 +473,15 @@ wait_ready() {
 
 provision() {
     wait_ready
-    local tar_metadata=()
+    local tar_metadata=() source_commit
+    source_commit=$(git -C "$REPO_DIR" rev-parse HEAD)
+    [[ "$source_commit" =~ ^[0-9a-f]{40}$ ]] || die "cannot determine source commit"
     test "$(uname -s)" = Darwin && tar_metadata+=(--no-xattrs)
     COPYFILE_DISABLE=1 tar "${tar_metadata[@]}" --exclude=.git \
         --exclude='./tools/qemu/state' --exclude='tools/qemu/state' --exclude='*.o' \
         --exclude=host/daemon --exclude=host/simulator -C "$REPO_DIR" -czf - . | \
         "${SSH[@]}" 'rm -rf /tmp/millennium-src && mkdir /tmp/millennium-src && tar -xzf - -C /tmp/millennium-src'
+    "${SSH[@]}" "printf '%s\\n' '$source_commit' > /tmp/millennium-src/.millennium-source-commit"
     "${SSH[@]}" sudo /tmp/millennium-src/tools/qemu/provision-guest.sh /tmp/millennium-src | tee "$STATE_DIR/provision.log"
 }
 

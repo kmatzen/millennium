@@ -253,6 +253,10 @@ class VirtualMCU:
         }
         return value
 
+    def begin_host_session(self):
+        """Forget replay identities when a new host serial session connects."""
+        self.critical_seen.clear()
+
     async def send(self, message_type, payload=b""):
         if not self.serial_enabled:
             raise ConnectionError("virtual serial link is down")
@@ -274,6 +278,7 @@ class VirtualMCU:
                     continue
                 reader, writer = await asyncio.open_unix_connection(self.serial_socket)
                 decoder = Decoder()
+                self.begin_host_session()
                 self.writer = writer
                 self.connected.set()
                 print("virtual MCU connected", flush=True)
@@ -290,6 +295,7 @@ class VirtualMCU:
                         continue
                     for message_type, sequence, payload in decoder.feed(data):
                         if message_type == HELLO:
+                            self.begin_host_session()
                             writer.write(encode(HELLO, self.sequence, bytes((VERSION, VERSION))))
                             self.sequence = (self.sequence + 1) & 0xFF
                         elif message_type in CRITICAL:

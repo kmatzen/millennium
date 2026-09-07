@@ -102,6 +102,11 @@ tools/qemu/qemu.sh full-test
 tools/qemu/qemu.sh stop
 ```
 
+When all three exact-image variables shown below are set, `full-test` includes
+the exact production-image gate and records
+`exact_production_image_tested: true`. With none set it runs the portable cloud
+lab and records `false`; a partial exact-image configuration is rejected.
+
 Cold disk checkpoints are available while the VM is stopped:
 
 ```sh
