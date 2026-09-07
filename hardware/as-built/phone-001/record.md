@@ -430,7 +430,7 @@ verified. The signed, factory-seeded candidate is retained on `anima` at
 `b584b827e9574575c7be65d8729818c465d5d95a7caf22f47e508c6e2e10c397`
 and expanded SHA-256
 `2cd7be17c6cb4711e880c81e630beb50a08b4122cf043fea703a1357eedaf08a`.
-It remains unapproved and has not yet been booted on the physical Zero 2 W.
+It remained unapproved until its first physical boot on 2026-09-07.
 On 2026-09-06, macOS identified the dedicated 63.9 GB removable USB card as
 `/dev/disk12`. The recovery writer verified the manifest signature and
 compressed image, wrote and flushed all 15,636,365,312 bytes, then read back
@@ -450,6 +450,19 @@ an immediate restore-stream listing without staging a plaintext archive.
 The same artifact was copied directly from `anima` to `UEBuild`; all three
 recorded hashes and the Ed25519 manifest signature verified locally without
 using laptop internal storage.
+
+On 2026-09-07 the `2ad5179` recovery card booted the physical Zero 2 W to a
+Debian 13 `millennium-phone` login prompt. The factory-bound maintainer key
+authenticated over the attached RTL8153 link at `192.168.8.239`; the active
+root was `mmcblk0p5`, partition 7 mounted read-write, and NetworkManager, SSH,
+the daemon, and maintenance-tunnel units started. Acceptance nevertheless
+failed. NetworkManager could not D-Bus activate `wpa_supplicant` because the
+minimal image omitted the `wpasupplicant` package, leaving `wlan0` unavailable
+and preventing the setup AP from starting. The monitor unit also failed its
+mount namespace because `/var/lib/node_exporter/textfile_collector` had not
+been created. This candidate remains rejected and must not be approved or
+redeployed. Exact evidence is in
+`evidence/physical-boot-rejection-2ad5179-2026-09-07.json`.
 
 The backup puller was hardened after a disconnected phone caused Restic to
 commit a zero-byte stdin snapshot before shell `pipefail` observed the SSH

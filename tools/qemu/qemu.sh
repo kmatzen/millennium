@@ -277,6 +277,53 @@ experience_test() {
     printf 'PASS: offline story activation, recovery, optional inputs, ending, and return visit\n'
 }
 
+experience_lifecycle_test() {
+    running || die "start and provision the VM before experience-lifecycle-test"
+    # The preceding interactive story deliberately exercises a return visit
+    # and may leave the handset off-hook.  Signed activation is correctly
+    # deferred while busy, so establish an idle precondition here rather than
+    # making this acceptance test depend on scenario ordering.
+    python3 "$SCRIPT_DIR/virtual_mcu.py" send \
+        --control "$STATE_DIR/control.sock" hook down >/dev/null
+    for _ in {1..30}; do
+        if "${SSH[@]}" curl -fsS http://127.0.0.1:8081/api/state 2>/dev/null | \
+                python3 -c 'import json,sys; raise SystemExit(json.load(sys.stdin)["current_state"] != 1)'; then
+            break
+        fi
+        sleep 1
+    done
+    "${SSH[@]}" curl -fsS http://127.0.0.1:8081/api/state | \
+        python3 -c 'import json,sys; raise SystemExit(json.load(sys.stdin)["current_state"] != 1)'
+    "${SSH[@]}" sudo /tmp/millennium-src/tools/qemu/experience-lifecycle-test-guest.sh /tmp/millennium-src
+}
+
+experience_power_test() {
+    local phase digest
+    running || die "run experience-lifecycle-test before experience-power-test"
+    "${SSH[@]}" test -d /var/lib/millennium/content/releases/last-line-2.1.0
+    "${SSH[@]}" test -d /var/lib/millennium/content/releases/last-line-2.1.1
+    for phase in activating selecting; do
+        if test "$phase" = activating; then
+            digest=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        else
+            digest=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+        fi
+        "${SSH[@]}" sudo /usr/local/libexec/millennium-experience-power-prepare "$phase" | grep -Fqx "$digest"
+        power_cut
+        start_vm
+        wait_ready
+        for _ in {1..30}; do
+            if "${SSH[@]}" sudo /usr/local/libexec/millennium-experience-power-verify "$phase" \
+                    2>/dev/null | grep -Fqx "$digest"; then
+                break
+            fi
+            sleep 1
+        done
+        "${SSH[@]}" sudo /usr/local/libexec/millennium-experience-power-verify "$phase" | grep -Fqx "$digest"
+    done
+    printf 'PASS: abrupt VM power cuts at activating and selecting journal boundaries recover the permanent fallback\n'
+}
+
 ota_test() {
     running || die "start and provision the VM before ota-test"
     "${SSH[@]}" sudo /tmp/millennium-src/tools/qemu/ota-test-guest.sh /tmp/millennium-src
@@ -331,6 +378,8 @@ full_test() {
     os_ota_test
     wifi_test
     experience_test
+    experience_lifecycle_test
+    experience_power_test
     lifecycle_test
     recovery_test
     local artifact
@@ -339,7 +388,7 @@ full_test() {
 import datetime, json, pathlib, sys
 acceptance = ["virtual-mcu-unit", "appliance-smoke", "lifecycle", "power-recovery",
               "peripheral-faults", "signed-ota", "ota-faults", "wifi-onboarding",
-              "offline-experience", "production-image-contracts", "evidence-export"]
+              "offline-experience", "signed-experience-lifecycle", "experience-power-recovery", "production-image-contracts", "evidence-export"]
 exact_image = sys.argv[2] == "true"
 if exact_image:
     acceptance.append("exact-production-image-userspace")
@@ -536,6 +585,8 @@ case ${1:-help} in
     os-ota-test) os_ota_test ;;
     wifi-test) wifi_test ;;
     experience-test) experience_test ;;
+    experience-lifecycle-test) experience_lifecycle_test ;;
+    experience-power-test) experience_power_test ;;
     exact-image-test) exact_image_test ;;
     full-test) full_test ;;
     collect-artifacts) collect_artifacts "${2:-}" ;;
@@ -569,6 +620,6 @@ case ${1:-help} in
         printf 'fresh overlay created; previous disk retained as a timestamped backup\n'
         ;;
     help|*)
-        printf 'usage: %s {fetch|init|start|wait|provision|stop|power-cut|pause|resume|restart-virtual-mcu|network|checkpoint|lifecycle-test|recovery-test|peripheral-fault-test|ota-test|ota-fault-test|os-ota-test|wifi-test|experience-test|full-test|collect-artifacts|status|ssh|logs|token|tunnel|display|peripherals|key|hook|coin|card|fault|reset-mcu|smoke|reset}\n' "$0"
+        printf 'usage: %s {fetch|init|start|wait|provision|stop|power-cut|pause|resume|restart-virtual-mcu|network|checkpoint|lifecycle-test|recovery-test|peripheral-fault-test|ota-test|ota-fault-test|os-ota-test|wifi-test|experience-test|experience-lifecycle-test|experience-power-test|full-test|collect-artifacts|status|ssh|logs|token|tunnel|display|peripherals|key|hook|coin|card|fault|reset-mcu|smoke|reset}\n' "$0"
         ;;
 esac

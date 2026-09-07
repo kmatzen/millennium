@@ -14,6 +14,10 @@ steps may be replaced by QEMU evidence.
 - the production power supply plus a meter or oscilloscope capable of recording
   minimum 5 V rail voltage during boot, ringing, coin operation, and brownout;
 - one dedicated, OS-reported removable SD card of at least 32 GB for recovery;
+- two additional, physically distinct removable media for the new offline
+  experience package/catalog signing keys (do not reuse the recovery card);
+- the disconnected signing machine and both custodians' full OpenPGP hardware
+  key fingerprints;
 - the Mac with this repository and `UEBuild` attached;
 - iOS, Android, macOS, and Windows clients;
 - a cellular hotspot or other network that is genuinely outside the home ISP;
@@ -23,6 +27,32 @@ Do **not** use the 512 GB `UEBuild` volume as recovery media, regardless of the
 `/dev/diskN` number macOS assigns it. It holds the builder, retained images, and
 signing-key backup. Identify the recovery card by its reported media name,
 capacity, and removable status immediately before writing it.
+
+## 0. Establish and provision the experience trust roots
+
+No production experience signing key currently exists in the repository,
+local restricted storage, or `anima`'s retained signing vault. Before
+publishing a catalog, generate separate package and catalog Ed25519 keys on the
+disconnected signing machine. Export only their public keys. For each private
+key, use `tools/signing_key_backup.py backup` for both custodians, copy the two
+encrypted ciphertexts to distinct removable media with `copy-offline`, and run
+an independent `recover` sign/verify drill from each read-only medium-backed
+copy. Retain the evidence records and destroy the plaintext RAM-backed scratch
+directory after each operation.
+
+Add both public keys to the phone through an OTA release authenticated by the
+existing `release-2026-08` trust root. Confirm their exact DER SHA-256 values
+on the rebuilt phone before signing any production content. Never copy either
+private key to this repository, the phone, `anima`, or the update web root.
+
+After all content unit and QEMU gates pass, build and sign immutable packages
+and stable/beta/device-group catalogs offline as described in
+`content/README.md`. Transfer only the signed artifacts and public keys to a
+private staging directory on `anima`, then run `content/publish_catalog.py`
+against `/home/kmatzen/selfhosted/millennium-updates/www/experiences`. Verify
+the public catalog, signature, and every catalog-bound immutable object before
+enabling the phone's automatic catalog timer. The nginx container reads that
+host directory through a read-only bind mount and does not require a restart.
 
 ## 1. Write and verify the corrected recovery card
 
@@ -36,8 +66,11 @@ The card was then ejected and is safe to remove. Evidence is retained in
 
 The earlier `/dev/disk10` write/readback passed byte-for-byte, but its v3 image
 failed physical boot acceptance and is quarantined. It must not be redeployed.
-The corrected `2ad5179` media write is complete; only its physical boot approval
-remains open.
+The corrected `2ad5179` media write completed, but its 2026-09-07 physical boot
+exposed a missing `wpasupplicant` package and missing monitor output directory.
+It is now rejected evidence and must not be redeployed. Build, sign, write, and
+fully read back a newer candidate containing both source fixes before resuming
+physical boot approval.
 
 The corrected factory-seeded artifact is retained on `anima` at:
 

@@ -97,6 +97,8 @@ tools/qemu/qemu.sh ota-fault-test
 tools/qemu/qemu.sh os-ota-test
 tools/qemu/qemu.sh wifi-test
 tools/qemu/qemu.sh experience-test
+tools/qemu/qemu.sh experience-lifecycle-test
+tools/qemu/qemu.sh experience-power-test
 tools/qemu/qemu.sh exact-image-test
 tools/qemu/qemu.sh full-test
 tools/qemu/qemu.sh stop
@@ -105,7 +107,9 @@ tools/qemu/qemu.sh stop
 When all three exact-image variables shown below are set, `full-test` includes
 the exact production-image gate and records
 `exact_production_image_tested: true`. With none set it runs the portable cloud
-lab and records `false`; a partial exact-image configuration is rejected.
+lab and records `false`; a partial exact-image configuration is rejected. The
+exact-image boot remains bounded at ten minutes because external-volume I/O and
+concurrent emulation can make a valid first boot exceed five minutes.
 
 Cold disk checkpoints are available while the VM is stopped:
 

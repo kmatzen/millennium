@@ -1,0 +1,3 @@
+d /var/lib/millennium/content 0755 root root -
+d /var/lib/millennium/content/releases 0755 root root -
+d /var/lib/millennium/content/owner-requests 0750 millennium millennium -

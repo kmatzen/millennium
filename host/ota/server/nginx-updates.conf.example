@@ -37,5 +37,19 @@ server {
         limit_except GET HEAD { deny all; }
     }
 
+    location ~ ^/experiences/(stable|beta|lab)/catalog\.json(\.sig)?$ {
+        default_type application/octet-stream;
+        add_header Cache-Control "no-store" always;
+        try_files $uri =404;
+        limit_except GET HEAD { deny all; }
+    }
+
+    location /experiences/releases/ {
+        default_type application/octet-stream;
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
+        try_files $uri =404;
+        limit_except GET HEAD { deny all; }
+    }
+
     location / { return 404; }
 }

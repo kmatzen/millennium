@@ -1,0 +1,14 @@
+catalog_url=https://updates.kmatzen.com/experiences/stable/catalog.json
+catalog_keys=catalog-2026:/etc/millennium/catalog-signing-key.pem
+package_keys=content-2026:/etc/millennium/content-signing-key.pem
+device_id=phone-001
+groups=production
+runtime_schema=1
+daemon_version=0.4.0
+state_dir=/var/lib/millennium/content
+fallback=last-line-2.0.0
+max_releases=4
+install_window_start=02:00
+install_window_end=05:00
+phone_state_url=http://127.0.0.1:8081/api/state
+health_url=http://127.0.0.1:8081/api/health

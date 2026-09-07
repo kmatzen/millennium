@@ -4,9 +4,23 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
 LAYER = ROOT / "host/os_image/layer/millennium-phone-image.yaml"
+WIFI_BOOTSTRAP_UNIT = ROOT / "host/systemd/millennium-wifi-bootstrap.service"
 
 
 class Zero2WImageLayerTests(unittest.TestCase):
+    def test_physical_wifi_backend_and_monitor_output_are_installed(self) -> None:
+        text = LAYER.read_text()
+        unit = WIFI_BOOTSTRAP_UNIT.read_text()
+
+        self.assertIn("    - wpasupplicant\n", text)
+        self.assertIn(
+            'install -d -m 0755 '
+            '"$1/var/lib/node_exporter/textfile_collector"',
+            text,
+        )
+        self.assertIn("Wants=NetworkManager.service wpa_supplicant.service", unit)
+        self.assertIn("After=NetworkManager.service wpa_supplicant.service", unit)
+
     def test_wifi_state_owner_is_resolved_inside_target_root(self) -> None:
         text = LAYER.read_text()
 

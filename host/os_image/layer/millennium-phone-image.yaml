@@ -9,6 +9,7 @@
 mmdebstrap:
   packages:
     - network-manager
+    - wpasupplicant
     - openssh-server
     - nftables
     - curl
@@ -105,6 +106,7 @@ mmdebstrap:
       # named owner here; the target-side recursive chown below assigns the
       # account after the payload and directory are in place.
       install -d -m 0700 "$1/var/lib/millennium/wifi"
+      install -d -m 0755 "$1/var/lib/node_exporter/textfile_collector"
       chroot "$1" systemctl enable daemon.service millennium-firewall.service
       chroot "$1" systemctl enable millennium-monitor.timer millennium-hil-smoke.timer
       chroot "$1" systemctl enable millennium-physical-interruption-reconcile.service

@@ -274,24 +274,40 @@ with one assembled-hardware session and without repeating the network wiring.
   - [ ] Publish immutable packages and channel catalogs through
     `updates.kmatzen.com`, with stable/beta/device-group rollout, holds,
     withdrawal, and an emergency signed denylist.
+    - [x] Implement a fail-closed publisher and verify FIDO-authenticated,
+      operator-writable access to `anima`'s container-backed update web root.
+    - [ ] Complete the offline package/catalog key ceremony, provision both
+      public trust roots through an existing-key-signed phone release, and
+      publish plus externally verify the first production catalog objects.
   - [x] Extend the authoring tool to produce deterministic packages and reject
     unsafe paths, missing media, invalid graphs, incompatible schemas, and
     excessive resource use.
-  - [ ] Implement periodic catalog polling, staged download, signature and hash
+  - [x] Implement periodic catalog polling, staged download, signature and hash
     verification, safe extraction, eligibility checks, and idle-only atomic
     activation.
-  - [ ] Retain a known-good version and permanent offline fallback; add automatic
+  - [x] Retain a known-good version and permanent offline fallback; add automatic
     rollback, digest quarantine, state migration, and bounded garbage collection.
-  - [ ] Ensure interruption at download, extraction, validation, activation,
+  - [x] Ensure interruption at download, extraction, validation, activation,
     migration, or cleanup leaves a bootable and selectable known-good package.
-  - [ ] Add an authenticated owner view for installed experiences, ratings,
+  - [x] Add an authenticated owner view for installed experiences, ratings,
     update health, storage, enable/disable, and fallback selection; keep advanced
     controls behind the restricted maintenance path.
-  - [ ] Add privacy-preserving package health and engagement metrics without
+  - [x] Add privacy-preserving package health and engagement metrics without
     uploading speech, credentials, free-form input, or reconstructable histories.
-  - [ ] Test malicious archives, compromised transport, signature/key failures,
+  - [x] Test malicious archives, compromised transport, signature/key failures,
     compatibility, disk-full, withdrawal, network loss, restart, rollback, and
     power interruption in unit tests and QEMU.
+    - [x] Cover malicious archives, transport and signature compromise,
+      compatibility rejection, disk-full preservation, withdrawal, network
+      loss, restart recovery, rollback, and durable-transition interruption in
+      the content unit suite.
+    - [x] Exercise signed installation, catalog-signature compromise, HTTPS
+      origin loss and recovery, signed withdrawal, and worker restart through
+      the production lifecycle worker in the ARM64 QEMU guest.
+    - [x] Prove real ENOSPC handling in a size-bounded QEMU filesystem while
+      retaining a readable, selected known-good fallback.
+    - [x] Add host-driven QEMU power cuts at each content activation journal
+      boundary; retain the known-good release after reboot.
   - [ ] Complete real-phone audio, display, peripheral, storage, owner-usability,
     and staged production acceptance.
   - Done when the phone can safely gain, update, disable, withdraw, and roll back

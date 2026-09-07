@@ -65,9 +65,15 @@ def verify_signature(manifest_path, signature_path, key_path):
 def safe_extract(archive, destination, maximum_bytes=256 * 1024 * 1024):
     with tarfile.open(archive, "r:gz") as bundle:
         members = bundle.getmembers()
+        if len(members) > 4096:
+            raise InstallError("content archive has too many members")
         total = 0
+        names = set()
         for member in members:
             path = Path(member.name)
+            if member.name in names:
+                raise InstallError(f"duplicate archive member: {member.name}")
+            names.add(member.name)
             if path.is_absolute() or ".." in path.parts or member.issym() or member.islnk():
                 raise InstallError(f"unsafe archive member: {member.name}")
             if not member.isfile() and not member.isdir():
@@ -96,7 +102,10 @@ def safe_extract(archive, destination, maximum_bytes=256 * 1024 * 1024):
                 raise InstallError(f"cannot read archive member: {member.name}")
             with source, target.open("wb") as output:
                 shutil.copyfileobj(source, output)
-            os.chmod(target, member.mode & 0o777)
+            # Downloadable experiences are data, never executables. Ignore
+            # archive write/execute bits so the unprivileged daemon cannot
+            # mutate an installed release after verification.
+            os.chmod(target, 0o444)
 
 
 def validate_manifest(manifest):
@@ -185,12 +194,14 @@ def validate_manifest(manifest):
         raise InstallError("content file inventory omits required files")
 
 
-def verify_inventory(stage, manifest):
+def verify_inventory(stage, manifest, ignored=()):
     if manifest["schema"] == 1:
         return
     expected = {item["path"]: item for item in manifest["files"]}
+    ignored = set(ignored)
     actual = {path.relative_to(stage).as_posix(): path
-              for path in stage.rglob("*") if path.is_file()}
+              for path in stage.rglob("*") if path.is_file()
+              and path.relative_to(stage).as_posix() not in ignored}
     if set(actual) != set(expected):
         raise InstallError("content file inventory does not match archive")
     total = 0
@@ -225,7 +236,7 @@ def semver(value):
 
 
 def install(manifest_path, signature_path, keys, root, runtime_schema=1,
-            daemon_version=None):
+            daemon_version=None, activate=True):
     try:
         manifest = json.loads(manifest_path.read_text())
     except (OSError, json.JSONDecodeError) as exc:
@@ -297,15 +308,24 @@ def install(manifest_path, signature_path, keys, root, runtime_schema=1,
         # immutable public appliance data; the archive retains file/subdir
         # modes, while the release root must always be traversable.
         os.chmod(target, 0o755)
-    current = root / "current"
-    if current.is_symlink():
-        atomic_link(root, "previous", os.readlink(current))
-    atomic_link(root, "current", Path("releases") / identity)
+        # Keep the exact signed metadata beside the immutable payload.  The
+        # lifecycle worker uses this for owner status, denylist recovery and
+        # garbage collection without trusting mutable catalog transport.
+        shutil.copy2(manifest_path, target / "package.manifest.json")
+        shutil.copy2(signature_path, target / "package.manifest.json.sig")
+        os.chmod(target / "package.manifest.json", 0o444)
+        os.chmod(target / "package.manifest.json.sig", 0o444)
     status = {"id": manifest["id"], "version": manifest["version"],
               "schema": manifest["schema"],
               "sequence": manifest.get("sequence", 0),
-              "identity": identity, "manifest_sha256": digest(manifest_path)}
-    atomic_json(root / "status.json", status)
+              "identity": identity, "manifest_sha256": digest(manifest_path),
+              "active": bool(activate)}
+    if activate:
+        current = root / "current"
+        if current.is_symlink():
+            atomic_link(root, "previous", os.readlink(current))
+        atomic_link(root, "current", Path("releases") / identity)
+        atomic_json(root / "status.json", status)
     if manifest["schema"] == 2:
         sequences[manifest["id"]] = manifest["sequence"]
         atomic_json(root / "sequences.json", sequences)

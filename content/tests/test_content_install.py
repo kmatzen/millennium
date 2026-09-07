@@ -59,6 +59,7 @@ class ContentInstallTests(unittest.TestCase):
         self.assertTrue((self.root / "installed/current/story.mst").is_file())
         release = (self.root / "installed/current").resolve()
         self.assertEqual(stat.S_IMODE(release.stat().st_mode), 0o755)
+        self.assertEqual(stat.S_IMODE((release / "story.mst").stat().st_mode), 0o444)
         second, second_sig = self.build(packages, "1.2.0")
         install(second, second_sig, {"test": self.public}, self.root / "installed")
         self.assertIn("1.2.0", os.readlink(self.root / "installed/current"))
@@ -116,6 +117,26 @@ class ContentInstallTests(unittest.TestCase):
             info.linkname = "/etc/passwd"
             bundle.addfile(info)
         with self.assertRaisesRegex(InstallError, "unsafe archive member"):
+            safe_extract(archive, self.root / "stage")
+
+    def test_duplicate_archive_members_are_rejected(self):
+        archive = self.root / "duplicate.tar.gz"
+        with tarfile.open(archive, "w:gz") as bundle:
+            for value in (b"first", b"second"):
+                info = tarfile.TarInfo("story.json")
+                info.size = len(value)
+                bundle.addfile(info, io.BytesIO(value))
+        with self.assertRaisesRegex(InstallError, "duplicate archive member"):
+            safe_extract(archive, self.root / "stage")
+
+    def test_archive_member_count_is_bounded(self):
+        archive = self.root / "many.tar.gz"
+        with tarfile.open(archive, "w:gz") as bundle:
+            for index in range(4097):
+                info = tarfile.TarInfo("empty/%04d" % index)
+                info.size = 0
+                bundle.addfile(info, io.BytesIO())
+        with self.assertRaisesRegex(InstallError, "too many members"):
             safe_extract(archive, self.root / "stage")
 
     def test_v2_manifest_rejects_undeclared_capabilities(self):

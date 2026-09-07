@@ -50,7 +50,7 @@ struct http_request {
 /* HTTP Response structure */
 struct http_response {
     int status_code;
-    char body[8192];  /* For small responses */
+    char body[16384];  /* Includes the self-contained authenticated dashboard. */
     char content_type[64];
     /* Headers stored as key-value pairs */
     char header_keys[16][64];
@@ -188,6 +188,8 @@ struct http_response web_server_handle_api_update(const struct http_request* req
 struct http_response web_server_handle_api_version(const struct http_request* request);
 struct http_response web_server_handle_api_check_update(const struct http_request* request);
 struct http_response web_server_handle_api_update_status(const struct http_request* request);
+struct http_response web_server_handle_api_experiences(const struct http_request* request);
+struct http_response web_server_handle_api_experience_control(const struct http_request* request);
 struct http_response web_server_handle_dashboard(const struct http_request* request);
 
 /* Utility functions */

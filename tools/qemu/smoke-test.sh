@@ -9,7 +9,7 @@ for _ in {1..30}; do
     sleep 2
 done
 "$QEMU" ssh systemctl is-active --quiet daemon.service
-"$QEMU" ssh test -c /dev/vport0p1
+"$QEMU" ssh test -c /dev/virtio-ports/millennium.mcu
 health=
 for _ in {1..45}; do
     health=$("$QEMU" ssh curl --silent http://127.0.0.1:8081/api/health || true)

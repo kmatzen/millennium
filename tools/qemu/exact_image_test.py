@@ -4,7 +4,8 @@
 QEMU's ``virt`` board cannot emulate a Zero 2 W.  This harness deliberately
 uses a generic arm64 kernel/initramfs only as a transport for the exact image's
 userspace, partition table, system slot, persistent slot and systemd graph.
-It injects QEMU-only udev aliases in /run; the image itself is never modified.
+It injects QEMU-only configuration in a disposable overlay; the source image
+itself is never modified.
 """
 
 from __future__ import annotations
@@ -24,6 +25,7 @@ import time
 
 PASS_MARKER = "MILLENNIUM_EXACT_IMAGE_PASS"
 FAIL_MARKER = "MILLENNIUM_EXACT_IMAGE_FAIL"
+DEFAULT_TIMEOUT_SECONDS = 600
 FORBIDDEN = (
     "Failed to start dbus.service",
     "Failed to start systemd-resolved.service",
@@ -88,13 +90,16 @@ def shell_commands() -> bytes:
     )
     quote = lambda value: "'" + value.replace("'", "'\\''") + "'"
     commands = [
-        "mkdir -p /run/udev/rules.d /run/systemd/system/multi-user.target.wants",
+        # /run belongs to the initramfs at this point and is replaced when
+        # systemd starts.  Put the QEMU-only files in the disposable overlay
+        # so they survive the switch to the real root filesystem.
+        "mkdir -p /etc/udev/rules.d /etc/systemd/system/multi-user.target.wants",
         "printf '%s\\n' " + " ".join(map(quote, rules))
-        + " > /run/udev/rules.d/99-qemu-slot.rules",
+        + " > /etc/udev/rules.d/99-qemu-slot.rules",
         "printf '%s\\n' " + " ".join(map(quote, unit))
-        + " > /run/systemd/system/qemu-exact-accept.service",
+        + " > /etc/systemd/system/qemu-exact-accept.service",
         "ln -s ../qemu-exact-accept.service "
-        "/run/systemd/system/multi-user.target.wants/qemu-exact-accept.service",
+        "/etc/systemd/system/multi-user.target.wants/qemu-exact-accept.service",
         "exec /sbin/init",
     ]
     return ("\n".join(commands) + "\n").encode()
@@ -119,7 +124,7 @@ def main() -> int:
     parser.add_argument("--kernel", type=Path, required=True)
     parser.add_argument("--initrd", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--timeout", type=int, default=300)
+    parser.add_argument("--timeout", type=int, default=DEFAULT_TIMEOUT_SECONDS)
     args = parser.parse_args()
     for path in (args.image, args.kernel, args.initrd):
         if not path.is_file():

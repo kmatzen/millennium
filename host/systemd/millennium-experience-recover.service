@@ -1,0 +1,16 @@
+[Unit]
+Description=Recover an interrupted Millennium experience activation
+Before=daemon.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/libexec/millennium-experience recover
+User=root
+Group=root
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/millennium/content
+
+[Install]
+WantedBy=multi-user.target

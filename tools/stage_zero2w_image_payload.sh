@@ -28,7 +28,7 @@ mkdir -p "$payload/usr/local/bin" "$payload/usr/local/libexec" \
     "$payload/etc/systemd/system/daemon.service.d" \
     "$payload/etc/systemd/system" "$payload/etc/sudoers.d" \
     "$payload/etc/rpi-image-gen/slot-shared.d" \
-    "$payload/usr/lib/sysusers.d" "$payload/usr/lib/systemd/system-generators" \
+    "$payload/usr/lib/sysusers.d" "$payload/usr/lib/tmpfiles.d" "$payload/usr/lib/systemd/system-generators" \
     "$payload/opt/millennium/releases/bootstrap/host" \
     "$payload/opt/millennium/releases/bootstrap/arduino" \
     "$payload/opt/millennium/releases/bootstrap/ota" \
@@ -45,6 +45,8 @@ install -m 0644 "$host/wifi/dnsmasq-shared.conf" \
 
 for source in \
     "$repo/content/install_content.py:millennium-content" \
+    "$repo/content/experience_agent.py:millennium-experience" \
+    "$repo/content/catalogtool.py:catalogtool.py" \
     "$repo/content/storytool.py:storytool.py" \
     "$host/monitoring/millennium_monitor.py:millennium-monitor" \
     "$host/monitoring/millennium_backup.sh:millennium-backup" \
@@ -69,6 +71,10 @@ for unit in "$host"/systemd/millennium-{firewall,monitor,hil-smoke,physical-inte
     test -f "$unit" || continue
     install -m 0644 "$unit" "$payload/etc/systemd/system/"
 done
+for unit in "$host"/systemd/millennium-experience-{update,recover}.{service,timer}; do
+    test -f "$unit" || continue
+    install -m 0644 "$unit" "$payload/etc/systemd/system/"
+done
 for unit in "$host"/systemd/millennium-os-update-{check,apply,recover,boot-health}.{service,timer}; do
     test -f "$unit" || continue
     install -m 0644 "$unit" "$payload/etc/systemd/system/"
@@ -79,11 +85,14 @@ printf '[Service]\nUser=millennium\nGroup=millennium\n' \
     >"$payload/etc/systemd/system/daemon.service.d/30-user.conf"
 install -m 0644 "$host/systemd/millennium-wifi.sysusers" \
     "$payload/usr/lib/sysusers.d/millennium-wifi.conf"
+install -m 0644 "$host/systemd/millennium-experience.tmpfiles" \
+    "$payload/usr/lib/tmpfiles.d/millennium-experience.conf"
 install -m 0755 "$repo/host/os_image/slot-shared-generator" \
     "$payload/usr/lib/systemd/system-generators/slot-shared-generator"
 install -m 0440 "$host/systemd/millennium-ota-sudoers" \
     "$payload/etc/sudoers.d/millennium-ota"
 install -m 0644 "$host/ota/ota.conf.example" "$payload/etc/millennium/ota.conf"
+install -m 0600 "$host/experiences.conf.example" "$payload/etc/millennium/experiences.conf"
 install -m 0644 "$host/os_ota/os-ota.conf.example" \
     "$payload/etc/millennium/os-ota.conf"
 

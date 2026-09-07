@@ -102,7 +102,12 @@ def build_catalog(manifests, base_url, channel, sequence, key_id,
     packages = []
     for path in sorted(manifests, key=lambda item: item.name):
         manifest = load_package_manifest(path)
-        manifest_url = urljoin(base_url, path.name)
+        # Package metadata lives with its immutable payload, never beneath the
+        # mutable channel directory. Sequence and version together prevent a
+        # later release from reusing an existing URL identity.
+        release_path = (f"releases/{manifest['id']}/"
+                        f"{manifest['sequence']:08d}-{manifest['version']}/{path.name}")
+        manifest_url = urljoin(base_url, release_path)
         packages.append({
             "id": manifest["id"], "version": manifest["version"],
             "sequence": manifest["sequence"], "manifest_url": manifest_url,

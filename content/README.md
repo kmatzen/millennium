@@ -17,12 +17,16 @@ python3 content/storytool.py compile content/stories/last_line/story.json \
 python3 content/storytool.py package content/stories/last_line/story.json \
   --output build/content --private-key /secure/content-signing.pem --key-id content-2026
 python3 content/catalogtool.py build build/content/*.manifest.json \
-  --base-url https://updates.kmatzen.com/experiences/stable/ \
+  --base-url https://updates.kmatzen.com/experiences/ \
   --channel stable --sequence 1 --key-id catalog-2026 \
   --private-key /secure/catalog-signing.pem --output build/content/catalog.json
 python3 content/catalogtool.py validate build/content/catalog.json
 python3 content/catalogtool.py select build/content/catalog.json \
   --device-id phone-001
+python3 content/publish_catalog.py build/content \
+  /home/kmatzen/selfhosted/millennium-updates/www/experiences \
+  --catalog-key catalog-2026:/secure/catalog-public.pem \
+  --package-key content-2026:/secure/content-public.pem
 ```
 
 Validation rejects unreachable scenes, unmarked dead ends, closed loops with no
@@ -51,6 +55,23 @@ the manifest SHA-256. Deterministic per-device rollout supports percentages,
 device groups, global holds, signed-digest withdrawal, package-ID denial, and
 installed-sequence filtering. The website remains an untrusted transport;
 catalog and package signatures establish authority.
+
+`publish_catalog.py` verifies both signature layers and every bound digest
+again at the server boundary. It refuses an existing release directory or a
+non-increasing channel sequence, publishes packages beneath
+`releases/<id>/<sequence>-<version>/`, then atomically commits the mutable
+channel catalog last. The publisher accepts public verification keys only;
+offline private keys never belong on the update server.
+
+On `anima`, `updates.kmatzen.com` is served by the unprivileged
+`millennium-updates` container. Its read-only `/srv/updates` mount is backed by
+the operator-writable host directory
+`/home/kmatzen/selfhosted/millennium-updates/www`; run the publisher against
+that host path. Copy only the already-signed package set, this publisher and
+its Python verifier modules, and the public keys to a private staging
+directory. No container restart is required because nginx reads the bind mount
+for each request. Verify the public catalog URL and every catalog-bound object
+after publication before advancing rollout.
 
 The full-device OTA bundle carries the matching content verifier and compiler
 under `/opt/millennium/current/content`, so a story compiler-format change is

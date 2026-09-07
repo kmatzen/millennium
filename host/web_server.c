@@ -9,6 +9,7 @@
 #include "websocket.h"
 #include "version.h"
 #include "updater.h"
+#include "experience_owner.h"
 
 #include <sys/socket.h>
 #include <sys/select.h>
@@ -821,9 +822,12 @@ struct http_response web_server_process_request(struct web_server* server, const
     /* State-changing operations are never available anonymously, even on a
      * trusted LAN. The default listener is loopback-only, and this second
      * boundary protects requests arriving through the maintenance tunnel. */
-    if (strcmp(request->method, "POST") == 0 &&
-        (strcmp(request->path, "/api/control") == 0 ||
-         strcmp(request->path, "/api/update") == 0)) {
+    if ((strcmp(request->method, "POST") == 0 &&
+         (strcmp(request->path, "/api/control") == 0 ||
+          strcmp(request->path, "/api/update") == 0 ||
+          strcmp(request->path, "/api/experience-control") == 0)) ||
+        (strcmp(request->method, "GET") == 0 &&
+         strcmp(request->path, "/api/experiences") == 0)) {
         if (!web_server_request_is_admin_authorized(server, request)) {
             response.status_code = 401;
             web_server_strcpy_safe(response.content_type, "application/json",
@@ -1018,6 +1022,7 @@ char* web_server_serialize_response(const struct http_response* response) {
     switch (response->status_code) {
         case 200: status_text = "OK"; break;
         case 202: status_text = "Accepted"; break;
+        case 400: status_text = "Bad Request"; break;
         case 401: status_text = "Unauthorized"; break;
         case 403: status_text = "Forbidden"; break;
         case 409: status_text = "Conflict"; break;
@@ -1096,6 +1101,8 @@ void web_server_setup_api_routes(struct web_server* server) {
     web_server_add_route(server, "GET", "/api/check-update", web_server_handle_api_check_update);
     web_server_add_route(server, "GET", "/api/update-status", web_server_handle_api_update_status);
     web_server_add_route(server, "POST", "/api/update", web_server_handle_api_update);
+    web_server_add_route(server, "GET", "/api/experiences", web_server_handle_api_experiences);
+    web_server_add_route(server, "POST", "/api/experience-control", web_server_handle_api_experience_control);
     web_server_add_route(server, "GET", "/", web_server_handle_dashboard);
 }
 
@@ -1773,6 +1780,35 @@ struct http_response web_server_handle_api_update_status(const struct http_reque
     return response;
 }
 
+struct http_response web_server_handle_api_experiences(const struct http_request* request) {
+    struct http_response response;
+    (void)request;
+    memset(&response, 0, sizeof(response));
+    web_server_strcpy_safe(response.content_type, "application/json", sizeof(response.content_type));
+    if (experience_owner_read_status("/var/lib/millennium/content/owner-status.json",
+                                     response.body, sizeof(response.body)) != 0) {
+        response.status_code = 500;
+        web_server_strcpy_safe(response.body, "{\"error\":\"Experience status unavailable\"}", sizeof(response.body));
+    } else {
+        response.status_code = 200;
+    }
+    return response;
+}
+
+struct http_response web_server_handle_api_experience_control(const struct http_request* request) {
+    struct http_response response;
+    memset(&response, 0, sizeof(response));
+    web_server_strcpy_safe(response.content_type, "application/json", sizeof(response.content_type));
+    if (experience_owner_submit("/var/lib/millennium/content/owner-requests", request->body) != 0) {
+        response.status_code = 400;
+        web_server_strcpy_safe(response.body, "{\"error\":\"Invalid or unavailable experience control\"}", sizeof(response.body));
+    } else {
+        response.status_code = 202;
+        web_server_strcpy_safe(response.body, "{\"accepted\":true}", sizeof(response.body));
+    }
+    return response;
+}
+
 struct http_response web_server_handle_api_update(const struct http_request* request) {
     struct http_response response;
     char json[512];
@@ -1827,12 +1863,13 @@ struct http_response web_server_handle_api_update(const struct http_request* req
 
 struct http_response web_server_handle_dashboard(const struct http_request* request) {
     struct http_response response;
+    int formatted;
     (void)request;
     memset(&response, 0, sizeof(response));
     response.status_code = 200;
     web_server_strcpy_safe(response.content_type, "text/html", sizeof(response.content_type));
 
-    snprintf(response.body, sizeof(response.body),
+    formatted = snprintf(response.body, sizeof(response.body),
         "<!DOCTYPE html><html><head>"
         "<meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
         "<title>Millennium Payphone</title>"
@@ -1875,6 +1912,11 @@ struct http_response web_server_handle_dashboard(const struct http_request* requ
         "<div id=\"plugins\" style=\"display:flex;gap:6px;flex-wrap:wrap\">"
         "<span style=\"font-size:12px;color:#888\">Loading...</span>"
         "</div></div>"
+
+        "<div class=\"card\"><h2>Experiences</h2>"
+        "<div id=\"experiences\"><span style=\"font-size:12px;color:#888\">Authenticate to load</span></div>"
+        "<button class=\"btn secondary\" onclick=\"experienceFallback()\">Use Offline Fallback</button>"
+        "</div>"
 
         "<div class=\"card\"><h2>Play</h2>"
         "<div style=\"display:flex;gap:6px;margin-bottom:8px\">"
@@ -1928,7 +1970,11 @@ struct http_response web_server_handle_dashboard(const struct http_request* requ
         "<script>"
         "function api(u){return fetch(u).then(r=>r.json())}"
         "function ah(){let t=sessionStorage.getItem('millenniumAdminToken');if(!t){t=prompt('Administrator token');if(t)sessionStorage.setItem('millenniumAdminToken',t)}return{'Content-Type':'application/json','Authorization':'Bearer '+(t||'')}}"
+        "function aapi(u){return fetch(u,{headers:ah()}).then(r=>{if(r.status===401)sessionStorage.removeItem('millenniumAdminToken');return r.json()})}"
         "function post(u,b){return fetch(u,{method:'POST',headers:ah(),body:JSON.stringify(b)}).then(r=>{if(r.status===401)sessionStorage.removeItem('millenniumAdminToken');return r.json()})}"
+        "function experienceControl(a,id){post('/api/experience-control',{action:a,id:id}).then(()=>setTimeout(loadExperiences,1000))}"
+        "function experienceFallback(){post('/api/experience-control',{action:'fallback'}).then(()=>setTimeout(loadExperiences,1000))}"
+        "function loadExperiences(){aapi('/api/experiences').then(function(d){var c=document.getElementById('experiences');c.innerHTML='';(d.installed||[]).forEach(function(x){var row=document.createElement('div');row.className='metric';var off=(d.disabled||[]).indexOf(x.id)>=0;row.innerHTML='<span>'+x.id+' '+x.version+' ('+x.rating+')</span>';var s=document.createElement('button');s.className='btn secondary';s.textContent='Select';s.disabled=off;s.onclick=function(){experienceControl('select',x.id)};row.appendChild(s);var b=document.createElement('button');b.className='btn secondary';b.textContent=off?'Enable':'Disable';b.onclick=function(){experienceControl(off?'enable':'disable',x.id)};row.appendChild(b);c.appendChild(row)});if(!(d.installed||[]).length)c.textContent='No downloadable experiences';}).catch(function(){})}"
         "function k(x){post('/api/control',{action:'keypad_press',key:x})}"
         "function coin(c){post('/api/control',{action:'coin_insert',cents:c})}"
         "function hook(u){post('/api/control',{action:u?'handset_up':'handset_down'})}"
@@ -1965,6 +2011,7 @@ struct http_response web_server_handle_dashboard(const struct http_request* requ
         "}).catch(function(){});"
         "}"
         "loadPlugins();"
+        "loadExperiences();"
         "api('/api/state').then(function(d){"
         "document.getElementById('state').textContent=d.state||'Unknown';"
         "document.getElementById('coins').textContent=(d.inserted_cents||0)+'c';"
@@ -1975,6 +2022,12 @@ struct http_response web_server_handle_dashboard(const struct http_request* requ
 
         "</body></html>",
         version_get_string(), version_get_git_hash());
+
+    if (formatted < 0 || (size_t)formatted >= sizeof(response.body)) {
+        response.status_code = 500;
+        web_server_strcpy_safe(response.body, "Dashboard exceeds response capacity", sizeof(response.body));
+        web_server_strcpy_safe(response.content_type, "text/plain", sizeof(response.content_type));
+    }
 
     return response;
 }

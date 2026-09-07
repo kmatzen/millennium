@@ -89,8 +89,11 @@ websocket.o: websocket.c websocket.h
 conn_queue.o: conn_queue.c conn_queue.h
 	$(CC) conn_queue.c -o conn_queue.o -c $(CFLAGS)
 
-web_server.o: web_server.c web_server.h conn_queue.h websocket.h config.h logger.h metrics.h health_monitor.h version.h updater.h
+web_server.o: web_server.c web_server.h experience_owner.h conn_queue.h websocket.h config.h logger.h metrics.h health_monitor.h version.h updater.h
 	$(CC) web_server.c -o web_server.o -c $(CFLAGS)
+
+experience_owner.o: experience_owner.c experience_owner.h
+	$(CC) experience_owner.c -o experience_owner.o -c $(CFLAGS)
 
 pjsip_interface.o: pjsip_interface.c pjsip_interface.h logger.h
 	$(CC) pjsip_interface.c -o pjsip_interface.o -c $(CFLAGS) `pkg-config --cflags libpjproject`
@@ -177,8 +180,8 @@ plugins/time_operator.o: plugins/time_operator.c plugins.h plugin_sdk.h
 plugins/story_mode.o: plugins/story_mode.c plugins.h plugin_sdk.h config.h
 	$(CC) plugins/story_mode.c -o plugins/story_mode.o -c $(CFLAGS)
 
-daemon: daemon.o daemon_state.o clock_source.o millennium_sdk.o mcu_protocol.o coin_gate.o serial_recovery.o serial_settings.o pjsip_interface.o sip_text.o sip_call_slot.o events.o event_processor.o config.o cli.o logger.o health_monitor.o metrics.o metrics_server.o call_metrics.o web_server.o websocket.o conn_queue.o plugins.o plugin_sdk.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o plugins/number_guess.o plugins/simon.o plugins/dial_a_joke.o plugins/trivia.o plugins/time_operator.o plugins/story_mode.o state_persistence.o display_manager.o version.o audio_tones.o wav.o updater.o
-	$(CC) daemon.o daemon_state.o clock_source.o millennium_sdk.o mcu_protocol.o coin_gate.o serial_recovery.o serial_settings.o pjsip_interface.o sip_text.o sip_call_slot.o events.o event_processor.o config.o cli.o logger.o health_monitor.o metrics.o metrics_server.o call_metrics.o web_server.o websocket.o conn_queue.o plugins.o plugin_sdk.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o plugins/number_guess.o plugins/simon.o plugins/dial_a_joke.o plugins/trivia.o plugins/time_operator.o plugins/story_mode.o state_persistence.o display_manager.o version.o audio_tones.o wav.o updater.o -o daemon $(LDFLAGS) -lm
+daemon: daemon.o daemon_state.o clock_source.o millennium_sdk.o mcu_protocol.o coin_gate.o serial_recovery.o serial_settings.o pjsip_interface.o sip_text.o sip_call_slot.o events.o event_processor.o config.o cli.o logger.o health_monitor.o metrics.o metrics_server.o call_metrics.o web_server.o experience_owner.o websocket.o conn_queue.o plugins.o plugin_sdk.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o plugins/number_guess.o plugins/simon.o plugins/dial_a_joke.o plugins/trivia.o plugins/time_operator.o plugins/story_mode.o state_persistence.o display_manager.o version.o audio_tones.o wav.o updater.o
+	$(CC) daemon.o daemon_state.o clock_source.o millennium_sdk.o mcu_protocol.o coin_gate.o serial_recovery.o serial_settings.o pjsip_interface.o sip_text.o sip_call_slot.o events.o event_processor.o config.o cli.o logger.o health_monitor.o metrics.o metrics_server.o call_metrics.o web_server.o experience_owner.o websocket.o conn_queue.o plugins.o plugin_sdk.o plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o plugins/number_guess.o plugins/simon.o plugins/dial_a_joke.o plugins/trivia.o plugins/time_operator.o plugins/story_mode.o state_persistence.o display_manager.o version.o audio_tones.o wav.o updater.o -o daemon $(LDFLAGS) -lm
 
 # Simulator object file
 simulator.o: simulator.c millennium_sdk.h events.h config.h daemon_state.h logger.h metrics.h call_metrics.h plugins.h
@@ -230,18 +233,23 @@ else
 DEAD_CODE_LDFLAG = -Wl,--gc-sections
 endif
 
-web_auth_tests: tests/web_auth_tests.c web_server.c web_server.h tests/test_framework.h
-	$(CC) tests/web_auth_tests.c web_server.c -o web_auth_tests $(CFLAGS) -I. \
+web_auth_tests: tests/web_auth_tests.c web_server.c web_server.h experience_owner.c experience_owner.h tests/test_framework.h
+	$(CC) tests/web_auth_tests.c web_server.c experience_owner.c -o web_auth_tests $(CFLAGS) -I. \
 		-ffunction-sections -fdata-sections $(DEAD_CODE_LDFLAG)
 
-test: simulator unit_tests web_auth_tests
+experience_owner_tests: tests/experience_owner_tests.c experience_owner.c experience_owner.h tests/test_framework.h
+	$(CC) tests/experience_owner_tests.c experience_owner.c -o experience_owner_tests $(CFLAGS) -I.
+
+test: simulator unit_tests web_auth_tests experience_owner_tests
 	@echo "Running unit tests..."
 	@./unit_tests
 	@./web_auth_tests
+	@./experience_owner_tests
 	@python3 tests/test_monitor.py
 	@python3 tests/test_wifi.py
-	@python3 ../content/tests/test_storytool.py
-	@python3 ../content/tests/test_content_install.py
+	@cd .. && python3 -m unittest content.tests.test_catalogtool \
+		content.tests.test_storytool content.tests.test_content_install \
+		content.tests.test_experience_agent content.tests.test_publish_catalog
 	@echo ""
 	@echo "Running scenario tests..."
 	@./simulator tests/*.scenario
@@ -256,7 +264,7 @@ test: simulator unit_tests web_auth_tests
 # code on any Linux box with libasound2-dev (e.g. CI), short of a full link.
 COMPILE_CHECK_OBJS = daemon.o daemon_state.o clock_source.o millennium_sdk.o coin_gate.o serial_recovery.o events.o \
 	event_processor.o config.o logger.o health_monitor.o metrics.o \
-	metrics_server.o call_metrics.o web_server.o websocket.o conn_queue.o plugins.o plugin_sdk.o \
+	metrics_server.o call_metrics.o web_server.o experience_owner.o websocket.o conn_queue.o plugins.o plugin_sdk.o \
 	plugins/classic_phone.o plugins/fortune_teller.o plugins/jukebox.o \
 	plugins/number_guess.o plugins/simon.o plugins/dial_a_joke.o \
 	plugins/trivia.o plugins/time_operator.o state_persistence.o display_manager.o version.o \
@@ -268,7 +276,7 @@ compile-check: $(COMPILE_CHECK_OBJS)
 	@echo "compile-check OK: all daemon sources (except pjsip_interface) compiled"
 
 clean:
-	rm -rf *.o daemon simulator unit_tests web_auth_tests pjsip_smoke plugins/*.o tests/*.o
+	rm -rf *.o daemon simulator unit_tests web_auth_tests experience_owner_tests pjsip_smoke plugins/*.o tests/*.o
 
 install: daemon
 	@systemctl --user stop daemon.service 2>/dev/null || true
@@ -291,13 +299,19 @@ install: daemon
 	sudo mkdir -p /usr/local/share/millennium/audio
 	sudo cp web_portal.html /usr/local/share/millennium/
 	sudo install -m 0755 ../content/install_content.py /usr/local/libexec/millennium-content
+	sudo install -m 0755 ../content/experience_agent.py /usr/local/libexec/millennium-experience
+	sudo install -m 0644 ../content/catalogtool.py /usr/local/libexec/catalogtool.py
 	sudo install -m 0644 ../content/storytool.py /usr/local/libexec/storytool.py
-	sudo install -d -m 0755 /var/lib/millennium/content/releases/last-line-2.0.0/media
-	sudo install -m 0644 ../content/stories/last_line/story.mst /var/lib/millennium/content/releases/last-line-2.0.0/story.mst
-	sudo install -m 0644 ../content/stories/last_line/story.json /var/lib/millennium/content/releases/last-line-2.0.0/story.json
-	sudo install -m 0644 ../content/stories/last_line/media/*.wav /var/lib/millennium/content/releases/last-line-2.0.0/media/
+	@test -f /etc/millennium/experiences.conf || sudo install -m 0600 experiences.conf.example /etc/millennium/experiences.conf
+	sudo install -d -o root -g root -m 0755 /var/lib/millennium/content /var/lib/millennium/content/releases /var/lib/millennium/content/releases/last-line-2.0.0 /var/lib/millennium/content/releases/last-line-2.0.0/media
+	sudo install -o root -g root -m 0444 ../content/stories/last_line/story.mst /var/lib/millennium/content/releases/last-line-2.0.0/story.mst
+	sudo install -o root -g root -m 0444 ../content/stories/last_line/story.json /var/lib/millennium/content/releases/last-line-2.0.0/story.json
+	sudo install -o root -g root -m 0444 ../content/stories/last_line/media/*.wav /var/lib/millennium/content/releases/last-line-2.0.0/media/
 	@test -e /var/lib/millennium/content/current || sudo ln -s releases/last-line-2.0.0 /var/lib/millennium/content/current
 	sudo cp systemd/daemon.service /etc/systemd/system/
+	sudo cp systemd/millennium-experience-update.service systemd/millennium-experience-update.timer systemd/millennium-experience-recover.service /etc/systemd/system/
+	sudo install -m 0644 systemd/millennium-experience.tmpfiles /usr/lib/tmpfiles.d/millennium-experience.conf
+	sudo systemd-tmpfiles --create /usr/lib/tmpfiles.d/millennium-experience.conf
 	sudo install -m 0644 firewall/millennium.nft /etc/millennium/millennium.nft
 	sudo cp systemd/millennium-firewall.service /etc/systemd/system/
 	sudo install -m 0755 monitoring/millennium_monitor.py /usr/local/libexec/millennium-monitor
@@ -316,6 +330,7 @@ install: daemon
 	sudo systemctl daemon-reload
 	sudo systemctl unmask daemon.service 2>/dev/null || true
 	sudo systemctl enable daemon.service
+	sudo systemctl enable millennium-experience-recover.service millennium-experience-update.timer
 	@if command -v nft >/dev/null 2>&1 || test -x /usr/sbin/nft; then sudo systemctl enable --now millennium-firewall.service; else echo "ERROR: nftables is required for the production firewall"; exit 1; fi
 	sudo systemctl enable --now millennium-monitor.timer
 	sudo systemctl enable --now millennium-hil-smoke.timer

@@ -11,8 +11,15 @@ SPEC.loader.exec_module(MODULE)
 
 
 class ExactImageHarnessTests(unittest.TestCase):
+    def test_default_timeout_allows_slow_external_image_boot(self):
+        self.assertEqual(MODULE.DEFAULT_TIMEOUT_SECONDS, 600)
+
     def test_injects_all_production_slot_aliases_and_acceptance_unit(self):
         commands = MODULE.shell_commands().decode()
+
+        self.assertIn("/etc/udev/rules.d/99-qemu-slot.rules", commands)
+        self.assertIn("/etc/systemd/system/qemu-exact-accept.service", commands)
+        self.assertNotIn("/run/udev/rules.d", commands)
 
         for expected in (
             'vda1", SYMLINK+="disk/by-slot/bootconfig',

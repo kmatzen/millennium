@@ -17,29 +17,45 @@ Zero 2 W, radio, USB, audio, power, or first-time-user requirement.
     hold/group/withdrawal/denylist eligibility.
 - QEMU hardening is in `13b62a6`; the prior full exact-image evidence was
   generated from the production image and passed all 18 artifact hashes.
+- The final local software audit on 2026-09-07 passed 151 host unit tests, 6
+  web-authorization tests, 2 owner-boundary tests, 50 content/story/security
+  tests, 68 tools tests, every simulator scenario, 16 OTA tests, generated
+  schema/version checks, and `git diff --check`.
+- The 2026-09-07 plugged-media rerun exposed and fixed two QEMU portability
+  defects: initramfs `/run` discarded the exact-image udev aliases before
+  systemd consumed them, and Linux does not guarantee the numeric
+  `/dev/vportNpM` name. The exact-image harness now injects configuration only
+  into its disposable overlay, and the portable lab uses the stable
+  `/dev/virtio-ports/millennium.mcu` link. The signed-experience lifecycle also
+  establishes the same idle handset state required by the production worker.
+- At `2026-09-07T19:13:20Z`, FIDO access to `anima` remained healthy but its
+  loopback phone listener `127.0.0.1:22022` was absent; do not infer live-phone
+  state until the reverse tunnel returns.
 
 Large QEMU and image artifacts intentionally live outside the repository at
 `/Volumes/UEBuild/millennium-exact-image-qemu/`. The most recent complete
 evidence bundle is
-`full-state/artifacts/full-20260907T030556Z/`. Its
+`goal-state-20260907T1919Z/artifacts/full-20260907T201143Z/`. Its
 `full-test-result.json` reports a pass with exact production-image userspace
 tested and `physical_hardware_claimed: false`.
 
 ## Immediate execution order
 
-1. Continue the downloadable-experience Phase 2 work in
-   [`host/docs/DOWNLOADABLE_EXPERIENCES.md`](host/docs/DOWNLOADABLE_EXPERIENCES.md):
-   implement the phone-side signed-catalog poller, staged downloads, idle-only
-   activation, durable activation journal, health rollback, digest quarantine,
-   withdrawal/denylist handling, state migration, and bounded garbage
-   collection. Reuse the existing OTA primitives and content installer rather
-   than adding an unauthenticated updater.
-2. Add owner dashboard status/enable/disable/fallback controls and
-   privacy-preserving metrics, then extend unit and QEMU fault matrices across
-   every durable transition.
-3. Publish only after the catalog worker and compromise/failure tests pass.
+1. Review and commit the completed downloadable-experience implementation and
+   its owner controls. The content unit suite passes, and the QEMU lifecycle
+   suite now covers signed activation, catalog compromise, origin loss,
+   ENOSPC, withdrawal, worker restart, and abrupt VM power cuts at both durable
+   activation journal phases. The latest reusable QEMU state is
+   `/Volumes/UEBuild/millennium-exact-image-qemu/goal-state-20260907T1919Z`
+   on SSH port 2234.
+2. Publish the immutable release objects and signed stable/beta/device-group
+   catalogs with `content/publish_catalog.py` after completing the offline
+   content/catalog signing ceremony. FIDO-authenticated access to `anima` is
+   working through `/opt/homebrew/bin/ssh`; its operator-writable update root is
+   `/home/kmatzen/selfhosted/millennium-updates/www`, bind-mounted read-only into
+   the `millennium-updates` nginx container.
    `updates.kmatzen.com` is transport, not trust; signatures remain mandatory.
-4. When the assembled phone and operator are available, follow
+3. When the assembled phone and operator are available, follow
    [`hardware/as-built/phone-001/NEXT_PHYSICAL_SESSION.md`](hardware/as-built/phone-001/NEXT_PHYSICAL_SESSION.md)
    exactly. That single session is intended to close the remaining P0 physical
    Wi-Fi, A/B OS, power-interruption, recovery-media, external-maintenance,
@@ -51,7 +67,8 @@ For content/catalog changes, run:
 
 ```sh
 python3 -m unittest content.tests.test_catalogtool \
-  content.tests.test_storytool content.tests.test_content_install
+  content.tests.test_storytool content.tests.test_content_install \
+  content.tests.test_experience_agent content.tests.test_publish_catalog
 python3 -m unittest discover -s tools/tests -p 'test_*.py'
 python3 tools/generate_experience_schemas.py --check
 python3 tools/generate_version_metadata.py --check
@@ -61,7 +78,8 @@ git diff --check
 For full appliance changes, use the external-backed QEMU state and exact image:
 
 ```sh
-export MILLENNIUM_QEMU_STATE=/Volumes/UEBuild/millennium-exact-image-qemu/full-state
+export MILLENNIUM_QEMU_STATE=/Volumes/UEBuild/millennium-exact-image-qemu/goal-state-20260907T1919Z
+export MILLENNIUM_QEMU_SSH_PORT=2234
 export MILLENNIUM_QEMU_EXACT_IMAGE=/Volumes/UEBuild/millennium-exact-image-qemu/phone001-c0427f2.img
 export MILLENNIUM_QEMU_EXACT_KERNEL=/Volumes/UEBuild/millennium-exact-image-qemu/vmlinuz-6.1.0-52-cloud-arm64
 export MILLENNIUM_QEMU_EXACT_INITRD=/Volumes/UEBuild/millennium-exact-image-qemu/initrd.img-6.1.0-52-cloud-arm64-millennium

@@ -1,0 +1,37 @@
+{
+  "schema": 1,
+  "operation": "physical-recovery-boot-acceptance",
+  "device_id": "phone-001",
+  "candidate_source_commit": "2ad5179b0b2de4958a34b845f2db60775e317e07",
+  "observed_at": "2026-09-07T20:25:16Z",
+  "diagnostics_captured_at": "2026-09-07T20:38:12Z",
+  "physical_hardware": "Raspberry Pi Zero 2 W",
+  "boot_reached_login": true,
+  "hostname": "millennium-phone",
+  "wired_address": "192.168.8.239",
+  "authorized_keys_sha256": "0c883e42ed0fc082247f05787a5a8ab660db6defb59bfc0b6390c00909033159",
+  "root_partition": "mmcblk0p5",
+  "persistent_partition": "mmcblk0p7",
+  "persistent_mounted_read_write": true,
+  "services_started": [
+    "NetworkManager.service",
+    "ssh.service",
+    "daemon.service",
+    "millennium-maintenance-tunnel.service"
+  ],
+  "failures": [
+    {
+      "unit": "millennium-wifi-bootstrap.service",
+      "cause": "NetworkManager could not D-Bus activate wpa_supplicant; the image omitted the wpasupplicant package",
+      "effect": "wlan0 remained unavailable and the millennium-setup AP could not activate"
+    },
+    {
+      "unit": "millennium-monitor.service",
+      "cause": "/var/lib/node_exporter/textfile_collector did not exist",
+      "effect": "systemd mount namespacing failed with status 226/NAMESPACE"
+    }
+  ],
+  "passed": false,
+  "physical_boot_approved": false,
+  "disposition": "Retain as failed evidence; rebuild from corrected source and repeat physical acceptance."
+}

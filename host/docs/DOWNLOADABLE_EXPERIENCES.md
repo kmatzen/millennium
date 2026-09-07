@@ -111,27 +111,30 @@ reconstructable interaction history.
 - [x] Provide deterministic signed catalog generation and local eligibility
   evaluation for channels, percentage rollout, device groups, holds,
   withdrawals, denylists, and installed anti-rollback sequences.
-- Implement catalog polling, eligibility, staged download, dual signature/hash
+- [x] Implement catalog polling, eligibility, staged download, dual signature/hash
   verification, safe extraction, atomic activation, and retained rollback.
-- Add power-loss recovery, digest quarantine, withdrawal/denylist handling,
+- [x] Add power-loss recovery, digest quarantine, withdrawal/denylist handling,
   state migration, bounded garbage collection, and a permanent fallback.
-- Prevent activation during calls, maintenance blackout periods, or unhealthy
+- [x] Prevent activation during calls, maintenance blackout periods, or unhealthy
   hardware state.
 
 ### Phase 3 — Runtime and management
 
 - Execute packages through the constrained capability API with time, storage,
   event-rate, and media limits.
-- Add authenticated owner views and restricted maintainer controls without
+- [x] Add authenticated owner views and restricted maintainer controls without
   exposing signing or system administration to the owner.
-- Add privacy-preserving health and engagement telemetry.
+- [x] Add privacy-preserving health and engagement telemetry.
 
 ### Phase 4 — Prove the lifecycle
 
 - Add unit, schema-fuzz, malicious-archive, compatibility, and migration tests.
-- Extend QEMU coverage through catalog compromise, signature failure, rollback,
-  withdrawal, disk-full, network loss, daemon restart, and power interruption at
-  every durable transition.
+- [x] Extend QEMU coverage through catalog compromise, signature failure,
+  withdrawal, network loss, and lifecycle-worker restart.
+- [x] Exercise disk-full behavior in a bounded QEMU filesystem with a seeded
+  known-good fallback.
+- [x] Extend QEMU coverage through host-driven power interruption at every durable
+  activation transition.
 - Run real-phone acceptance for audio, display, all physical inputs, long-term
   storage behavior, owner usability, and staged production rollout.
 

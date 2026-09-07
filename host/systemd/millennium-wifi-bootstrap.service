@@ -1,7 +1,7 @@
 [Unit]
 Description=Enter Millennium owner Wi-Fi setup when explicitly required
-After=NetworkManager.service millennium-firewall.service
-Wants=NetworkManager.service millennium-firewall.service
+After=NetworkManager.service wpa_supplicant.service millennium-firewall.service
+Wants=NetworkManager.service wpa_supplicant.service millennium-firewall.service
 Wants=millennium-wifi-helper.service millennium-wifi-portal.service
 Before=millennium-wifi-helper.service millennium-wifi-portal.service
 

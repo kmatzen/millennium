@@ -115,11 +115,22 @@ Acceptance: `tools/qemu/qemu.sh wifi-test`.
   offline, optional-input, and return-visit story paths through the VM boundary.
 - [x] Export display/audio selection, peripheral state, story state, daemon
   journal, metrics, and fault timeline as one timestamped test artifact.
+- [x] Install a newly signed data experience through a guest-local HTTPS
+  catalog using the production phone-side lifecycle worker and QEMU-only keys.
+- [x] Prove the lifecycle worker preserves its known-good release across a
+  compromised catalog signature, HTTPS-origin loss, signed withdrawal, and a
+  systemd worker restart in a repeatable reused-guest test.
+- [x] Exercise real disk exhaustion in an isolated, size-bounded guest
+  filesystem and retain its readable known-good fallback.
+- [x] Exercise host-driven virtual power cuts at every content activation
+  journal boundary.
 - [x] Provide a single noninteractive full-lab command that starts or reuses the
   VM, provisions current source, runs every software acceptance layer, and emits
   a machine-readable summary with no false physical-hardware claims.
 
-Acceptance: `tools/qemu/qemu.sh experience-test` and
+Acceptance: `tools/qemu/qemu.sh experience-test`,
+`tools/qemu/qemu.sh experience-lifecycle-test`,
+`tools/qemu/qemu.sh experience-power-test`, and
 `tools/qemu/qemu.sh full-test`.
 
 ## Explicit non-objectives

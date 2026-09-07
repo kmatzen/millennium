@@ -31,7 +31,8 @@ cd "$SOURCE/host"
 make clean
 make daemon GIT_HASH="$SOURCE_COMMIT_SHORT"
 
-install -d -m 0755 /etc/millennium /var/lib/millennium /var/log/millennium
+install -d -m 0755 /etc/millennium /var/lib/millennium /var/log/millennium \
+    /usr/local/libexec
 install -m 0755 daemon /usr/local/bin/millennium-daemon
 install -m 0644 systemd/daemon.service /etc/systemd/system/daemon.service
 install -m 0644 "$SOURCE/tools/qemu/daemon.conf" /etc/millennium/daemon.conf
@@ -39,16 +40,30 @@ cat >/etc/udev/rules.d/99-millennium-qemu.rules <<'EOF'
 KERNEL=="vport*", GROUP="dialout", MODE="0660"
 EOF
 udevadm control --reload-rules
-udevadm trigger --name-match=/dev/vport0p1 || true
-chgrp dialout /dev/vport0p1
-chmod 0660 /dev/vport0p1
+MCU_PORT=/dev/virtio-ports/millennium.mcu
+udevadm trigger --name-match="$MCU_PORT" || true
+chgrp dialout "$MCU_PORT"
+chmod 0660 "$MCU_PORT"
 if [ ! -s /etc/millennium/admin-token ]; then
     umask 077
     od -An -N32 -tx1 /dev/urandom | tr -d ' \n' > /etc/millennium/admin-token
 fi
 chown millennium:millennium /etc/millennium/admin-token
 chmod 0600 /etc/millennium/admin-token
-install -d -o millennium -g millennium -m 0750 /var/lib/millennium/content
+install -d -o root -g root -m 0755 /var/lib/millennium/content
+install -d -o millennium -g millennium -m 0750 /var/lib/millennium/content/owner-requests
+install -m 0755 "$SOURCE/content/experience_agent.py" /usr/local/libexec/millennium-experience
+install -m 0644 "$SOURCE/content/install_content.py" /usr/local/libexec/install_content.py
+install -m 0644 "$SOURCE/content/catalogtool.py" /usr/local/libexec/catalogtool.py
+install -m 0644 "$SOURCE/content/storytool.py" /usr/local/libexec/storytool.py
+install -m 0755 "$SOURCE/tools/qemu/experience-power-prepare-guest.py" \
+    /usr/local/libexec/millennium-experience-power-prepare
+install -m 0755 "$SOURCE/tools/qemu/experience-power-verify-guest.py" \
+    /usr/local/libexec/millennium-experience-power-verify
+install -m 0644 "$SOURCE/host/systemd/millennium-experience-update.service" \
+    "$SOURCE/host/systemd/millennium-experience-update.timer" \
+    "$SOURCE/host/systemd/millennium-experience-recover.service" \
+    /etc/systemd/system/
 CONTENT_ID=$(python3 - "$SOURCE/content/stories/last_line/story.json" <<'PY'
 import json, sys
 value = json.load(open(sys.argv[1], encoding="utf-8"))
@@ -127,6 +142,8 @@ EOF
 install -d -m 0755 /var/lib/millennium/qemu-origin
 printf '%s\n' '{"overall_status":"WARNING","source":"qemu-sip-disabled"}' \
     >/var/lib/millennium/qemu-origin/health.json
+printf '%s\n' '{"overall_status":"healthy","source":"qemu-experience-gate"}' \
+    >/var/lib/millennium/qemu-origin/experience-health.json
 install -m 0755 "$SOURCE/tools/qemu/https-origin.py" \
     /usr/local/libexec/millennium-qemu-origin
 if [ ! -s /var/lib/millennium/qemu-ota/origin-key.pem ]; then
@@ -140,6 +157,22 @@ chmod 0600 /var/lib/millennium/qemu-ota/origin-key.pem
 install -m 0644 /var/lib/millennium/qemu-ota/origin-cert.pem \
     /usr/local/share/ca-certificates/millennium-qemu-ota.crt
 update-ca-certificates >/dev/null
+cat >/etc/millennium/experiences.conf <<EOF
+catalog_url=https://127.0.0.1:18080/experiences/stable/catalog.json
+catalog_keys=qemu-lab:/etc/millennium/qemu-update-signing-key.pem
+package_keys=qemu-lab:/etc/millennium/qemu-update-signing-key.pem
+device_id=qemu-phone
+groups=qemu
+runtime_schema=1
+daemon_version=$(cat "$SOURCE/VERSION")
+state_dir=/var/lib/millennium/content
+fallback=$CONTENT_ID
+max_releases=4
+install_window_start=00:00
+install_window_end=00:00
+phone_state_url=http://127.0.0.1:8081/api/state
+health_url=https://127.0.0.1:18080/experience-health.json
+EOF
 cat >/etc/systemd/system/millennium-qemu-origin.service <<'EOF'
 [Unit]
 Description=Millennium QEMU lab-only OTA origin
@@ -167,15 +200,25 @@ cat >/etc/systemd/system/daemon.service.d/qemu.conf <<'EOF'
 User=millennium
 Group=millennium
 DevicePolicy=closed
-DeviceAllow=/dev/vport0p1 rw
+DeviceAllow=/dev/virtio-ports/millennium.mcu rw
 AmbientCapabilities=
 CapabilityBoundingSet=
 LimitRTPRIO=0
 LimitMEMLOCK=0
 EOF
 chown -R millennium:millennium /var/lib/millennium /var/log/millennium
+chown -R root:root /var/lib/millennium/content
+find /var/lib/millennium/content/releases -type d -exec chmod 0755 {} +
+find /var/lib/millennium/content/releases -type f -exec chmod 0444 {} +
+chown millennium:millennium /var/lib/millennium/content/owner-requests
+chmod 0750 /var/lib/millennium/content/owner-requests
 systemctl daemon-reload
 systemctl enable daemon.service
+systemctl enable millennium-experience-recover.service \
+    millennium-experience-update.timer
 systemctl enable --now millennium-qemu-identity-devices.service
 systemctl enable --now millennium-qemu-origin.service
 systemctl restart daemon.service
+# A successful provision is the durable baseline for subsequent abrupt-power
+# tests. Do not let host-side QEMU termination test unflushed setup writes.
+sync

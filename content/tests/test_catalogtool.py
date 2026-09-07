@@ -39,6 +39,7 @@ class CatalogToolTests(unittest.TestCase):
         self.assertEqual(self.catalog, second)
         entry = self.catalog["packages"][0]
         self.assertTrue(entry["manifest_url"].startswith("https://"))
+        self.assertIn("/releases/last-line/00000001-2.1.0/", entry["manifest_url"])
         self.assertEqual(entry["signature_url"], entry["manifest_url"] + ".sig")
 
     def test_transport_must_be_https_and_package_schema_two(self):
