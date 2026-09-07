@@ -39,7 +39,10 @@ Display and coin commands are critical. Beta ACKs an accepted sequence before
 work begins, retains the last accepted sequence independently for the display
 and coin subsystems, and ACKs a replay without executing it again. A busy
 subsystem returns status 1. The host retries an unacknowledged frame after 500 ms
-up to three times, then fails serial health and exports timeout metrics.
+up to three times, then fails serial health and exports timeout metrics. Critical
+commands are serialized through a bounded FIFO so a later command cannot replace
+the sequence awaiting acknowledgement. A matching busy ACK is backpressure: it
+restarts the 500 ms window without consuming the transport-failure retry budget.
 
 Long operations are cooperative state machines. The display deadline is five
 seconds; coin control five seconds; EEPROM programming 45 seconds; verification

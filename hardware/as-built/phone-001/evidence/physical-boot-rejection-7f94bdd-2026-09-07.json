@@ -1,0 +1,56 @@
+{
+  "schema": 1,
+  "operation": "physical-recovery-boot-acceptance",
+  "device_id": "phone-001",
+  "candidate_source_commit": "7f94bdd03c5623eb2588776bc8d909c294ca84fa",
+  "observed_at": "2026-09-07T23:24:25Z",
+  "diagnostics_completed_at": "2026-09-07T23:58:30Z",
+  "physical_hardware": "Raspberry Pi Zero 2 W with integrated USB hub and r8152 Ethernet",
+  "boot_reached_login": true,
+  "wired_address": "192.168.8.239",
+  "mount_contract_verified": true,
+  "daemon_version": "0.4.0 (git 7f94bdd03c56)",
+  "mcu_identity": {
+    "alpha": "version=0.4.0 protocol=2 build=e0fe59960549 selftest=ok",
+    "beta": "version=0.4.0 protocol=2 build=e0fe59960549 selftest=ok"
+  },
+  "failures": [
+    {
+      "gate": "stable USB and MCU operation",
+      "cause": "The host kept only one pending critical command while startup emitted multiple coin and display commands. Later commands overwrote the awaited sequence, and matching MCU busy acknowledgements were treated as eventual transport failures.",
+      "effect": "The daemon entered a close, reopen, Arduino-reset, and replay loop. The Raspberry Pi DWC OTG driver emitted 229 FSM NP dequeue timeout warnings; the first boot escalated to an RCU stall and r8152 transmit watchdog timeout."
+    }
+  ],
+  "isolation": {
+    "daemon_sigstop_timeout_count_before": 207,
+    "daemon_sigstop_timeout_count_after_20_seconds": 207,
+    "direct_alpha_beta_probe_timeout_count_before": 229,
+    "direct_alpha_beta_probe_timeout_count_after": 229,
+    "conclusion": "The attached hub and responsive MCUs did not trigger new warnings while daemon traffic was paused; the daemon reconnect workload was the trigger."
+  },
+  "candidate_fix_validation": {
+    "source_tree_base": "fae75a04d41fdc6a22391cef04f73c2168af1fcf",
+    "build_host": "anima",
+    "binary_architecture": "aarch64",
+    "binary_sha256": "9ad96a116d2dd20d618a66ba372fbb29408747f0dbf56c8ae575bce94c2d936a",
+    "pjsip_version": "2.14.1",
+    "elapsed_seconds": 113,
+    "kernel_timeout_count_before": 229,
+    "kernel_timeout_count_after": 229,
+    "mcu_command_busy": 1,
+    "mcu_command_retries": 1,
+    "mcu_operations_completed": 3,
+    "mcu_command_timeouts": 0,
+    "serial_reconnects": 0,
+    "serial_health_status": 0,
+    "result": "The busy reply was retried and completed without reconnecting or adding a kernel USB warning."
+  },
+  "coverage_limits": [
+    "Phone audio, handset, keypad, coin validator, card reader, and complete installed electrical load were not attached.",
+    "The isolated network had no external DNS, so SIP registration and reverse-tunnel health were not acceptance-tested.",
+    "This diagnostic binary was not the signed recovery artifact and does not approve the recovery image."
+  ],
+  "passed": false,
+  "physical_boot_approved": false,
+  "disposition": "Retain as failed evidence. Ship the serialized command fix in a newly signed candidate and repeat full physical acceptance."
+}

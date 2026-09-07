@@ -38,6 +38,7 @@ static int send_mcu_hello(struct millennium_client *client);
 static speed_t serial_speed_from_baud(int baud_rate);
 static int serial_write_all(struct millennium_client *client, const uint8_t *data,
                             size_t length);
+static int send_next_critical_command(struct millennium_client *client);
 static void process_mcu_frame(struct millennium_client *client, const mcu_frame_t *frame);
 
 /* SIP registration state: 0=unknown, 1=ok, -1=fail */
@@ -297,6 +298,8 @@ static int open_serial_port(struct millennium_client *client, const char *device
     clock_gettime(CLOCK_MONOTONIC, &client->mcu_protocol_started_at);
     client->mcu_protocol_last_hello_at = client->mcu_protocol_started_at;
     client->pending_frame_length = 0;
+    client->command_queue_head = 0;
+    client->command_queue_count = 0;
     if (send_mcu_hello(client) != 0) {
         logger_error_with_category("SDK", "Failed to begin MCU protocol negotiation");
         close(client->display_fd);
@@ -861,7 +864,15 @@ static void process_mcu_frame(struct millennium_client *client, const mcu_frame_
                 frame->payload[0] == client->pending_sequence) {
             client->pending_frame_length = 0;
             client->pending_retries = 0;
-        } else if (frame->length >= 2 && frame->payload[1] != 0) {
+            if (send_next_critical_command(client) != 0)
+                client->serial_healthy = 0;
+        } else if (frame->length >= 2 && frame->payload[1] != 0 &&
+                client->pending_frame_length > 0 &&
+                frame->payload[0] == client->pending_sequence) {
+            /* BUSY is MCU backpressure, not a transport failure. Restart the
+             * retry window without consuming the link-failure retry budget. */
+            clock_gettime(CLOCK_MONOTONIC, &client->pending_sent_at);
+            client->pending_retries = 0;
             metrics_increment_counter("mcu_command_busy", 1);
         }
         return;
@@ -1012,6 +1023,27 @@ static int serial_write_all(struct millennium_client *client, const uint8_t *dat
     return 0;
 }
 
+static int send_next_critical_command(struct millennium_client *client) {
+    size_t index;
+    size_t length;
+    if (!client || client->pending_frame_length > 0 ||
+            client->command_queue_count == 0) return 0;
+
+    index = client->command_queue_head;
+    length = client->queued_frame_lengths[index];
+    if (serial_write_all(client, client->queued_frames[index], length) != 0)
+        return -1;
+
+    memcpy(client->pending_frame, client->queued_frames[index], length);
+    client->pending_frame_length = length;
+    client->pending_sequence = client->queued_frame_sequences[index];
+    client->pending_retries = 0;
+    clock_gettime(CLOCK_MONOTONIC, &client->pending_sent_at);
+    client->command_queue_head = (index + 1) % MCU_COMMAND_QUEUE_CAPACITY;
+    client->command_queue_count--;
+    return 0;
+}
+
 void millennium_client_write_command(struct millennium_client *client, uint8_t command,
                                      const uint8_t *data, size_t data_size) {
     uint8_t type;
@@ -1041,13 +1073,31 @@ void millennium_client_write_command(struct millennium_client *client, uint8_t c
         logger_error_with_category("SDK", "MCU command payload is invalid or oversized");
         return;
     }
-    if (serial_write_all(client, frame, frame_length) != 0) return;
     if (mcu_message_is_critical(type)) {
+        if (client->pending_frame_length > 0) {
+            size_t index;
+            if (client->command_queue_count >= MCU_COMMAND_QUEUE_CAPACITY) {
+                logger_error_with_category("SDK", "MCU command queue overflow");
+                metrics_increment_counter("mcu_command_queue_overflows", 1);
+                client->serial_healthy = 0;
+                return;
+            }
+            index = (client->command_queue_head + client->command_queue_count) %
+                MCU_COMMAND_QUEUE_CAPACITY;
+            memcpy(client->queued_frames[index], frame, frame_length);
+            client->queued_frame_lengths[index] = frame_length;
+            client->queued_frame_sequences[index] = sequence;
+            client->command_queue_count++;
+            return;
+        }
+        if (serial_write_all(client, frame, frame_length) != 0) return;
         memcpy(client->pending_frame, frame, frame_length);
         client->pending_frame_length = frame_length;
         client->pending_sequence = sequence;
         client->pending_retries = 0;
         clock_gettime(CLOCK_MONOTONIC, &now);
         client->pending_sent_at = now;
+    } else {
+        (void)serial_write_all(client, frame, frame_length);
     }
 }

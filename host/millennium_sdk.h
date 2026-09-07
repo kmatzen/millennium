@@ -7,6 +7,8 @@
 #include <time.h>
 #include "mcu_protocol.h"
 
+#define MCU_COMMAND_QUEUE_CAPACITY 8
+
 /* Forward declarations */
 struct millennium_client;
 struct millennium_logger;
@@ -77,6 +79,11 @@ typedef struct millennium_client {
     uint8_t pending_sequence;
     int pending_retries;
     struct timespec pending_sent_at;
+    uint8_t queued_frames[MCU_COMMAND_QUEUE_CAPACITY][MCU_PROTOCOL_MAX_FRAME];
+    size_t queued_frame_lengths[MCU_COMMAND_QUEUE_CAPACITY];
+    uint8_t queued_frame_sequences[MCU_COMMAND_QUEUE_CAPACITY];
+    size_t command_queue_head;
+    size_t command_queue_count;
 } millennium_client_t;
 
 /* Function declarations */
