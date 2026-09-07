@@ -87,6 +87,8 @@ install -m 0644 "$host/systemd/millennium-wifi.sysusers" \
     "$payload/usr/lib/sysusers.d/millennium-wifi.conf"
 install -m 0644 "$host/systemd/millennium-experience.tmpfiles" \
     "$payload/usr/lib/tmpfiles.d/millennium-experience.conf"
+install -m 0644 "$host/systemd/millennium-monitor.tmpfiles" \
+    "$payload/usr/lib/tmpfiles.d/millennium-monitor.conf"
 install -m 0755 "$repo/host/os_image/slot-shared-generator" \
     "$payload/usr/lib/systemd/system-generators/slot-shared-generator"
 install -m 0440 "$host/systemd/millennium-ota-sudoers" \

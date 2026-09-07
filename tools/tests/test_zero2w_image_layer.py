@@ -20,6 +20,14 @@ class Zero2WImageLayerTests(unittest.TestCase):
         )
         self.assertIn("Wants=NetworkManager.service wpa_supplicant.service", unit)
         self.assertIn("After=NetworkManager.service wpa_supplicant.service", unit)
+        tmpfiles = (ROOT / "host/systemd/millennium-monitor.tmpfiles").read_text()
+        staging = (ROOT / "tools/stage_zero2w_image_payload.sh").read_text()
+        self.assertIn(
+            "/var/lib/node_exporter/textfile_collector 0755 millennium millennium",
+            tmpfiles,
+        )
+        self.assertIn("millennium-monitor.tmpfiles", staging)
+        self.assertIn("millennium-monitor.conf", staging)
 
     def test_wifi_state_owner_is_resolved_inside_target_root(self) -> None:
         text = LAYER.read_text()
