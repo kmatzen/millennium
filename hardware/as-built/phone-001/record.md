@@ -431,7 +431,12 @@ and expanded SHA-256
 It was signed on a disposable APFS RAM disk and verified on macOS and `anima`.
 A bounded copy on external `UEBuild` passed all four hashes, signature, and
 Zstandard integrity checks without using laptop internal storage. It remains
-unapproved pending recovery-media write/readback and physical boot.
+unapproved pending physical boot. On 2026-09-07 macOS identified the dedicated
+63.9 GB card as `/dev/disk6`; signed preflight, full write, flush, and complete
+15,636,365,312-byte readback passed. The readback matched expanded SHA-256
+`b37ab43d14da59b887f336f10252f4e7b0607c8ec04532b66a7797901a5970a5`,
+and the card was ejected. Exact media evidence is in
+`evidence/recovery-media-phone001-7f94bdd.json`.
 Exact evidence is in
 `evidence/zero2w-recovery-seeded-artifact-7f94bdd-2026-09-07.json`.
 

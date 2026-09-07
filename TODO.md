@@ -91,7 +91,7 @@ with one assembled-hardware session and without repeating the network wiring.
     - [x] Produce, sign, and retain a software-verified production-equivalent
       recovery image, with its exact compressed and expanded hashes bound to
       the active release key. Keep it explicitly unapproved until physical boot.
-    - [ ] Write the current `7f94bdd` retained image to OS-identified removable
+    - [x] Write the current `7f94bdd` retained image to OS-identified removable
       recovery media and verify its full image-length readback against the
       signed expanded digest.
       - [x] Preserve the completed write/readback evidence for the rejected

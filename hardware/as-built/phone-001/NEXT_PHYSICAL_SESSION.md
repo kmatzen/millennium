@@ -56,9 +56,14 @@ host directory through a read-only bind mount and does not require a restart.
 
 ## 1. Write and verify the corrected recovery card
 
-**Pending for `7f94bdd`.** The earlier media write/readback completed, but its
-physical boot rejected the image. Its evidence remains historical only and
-does not satisfy this gate for the current candidate.
+**Completed for `7f94bdd` on 2026-09-07.** macOS identified the dedicated
+63.9 GB USB-attached card as `/dev/disk6`. The active-key signature and source
+disk separation passed preflight. The writer expanded, wrote, and flushed the
+15,636,365,312-byte image, then read the complete image length back. Readback
+matched signed SHA-256
+`b37ab43d14da59b887f336f10252f4e7b0607c8ec04532b66a7797901a5970a5`.
+The card was ejected. Evidence is retained in
+`evidence/recovery-media-phone001-7f94bdd.json`.
 
 The earlier `/dev/disk10` write/readback passed byte-for-byte, but its v3 image
 failed physical boot acceptance and is quarantined. It must not be redeployed.
@@ -94,12 +99,10 @@ media write/readback and physical boot both pass:
 /Volumes/UEBuild/millennium-images/zero2w-ab-1.0.0-7f94bdd-phone001-unapproved
 ```
 
-Shut down the currently booted rejected image, remove its dedicated recovery
-card, and attach that card to the Mac. Identify its current whole-disk name
-with `diskutil list external physical`. Transfer the restricted artifact
-directly from `anima` to `UEBuild` for the bounded write session; do not place
-the image on the laptop's internal disk. Verify the four recorded hashes and
-signature after transfer, then run the preflight first:
+Do not rewrite this verified card merely to repeat the completed step. If its
+custody/readback evidence becomes invalid, identify its current whole-disk name
+with `diskutil list external physical`, verify the four recorded hashes and
+signature, and run the preflight first:
 
 ```bash
 python3 tools/write_recovery_media.py \

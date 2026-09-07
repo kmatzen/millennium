@@ -30,7 +30,15 @@
   "operation": "production-recovery-artifact-factory-seed",
   "passed": true,
   "physical_boot_approved": false,
-  "recovery_media_written": false,
+  "recovery_media": {
+    "ejected": true,
+    "evidence_sha256": "2224af18a3810decc3337abac6bf8d39f9febdb3e51a15b719beacaf3af8a79a",
+    "expanded_readback_sha256": "b37ab43d14da59b887f336f10252f4e7b0607c8ec04532b66a7797901a5970a5",
+    "full_image_length_readback": true,
+    "path": "/dev/disk6",
+    "size_bytes": 63864569856
+  },
+  "recovery_media_written": true,
   "schema": 1,
   "signing": {
     "active_ciphertext_sha256": "a94302f82874284020aeca7b3ccc7543fb014e4207d4268e17aaa1b8aea9ccad",
