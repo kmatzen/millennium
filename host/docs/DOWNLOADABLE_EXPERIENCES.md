@@ -98,13 +98,13 @@ reconstructable interaction history.
 
 ### Phase 1 — Specify and validate
 
-- Define signed catalog and package schemas and add them to compatibility
+- [x] Define signed catalog and package schemas and add them to compatibility
   metadata.
-- Define the versioned runtime capability API, package quotas, ratings policy,
-  and native-code prohibition.
-- Extend the authoring tool to build deterministic packages and reject unsafe
-  paths, missing media, invalid graphs, incompatible schemas, and excessive
-  resource use.
+- [x] Define the versioned runtime capability allowlist, package quotas, ratings
+  policy, and native-code prohibition.
+- [x] Extend the authoring tool to build deterministic schema-2 packages with an
+  exact file inventory and reject unsafe paths, missing media, invalid graphs,
+  incompatible schemas, and excessive resource use.
 
 ### Phase 2 — Install and recover
 

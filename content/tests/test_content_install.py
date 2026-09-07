@@ -14,7 +14,8 @@ import unittest
 
 CONTENT = Path(__file__).parents[1]
 sys.path.insert(0, str(CONTENT))
-from install_content import InstallError, install, rollback, safe_extract
+from install_content import (InstallError, install, rollback, safe_extract,
+                             validate_manifest, verify_inventory)
 from storytool import package
 
 STORY = CONTENT / "stories" / "last_line" / "story.json"
@@ -40,6 +41,7 @@ class ContentInstallTests(unittest.TestCase):
         if version:
             story = json.loads(STORY.read_text())
             story["version"] = version
+            story["distribution"]["sequence"] = 2
             source_root = output / f"story-{version}"
             source_root.mkdir()
             shutil.copytree(STORY.parent / "media", source_root / "media")
@@ -62,6 +64,29 @@ class ContentInstallTests(unittest.TestCase):
         self.assertIn("1.2.0", os.readlink(self.root / "installed/current"))
         rollback(self.root / "installed")
         self.assertIn(BASE_VERSION, os.readlink(self.root / "installed/current"))
+
+    def test_runtime_compatibility_and_sequence_rollback_are_rejected(self):
+        packages = self.root / "packages"
+        packages.mkdir()
+        manifest, signature = self.build(packages)
+        installed = self.root / "installed"
+        with self.assertRaisesRegex(InstallError, "runtime schema"):
+            install(manifest, signature, {"test": self.public}, installed,
+                    runtime_schema=2, daemon_version="0.4.0")
+        install(manifest, signature, {"test": self.public}, installed,
+                runtime_schema=1, daemon_version="0.4.0")
+        shutil.rmtree(installed / "releases" / f"last-line-{BASE_VERSION}")
+        with self.assertRaisesRegex(InstallError, "sequence rollback"):
+            install(manifest, signature, {"test": self.public}, installed,
+                    runtime_schema=1, daemon_version="0.4.0")
+
+    def test_daemon_version_bounds_are_enforced(self):
+        packages = self.root / "packages"
+        packages.mkdir()
+        manifest, signature = self.build(packages)
+        with self.assertRaisesRegex(InstallError, "newer daemon"):
+            install(manifest, signature, {"test": self.public},
+                    self.root / "installed", daemon_version="0.3.9")
 
     def test_tampered_bundle_is_rejected(self):
         packages = self.root / "packages"
@@ -92,6 +117,38 @@ class ContentInstallTests(unittest.TestCase):
             bundle.addfile(info)
         with self.assertRaisesRegex(InstallError, "unsafe archive member"):
             safe_extract(archive, self.root / "stage")
+
+    def test_v2_manifest_rejects_undeclared_capabilities(self):
+        packages = self.root / "packages"
+        packages.mkdir()
+        manifest_path, unused_signature = self.build(packages)
+        manifest = json.loads(manifest_path.read_text())
+        manifest["capabilities"].append("shell")
+        with self.assertRaisesRegex(InstallError, "capabilities"):
+            validate_manifest(manifest)
+
+    def test_v2_inventory_rejects_added_or_changed_files(self):
+        packages = self.root / "packages"
+        packages.mkdir()
+        manifest_path, unused_signature = self.build(packages)
+        manifest = json.loads(manifest_path.read_text())
+        archive = packages / manifest["bundle"]
+        stage = self.root / "stage"
+        stage.mkdir()
+        safe_extract(archive, stage, manifest["quotas"]["storage_bytes"])
+        verify_inventory(stage, manifest)
+        (stage / "undeclared").write_text("no")
+        with self.assertRaisesRegex(InstallError, "inventory"):
+            verify_inventory(stage, manifest)
+
+    def test_extraction_limit_rejects_expansion_bomb(self):
+        archive = self.root / "large.tar.gz"
+        with tarfile.open(archive, "w:gz") as bundle:
+            info = tarfile.TarInfo("story.json")
+            info.size = 33
+            bundle.addfile(info, io.BytesIO(b"x" * 33))
+        with self.assertRaisesRegex(InstallError, "extraction limit"):
+            safe_extract(archive, self.root / "limited", maximum_bytes=32)
 
 
 if __name__ == "__main__":

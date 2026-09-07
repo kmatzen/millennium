@@ -270,7 +270,7 @@ with one assembled-hardware session and without repeating the network wiring.
   - [ ] Publish immutable packages and channel catalogs through
     `updates.kmatzen.com`, with stable/beta/device-group rollout, holds,
     withdrawal, and an emergency signed denylist.
-  - [ ] Extend the authoring tool to produce deterministic packages and reject
+  - [x] Extend the authoring tool to produce deterministic packages and reject
     unsafe paths, missing media, invalid graphs, incompatible schemas, and
     excessive resource use.
   - [ ] Implement periodic catalog polling, staged download, signature and hash

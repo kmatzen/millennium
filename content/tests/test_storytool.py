@@ -49,6 +49,25 @@ class StoryToolTests(unittest.TestCase):
             manifest = json.loads(next(output.glob("*.manifest.json")).read_text())
             archive = output / manifest["bundle"]
             self.assertEqual(manifest["sha256"], TOOL.sha256(archive))
+            self.assertEqual(manifest["schema"], 2)
+            self.assertEqual(manifest["sequence"], 1)
+            self.assertEqual(manifest["compatibility"], {
+                "runtime_schema_min": 1, "runtime_schema_max": 1,
+                "daemon_min": "0.4.0"})
+            expected = {"story.json", "story.mst"}
+            expected.update("media/" + path.name
+                            for path in TOOL.media_files(STORY_PATH.parent / "media"))
+            self.assertEqual({item["path"] for item in manifest["files"]}, expected)
+
+    def test_distribution_policy_rejects_native_network_and_bad_quotas(self):
+        story = copy.deepcopy(self.story)
+        story["distribution"] = {"capabilities": ["native", "network"],
+                                 "storage_bytes": 0}
+        with self.assertRaisesRegex(TOOL.StoryError, "capabilities"):
+            TOOL.package_policy(story)
+        story["distribution"] = {"storage_bytes": 0}
+        with self.assertRaisesRegex(TOOL.StoryError, "storage_bytes"):
+            TOOL.package_policy(story)
 
     def test_packages_are_reproducible_and_include_runtime_form(self):
         with tempfile.TemporaryDirectory() as first, tempfile.TemporaryDirectory() as second:

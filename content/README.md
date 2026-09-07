@@ -20,14 +20,23 @@ python3 content/storytool.py package content/stories/last_line/story.json \
 
 Validation rejects unreachable scenes, unmarked dead ends, closed loops with no
 ending, missing or unused media, duplicate inputs, invalid transitions, and
-copy that exceeds the physical 20-character VFD. `preview` lets an editor play each choice locally;
+copy that exceeds the physical 20-character VFD. It also rejects undeclared
+runtime capabilities, invalid compatibility ranges, ratings/locales, state
+migrations, and package quotas. `preview` lets an editor play each choice locally;
 `explore` prints every acyclic path and ending for review. Packaging produces a
-canonical manifest, content digest, reproducible archive, and optional Ed25519
-signature. Content versions are independent of the daemon version.
+canonical schema-2 manifest, per-file inventory and digests, compressed size,
+monotonic sequence, compatibility/capability/rating/quota policy, reproducible
+archive, and optional Ed25519 signature. Content versions are independent of
+the daemon version; sequence provides the anti-rollback ordering.
 
 On the phone, `install_content.py install` requires that signature and a
 matching trusted key ID, revalidates the author and runtime forms, installs an
 immutable release, and atomically moves `current` while retaining `previous`.
+It accepts legacy schema-1 releases during migration, but schema-2 releases
+also enforce archive and expanded-size limits, exact file inventory, runtime
+and daemon compatibility, allowlisted capabilities, and persistent monotonic
+sequence state. A rollback switches to the retained known-good release without
+lowering that anti-rollback state.
 The full-device OTA bundle carries the matching content verifier and compiler
 under `/opt/millennium/current/content`, so a story compiler-format change is
 promoted with the daemon that reads it. Production content activation should

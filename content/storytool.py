@@ -45,6 +45,97 @@ def sha256(path):
     return digest.hexdigest()
 
 
+def packaged_files(stage):
+    """Return the deterministic signed inventory for a staged experience."""
+    result = []
+    for path in sorted(item for item in stage.rglob("*") if item.is_file()):
+        result.append({"path": path.relative_to(stage).as_posix(),
+                       "sha256": sha256(path), "size": path.stat().st_size})
+    return result
+
+
+def package_policy(story):
+    """Return bounded distribution metadata, with conservative defaults."""
+    policy = story.get("distribution", {})
+    if not isinstance(policy, dict):
+        raise StoryError("distribution must be an object")
+    allowed = {"sequence", "runtime_schema_min", "runtime_schema_max",
+               "daemon_min", "daemon_max", "capabilities", "rating",
+               "locales", "storage_bytes", "state_bytes", "session_seconds",
+               "state_schema", "rollback_compatible", "migrate_from"}
+    unknown = sorted(set(policy) - allowed)
+    if unknown:
+        raise StoryError("unsupported distribution metadata: " + ", ".join(unknown))
+    sequence = policy.get("sequence", 1)
+    if not isinstance(sequence, int) or isinstance(sequence, bool) or sequence < 1:
+        raise StoryError("distribution.sequence must be a positive integer")
+    capabilities = policy.get(
+        "capabilities",
+        ["audio", "display", "handset", "keypad", "coin", "credential",
+         "timers", "state"],
+    )
+    allowed_capabilities = {"audio", "display", "handset", "keypad", "coin",
+                            "credential", "timers", "state"}
+    if (not isinstance(capabilities, list) or len(capabilities) != len(set(capabilities))
+            or any(item not in allowed_capabilities for item in capabilities)):
+        raise StoryError("distribution.capabilities contains unsupported or duplicate values")
+    rating = policy.get("rating", "everyone")
+    if rating not in {"everyone", "teen", "mature"}:
+        raise StoryError("distribution.rating is invalid")
+    locales = policy.get("locales", ["en-US"])
+    if (not isinstance(locales, list) or not locales or len(locales) != len(set(locales))
+            or any(not isinstance(item, str) or
+                   not re.fullmatch(r"[a-z]{2,3}(-[A-Z]{2})?", item)
+                   for item in locales)):
+        raise StoryError("distribution.locales is invalid")
+    integers = {
+        "runtime_schema_min": (policy.get("runtime_schema_min", 1), 1, 1),
+        "runtime_schema_max": (policy.get("runtime_schema_max", 1), 1, 1),
+        "storage_bytes": (policy.get("storage_bytes", 64 * 1024 * 1024), 1,
+                          256 * 1024 * 1024),
+        "state_bytes": (policy.get("state_bytes", 64 * 1024), 0, 1024 * 1024),
+        "session_seconds": (policy.get("session_seconds", 3600), 1, 86400),
+        "state_schema": (policy.get("state_schema", 1), 1, 2**31 - 1),
+    }
+    for name, (value, minimum, maximum) in integers.items():
+        if (not isinstance(value, int) or isinstance(value, bool)
+                or not minimum <= value <= maximum):
+            raise StoryError(f"distribution.{name} must be {minimum}..{maximum}")
+    if integers["runtime_schema_min"][0] > integers["runtime_schema_max"][0]:
+        raise StoryError("distribution runtime schema range is inverted")
+    rollback = policy.get("rollback_compatible", True)
+    if not isinstance(rollback, bool):
+        raise StoryError("distribution.rollback_compatible must be true or false")
+    migrate = policy.get("migrate_from", [])
+    if (not isinstance(migrate, list) or len(migrate) != len(set(migrate))
+            or any(not isinstance(item, int) or isinstance(item, bool) or item < 1
+                   for item in migrate)):
+        raise StoryError("distribution.migrate_from must contain unique positive integers")
+    compatibility = {
+        "runtime_schema_min": integers["runtime_schema_min"][0],
+        "runtime_schema_max": integers["runtime_schema_max"][0],
+    }
+    for name in ("daemon_min", "daemon_max"):
+        if name in policy:
+            if not isinstance(policy[name], str) or not re.fullmatch(
+                    r"[0-9]+\.[0-9]+\.[0-9]+", policy[name]):
+                raise StoryError(f"distribution.{name} must use semantic versioning")
+            compatibility[name] = policy[name]
+    return {
+        "sequence": sequence,
+        "compatibility": compatibility,
+        "capabilities": sorted(capabilities),
+        "rating": rating,
+        "locales": sorted(locales),
+        "quotas": {"storage_bytes": integers["storage_bytes"][0],
+                   "state_bytes": integers["state_bytes"][0],
+                   "session_seconds": integers["session_seconds"][0]},
+        "state": {"schema": integers["state_schema"][0],
+                  "rollback_compatible": rollback,
+                  "migrate_from": sorted(migrate)},
+    }
+
+
 def sign_ed25519(private_key, message, signature):
     """Sign on OpenSSL 3 or Raspberry Pi OS's OpenSSL 1.1.1."""
     result = subprocess.run(
@@ -91,6 +182,10 @@ def closed_cycles(story, reachable):
 
 def validate(story, root):
     errors = []
+    try:
+        package_policy(story)
+    except StoryError as exc:
+        errors.append(str(exc))
     story_id = story.get("id")
     version = story.get("version")
     entry = story.get("entry")
@@ -378,6 +473,7 @@ def package(story_path, output, private_key=None, key_id="primary"):
     errors = validate(story, root)
     if errors:
         raise StoryError("\n".join(errors))
+    policy = package_policy(story)
     output.mkdir(parents=True, exist_ok=True)
     identity = f"{story['id']}-{story['version']}"
     archive = output / f"{identity}.tar.gz"
@@ -390,6 +486,10 @@ def package(story_path, output, private_key=None, key_id="primary"):
             (stage / "media").mkdir()
             for source in sorted(media_files(root / "media")):
                 (stage / "media" / source.name).write_bytes(source.read_bytes())
+        inventory = packaged_files(stage)
+        total_size = sum(item["size"] for item in inventory)
+        if total_size > policy["quotas"]["storage_bytes"]:
+            raise StoryError("package exceeds distribution.storage_bytes")
         with archive.open("wb") as raw:
             with gzip.GzipFile(filename="", mode="wb", fileobj=raw, mtime=0) as compressed:
                 with tarfile.open(fileobj=compressed, mode="w", format=tarfile.PAX_FORMAT) as bundle:
@@ -403,8 +503,9 @@ def package(story_path, output, private_key=None, key_id="primary"):
                                 bundle.addfile(info, stream)
                         else:
                             bundle.addfile(info)
-    manifest = {"schema": 1, "id": story["id"], "version": story["version"],
-                "key_id": key_id, "bundle": archive.name, "sha256": sha256(archive)}
+    manifest = {"schema": 2, "id": story["id"], "version": story["version"],
+                "key_id": key_id, "bundle": archive.name, "sha256": sha256(archive),
+                "size": archive.stat().st_size, "files": inventory, **policy}
     manifest_path = output / f"{identity}.manifest.json"
     manifest_path.write_bytes(canonical(manifest))
     if private_key:
