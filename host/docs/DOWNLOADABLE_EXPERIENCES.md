@@ -108,6 +108,9 @@ reconstructable interaction history.
 
 ### Phase 2 — Install and recover
 
+- [x] Provide deterministic signed catalog generation and local eligibility
+  evaluation for channels, percentage rollout, device groups, holds,
+  withdrawals, denylists, and installed anti-rollback sequences.
 - Implement catalog polling, eligibility, staged download, dual signature/hash
   verification, safe extraction, atomic activation, and retained rollback.
 - Add power-loss recovery, digest quarantine, withdrawal/denylist handling,

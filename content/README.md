@@ -16,6 +16,13 @@ python3 content/storytool.py compile content/stories/last_line/story.json \
   --output content/stories/last_line/story.mst
 python3 content/storytool.py package content/stories/last_line/story.json \
   --output build/content --private-key /secure/content-signing.pem --key-id content-2026
+python3 content/catalogtool.py build build/content/*.manifest.json \
+  --base-url https://updates.kmatzen.com/experiences/stable/ \
+  --channel stable --sequence 1 --key-id catalog-2026 \
+  --private-key /secure/catalog-signing.pem --output build/content/catalog.json
+python3 content/catalogtool.py validate build/content/catalog.json
+python3 content/catalogtool.py select build/content/catalog.json \
+  --device-id phone-001
 ```
 
 Validation rejects unreachable scenes, unmarked dead ends, closed loops with no
@@ -37,6 +44,14 @@ also enforce archive and expanded-size limits, exact file inventory, runtime
 and daemon compatibility, allowlisted capabilities, and persistent monotonic
 sequence state. A rollback switches to the retained known-good release without
 lowering that anti-rollback state.
+
+`catalogtool.py` builds canonical signed channel catalogs from schema-2 package
+manifests. Catalog entries use immutable HTTPS manifest/signature URLs and bind
+the manifest SHA-256. Deterministic per-device rollout supports percentages,
+device groups, global holds, signed-digest withdrawal, package-ID denial, and
+installed-sequence filtering. The website remains an untrusted transport;
+catalog and package signatures establish authority.
+
 The full-device OTA bundle carries the matching content verifier and compiler
 under `/opt/millennium/current/content`, so a story compiler-format change is
 promoted with the daemon that reads it. Production content activation should
