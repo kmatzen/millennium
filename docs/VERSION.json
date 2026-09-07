@@ -1,5 +1,7 @@
 {
   "content_manifest_schema": 1,
+  "experience_catalog_schema": 1,
+  "experience_package_schema": 2,
   "mcu_protocol": 2,
   "ota_manifest_schema": 1,
   "ota_release_schema": 1,

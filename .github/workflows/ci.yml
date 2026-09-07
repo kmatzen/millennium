@@ -31,6 +31,8 @@ jobs:
 
       - name: Verify generated compatibility metadata
         run: python3 tools/generate_version_metadata.py --check
+      - name: Verify generated experience schemas
+        run: python3 tools/generate_experience_schemas.py --check
 
       - name: Run scenario tests
         working-directory: host

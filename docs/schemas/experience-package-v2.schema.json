@@ -1,0 +1,195 @@
+{
+  "$id": "https://updates.kmatzen.com/schemas/experience-package-v2.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "bundle": {
+      "pattern": "^[a-z0-9._-]+\\.tar\\.gz$",
+      "type": "string"
+    },
+    "capabilities": {
+      "items": {
+        "enum": [
+          "audio",
+          "display",
+          "handset",
+          "keypad",
+          "coin",
+          "credential",
+          "timers",
+          "state"
+        ]
+      },
+      "type": "array",
+      "uniqueItems": true
+    },
+    "compatibility": {
+      "additionalProperties": false,
+      "properties": {
+        "daemon_max": {
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+          "type": "string"
+        },
+        "daemon_min": {
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+          "type": "string"
+        },
+        "runtime_schema_max": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "runtime_schema_min": {
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "runtime_schema_min",
+        "runtime_schema_max"
+      ],
+      "type": "object"
+    },
+    "files": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "pattern": "^[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)*$",
+            "type": "string"
+          },
+          "sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "size": {
+            "maximum": 268435456,
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "size"
+        ],
+        "type": "object"
+      },
+      "minItems": 2,
+      "type": "array"
+    },
+    "id": {
+      "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$",
+      "type": "string"
+    },
+    "key_id": {
+      "pattern": "^[A-Za-z0-9._-]{1,64}$",
+      "type": "string"
+    },
+    "locales": {
+      "items": {
+        "pattern": "^[a-z]{2,3}(-[A-Z]{2})?$",
+        "type": "string"
+      },
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "quotas": {
+      "additionalProperties": false,
+      "properties": {
+        "session_seconds": {
+          "maximum": 86400,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "state_bytes": {
+          "maximum": 1048576,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "storage_bytes": {
+          "maximum": 268435456,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "storage_bytes",
+        "state_bytes",
+        "session_seconds"
+      ],
+      "type": "object"
+    },
+    "rating": {
+      "enum": [
+        "everyone",
+        "teen",
+        "mature"
+      ]
+    },
+    "schema": {
+      "const": 2
+    },
+    "sequence": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "size": {
+      "maximum": 268435456,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "state": {
+      "additionalProperties": false,
+      "properties": {
+        "migrate_from": {
+          "items": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "type": "array",
+          "uniqueItems": true
+        },
+        "rollback_compatible": {
+          "type": "boolean"
+        },
+        "schema": {
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "schema",
+        "rollback_compatible"
+      ],
+      "type": "object"
+    },
+    "version": {
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema",
+    "id",
+    "version",
+    "sequence",
+    "key_id",
+    "bundle",
+    "sha256",
+    "size",
+    "compatibility",
+    "capabilities",
+    "rating",
+    "locales",
+    "quotas",
+    "files",
+    "state"
+  ],
+  "title": "Millennium downloadable experience package",
+  "type": "object"
+}

@@ -1,0 +1,119 @@
+{
+  "$id": "https://updates.kmatzen.com/schemas/experience-catalog-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "channel": {
+      "enum": [
+        "stable",
+        "beta",
+        "lab"
+      ]
+    },
+    "denied": {
+      "items": {
+        "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$",
+        "type": "string"
+      },
+      "type": "array",
+      "uniqueItems": true
+    },
+    "key_id": {
+      "pattern": "^[A-Za-z0-9._-]{1,64}$",
+      "type": "string"
+    },
+    "packages": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$",
+            "type": "string"
+          },
+          "manifest_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "manifest_url": {
+            "pattern": "^https://",
+            "type": "string"
+          },
+          "rollout": {
+            "additionalProperties": false,
+            "properties": {
+              "groups": {
+                "items": {
+                  "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$",
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              "hold": {
+                "type": "boolean"
+              },
+              "percentage": {
+                "maximum": 100,
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "percentage"
+            ],
+            "type": "object"
+          },
+          "sequence": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "signature_url": {
+            "pattern": "^https://",
+            "type": "string"
+          },
+          "version": {
+            "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "sequence",
+          "manifest_url",
+          "manifest_sha256",
+          "signature_url",
+          "rollout"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "schema": {
+      "const": 1
+    },
+    "sequence": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "withdrawn": {
+      "items": {
+        "pattern": "^[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "type": "array",
+      "uniqueItems": true
+    }
+  },
+  "required": [
+    "schema",
+    "channel",
+    "sequence",
+    "key_id",
+    "packages",
+    "withdrawn",
+    "denied"
+  ],
+  "title": "Millennium downloadable experience catalog",
+  "type": "object"
+}

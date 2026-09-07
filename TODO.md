@@ -265,7 +265,7 @@ with one assembled-hardware session and without repeating the network wiring.
   - [x] Document the distribution, package, lifecycle, owner experience,
     recovery, privacy, and release-gate design in
     `host/docs/DOWNLOADABLE_EXPERIENCES.md`.
-  - [ ] Define and generate signed catalog and experience-package schemas,
+  - [x] Define and generate signed catalog and experience-package schemas,
     compatibility metadata, ratings, quotas, and capability declarations.
   - [ ] Publish immutable packages and channel catalogs through
     `updates.kmatzen.com`, with stable/beta/device-group rollout, holds,
