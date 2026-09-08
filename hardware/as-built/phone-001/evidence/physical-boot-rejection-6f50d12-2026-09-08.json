@@ -1,0 +1,68 @@
+{
+  "schema": 1,
+  "operation": "physical-production-image-boot",
+  "device_id": "phone-001",
+  "observed_at": "2026-09-08T08:57:47-07:00",
+  "source_commit": "6f50d127e5813e583e6898a6986175614422470a",
+  "passed": false,
+  "approved": false,
+  "recovery_media_evidence": "recovery-media-phone001-6f50d12.json",
+  "platform": {
+    "model": "Raspberry Pi Zero 2 W",
+    "kernel": "6.18.39+rpt-rpi-v8",
+    "active_system_device": "/dev/mmcblk0p5",
+    "root_read_only": true,
+    "persistent_device": "/dev/mmcblk0p7",
+    "persistent_read_write": true
+  },
+  "verified": {
+    "factory_maintainer_key_authenticated": true,
+    "daemon_started": true,
+    "network_manager_started": true,
+    "ssh_started": true,
+    "wifi_setup_ap_started": true,
+    "captive_portal_rendered_real_template": true,
+    "captive_portal_accepted_owner_request": true,
+    "alpha_enumerated": true,
+    "beta_enumerated": true,
+    "serial_connection_up": true,
+    "alpha_connection_up": true,
+    "alpha_i2c_drops": 0,
+    "beta_i2c_drops": 0
+  },
+  "rejection_reasons": [
+    {
+      "id": "usb-ethernet-default-route",
+      "observation": "The automatically generated eth0 profile installed a lower-metric default route through the isolated USB maintenance link, overriding the valid Wi-Fi default route and preventing DNS, HTTPS, SIP, OTA, and maintenance verification.",
+      "corrected_in": "38350ac"
+    },
+    {
+      "id": "rtl8153-firmware-missing",
+      "observation": "The kernel could not load rtl_nic/rtl8153a-4.fw for the installed RTL8153 adapter.",
+      "corrected_in": "38350ac"
+    },
+    {
+      "id": "persistent-content-unsafe-transition",
+      "observation": "systemd-tmpfiles rejected root-owned content paths below a recursively millennium-owned persistent parent as unsafe path transitions.",
+      "corrected_in": "38350ac"
+    },
+    {
+      "id": "wifi-setup-timeout-restarts",
+      "observation": "RuntimeMaxSec terminated the helper while connectivity verification was blocked; Restart=on-failure then reopened setup repeatedly instead of enforcing the hard 15-minute limit.",
+      "corrected_in": "03b5382"
+    },
+    {
+      "id": "wifi-connectivity-dns-not-wall-clock-bounded",
+      "observation": "The Python URL probe did not bound resolver latency at the process level, allowing an accepted owner attempt to reach the service deadline before rollback completed.",
+      "corrected_in": "03b5382"
+    }
+  ],
+  "privacy": {
+    "owner_ssid_stored_in_evidence": false,
+    "owner_passphrase_stored_in_evidence": false,
+    "sip_credentials_stored_in_evidence": false,
+    "client_address_stored": false,
+    "user_agent_stored": false
+  },
+  "status": "rejected; do not approve or redeploy; rebuild from 03b5382 or later and repeat media plus physical acceptance"
+}

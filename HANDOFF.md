@@ -7,10 +7,10 @@ Zero 2 W, radio, USB, audio, power, or first-time-user requirement.
 ## Current repository state
 
 - Working branch: `main`.
-- The current production-image source is
-  `6f50d127e5813e583e6898a6986175614422470a`; it includes rebuilt Alpha and
-  Beta firmware plus observable MCU/I2C/health semantics and is pushed to
-  `origin/main`.
+- The next production-image source must be `03b5382` or later. The physically
+  booted `6f50d12` candidate is rejected; it exposed USB-Ethernet route
+  priority, missing RTL8153 firmware, persistent content ownership, and
+  Wi-Fi-helper deadline/restart defects fixed by `38350ac` and `03b5382`.
 - The factory-seeded candidate is signed, independently verified, retained on
   `anima`, and copied directly to external `UEBuild`. Its compressed SHA-256 is
   `4509d94f76d12056dbad1d2c92c7281cd8924c1375814cc05d6b9696d5f55efd`;
@@ -53,11 +53,11 @@ image userspace tested and `physical_hardware_claimed: false`.
 
 ## Immediate execution order
 
-1. Insert and physically boot the verified `6f50d12` recovery card. Its
-   15,636,365,312-byte write/readback on the OS-identified 63.9 GB USB device
-   matched the signed expanded SHA-256 and the card was ejected. Both Arduino
-   MCUs are required for the physical health gate; phone peripherals may be
-   absent only for explicitly scoped platform validation.
+1. Build, factory-seed, sign, QEMU-test, write/read back, and physically boot a
+   replacement from `03b5382` or later. Preserve the rejected `6f50d12` media
+   and boot evidence without treating either as approval. Both Arduino MCUs are
+   required for the physical health gate; phone peripherals may be absent only
+   for explicitly scoped platform validation.
 2. Publish the immutable release objects and signed stable/beta/device-group
    catalogs with `content/publish_catalog.py` after completing the offline
    content/catalog signing ceremony. FIDO-authenticated access to `anima` is

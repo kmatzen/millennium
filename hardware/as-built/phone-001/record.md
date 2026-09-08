@@ -628,3 +628,22 @@ SHA-256
 The card was safely ejected. Exact evidence is in
 `evidence/recovery-media-phone001-6f50d12.json`; physical boot acceptance
 remains open.
+
+The `6f50d12` card then booted the physical Zero 2 W from system slot A. The
+root filesystem was read-only, partition 7 was read-write, the factory
+maintainer key authenticated, the daemon and setup portal started, the real
+portal template rendered and accepted an owner-network request, and both Alpha
+and Beta enumerated with their independent health gauges up and zero reported
+I2C drops. The candidate is nevertheless rejected. NetworkManager's
+automatically generated USB Ethernet profile installed a lower-metric default
+route through the isolated maintenance link, blackholing the otherwise valid
+Wi-Fi route. The image also omitted the RTL8153 firmware blob, and persistent
+content ownership caused systemd-tmpfiles unsafe-transition warnings. Commit
+`38350ac` fixes all three and updates monitor metric names. The Wi-Fi helper's
+service deadline then exposed two more faults: resolver latency was not bounded
+at the process level, and `Restart=on-failure` reopened setup after the hard
+15-minute timeout. Commit `03b5382` uses a bounded curl child, stops setup
+services immediately on success, and makes the hard timeout non-restarting.
+No owner SSID, passphrase, SIP credential, client address, or user agent is in
+the evidence. Exact rejection evidence is in
+`evidence/physical-boot-rejection-6f50d12-2026-09-08.json`.

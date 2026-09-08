@@ -97,8 +97,9 @@ with one assembled-hardware session and without repeating the network wiring.
       removable recovery media and verify its full image-length readback against
       the signed expanded digest.
     - [ ] Boot a non-quarantined verified recovery image on the
-      production-equivalent Zero 2 W; the physically booted v3 artifact is
-      retained as failed evidence and must not be redeployed.
+      production-equivalent Zero 2 W; the physically booted v3, `2ad5179`,
+      `7f94bdd`, and `6f50d12` artifacts are retained as failed evidence and
+      must not be redeployed.
   - [ ] Exercise download, inactive-slot write, pre-reboot, first boot, health
     commit, and rollback in QEMU and by physically removing power on the
     production-equivalent Zero 2 W image.

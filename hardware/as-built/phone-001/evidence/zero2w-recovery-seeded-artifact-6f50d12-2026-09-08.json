@@ -100,5 +100,6 @@
     "evidence": "recovery-media-phone001-6f50d12.json",
     "ejected": true
   },
-  "status": "software-verified, QEMU end-to-end passed, signed, externally staged, and written with complete matching readback; explicitly unapproved pending physical boot"
+  "physical_boot_evidence": "physical-boot-rejection-6f50d12-2026-09-08.json",
+  "status": "rejected by physical boot acceptance; retain as failed evidence and do not redeploy"
 }
