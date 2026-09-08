@@ -51,9 +51,15 @@
     "expanded_stream_verified_independently": true
   },
   "external_copy": {
-    "status": "not_created",
-    "reason": "Copying the factory-seeded image to external UEBuild requires explicit authorization for that sensitive destination."
+    "status": "verified",
+    "verified_at": "2026-09-08T01:05:14Z",
+    "directory": "/Volumes/UEBuild/millennium-images/zero2w-ab-1.0.0-5d7bdda-phone001-unapproved",
+    "all_four_sha256_values_matched": true,
+    "manifest_source_commit_matched": true,
+    "signature_verified": true,
+    "zstandard_stream_verified": true,
+    "used_laptop_internal_storage": false
   },
   "recovery_media_written": false,
-  "status": "software-verified and signed; retained as explicitly unapproved pending external-copy authorization, recovery-media write/readback, and physical boot"
+  "status": "software-verified, signed, and externally staged; retained as explicitly unapproved pending recovery-media write/readback and physical boot"
 }

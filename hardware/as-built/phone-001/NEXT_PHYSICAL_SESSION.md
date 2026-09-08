@@ -89,9 +89,11 @@ its signed expanded SHA-256 is
 `372f3c726285d485954f55ed7b681e215515f411691cbc9f891e45b70d3901dd`.
 The Ed25519 signature and Zstandard stream were independently verified on
 `anima`; the signing operation and active public-key identity were also
-verified on macOS. Its external `UEBuild` copy awaits explicit authorization
-because the factory-seeded image contains device credentials. It has not yet
-been written to recovery media.
+verified on macOS. The factory-seeded image was copied directly from `anima`
+to external `UEBuild` without using laptop internal storage. All four file
+hashes, the manifest's source commit and expanded digest, the Ed25519
+signature, and the Zstandard stream verified there. It has not yet been
+written to recovery media.
 
 The software-verified candidate is intentionally named `unapproved` until the
 media write/readback and physical boot both pass:
