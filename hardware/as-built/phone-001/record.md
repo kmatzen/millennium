@@ -616,5 +616,15 @@ correctly rejected because it could not find the physical slot aliases under
 QEMU. Neither run claims Raspberry Pi firmware, radio, native SD/USB, audio,
 installed-load power, or attached phone-peripheral fidelity. Exact evidence is
 in `evidence/zero2w-recovery-seeded-artifact-6f50d12-2026-09-08.json`. The
-candidate remains explicitly unapproved until dedicated-media write/readback
-and physical acceptance are complete.
+candidate remained explicitly unapproved pending dedicated-media write/readback
+and physical acceptance at the time of that software test.
+
+On 2026-09-08 macOS identified the dedicated 63.9 GB USB recovery card as
+`/dev/disk6`, distinct from the 512 GB `UEBuild` source. The media writer
+reverified the signed artifact, wrote and flushed all 15,636,365,312 expanded
+bytes, and hashed the complete image length back. The readback matched signed
+SHA-256
+`f5c6bd4954374b0f06e206c748f096eb24964f767de0fff8d6036ce4790962b8`.
+The card was safely ejected. Exact evidence is in
+`evidence/recovery-media-phone001-6f50d12.json`; physical boot acceptance
+remains open.

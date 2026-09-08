@@ -71,10 +71,14 @@ host directory through a read-only bind mount and does not require a restart.
 
 ## 1. Write and verify the corrected recovery card
 
-**The write is required for `6f50d12`.** Prior media writes remain useful
-failed/rejected evidence but do not approve this candidate. The current image
-adds the observable MCU/I2C/health behavior and rebuilt firmware needed by the
-physical health gate. It is retained on `anima` at:
+**The `6f50d12` write is complete.** On 2026-09-08 macOS identified the
+dedicated 63.9 GB USB-attached card as `/dev/disk6`, distinct from the 512 GB
+`UEBuild` source. The writer reverified the signature, wrote and flushed all
+15,636,365,312 bytes, and read the complete image length back. Readback matched
+the signed expanded SHA-256 and the card was ejected. Evidence is retained in
+`evidence/recovery-media-phone001-6f50d12.json`. Prior media writes remain
+failed/rejected evidence and do not approve this candidate. The current image
+is retained on `anima` at:
 
 ```text
 /home/kmatzen/.local/share/millennium-recovery/images/zero2w-ab-1.0.0-6f50d12-phone001-unapproved
@@ -93,8 +97,8 @@ signature, and the Zstandard stream verified there. The complete 17-layer QEMU
 lab also passed, including exact-image userspace. This does not replace a new
 media write/readback or physical boot.
 
-The software-verified candidate is intentionally named `unapproved` until the
-media write/readback and physical boot both pass:
+The software- and media-verified candidate is intentionally named `unapproved`
+until physical boot passes:
 
 ```text
 /Volumes/UEBuild/millennium-images/zero2w-ab-1.0.0-6f50d12-phone001-unapproved

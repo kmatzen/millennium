@@ -53,11 +53,11 @@ image userspace tested and `physical_hardware_claimed: false`.
 
 ## Immediate execution order
 
-1. Write the retained `6f50d12` phone-001 artifact to an exactly identified
-   dedicated removable device, verify its complete image-length readback, then
-   physically boot it. Do not reuse prior-candidate readback as evidence. Both
-   Arduino MCUs are required for the physical health gate; phone peripherals
-   may be absent only for explicitly scoped platform validation.
+1. Insert and physically boot the verified `6f50d12` recovery card. Its
+   15,636,365,312-byte write/readback on the OS-identified 63.9 GB USB device
+   matched the signed expanded SHA-256 and the card was ejected. Both Arduino
+   MCUs are required for the physical health gate; phone peripherals may be
+   absent only for explicitly scoped platform validation.
 2. Publish the immutable release objects and signed stable/beta/device-group
    catalogs with `content/publish_catalog.py` after completing the offline
    content/catalog signing ceremony. FIDO-authenticated access to `anima` is

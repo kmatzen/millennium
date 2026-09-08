@@ -93,7 +93,7 @@ with one assembled-hardware session and without repeating the network wiring.
       the active release key. Keep it explicitly unapproved until physical boot.
     - [x] Preserve completed write/readback evidence for rejected predecessor
       images without treating it as acceptance of the current candidate.
-    - [ ] Write the current `6f50d12` retained image to OS-identified dedicated
+    - [x] Write the current `6f50d12` retained image to OS-identified dedicated
       removable recovery media and verify its full image-length readback against
       the signed expanded digest.
     - [ ] Boot a non-quarantined verified recovery image on the

@@ -89,6 +89,16 @@
     "raspberry_pi_firmware_emulated": false,
     "physical_hardware_claimed": false
   },
-  "recovery_media_written": false,
-  "status": "software-verified, QEMU end-to-end passed, signed, and externally staged; explicitly unapproved pending recovery-media write/readback and physical boot"
+  "recovery_media": {
+    "written": true,
+    "completed_at": "2026-09-08T15:03:32+00:00",
+    "device_identifier": "disk6",
+    "size_bytes": 63864569856,
+    "transport": "USB",
+    "complete_readback_verified": true,
+    "readback_sha256": "f5c6bd4954374b0f06e206c748f096eb24964f767de0fff8d6036ce4790962b8",
+    "evidence": "recovery-media-phone001-6f50d12.json",
+    "ejected": true
+  },
+  "status": "software-verified, QEMU end-to-end passed, signed, externally staged, and written with complete matching readback; explicitly unapproved pending physical boot"
 }
