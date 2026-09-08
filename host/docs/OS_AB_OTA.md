@@ -170,8 +170,8 @@ The runtime gate does not infer these checks from device nodes alone. It opens
 the ALSA PCM path with a bounded silent sample; requires named daemon serial and
 SIP health checks; waits for fresh, zero-drop diagnostics independently emitted
 by Alpha and Beta; accepts only a valid daemon state; and requires the SSH
-reverse-tunnel process to remain active longer than its 90-second server-alive
-failure window. The current signed application release establishes each MCU's
+reverse-tunnel process to remain active beyond four 30-second keepalive
+boundaries (125 seconds). The current signed application release establishes each MCU's
 exact role/build identity before OS activation; the per-board diagnostics prove
 that both attested controllers are alive after the candidate boots.
 

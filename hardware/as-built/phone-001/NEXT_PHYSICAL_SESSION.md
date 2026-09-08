@@ -153,7 +153,7 @@ the complete installed load is present.
 
 The first physical boot must prove that the actual Zero 2 W reaches a stable
 slot, the daemon, Alpha, Beta, audio, SIP, controls, update origin, and reverse
-tunnel are healthy, and the candidate commits only after the full 95-second
+tunnel are healthy, and the candidate commits only after the full 125-second
 maintenance-tunnel gate. Retain `journalctl`, boot-slot, health, HIL, and MCU
 identity output before changing anything else.
 

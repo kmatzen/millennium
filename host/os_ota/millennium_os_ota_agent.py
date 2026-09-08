@@ -49,7 +49,7 @@ DEFAULTS = {
     "install_window_start": "02:00",
     "install_window_end": "05:00",
     "health_timeout_seconds": "180",
-    "maintenance_stable_seconds": "95",
+    "maintenance_stable_seconds": "125",
     "failure_backoff_seconds": "3600",
     "max_failure_attempts": "3",
     "phone_state_url": "http://127.0.0.1:8081/api/state",
