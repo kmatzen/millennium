@@ -500,8 +500,10 @@ portal-runtime checks. Its signed compressed SHA-256 is
 `8745362a7bbd00fc37d852e9fca993ee92ee894529dd54e8cce2aa9e0991f9f3`;
 its expanded SHA-256 is
 `ab2937d9ff3848e91bfb4300adb2591a301e08ef6fdeace1dbe81883cd2672e8`.
-It remains protected on `anima` and unapproved pending authorized external
-copy, media write/readback, and physical boot. Exact evidence is in
+An explicitly authorized direct copy to external `UEBuild` passed all four
+hashes, the Ed25519 signature, and Zstandard integrity without using laptop
+internal storage. It remains unapproved pending media write/readback and
+physical boot. Exact evidence is in
 `evidence/zero2w-recovery-seeded-artifact-8ac303b-2026-09-08.json`.
 
 That candidate's physical boot exposed an upstream image-generator ordering
