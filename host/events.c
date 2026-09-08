@@ -5,6 +5,23 @@
 #include <string.h>
 #include <stdio.h>
 
+size_t event_payload_length(char event_type) {
+    switch (event_type) {
+    case EVENT_TYPE_KEYPAD:
+    case EVENT_TYPE_HOOK:
+    case EVENT_TYPE_COIN:
+        return 1;
+    case EVENT_TYPE_CARD:
+        return 16;
+    case EVENT_TYPE_EEPROM_ERROR:
+        return 3;
+    case EVENT_TYPE_DIAG:
+        return EVENT_DIAG_PAYLOAD_LEN;
+    default:
+        return 0;
+    }
+}
+
 /* Helper function to create a string copy */
 static char *strdup_safe(const char *src) {
     size_t len;

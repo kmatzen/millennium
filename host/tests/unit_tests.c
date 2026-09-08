@@ -2560,12 +2560,14 @@ static void test_mcu_protocol_replay_and_critical_policy(void) {
     TEST_ASSERT_EQ_INT(mcu_message_is_critical(MCU_CMD_KEEPALIVE), 0);
 }
 
-/* The count is ASCII rather than a raw byte precisely so a zero never appears
- * as NUL: process_event_buffer() consumes strlen(payload)+1, so an embedded
- * NUL would truncate the event and desync everything after it. */
-static void test_diag_payload_has_no_embedded_nul(void) {
+static void test_legacy_event_payload_widths_are_declared(void) {
     TEST_ASSERT_EQ_INT((int)strlen("A000"), EVENT_DIAG_PAYLOAD_LEN);
     TEST_ASSERT_EQ_INT((int)strlen("B000"), EVENT_DIAG_PAYLOAD_LEN);
+    TEST_ASSERT_EQ_INT((int)event_payload_length(EVENT_TYPE_COIN), 1);
+    TEST_ASSERT_EQ_INT((int)event_payload_length(EVENT_TYPE_EEPROM_ERROR), 3);
+    TEST_ASSERT_EQ_INT((int)event_payload_length(EVENT_TYPE_CARD), 16);
+    TEST_ASSERT_EQ_INT((int)event_payload_length(EVENT_TYPE_DIAG), 4);
+    TEST_ASSERT_EQ_INT((int)event_payload_length(EVENT_TYPE_HEARTBEAT), 0);
 }
 
 /* (#259) Every letter registered as an event type becomes a marker that
@@ -2768,7 +2770,7 @@ int main(void) {
     TEST_SUITE_RUN(test_mcu_protocol_round_trip_and_partial_input);
     TEST_SUITE_RUN(test_mcu_protocol_rejects_crc_and_resynchronizes);
     TEST_SUITE_RUN(test_mcu_protocol_replay_and_critical_policy);
-    TEST_SUITE_RUN(test_diag_payload_has_no_embedded_nul);
+    TEST_SUITE_RUN(test_legacy_event_payload_widths_are_declared);
     TEST_SUITE_RUN(test_event_types_do_not_collide_with_debug_bytes);
 
     TEST_SUITE_BEGIN("Coin Validator Gate");

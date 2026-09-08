@@ -27,6 +27,8 @@
 #define EVENT_TYPE_EEPROM_ERROR         'E'
 #define EVENT_TYPE_HOOK                 'H'
 #define EVENT_TYPE_HEARTBEAT            'P'
+#define EVENT_TYPE_DIAG                 'G'
+#define EVENT_DIAG_PAYLOAD_LEN          4
 
 struct event_queue_node { void *event; struct event_queue_node *next; };
 struct millennium_client {
@@ -44,30 +46,30 @@ static void millennium_client_create_and_queue_event_char(
 
 /* ─────────── VERBATIM from millennium_sdk.c (keep in sync) ─────────── */
 
-char *millennium_client_extract_payload(struct millennium_client *client, char event_type, size_t event_start) {
-    size_t payload_length = 0;
+size_t event_payload_length(char event_type) {
     switch (event_type) {
     case EVENT_TYPE_KEYPAD:
     case EVENT_TYPE_HOOK:
     case EVENT_TYPE_COIN:
-        payload_length = 1;
-        break;
+        return 1;
     case EVENT_TYPE_CARD:
-        payload_length = 16;
-        break;
+        return 16;
     case EVENT_TYPE_EEPROM_ERROR:
-        payload_length = 3;
-        break;
+        return 3;
+    case EVENT_TYPE_DIAG:
+        return EVENT_DIAG_PAYLOAD_LEN;
     case EVENT_TYPE_COIN_UPLOAD_START:
     case EVENT_TYPE_COIN_UPLOAD_END:
     case EVENT_TYPE_COIN_VALIDATION_START:
     case EVENT_TYPE_COIN_VALIDATION_END:
     case EVENT_TYPE_HEARTBEAT:
-        payload_length = 0;
-        break;
     default:
-        return NULL;
+        return 0;
     }
+}
+
+char *millennium_client_extract_payload(struct millennium_client *client, char event_type, size_t event_start) {
+    size_t payload_length = event_payload_length(event_type);
 
     if (event_start + payload_length < client->input_buffer_size) {
         char *payload = malloc(payload_length + 1);
@@ -94,7 +96,7 @@ void millennium_client_process_event_buffer(struct millennium_client *client) {
             char c = client->input_buffer[i];
             if (c == '@' || c == 'K' || c == 'C' || c == 'V' || c == 'A' ||
                 c == 'B' || c == 'D' || c == 'E' || c == 'F' || c == 'H' ||
-                c == EVENT_TYPE_HEARTBEAT) {
+                c == EVENT_TYPE_DIAG || c == EVENT_TYPE_HEARTBEAT) {
                 event_start = i;
                 break;
             }
@@ -105,7 +107,9 @@ void millennium_client_process_event_buffer(struct millennium_client *client) {
         }
 
         event_type = client->input_buffer[event_start];
+        payload_len = event_payload_length(event_type);
         payload = millennium_client_extract_payload(client, event_type, event_start);
+        if (payload_len > 0 && !payload) return;
 
         logger_debugf_with_category("SDK", "Event type: %c", event_type);
 
@@ -116,7 +120,6 @@ void millennium_client_process_event_buffer(struct millennium_client *client) {
         millennium_client_create_and_queue_event_char(client, event_type, payload);
 
         /* Remove processed data from buffer */
-        payload_len = payload ? strlen(payload) : 0;
         remove_len = event_start + payload_len + 1;
         if (remove_len < client->input_buffer_size) {
             memmove(client->input_buffer, client->input_buffer + remove_len,

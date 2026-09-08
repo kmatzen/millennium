@@ -20,9 +20,8 @@ struct call;
 #define EVENT_TYPE_HEARTBEAT 'P'
 /* (#230) Arduino diagnostics: 'G' + source ('A'=Alpha I2C send drops,
  * 'B'=Beta I2C receive-ring overflows) + a 3-digit ASCII count.
- * ASCII rather than a raw byte on purpose: process_event_buffer() computes how
- * much to consume with strlen(), so a payload byte of 0 would truncate the
- * event and desync the stream.
+ * The count remains ASCII for readable wire diagnostics; the stream parser
+ * consumes every event by this declared fixed width, including binary events.
  *
  * (#259) 'G' and not 'X': display.ino spends 'X' on a display-timeout debug
  * response. Any letter registered here is a marker that consumes a fixed-width
@@ -36,6 +35,9 @@ struct call;
  */
 #define EVENT_TYPE_DIAG 'G'
 #define EVENT_DIAG_PAYLOAD_LEN 4
+
+/* Fixed payload width of a legacy unframed serial event. */
+size_t event_payload_length(char event_type);
 
 /* Decode diagnostics. A/B are I2C loss counters; K/D are the keypad/display
  * MCUSR reset-cause bitmasks captured before Arduino startup. */

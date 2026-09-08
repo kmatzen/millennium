@@ -691,7 +691,12 @@ void millennium_client_process_event_buffer(struct millennium_client *client) {
         }
 
         event_type = client->input_buffer[event_start];
+        payload_len = event_payload_length(event_type);
         payload = millennium_client_extract_payload(client, event_type, event_start);
+
+        /* A fixed-width event may be split across reads.  Keep the marker and
+         * partial payload until the remaining bytes arrive. */
+        if (payload_len > 0 && !payload) return;
         
         logger_debugf_with_category("SDK", "Event type: %c", event_type);
         
@@ -702,7 +707,6 @@ void millennium_client_process_event_buffer(struct millennium_client *client) {
         millennium_client_create_and_queue_event_char(client, event_type, payload);
         
         /* Remove processed data from buffer */
-        payload_len = payload ? strlen(payload) : 0;
         remove_len = event_start + payload_len + 1;
         if (remove_len < client->input_buffer_size) {
             memmove(client->input_buffer, client->input_buffer + remove_len, 
@@ -723,32 +727,7 @@ void millennium_client_process_event_buffer(struct millennium_client *client) {
 }
 
 char *millennium_client_extract_payload(struct millennium_client *client, char event_type, size_t event_start) {
-    size_t payload_length = 0;
-    switch (event_type) {
-    case EVENT_TYPE_KEYPAD:
-    case EVENT_TYPE_HOOK:
-    case EVENT_TYPE_COIN:
-        payload_length = 1;
-        break;
-    case EVENT_TYPE_CARD:
-        payload_length = 16;
-        break;
-    case EVENT_TYPE_EEPROM_ERROR:
-        payload_length = 3;
-        break;
-    case EVENT_TYPE_DIAG:
-        payload_length = EVENT_DIAG_PAYLOAD_LEN;
-        break;
-    case EVENT_TYPE_COIN_UPLOAD_START:
-    case EVENT_TYPE_COIN_UPLOAD_END:
-    case EVENT_TYPE_COIN_VALIDATION_START:
-    case EVENT_TYPE_COIN_VALIDATION_END:
-    case EVENT_TYPE_HEARTBEAT:
-        payload_length = 0;
-        break;
-    default:
-        return NULL;
-    }
+    size_t payload_length = event_payload_length(event_type);
 
     if (event_start + payload_length < client->input_buffer_size) {
         char *payload = malloc(payload_length + 1);
@@ -770,16 +749,16 @@ void millennium_client_create_and_queue_event_ptr(struct millennium_client *clie
 void millennium_client_create_and_queue_event_char(struct millennium_client *client, char event_type, const char *payload) {
     logger_debugf_with_category("SDK", "Creating event of type: %c", event_type);
     
-    if (event_type == EVENT_TYPE_KEYPAD && payload && strlen(payload) > 0) {
+    if (event_type == EVENT_TYPE_KEYPAD && payload) {
         keypad_event_t *event = keypad_event_create(payload[0]);
         if (event) event_queue_push(client, (void *)event);
     } else if (event_type == EVENT_TYPE_CARD && payload) {
         card_event_t *event = card_event_create(payload);
         if (event) event_queue_push(client, (void *)event);
-    } else if (event_type == EVENT_TYPE_COIN && payload && strlen(payload) > 0) {
+    } else if (event_type == EVENT_TYPE_COIN && payload) {
         coin_event_t *event = coin_event_create((uint8_t)payload[0]);
         if (event) event_queue_push(client, (void *)event);
-    } else if (event_type == EVENT_TYPE_HOOK && payload && strlen(payload) > 0) {
+    } else if (event_type == EVENT_TYPE_HOOK && payload) {
         hook_state_change_event_t *event = hook_state_change_event_create(payload[0]);
         if (event) event_queue_push(client, (void *)event);
     } else if (event_type == EVENT_TYPE_COIN_UPLOAD_START) {
@@ -794,14 +773,13 @@ void millennium_client_create_and_queue_event_char(struct millennium_client *cli
     } else if (event_type == EVENT_TYPE_COIN_VALIDATION_END) {
         coin_eeprom_validation_end_t *event = coin_eeprom_validation_end_create();
         if (event) event_queue_push(client, (void *)event);
-    } else if (event_type == EVENT_TYPE_EEPROM_ERROR && payload && strlen(payload) >= 3) {
+    } else if (event_type == EVENT_TYPE_EEPROM_ERROR && payload) {
         uint8_t addr = (uint8_t)payload[0];
         uint8_t expected = (uint8_t)payload[1];
         uint8_t actual = (uint8_t)payload[2];
         coin_eeprom_validation_error_t *event = coin_eeprom_validation_error_create(addr, expected, actual);
         if (event) event_queue_push(client, (void *)event);
-    } else if (event_type == EVENT_TYPE_DIAG && payload &&
-               strlen(payload) >= EVENT_DIAG_PAYLOAD_LEN) {
+    } else if (event_type == EVENT_TYPE_DIAG && payload) {
         /* (#230) An Arduino telling us it lost messages.  Not queued as a phone
          * event -- nothing acts on it -- but it must not stay invisible, which
          * was the whole complaint: keypresses went missing with nothing
