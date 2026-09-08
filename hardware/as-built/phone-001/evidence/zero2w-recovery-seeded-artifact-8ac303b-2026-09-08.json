@@ -1,0 +1,63 @@
+{
+  "schema": 1,
+  "operation": "production-recovery-artifact-factory-seed",
+  "completed_at": "2026-09-08T03:00:11Z",
+  "source_commit": "8ac303b638ee771fe902be6ee0aafdb157a33da0",
+  "passed": true,
+  "physical_boot_approved": false,
+  "factory_provision": {
+    "device_id": "phone-001",
+    "evidence_sha256": "472714f3fa743eb358b2f178e2a50bebce82aeb91ac53a39a90dcf95ad5418fa",
+    "machine_id_sha256": "3ac81f8c297084dbe825bea0ee44124fec3d7439ef033f74e4a79f19045f59aa",
+    "authorized_keys_sha256": "0c883e42ed0fc082247f05787a5a8ab660db6defb59bfc0b6390c00909033159",
+    "maintenance_tunnel_key_sha256": "7123128cd06723027461343aaa25f9b24860a8157653d81c3a15deeca8121a01",
+    "ssh_host_ed25519_sha256": "87107da333da56e116fe7871370f13cc27558ab2ddfe4833a69831ce111725f2"
+  },
+  "artifact": {
+    "anima_directory": "/home/kmatzen/.local/share/millennium-recovery/images/zero2w-ab-1.0.0-8ac303b-phone001-unapproved",
+    "filename": "millennium-zero2w-ab-phone-001.img.zst",
+    "compressed_sha256": "8745362a7bbd00fc37d852e9fca993ee92ee894529dd54e8cce2aa9e0991f9f3",
+    "compressed_size": 452606965,
+    "expanded_sha256": "ab2937d9ff3848e91bfb4300adb2591a301e08ef6fdeace1dbe81883cd2672e8",
+    "expanded_size": 15636365312,
+    "manifest_sha256": "6bcf366d51c27fa394e0908227caa0867b1080c8b14209dffbb8e2af67ab615c",
+    "signature_sha256": "cfee97a0356c0f3af21bd7e65f86f6d60d0a1caf0c3581455520b24f6182f294",
+    "public_key_file_sha256": "3325be09e2dd46e9e9bced682fe518af522a9d3d8305081ae8b171749c8f3bab",
+    "daemon_sha256": "c60dc0f10e732f6c727b11db6bf6e8a23918f58bba215278c5b48d81bfa12f86",
+    "daemon_source_commit": "5d7bdda57565ab141a2847b6169f2254ad5e2428"
+  },
+  "signing": {
+    "key_id": "release-2026-08",
+    "active_ciphertext_sha256": "a94302f82874284020aeca7b3ccc7543fb014e4207d4268e17aaa1b8aea9ccad",
+    "public_key_der_sha256": "581a1ff72d1867b3dfb3b1ffc5521308ac646878050f1c4c12739e0dedaf7348",
+    "public_identity_matched": true,
+    "signature_verified_on_mac": true,
+    "signature_verified_on_anima": true,
+    "plaintext_location": "temporary APFS RAM disk",
+    "plaintext_persisted": false,
+    "ram_device_ejected": true
+  },
+  "verification": {
+    "raw_mbr_partition_contract": true,
+    "raw_boot_content_contract": true,
+    "production_rootfs_minimality": true,
+    "both_system_slots_remounted_read_only": true,
+    "persistent_partition_remounted_read_only": true,
+    "exact_daemon_in_both_slots": true,
+    "active_trust_root_in_both_system_slots": true,
+    "active_trust_root_in_persistent_partition": true,
+    "wifi_runtime_user_in_both_slots": true,
+    "wifi_setup_marker_preserved_in_both_slots": true,
+    "wifi_helper_execution_condition_in_both_slots": true,
+    "wifi_portal_execution_condition_in_both_slots": true,
+    "monitor_tmpfiles_contract_in_both_slots": true,
+    "wifi_supplicant_in_both_slots": true,
+    "expanded_stream_verified_independently": true
+  },
+  "external_copy": {
+    "status": "not_created",
+    "reason": "The new factory-seeded image contains device credentials and requires explicit authorization for external UEBuild."
+  },
+  "recovery_media_written": false,
+  "status": "software-verified and signed; retained as explicitly unapproved pending external-copy authorization, recovery-media write/readback, and physical boot"
+}

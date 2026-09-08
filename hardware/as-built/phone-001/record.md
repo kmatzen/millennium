@@ -487,6 +487,23 @@ SIP, the reverse tunnel, complete HIL, installed-load power, and peripheral
 acceptance remain open. Exact evidence is in
 `evidence/physical-boot-offline-platform-5d7bdda-2026-09-07.json`.
 
+Wi-Fi onboarding on that boot exposed two additional image defects: systemd
+removed the bootstrap service's runtime directory when the oneshot exited, and
+the staged `millennium-wifi` sysusers declaration had not been executed in the
+target root. The setup AP therefore existed, but its helper and portal could
+not start. Commit `8ac303b638ee771fe902be6ee0aafdb157a33da0` preserves the
+runtime directory, evaluates the setup marker after bootstrap ordering, and
+creates and asserts the service account during image construction. A clean
+replacement image built on `anima` passed the MBR, raw boot-content, production
+minimality, both-slot read-only, persistent-state, trust-root, daemon, and
+portal-runtime checks. Its signed compressed SHA-256 is
+`8745362a7bbd00fc37d852e9fca993ee92ee894529dd54e8cce2aa9e0991f9f3`;
+its expanded SHA-256 is
+`ab2937d9ff3848e91bfb4300adb2591a301e08ef6fdeace1dbe81883cd2672e8`.
+It remains protected on `anima` and unapproved pending authorized external
+copy, media write/readback, and physical boot. Exact evidence is in
+`evidence/zero2w-recovery-seeded-artifact-8ac303b-2026-09-08.json`.
+
 That candidate's physical boot exposed an upstream image-generator ordering
 defect: the upstream shared-state generator overwrote the project generator
 after payload staging, leaving generated mount units outside
