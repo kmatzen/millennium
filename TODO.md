@@ -96,6 +96,9 @@ with one assembled-hardware session and without repeating the network wiring.
     - [x] Write the current `6f50d12` retained image to OS-identified dedicated
       removable recovery media and verify its full image-length readback against
       the signed expanded digest.
+    - [x] Build, sign, fully simulate, write, and read back the corrected
+      `c9b01fb` replacement after rejecting `6f50d12`; retain it as unapproved
+      until physical boot acceptance.
     - [ ] Boot a non-quarantined verified recovery image on the
       production-equivalent Zero 2 W; the physically booted v3, `2ad5179`,
       `7f94bdd`, and `6f50d12` artifacts are retained as failed evidence and

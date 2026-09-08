@@ -71,6 +71,13 @@ host directory through a read-only bind mount and does not require a restart.
 
 ## 1. Write and verify the corrected recovery card
 
+**The `c9b01fb` replacement card is written and fully verified; boot this card
+next.** Its complete readback matched signed expanded SHA-256
+`d8cb7101c6102c394620547d46f576ae965d326202ce9e24bdafe73283a0962f`
+and it was safely ejected. Evidence is in
+`evidence/recovery-media-phone001-c9b01fb.json`. It remains unapproved until
+the physical checks below pass.
+
 **The `6f50d12` write is complete but its physical boot is rejected.** On 2026-09-08 macOS identified the
 dedicated 63.9 GB USB-attached card as `/dev/disk6`, distinct from the 512 GB
 `UEBuild` source. The writer reverified the signature, wrote and flushed all

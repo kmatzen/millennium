@@ -647,3 +647,23 @@ services immediately on success, and makes the hard timeout non-restarting.
 No owner SSID, passphrase, SIP credential, client address, or user agent is in
 the evidence. Exact rejection evidence is in
 `evidence/physical-boot-rejection-6f50d12-2026-09-08.json`.
+
+Replacement source `c9b01fb2afb56ddf820ff34fa235ea4dbf2bb5b8` incorporates
+those physical findings. Its exact factory-seeded image passed the raw A/B and
+boot-content contracts and the complete 17-layer QEMU lab, including an
+independent captive-portal client, external OTA failure recovery, reverse
+maintenance recovery, virtual MCU/peripheral faults, signed experience
+lifecycle, and abrupt-power recovery. Commit `bba5296` strengthened the exact
+image gate to assert the assembled USB-Ethernet `never-default` policy and the
+bounded, non-restarting Wi-Fi helper. The full result SHA-256 is
+`fb6c37274437ba9abd8799a7f779f4adc5394ebdab55e21cfd46bdb79b24c61d`.
+The signed compressed SHA-256 is
+`1c21c368d22abd6fe509bd185d8ba1408d703941b4fb2de8381333a9e64ddd00`;
+the signed expanded SHA-256 is
+`d8cb7101c6102c394620547d46f576ae965d326202ce9e24bdafe73283a0962f`.
+The release key existed only on a disposable APFS RAM disk, its public identity
+and signature were verified on macOS and `anima`, and the RAM disk was ejected.
+The dedicated 63.9 GB USB card was then written, flushed, completely read back,
+matched the signed expanded digest, and safely ejected. Exact media evidence is
+in `evidence/recovery-media-phone001-c9b01fb.json`. The candidate remains
+unapproved until physical boot acceptance.
