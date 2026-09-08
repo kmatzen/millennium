@@ -33,6 +33,14 @@ class ExactImageHarnessTests(unittest.TestCase):
             "systemctl is-active --quiet nftables.service",
             "runuser -u messagebus -- test -x /usr/bin/dbus-daemon",
             "runuser -u systemd-resolve -- test -r /etc/systemd/resolved.conf",
+            "systemctl is-active --quiet NetworkManager.service",
+            "millennium-wired.nmconnection",
+            "grep -Fxc never-default=true",
+            r"grep -Fqx no-auto-default=\*",
+            "nmcli -g ipv4.never-default connection show millennium-wired",
+            "nmcli -g ipv6.never-default connection show millennium-wired",
+            "grep -Fqx Restart=no",
+            "grep -Fqx RuntimeMaxSec=900",
         ):
             self.assertIn(expected, commands)
         self.assertNotIn(MODULE.PASS_MARKER, commands)

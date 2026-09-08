@@ -62,16 +62,17 @@ def shell_commands() -> bytes:
     unit = (
         "[Unit]",
         "Description=QEMU exact-image acceptance",
-        "Requires=dbus.service systemd-resolved.service persistent.mount "
+        "Requires=dbus.service systemd-resolved.service NetworkManager.service persistent.mount "
         "boot-firmware.mount bootfs.mount nftables.service "
         "millennium-firewall.service",
-        "After=dbus.service systemd-resolved.service persistent.mount "
+        "After=dbus.service systemd-resolved.service NetworkManager.service persistent.mount "
         "boot-firmware.mount bootfs.mount nftables.service "
         "millennium-firewall.service local-fs.target",
         "[Service]",
         "Type=oneshot",
         "ExecStart=/bin/sh -c 'systemctl is-active --quiet dbus.service && "
         "systemctl is-active --quiet systemd-resolved.service && "
+        "systemctl is-active --quiet NetworkManager.service && "
         "systemctl is-active --quiet boot-firmware.mount && "
         "systemctl is-active --quiet bootfs.mount && "
         "systemctl is-active --quiet nftables.service && "
@@ -81,6 +82,23 @@ def shell_commands() -> bytes:
         "mountpoint -q /bootfs && "
         "runuser -u messagebus -- test -x /usr/bin/dbus-daemon && "
         "runuser -u systemd-resolve -- test -r /etc/systemd/resolved.conf && "
+        # Reproduce the physical dual-link case: the maintenance Ethernet
+        # profile must never install a default route while owner Wi-Fi is the
+        # upstream connection.  Check the assembled image, not just source.
+        "test \"$(grep -Fxc never-default=true "
+        "/etc/NetworkManager/system-connections/millennium-wired.nmconnection)\" "
+        "-eq 2 && "
+        "grep -Fqx no-auto-default=\\* /etc/NetworkManager/NetworkManager.conf && "
+        "test \"$(nmcli -g ipv4.never-default connection show millennium-wired)\" "
+        "= yes && "
+        "test \"$(nmcli -g ipv6.never-default connection show millennium-wired)\" "
+        "= yes && "
+        # A successful Wi-Fi handoff must not fall back into an immortal
+        # setup loop or leave the captive portal running indefinitely.
+        "grep -Fqx Restart=no "
+        "/etc/systemd/system/millennium-wifi-helper.service && "
+        "grep -Fqx RuntimeMaxSec=900 "
+        "/etc/systemd/system/millennium-wifi-helper.service && "
         # Octal-encode the suffixes so the serial echo of this injected unit
         # cannot itself contain either result marker.
         "printf \"MILLENNIUM_EXACT_IMAGE_\\120\\101\\123\\123\\n\" "
