@@ -26,7 +26,9 @@ the matching protocol-1 host and both protocol-1 MCU images as one release.
 
 - `0x01`: ACK (`acked sequence`, `status`; status 0 accepted, 1 busy)
 - `0x02`: HELLO (`minimum version`, `maximum version`)
-- `0x10`–`0x15`: display, coin control/program/verify, keepalive, identity commands
+- `0x10`–`0x13`: display and coin control/program/verify commands
+- `0x14`: reserved (retired host keepalive; board heartbeats provide liveness)
+- `0x15`: identity command
 - `0x20`–`0x26`: key, hook, credential, coin, diagnostic, heartbeat, operation events
 
 Alpha frames physical events over I2C; Beta forwards each complete frame to USB
@@ -53,3 +55,9 @@ reset only after a complete main-loop pass, never inside a blocking operation.
 MCUSR reset-cause bitmasks are captured in `.init3` before Arduino startup and
 reported as diagnostics for both boards. The daemon exports reset counters and
 the raw cause bitmasks for monitoring.
+
+Alpha also reports a positive liveness diagnostic every 30 seconds. The daemon
+marks `alpha_connection` critical after 120 seconds without one, independently
+of Beta's USB heartbeat. Wire return codes 1–4 are exported as cumulative
+`arduino_i2c_error_<code>` gauges, so address NACKs, data NACKs, and other bus
+failures are distinguishable rather than hidden behind the retry count.

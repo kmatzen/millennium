@@ -116,7 +116,7 @@ Alpha frame to 32 bytes and its credential payload to 24 bytes.
 
 All commands use the versioned frame described in `docs/MCU_PROTOCOL.md`.
 Display, coin control, EEPROM program, and EEPROM verify are types `0x10`–`0x13`;
-keepalive is `0x14`. Critical commands are acknowledged by sequence number and
+`0x14` is reserved and identity is `0x15`. Critical commands are acknowledged by sequence number and
 replays are not executed twice.
 
 ### Coin Validator → Pi

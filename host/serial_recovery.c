@@ -16,15 +16,6 @@ serial_action_t serial_recovery_next_action(const serial_link_state_t *state) {
         if (state->idle_seconds > SERIAL_WATCHDOG_SECONDS) {
             return SERIAL_ACTION_MARK_DEAD;
         }
-        /* (#59) Poke an idle-but-alive link so the watchdog doesn't fire on a
-         * phone nobody is using.  The upper bound leaves idle_seconds exactly
-         * equal to SERIAL_WATCHDOG_SECONDS doing nothing for one pass, which is
-         * the long-standing behaviour: by then the keepalive writes are already
-         * failing, so the next pass declares the link dead anyway. */
-        if (state->idle_seconds >= SERIAL_KEEPALIVE_INTERVAL &&
-            state->idle_seconds < SERIAL_WATCHDOG_SECONDS) {
-            return SERIAL_ACTION_KEEPALIVE;
-        }
         return SERIAL_ACTION_NONE;
     }
 

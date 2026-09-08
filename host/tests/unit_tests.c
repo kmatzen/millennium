@@ -69,6 +69,7 @@ char *millennium_client_extract_payload(millennium_client_t *c, char t, size_t s
 void millennium_client_create_and_queue_event_char(millennium_client_t *c, char t, const char *p) { (void)c; (void)t; (void)p; }
 void millennium_client_create_and_queue_event_ptr(millennium_client_t *c, void *e) { (void)c; (void)e; }
 int millennium_client_serial_is_healthy(millennium_client_t *c) { (void)c; return 1; }
+long millennium_client_alpha_idle_seconds(millennium_client_t *c) { (void)c; return 0; }
 void millennium_client_check_serial(millennium_client_t *c) { (void)c; }
 void millennium_client_serial_activity(millennium_client_t *c) { (void)c; }
 void list_audio_devices(void) {}
@@ -2203,6 +2204,12 @@ static void test_health_status_is_serving(void) {
     TEST_ASSERT_EQ_INT(health_monitor_status_is_serving(HEALTH_STATUS_UNKNOWN), 0);
 }
 
+static void test_alpha_liveness_policy(void) {
+    TEST_ASSERT_EQ_INT(health_monitor_alpha_liveness(-1), HEALTH_STATUS_UNKNOWN);
+    TEST_ASSERT_EQ_INT(health_monitor_alpha_liveness(120), HEALTH_STATUS_HEALTHY);
+    TEST_ASSERT_EQ_INT(health_monitor_alpha_liveness(121), HEALTH_STATUS_CRITICAL);
+}
+
 /* A check-backed status reporter the test can steer, so we can drive the
  * monitor's overall status through every level. */
 static health_status_t g_test_check_status = HEALTH_STATUS_HEALTHY;
@@ -2272,10 +2279,13 @@ static void test_health_metrics_published(void) {
                        (int)HEALTH_STATUS_HEALTHY);
     TEST_ASSERT_EQ_INT((int)metrics_get_gauge("health_check_ut_sip_status"),
                        (int)HEALTH_STATUS_CRITICAL);
+    TEST_ASSERT_EQ_INT((int)metrics_get_gauge("health_check_ut_serial_up"), 1);
+    TEST_ASSERT_EQ_INT((int)metrics_get_gauge("health_check_ut_sip_up"), 0);
 
     /* Overall rollup is the worst status across all checks. */
     TEST_ASSERT_EQ_INT((int)metrics_get_gauge("health_overall_status"),
                        (int)HEALTH_STATUS_CRITICAL);
+    TEST_ASSERT_EQ_INT((int)metrics_get_gauge("health_overall_up"), 0);
 
     /* Cumulative tallies: at least the two we ran, one of them failed. */
     TEST_ASSERT((int)metrics_get_gauge("health_checks_total") >= 2);
@@ -2377,14 +2387,7 @@ static serial_action_t action_for(int fd_open, int healthy, long idle, long unti
 
 static void test_serial_healthy_link_idles_quietly(void) {
     TEST_ASSERT_EQ_INT(action_for(1, 1, 0, 0), SERIAL_ACTION_NONE);
-    TEST_ASSERT_EQ_INT(action_for(1, 1, SERIAL_KEEPALIVE_INTERVAL - 1, 0), SERIAL_ACTION_NONE);
-}
-
-static void test_serial_keepalive_window(void) {
-    TEST_ASSERT_EQ_INT(action_for(1, 1, SERIAL_KEEPALIVE_INTERVAL, 0), SERIAL_ACTION_KEEPALIVE);
-    TEST_ASSERT_EQ_INT(action_for(1, 1, SERIAL_WATCHDOG_SECONDS - 1, 0), SERIAL_ACTION_KEEPALIVE);
-    /* Long-standing boundary: exactly at the watchdog threshold, neither the
-     * keepalive nor the watchdog fires; the next pass declares it dead. */
+    TEST_ASSERT_EQ_INT(action_for(1, 1, SERIAL_WATCHDOG_SECONDS - 1, 0), SERIAL_ACTION_NONE);
     TEST_ASSERT_EQ_INT(action_for(1, 1, SERIAL_WATCHDOG_SECONDS, 0), SERIAL_ACTION_NONE);
 }
 
@@ -2489,6 +2492,16 @@ static void test_diag_parse_rejects_malformed(void) {
     TEST_ASSERT_EQ_INT(event_diag_parse("A001", &src, NULL), 0);
 }
 
+static void test_i2c_error_diag_parse(void) {
+    int code = 0;
+    long count = 0;
+    TEST_ASSERT(event_i2c_error_parse("I207", &code, &count));
+    TEST_ASSERT_EQ_INT(code, 2);
+    TEST_ASSERT_EQ_INT((int)count, 7);
+    TEST_ASSERT(!event_i2c_error_parse("I507", &code, &count));
+    TEST_ASSERT(!event_i2c_error_parse("I2x7", &code, &count));
+}
+
 static void test_reset_diag_parse(void) {
     const char *role = NULL;
     long cause = -1;
@@ -2557,7 +2570,6 @@ static void test_mcu_protocol_replay_and_critical_policy(void) {
     TEST_ASSERT_EQ_INT(mcu_replay_accept(&guard, 200), 0);
     TEST_ASSERT_EQ_INT(mcu_message_is_critical(MCU_CMD_DISPLAY), 1);
     TEST_ASSERT_EQ_INT(mcu_message_is_critical(MCU_CMD_COIN_PROGRAM), 1);
-    TEST_ASSERT_EQ_INT(mcu_message_is_critical(MCU_CMD_KEEPALIVE), 0);
 }
 
 static void test_legacy_event_payload_widths_are_declared(void) {
@@ -2766,6 +2778,7 @@ int main(void) {
     TEST_SUITE_BEGIN("Arduino Diagnostics");
     TEST_SUITE_RUN(test_diag_parse_alpha_and_beta);
     TEST_SUITE_RUN(test_diag_parse_rejects_malformed);
+    TEST_SUITE_RUN(test_i2c_error_diag_parse);
     TEST_SUITE_RUN(test_reset_diag_parse);
     TEST_SUITE_RUN(test_mcu_protocol_round_trip_and_partial_input);
     TEST_SUITE_RUN(test_mcu_protocol_rejects_crc_and_resynchronizes);
@@ -2783,7 +2796,6 @@ int main(void) {
 
     TEST_SUITE_BEGIN("Serial Recovery");
     TEST_SUITE_RUN(test_serial_healthy_link_idles_quietly);
-    TEST_SUITE_RUN(test_serial_keepalive_window);
     TEST_SUITE_RUN(test_serial_watchdog_marks_dead);
     TEST_SUITE_RUN(test_serial_closed_fd_is_a_dead_link);
     TEST_SUITE_RUN(test_serial_down_link_retries_when_due);
@@ -2890,6 +2902,7 @@ int main(void) {
     TEST_SUITE_RUN(test_health_check_records_message);
     TEST_SUITE_RUN(test_health_check_default_message);
     TEST_SUITE_RUN(test_health_status_is_serving);
+    TEST_SUITE_RUN(test_alpha_liveness_policy);
     TEST_SUITE_RUN(test_health_overall_reflects_checks);
 
     TEST_SUITE_BEGIN("Health Metrics");

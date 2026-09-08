@@ -42,6 +42,7 @@ size_t event_payload_length(char event_type);
 /* Decode diagnostics. A/B are I2C loss counters; K/D are the keypad/display
  * MCUSR reset-cause bitmasks captured before Arduino startup. */
 int event_diag_parse(const char *payload, const char **source, long *count);
+int event_i2c_error_parse(const char *payload, int *code, long *count);
 int event_reset_parse(const char *payload, const char **role, long *cause);
 #define EVENT_TYPE_CALL_STATE '1'
 

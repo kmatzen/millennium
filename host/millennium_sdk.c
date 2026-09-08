@@ -358,6 +358,7 @@ struct millennium_client *millennium_client_create(void) {
     
     /* Get current time */
     clock_gettime(CLOCK_MONOTONIC, &client->last_update_time);
+    client->last_alpha_activity = client->last_update_time;
     
     {
         config_data_t *cfg = config_get_instance();
@@ -504,6 +505,13 @@ int millennium_client_serial_is_healthy(struct millennium_client *client) {
     return client->serial_healthy;
 }
 
+long millennium_client_alpha_idle_seconds(struct millennium_client *client) {
+    struct timespec now;
+    if (!client) return -1;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    return now.tv_sec - client->last_alpha_activity.tv_sec;
+}
+
 void millennium_client_check_serial(struct millennium_client *client) {
 #if SERIAL_WATCHDOG_ENABLED
     struct timespec now;
@@ -544,12 +552,6 @@ void millennium_client_check_serial(struct millennium_client *client) {
         st.link_healthy = 0;
         st.seconds_until_retry = 0;
         action = serial_recovery_next_action(&st);
-    }
-
-    /* (#59) Send periodic keepalive when idle to avoid false watchdog triggers.
-     * Arduino consumes CMD_KEEPALIVE (0x06) as no-op; write_command updates last_serial_activity. */
-    if (action == SERIAL_ACTION_KEEPALIVE) {
-        millennium_client_write_command(client, CMD_KEEPALIVE, NULL, 0);
     }
 
     if (action == SERIAL_ACTION_RECONNECT) {
@@ -799,6 +801,8 @@ void millennium_client_create_and_queue_event_char(struct millennium_client *cli
 
             snprintf(metric, sizeof(metric), "arduino_i2c_drops_%s", source);
             metrics_set_gauge(metric, (double)count);
+            if (source[0] == 'a')
+                clock_gettime(CLOCK_MONOTONIC, &client->last_alpha_activity);
 
             if (count != last_logged[idx]) {
                 if (count > 0) {
@@ -813,7 +817,13 @@ void millennium_client_create_and_queue_event_char(struct millennium_client *cli
         } else {
             const char *role;
             long cause;
-            if (event_reset_parse(payload, &role, &cause)) {
+            int i2c_code;
+            if (event_i2c_error_parse(payload, &i2c_code, &cause)) {
+                char metric[64];
+                snprintf(metric, sizeof(metric),
+                         "arduino_i2c_error_%d", i2c_code);
+                metrics_set_gauge(metric, (double)cause);
+            } else if (event_reset_parse(payload, &role, &cause)) {
                 char metric[64];
                 snprintf(metric, sizeof(metric), "mcu_reset_cause_%s", role);
                 metrics_set_gauge(metric, (double)cause);
@@ -1035,7 +1045,6 @@ void millennium_client_write_command(struct millennium_client *client, uint8_t c
     case 0x03: type = MCU_CMD_COIN_CONTROL; break;
     case 0x04: type = MCU_CMD_COIN_PROGRAM; break;
     case 0x05: type = MCU_CMD_COIN_VERIFY; break;
-    case 0x06: type = MCU_CMD_KEEPALIVE; break;
     case 0x07: type = MCU_CMD_IDENTITY; break;
     default:
         logger_errorf_with_category("SDK", "Unsupported MCU command: %u", command);

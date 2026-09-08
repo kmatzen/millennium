@@ -74,8 +74,8 @@ int health_monitor_is_monitoring(void);
 /* Statistics */
 int health_monitor_get_statistics(health_statistics_t* stats_out);
 
-/* Publish the current health-check results to the metrics subsystem as gauges
- * (per-check status, an overall rollup, and cumulative tallies) so the serial
+/* Publish status enums plus conventional boolean `_up` gauges (1=serving,
+ * 0=not serving), an overall rollup, and cumulative tallies so the serial
  * link and SIP registration are observable out-of-band via /metrics. Reads a
  * point-in-time snapshot; safe to call from the main-loop metrics tick. */
 void health_monitor_publish_metrics(void);
@@ -90,6 +90,9 @@ health_status_t health_monitor_string_to_status(const char* status_str);
  * fails safe, e.g. before the first check has run). Used to map the overall
  * health onto an HTTP status code for liveness/readiness probes. */
 int health_monitor_status_is_serving(health_status_t status);
+
+/* Pure Alpha-board liveness policy, separated for deterministic tests. */
+health_status_t health_monitor_alpha_liveness(long idle_seconds);
 
 /* Predefined system health checks */
 health_status_t system_health_check_serial_connection(char *message, size_t message_len);

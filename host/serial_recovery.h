@@ -1,7 +1,7 @@
 /* Serial link watchdog / reconnect policy (#247).
  *
  * millennium_client_check_serial() decides, once per main-loop pass, whether to
- * nudge an idle link, declare it dead, or retry the reopen.  That decision used
+ * leave a live link alone, declare it dead, or retry the reopen. That decision used
  * to be tangled up with the syscalls that carry it out, and both simulator.c
  * and tests/unit_tests.c stub the whole SDK serial layer -- so the policy had
  * no coverage at all, which is how #247 (the reconnect that gave up after one
@@ -17,7 +17,6 @@
 
 typedef enum {
     SERIAL_ACTION_NONE = 0,
-    SERIAL_ACTION_KEEPALIVE,   /* link is idle but alive; poke it (#59) */
     SERIAL_ACTION_MARK_DEAD,   /* declare the link down and start retrying */
     SERIAL_ACTION_RECONNECT    /* backoff elapsed; try to reopen the port */
 } serial_action_t;

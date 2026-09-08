@@ -435,6 +435,17 @@ int event_diag_parse(const char *payload, const char **source, long *count) {
     return 1;
 }
 
+int event_i2c_error_parse(const char *payload, int *code, long *count) {
+    if (!payload || !code || !count) return 0;
+    if (strlen(payload) < EVENT_DIAG_PAYLOAD_LEN || payload[0] != 'I') return 0;
+    if (payload[1] < '1' || payload[1] > '4' ||
+        payload[2] < '0' || payload[2] > '9' ||
+        payload[3] < '0' || payload[3] > '9') return 0;
+    *code = payload[1] - '0';
+    *count = (payload[2] - '0') * 10 + (payload[3] - '0');
+    return 1;
+}
+
 /* Decode reset diagnostics: K/D (keypad/display) plus decimal MCUSR bitmask. */
 int event_reset_parse(const char *payload, const char **role, long *cause) {
     long n;

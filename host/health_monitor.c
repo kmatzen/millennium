@@ -302,11 +302,18 @@ void health_monitor_publish_metrics(void) {
         snprintf(metric_name, sizeof(metric_name),
                  "health_check_%.63s_status", checks[i].name);
         metrics_set_gauge(metric_name, (double)checks[i].last_status);
+        snprintf(metric_name, sizeof(metric_name),
+                 "health_check_%.63s_up", checks[i].name);
+        metrics_set_gauge(metric_name,
+            (double)health_monitor_status_is_serving(checks[i].last_status));
     }
 
     /* Worst status across all checks: a single rollup to alert on. */
     metrics_set_gauge("health_overall_status",
                       (double)health_monitor_get_overall_status());
+    metrics_set_gauge("health_overall_up",
+        (double)health_monitor_status_is_serving(
+            health_monitor_get_overall_status()));
 
     /* Cumulative check tallies (running totals the monitor maintains). */
     if (health_monitor_get_statistics(&stats)) {
@@ -336,6 +343,12 @@ int health_monitor_status_is_serving(health_status_t status) {
         default:
             return 0;
     }
+}
+
+health_status_t health_monitor_alpha_liveness(long idle_seconds) {
+    if (idle_seconds < 0) return HEALTH_STATUS_UNKNOWN;
+    if (idle_seconds > 120) return HEALTH_STATUS_CRITICAL;
+    return HEALTH_STATUS_HEALTHY;
 }
 
 health_status_t health_monitor_string_to_status(const char* status_str) {

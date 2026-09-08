@@ -12,7 +12,7 @@ from collections import deque
 SOF, VERSION, MAX_PAYLOAD = 0x7E, 2, 240
 ACK, HELLO = 0x01, 0x02
 DISPLAY, COIN_CONTROL, COIN_PROGRAM, COIN_VERIFY = 0x10, 0x11, 0x12, 0x13
-KEEPALIVE, IDENTITY = 0x14, 0x15
+IDENTITY = 0x15
 KEY, HOOK, CARD, COIN, DIAGNOSTIC, HEARTBEAT, OPERATION = range(0x20, 0x27)
 CRITICAL = {DISPLAY, COIN_CONTROL, COIN_PROGRAM, COIN_VERIFY}
 
@@ -334,6 +334,11 @@ class VirtualMCU:
             if self.connected.is_set():
                 with contextlib.suppress(ConnectionError):
                     await self.send(HEARTBEAT)
+                    if self.hardware.i2c_available:
+                        drops = min(self.hardware.i2c_drops, 999)
+                        await self.send(DIAGNOSTIC, f"A{drops:03d}".encode())
+                        await self.send(DIAGNOSTIC,
+                                        f"I2{min(drops, 99):02d}".encode())
 
     async def control_client(self, reader, writer):
         try:

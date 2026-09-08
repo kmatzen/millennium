@@ -634,13 +634,6 @@
     {
       "category": "mcu-message",
       "function": "serial-reconnect-and-role-routing",
-      "id": "mcu-message:MCU_CMD_KEEPALIVE",
-      "name": "MCU_CMD_KEEPALIVE",
-      "source": "host/mcu_protocol.h"
-    },
-    {
-      "category": "mcu-message",
-      "function": "serial-reconnect-and-role-routing",
       "id": "mcu-message:MCU_MSG_ACK",
       "name": "MCU_MSG_ACK",
       "source": "host/mcu_protocol.h"

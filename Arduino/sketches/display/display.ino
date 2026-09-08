@@ -400,6 +400,7 @@ static void handleProtocolFrame(const MillenniumFrame &frame) {
   if (frame.type == MCU_MSG_HELLO) {
     uint8_t versions[2] = {MILLENNIUM_PROTOCOL_VERSION, MILLENNIUM_PROTOCOL_VERSION};
     sendFrame(MCU_MSG_HELLO, versions, sizeof(versions));
+    sendResetCause();
     return;
   }
   if (frame.type >= MCU_CMD_DISPLAY && frame.type <= MCU_CMD_COIN_VERIFY) {
@@ -444,8 +445,6 @@ static void handleProtocolFrame(const MillenniumFrame &frame) {
     startCoinProgram(frame.sequence);
   } else if (frame.type == MCU_CMD_COIN_VERIFY) {
     startCoinVerify(frame.sequence);
-  } else if (frame.type == MCU_CMD_KEEPALIVE) {
-    sendResetCause();
   } else if (frame.type == MCU_CMD_IDENTITY) {
     printIdentity();
   }

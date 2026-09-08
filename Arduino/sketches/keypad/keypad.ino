@@ -44,6 +44,7 @@ const unsigned long I2C_RETRY_DELAY_MS = 25;
  * value we managed to report to the host. */
 unsigned int i2cDropped = 0;
 unsigned int i2cDroppedReported = 0;
+unsigned int i2cErrors[5] = {0, 0, 0, 0, 0};
 unsigned long lastDropReport = 0;
 uint8_t protocolSequence = 0;
 
@@ -86,20 +87,23 @@ MagStripe card(22, 0, 1);
  * (#230) Send one I2C message to Beta, retrying while it NACKs.
  *
  * Wire.endTransmission() returns 0 only when Beta acknowledged every byte; 2
- * and 3 are NACKs, which is exactly what happens while Beta sits in a delay()
- * or repaints the VFD.  Every call site used to discard that status, so a
- * keypress lost to a busy Beta was indistinguishable from one delivered --
- * which is why "every keypress eventually reaches the Pi" did not hold.
+ * and 3 are NACKs. Blocking sketch code does not itself explain either result:
+ * AVR TWI acknowledges in hardware while interrupts are enabled. We retain
+ * retries for transient faults and count every actual return code so electrical,
+ * address-NACK, and data-NACK failures can be distinguished in production.
  *
  * Returns true if the message landed.
  */
 bool i2cTrySend(const uint8_t *payload, uint8_t len) {
   for (uint8_t attempt = 0; attempt < I2C_SEND_ATTEMPTS; attempt++) {
+    uint8_t status;
     Wire.beginTransmission(I2C_DISPLAY_ADDR);
     Wire.write(payload, len);
-    if (Wire.endTransmission() == 0) {
+    status = Wire.endTransmission();
+    if (status == 0) {
       return true;
     }
+    if (status <= 4) i2cErrors[status]++;
     wdt_reset();
     delay(I2C_RETRY_DELAY_MS);
   }
@@ -134,8 +138,7 @@ bool i2cSendFrame(uint8_t type, const uint8_t *payload, uint8_t len) {
  * This necessarily rides the same I2C link that dropped them, so it only gets
  * through once the link is healthy again. That is fine: the count is
  * cumulative and the host publishes it as a gauge, so a late report is still
- * correct. Encoded as ASCII digits because the host consumes the payload with
- * strlen(), and a raw zero byte would truncate the event and desync the stream.
+ * correct. ASCII keeps these diagnostics readable on a serial console.
  */
 void reportDropsIfChanged() {
   uint8_t msg[5];
@@ -156,6 +159,17 @@ void reportDropsIfChanged() {
   if (i2cTrySendFrame(MCU_EVT_DIAGNOSTIC, msg, 4)) {
     i2cDroppedReported = i2cDropped;
     lastDropReport = now;
+  }
+
+  /* Preserve the Wire return code distribution: 1=data too long, 2=address
+   * NACK, 3=data NACK, 4=other. Two decimal digits saturate rather than wrap. */
+  for (uint8_t code = 1; code <= 4; code++) {
+    unsigned int errors = i2cErrors[code] > 99 ? 99 : i2cErrors[code];
+    msg[0] = 'I';
+    msg[1] = '0' + code;
+    msg[2] = '0' + (errors / 10);
+    msg[3] = '0' + (errors % 10);
+    i2cTrySendFrame(MCU_EVT_DIAGNOSTIC, msg, 4);
   }
 }
 

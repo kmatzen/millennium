@@ -179,6 +179,7 @@ static void update_display(void);
 static int is_phone_ready_for_operation(void);
 static int keypad_has_space(void);
 static health_status_t check_serial_connection(char *message, size_t message_len);
+static health_status_t check_alpha_connection(char *message, size_t message_len);
 static void daemon_save_state(void);
 static void daemon_broadcast_state(const char *event_type);
 static health_status_t check_sip_connection(char *message, size_t message_len);
@@ -985,6 +986,22 @@ health_status_t check_serial_connection(char *message, size_t message_len) {
     return HEALTH_STATUS_CRITICAL;
 }
 
+health_status_t check_alpha_connection(char *message, size_t message_len) {
+    long idle = millennium_client_alpha_idle_seconds(client);
+    health_status_t status = health_monitor_alpha_liveness(idle);
+    if (status == HEALTH_STATUS_UNKNOWN) {
+        snprintf(message, message_len, "Alpha liveness unavailable");
+        return status;
+    }
+    if (status == HEALTH_STATUS_CRITICAL) {
+        snprintf(message, message_len,
+                 "No Alpha diagnostic for %ld s (expected every 30 s)", idle);
+        return status;
+    }
+    snprintf(message, message_len, "Alpha diagnostic received %ld s ago", idle);
+    return status;
+}
+
 health_status_t check_sip_connection(char *message, size_t message_len) {
     int registered = 0;
     millennium_sdk_get_sip_status(&registered, NULL, 0);
@@ -1223,6 +1240,7 @@ int main(int argc, char *argv[]) {
     
     /* Initialize health monitoring */
     health_monitor_register_check("serial_connection", check_serial_connection, 30);
+    health_monitor_register_check("alpha_connection", check_alpha_connection, 30);
     health_monitor_register_check("sip_connection", check_sip_connection, 60);
     health_monitor_register_check("daemon_activity", check_daemon_activity, 120);
 

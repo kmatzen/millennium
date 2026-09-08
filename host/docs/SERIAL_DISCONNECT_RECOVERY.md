@@ -99,7 +99,7 @@ While the serial link is down:
 
 ## Recovery Policy (#247)
 
-The decision `millennium_client_check_serial` makes each pass — idle, keepalive,
+The decision `millennium_client_check_serial` makes each pass — idle,
 declare dead, or retry the reopen — lives in `serial_recovery.c` as pure logic:
 
 ```c
@@ -120,7 +120,7 @@ still set must resolve to `MARK_DEAD`, never `NONE`.
 ## Testing
 
 Policy: covered by the `Serial Recovery` unit suite (`make test`), including the
-keepalive/watchdog boundaries, that retries never give up while the link is down,
+the watchdog boundary, that retries never give up while the link is down,
 that the backoff stays in range for an unbounded outage, and that an Arduino boot
 holds one descriptor open while retrying `HELLO` instead of repeatedly resetting
 the board.

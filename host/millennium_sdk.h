@@ -55,6 +55,7 @@ typedef struct millennium_client {
 
     /* Serial health tracking */
     struct timespec last_serial_activity;
+    struct timespec last_alpha_activity;
     int serial_healthy;
     int reconnect_attempts;
     struct timespec next_reconnect_time;
@@ -124,6 +125,7 @@ void millennium_client_write_to_display(struct millennium_client *client, const 
 
 /* Serial health and reconnection */
 int millennium_client_serial_is_healthy(struct millennium_client *client);
+long millennium_client_alpha_idle_seconds(struct millennium_client *client);
 void millennium_client_check_serial(struct millennium_client *client);
 void millennium_client_serial_activity(struct millennium_client *client);
 
@@ -137,10 +139,8 @@ void millennium_sdk_get_sip_status(int *registered, char *last_error, size_t las
 #define BAUD_RATE B9600
 #define ASYNC_WORKERS 4
 #define SERIAL_WATCHDOG_SECONDS 60
-#define SERIAL_KEEPALIVE_INTERVAL 30   /* (#59) send keepalive when idle this long */
 #define SERIAL_MAX_BACKOFF_SECONDS 60
 #define SERIAL_WATCHDOG_ENABLED 1
-#define CMD_KEEPALIVE 0x06  /* Internal API value mapped to framed keepalive 0x14 */
 
 /* Largest display payload the protocol-v2 display frame can carry.
  *
