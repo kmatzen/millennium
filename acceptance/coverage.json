@@ -1,10 +1,11 @@
 {
   "schema": 1,
   "issue": "https://github.com/kmatzen/millennium/issues/273",
+  "open_defects": [265, 266, 267, 268, 269],
   "automated_suites": {
-    "host": {"cwd": "host", "command": ["make", "test"]},
-    "contracts": {"cwd": ".", "command": ["python3", "-m", "unittest", "discover", "-s", "tools/tests"]},
-    "qemu": {"cwd": ".", "command": ["tools/qemu/qemu.sh", "full-test"], "runner": "anima"}
+    "host": {"cwd": "host", "command": ["make", "test"], "evidence": "GitHub Actions test job log or coverage-ledger evidence JSON"},
+    "contracts": {"cwd": ".", "command": ["python3", "-m", "unittest", "discover", "-s", "tools/tests"], "evidence": "GitHub Actions test job log or coverage-ledger evidence JSON"},
+    "qemu": {"cwd": ".", "command": ["tools/qemu/qemu.sh", "full-test"], "runner": "anima", "evidence": "tools/qemu/state/artifacts/full-*/full-test-result.json"}
   },
   "functions": [
     {"id": "daemon-core", "area": "host", "automated": ["host", "qemu"]},
@@ -27,6 +28,27 @@
     {"id": "power-network-and-update-interruptions", "area": "recovery", "automated": ["qemu"], "physical": ["measured-power-matrix"]},
     {"id": "production-image-userspace", "area": "release", "automated": ["qemu"], "physical": ["zero2w-boot"]}
   ],
+  "profiles": {
+    "daemon-core": {"fidelity": ["unit", "process", "guest-integration"], "faults": ["malformed-input", "restart"]},
+    "sip-calls-and-text": {"fidelity": ["unit", "process", "guest-integration", "physical-only"], "faults": ["malformed-input", "interruption", "restart"], "mock_limitation": "Carrier media and acoustic behavior require the assembled phone."},
+    "serial-reconnect-and-role-routing": {"fidelity": ["unit", "guest-integration", "physical-only"], "faults": ["malformed-input", "interruption", "retry", "restart"], "mock_limitation": "Native USB CDC enumeration requires the real controllers."},
+    "keypad-display-coins-cards-hooks": {"fidelity": ["guest-integration", "physical-only"], "faults": ["malformed-input", "interruption", "restart"], "mock_limitation": "Electrical and mechanical behavior requires the assembled controls."},
+    "audio-generation-and-playback": {"fidelity": ["unit", "guest-integration", "physical-only"], "faults": ["malformed-input", "resource-exhaustion", "restart"], "mock_limitation": "Acoustic intelligibility requires the installed transducers."},
+    "admin-api-auth-csrf-and-firewall": {"fidelity": ["unit", "process", "guest-integration", "outside-in"], "faults": ["authentication", "malformed-input", "resource-exhaustion", "restart"]},
+    "signed-host-and-mcu-ota": {"fidelity": ["unit", "process", "guest-integration"], "faults": ["authentication", "malformed-input", "interruption", "retry", "rollback", "resource-exhaustion", "restart"]},
+    "external-https-update-transport": {"fidelity": ["outside-in"], "faults": ["authentication", "malformed-input", "interruption", "retry", "rollback", "restart"]},
+    "ab-operating-system-ota": {"fidelity": ["unit", "guest-integration", "exact-image", "physical-only"], "faults": ["authentication", "malformed-input", "interruption", "retry", "rollback", "resource-exhaustion", "restart"], "mock_limitation": "VideoCore tryboot selection requires a Zero 2 W."},
+    "readonly-root-and-persistent-state": {"fidelity": ["unit", "exact-image", "physical-only"], "faults": ["interruption", "resource-exhaustion", "restart"], "mock_limitation": "Final mount behavior must be observed from the physical image."},
+    "wifi-onboarding-recovery-and-privacy": {"fidelity": ["unit", "guest-integration", "outside-in", "physical-only"], "faults": ["authentication", "malformed-input", "interruption", "retry", "rollback", "restart"], "mock_limitation": "Broadcom RF and native client association are physical."},
+    "captive-portal-outside-guest": {"fidelity": ["outside-in", "physical-only"], "faults": ["authentication", "malformed-input", "interruption", "retry"], "mock_limitation": "Native captive detector UI requires each named client platform."},
+    "reverse-maintenance-tunnel": {"fidelity": ["guest-integration", "outside-in", "physical-only"], "faults": ["authentication", "interruption", "retry", "restart"], "mock_limitation": "The final source-network audit must use a genuinely external network."},
+    "monitoring-alerting-and-backup": {"fidelity": ["unit", "process", "physical-only"], "faults": ["authentication", "malformed-input", "interruption", "retry", "resource-exhaustion", "restart"], "mock_limitation": "Deployed alert delivery and retention require production operations."},
+    "signed-experience-install-rollback": {"fidelity": ["unit", "process", "guest-integration"], "faults": ["authentication", "malformed-input", "interruption", "retry", "rollback", "resource-exhaustion", "restart"]},
+    "story-branches-persistence-and-accessibility": {"fidelity": ["unit", "process", "guest-integration", "physical-only"], "faults": ["malformed-input", "interruption", "retry", "restart"], "mock_limitation": "Discoverability and engagement require first-time callers."},
+    "factory-seed-recovery-media-and-key-custody": {"fidelity": ["unit", "process", "physical-only"], "faults": ["authentication", "malformed-input", "interruption", "rollback"], "mock_limitation": "Media boot and separate offline custody require physical devices."},
+    "power-network-and-update-interruptions": {"fidelity": ["guest-integration", "physical-only"], "faults": ["interruption", "retry", "rollback", "resource-exhaustion", "restart"], "mock_limitation": "Measured rail collapse and brownout require installed-load instrumentation."},
+    "production-image-userspace": {"fidelity": ["exact-image", "physical-only"], "faults": ["interruption", "rollback", "restart"], "mock_limitation": "Board firmware, SD, USB, and power behavior are not modeled by QEMU virt."}
+  },
   "physical_gates": {
     "sip-carrier-audio": {"issue": 274, "procedure": "hardware/as-built/phone-001/NEXT_PHYSICAL_SESSION.md#2-assemble-once-and-capture-the-baseline"},
     "native-usb-cdc": {"issue": 265, "procedure": "hardware/as-built/phone-001/NEXT_PHYSICAL_SESSION.md#2-assemble-once-and-capture-the-baseline"},

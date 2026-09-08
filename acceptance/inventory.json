@@ -1,0 +1,1224 @@
+{
+  "generator": "tools/generate_coverage_inventory.py",
+  "items": [
+    {
+      "category": "api-route",
+      "function": "admin-api-auth-csrf-and-firewall",
+      "id": "api-route:GET /",
+      "name": "GET /",
+      "source": "host/web_server.c"
+    },
+    {
+      "category": "api-route",
+      "function": "signed-host-and-mcu-ota",
+      "id": "api-route:GET /api/check-update",
+      "name": "GET /api/check-update",
+      "source": "host/web_server.c"
+    },
+    {
+      "category": "api-route",
+      "function": "admin-api-auth-csrf-and-firewall",
+      "id": "api-route:GET /api/config",
+      "name": "GET /api/config",
+      "source": "host/web_server.c"
+    },
+    {
+      "category": "api-route",
+      "function": "signed-experience-install-rollback",
+      "id": "api-route:GET /api/experiences",
+      "name": "GET /api/experiences",
+      "source": "host/web_server.c"
+    },
+    {
+      "category": "api-route",
+      "function": "admin-api-auth-csrf-and-firewall",
+      "id": "api-route:GET /api/health",
+      "name": "GET /api/health",
+      "source": "host/web_server.c"
+    },
+    {
+      "category": "api-route",
+      "function": "admin-api-auth-csrf-and-firewall",
+      "id": "api-route:GET /api/logs",
+      "name": "GET /api/logs",
+      "source": "host/web_server.c"
+    },
+    {
+      "category": "api-route",
+      "function": "admin-api-auth-csrf-and-firewall",
+      "id": "api-route:GET /api/metrics",
+      "name": "GET /api/metrics",
+      "source": "host/web_server.c"
+    },
+    {
+      "category": "api-route",
+      "function": "admin-api-auth-csrf-and-firewall",
+      "id": "api-route:GET /api/plugins",
+      "name": "GET /api/plugins",
+      "source": "host/web_server.c"
+    },
+    {
+      "category": "api-route",
+      "function": "admin-api-auth-csrf-and-firewall",
+      "id": "api-route:GET /api/state",
+      "name": "GET /api/state",
+      "source": "host/web_server.c"
+    },
+    {
+      "category": "api-route",
+      "function": "admin-api-auth-csrf-and-firewall",
+      "id": "api-route:GET /api/status",
+      "name": "GET /api/status",
+      "source": "host/web_server.c"
+    },
+    {
+      "category": "api-route",
+      "function": "signed-host-and-mcu-ota",
+      "id": "api-route:GET /api/update-status",
+      "name": "GET /api/update-status",
+      "source": "host/web_server.c"
+    },
+    {
+      "category": "api-route",
+      "function": "admin-api-auth-csrf-and-firewall",
+      "id": "api-route:GET /api/version",
+      "name": "GET /api/version",
+      "source": "host/web_server.c"
+    },
+    {
+      "category": "api-route",
+      "function": "admin-api-auth-csrf-and-firewall",
+      "id": "api-route:POST /api/control",
+      "name": "POST /api/control",
+      "source": "host/web_server.c"
+    },
+    {
+      "category": "api-route",
+      "function": "signed-experience-install-rollback",
+      "id": "api-route:POST /api/experience-control",
+      "name": "POST /api/experience-control",
+      "source": "host/web_server.c"
+    },
+    {
+      "category": "api-route",
+      "function": "signed-host-and-mcu-ota",
+      "id": "api-route:POST /api/update",
+      "name": "POST /api/update",
+      "source": "host/web_server.c"
+    },
+    {
+      "category": "cli-action",
+      "function": "daemon-core",
+      "id": "cli-action:as_built_record:add-photo",
+      "name": "as_built_record:add-photo",
+      "source": "tools/as_built_record.py"
+    },
+    {
+      "category": "cli-action",
+      "function": "daemon-core",
+      "id": "cli-action:as_built_record:capture",
+      "name": "as_built_record:capture",
+      "source": "tools/as_built_record.py"
+    },
+    {
+      "category": "cli-action",
+      "function": "daemon-core",
+      "id": "cli-action:as_built_record:fail",
+      "name": "as_built_record:fail",
+      "source": "tools/as_built_record.py"
+    },
+    {
+      "category": "cli-action",
+      "function": "daemon-core",
+      "id": "cli-action:as_built_record:pass",
+      "name": "as_built_record:pass",
+      "source": "tools/as_built_record.py"
+    },
+    {
+      "category": "cli-action",
+      "function": "daemon-core",
+      "id": "cli-action:as_built_record:record-installed",
+      "name": "as_built_record:record-installed",
+      "source": "tools/as_built_record.py"
+    },
+    {
+      "category": "cli-action",
+      "function": "daemon-core",
+      "id": "cli-action:as_built_record:record-test",
+      "name": "as_built_record:record-test",
+      "source": "tools/as_built_record.py"
+    },
+    {
+      "category": "cli-action",
+      "function": "daemon-core",
+      "id": "cli-action:as_built_record:set-physical",
+      "name": "as_built_record:set-physical",
+      "source": "tools/as_built_record.py"
+    },
+    {
+      "category": "cli-action",
+      "function": "daemon-core",
+      "id": "cli-action:as_built_record:validate",
+      "name": "as_built_record:validate",
+      "source": "tools/as_built_record.py"
+    },
+    {
+      "category": "cli-action",
+      "function": "signed-experience-install-rollback",
+      "id": "cli-action:catalogtool:build",
+      "name": "catalogtool:build",
+      "source": "content/catalogtool.py"
+    },
+    {
+      "category": "cli-action",
+      "function": "signed-experience-install-rollback",
+      "id": "cli-action:catalogtool:select",
+      "name": "catalogtool:select",
+      "source": "content/catalogtool.py"
+    },
+    {
+      "category": "cli-action",
+      "function": "signed-experience-install-rollback",
+      "id": "cli-action:catalogtool:validate",
+      "name": "catalogtool:validate",
+      "source": "content/catalogtool.py"
+    },
+    {
+      "category": "cli-action",
+      "function": "signed-experience-install-rollback",
+      "id": "cli-action:experience_agent:check",
+      "name": "experience_agent:check",
+      "source": "content/experience_agent.py"
+    },
+    {
+      "category": "cli-action",
+      "function": "signed-experience-install-rollback",
+      "id": "cli-action:experience_agent:disable",
+      "name": "experience_agent:disable",
+      "source": "content/experience_agent.py"
+    },
+    {
+      "category": "cli-action",
+      "function": "signed-experience-install-rollback",
+      "id": "cli-action:experience_agent:enable",
+      "name": "experience_agent:enable",
+      "source": "content/experience_agent.py"
+    },
+    {
+      "category": "cli-action",
+      "function": "signed-experience-install-rollback",
+      "id": "cli-action:experience_agent:fallback",
+      "name": "experience_agent:fallback",
+      "source": "content/experience_agent.py"
+    },
+    {
+      "category": "cli-action",
+      "function": "signed-experience-install-rollback",
+      "id": "cli-action:experience_agent:gc",
+      "name": "experience_agent:gc",
+      "source": "content/experience_agent.py"
+    },
+    {
+      "category": "cli-action",
+      "function": "signed-experience-install-rollback",
+      "id": "cli-action:experience_agent:recover",
+      "name": "experience_agent:recover",
+      "source": "content/experience_agent.py"
+    },
+    {
+      "category": "cli-action",
+      "function": "signed-experience-install-rollback",
+      "id": "cli-action:experience_agent:status",
+      "name": "experience_agent:status",
+      "source": "content/experience_agent.py"
+    },
+    {
+      "category": "cli-action",
+      "function": "daemon-core",
+      "id": "cli-action:handoff_acceptance:add-key-copy",
+      "name": "handoff_acceptance:add-key-copy",
+      "source": "tools/handoff_acceptance.py"
+    },
+    {
+      "category": "cli-action",
+      "function": "daemon-core",
+      "id": "cli-action:handoff_acceptance:fail",
+      "name": "handoff_acceptance:fail",
+      "source": "tools/handoff_acceptance.py"
+    },
+    {
+      "category": "cli-action",
+      "function": "daemon-core",
+      "id": "cli-action:handoff_acceptance:pass",
+      "name": "handoff_acceptance:pass",
+      "source": "tools/handoff_acceptance.py"
+    },
+    {
+      "category": "cli-action",
+      "function": "daemon-core",
+      "id": "cli-action:handoff_acceptance:record-external",
+      "name": "handoff_acceptance:record-external",
+      "source": "tools/handoff_acceptance.py"
+    },
+    {
+      "category": "cli-action",
+      "function": "monitoring-alerting-and-backup",
+      "id": "cli-action:handoff_acceptance:record-server-backup",
+      "name": "handoff_acceptance:record-server-backup",
+      "source": "tools/handoff_acceptance.py"
+    },
+    {
+      "category": "cli-action",
+      "function": "wifi-onboarding-recovery-and-privacy",
+      "id": "cli-action:handoff_acceptance:record-wifi",
+      "name": "handoff_acceptance:record-wifi",
+      "source": "tools/handoff_acceptance.py"
+    },
+    {
+      "category": "cli-action",
+      "function": "daemon-core",
+      "id": "cli-action:handoff_acceptance:template",
+      "name": "handoff_acceptance:template",
+      "source": "tools/handoff_acceptance.py"
+    },
+    {
+      "category": "cli-action",
+      "function": "daemon-core",
+      "id": "cli-action:handoff_acceptance:validate",
+      "name": "handoff_acceptance:validate",
+      "source": "tools/handoff_acceptance.py"
+    },
+    {
+      "category": "cli-action",
+      "function": "signed-experience-install-rollback",
+      "id": "cli-action:install_content:install",
+      "name": "install_content:install",
+      "source": "content/install_content.py"
+    },
+    {
+      "category": "cli-action",
+      "function": "signed-experience-install-rollback",
+      "id": "cli-action:install_content:rollback",
+      "name": "install_content:rollback",
+      "source": "content/install_content.py"
+    },
+    {
+      "category": "cli-action",
+      "function": "signed-experience-install-rollback",
+      "id": "cli-action:install_content:status",
+      "name": "install_content:status",
+      "source": "content/install_content.py"
+    },
+    {
+      "category": "cli-action",
+      "function": "ab-operating-system-ota",
+      "id": "cli-action:millennium_os_ota_agent:apply",
+      "name": "millennium_os_ota_agent:apply",
+      "source": "host/os_ota/millennium_os_ota_agent.py"
+    },
+    {
+      "category": "cli-action",
+      "function": "ab-operating-system-ota",
+      "id": "cli-action:millennium_os_ota_agent:auto-apply",
+      "name": "millennium_os_ota_agent:auto-apply",
+      "source": "host/os_ota/millennium_os_ota_agent.py"
+    },
+    {
+      "category": "cli-action",
+      "function": "ab-operating-system-ota",
+      "id": "cli-action:millennium_os_ota_agent:boot-health",
+      "name": "millennium_os_ota_agent:boot-health",
+      "source": "host/os_ota/millennium_os_ota_agent.py"
+    },
+    {
+      "category": "cli-action",
+      "function": "ab-operating-system-ota",
+      "id": "cli-action:millennium_os_ota_agent:check",
+      "name": "millennium_os_ota_agent:check",
+      "source": "host/os_ota/millennium_os_ota_agent.py"
+    },
+    {
+      "category": "cli-action",
+      "function": "ab-operating-system-ota",
+      "id": "cli-action:millennium_os_ota_agent:clear-failure",
+      "name": "millennium_os_ota_agent:clear-failure",
+      "source": "host/os_ota/millennium_os_ota_agent.py"
+    },
+    {
+      "category": "cli-action",
+      "function": "ab-operating-system-ota",
+      "id": "cli-action:millennium_os_ota_agent:recover",
+      "name": "millennium_os_ota_agent:recover",
+      "source": "host/os_ota/millennium_os_ota_agent.py"
+    },
+    {
+      "category": "cli-action",
+      "function": "ab-operating-system-ota",
+      "id": "cli-action:millennium_os_ota_agent:status",
+      "name": "millennium_os_ota_agent:status",
+      "source": "host/os_ota/millennium_os_ota_agent.py"
+    },
+    {
+      "category": "cli-action",
+      "function": "signed-host-and-mcu-ota",
+      "id": "cli-action:millennium_ota:apply",
+      "name": "millennium_ota:apply",
+      "source": "host/ota/millennium_ota.py"
+    },
+    {
+      "category": "cli-action",
+      "function": "signed-host-and-mcu-ota",
+      "id": "cli-action:millennium_ota:auto-apply",
+      "name": "millennium_ota:auto-apply",
+      "source": "host/ota/millennium_ota.py"
+    },
+    {
+      "category": "cli-action",
+      "function": "signed-host-and-mcu-ota",
+      "id": "cli-action:millennium_ota:check",
+      "name": "millennium_ota:check",
+      "source": "host/ota/millennium_ota.py"
+    },
+    {
+      "category": "cli-action",
+      "function": "signed-host-and-mcu-ota",
+      "id": "cli-action:millennium_ota:clear-failure",
+      "name": "millennium_ota:clear-failure",
+      "source": "host/ota/millennium_ota.py"
+    },
+    {
+      "category": "cli-action",
+      "function": "signed-host-and-mcu-ota",
+      "id": "cli-action:millennium_ota:recover",
+      "name": "millennium_ota:recover",
+      "source": "host/ota/millennium_ota.py"
+    },
+    {
+      "category": "cli-action",
+      "function": "signed-host-and-mcu-ota",
+      "id": "cli-action:millennium_ota:status",
+      "name": "millennium_ota:status",
+      "source": "host/ota/millennium_ota.py"
+    },
+    {
+      "category": "cli-action",
+      "function": "signed-experience-install-rollback",
+      "id": "cli-action:playtest_record:accept",
+      "name": "playtest_record:accept",
+      "source": "content/playtest_record.py"
+    },
+    {
+      "category": "cli-action",
+      "function": "signed-experience-install-rollback",
+      "id": "cli-action:playtest_record:decision",
+      "name": "playtest_record:decision",
+      "source": "content/playtest_record.py"
+    },
+    {
+      "category": "cli-action",
+      "function": "signed-experience-install-rollback",
+      "id": "cli-action:playtest_record:fail",
+      "name": "playtest_record:fail",
+      "source": "content/playtest_record.py"
+    },
+    {
+      "category": "cli-action",
+      "function": "signed-experience-install-rollback",
+      "id": "cli-action:playtest_record:no",
+      "name": "playtest_record:no",
+      "source": "content/playtest_record.py"
+    },
+    {
+      "category": "cli-action",
+      "function": "signed-experience-install-rollback",
+      "id": "cli-action:playtest_record:pass",
+      "name": "playtest_record:pass",
+      "source": "content/playtest_record.py"
+    },
+    {
+      "category": "cli-action",
+      "function": "signed-experience-install-rollback",
+      "id": "cli-action:playtest_record:record-participant",
+      "name": "playtest_record:record-participant",
+      "source": "content/playtest_record.py"
+    },
+    {
+      "category": "cli-action",
+      "function": "signed-experience-install-rollback",
+      "id": "cli-action:playtest_record:record-scenario",
+      "name": "playtest_record:record-scenario",
+      "source": "content/playtest_record.py"
+    },
+    {
+      "category": "cli-action",
+      "function": "signed-experience-install-rollback",
+      "id": "cli-action:playtest_record:reject",
+      "name": "playtest_record:reject",
+      "source": "content/playtest_record.py"
+    },
+    {
+      "category": "cli-action",
+      "function": "signed-experience-install-rollback",
+      "id": "cli-action:playtest_record:template",
+      "name": "playtest_record:template",
+      "source": "content/playtest_record.py"
+    },
+    {
+      "category": "cli-action",
+      "function": "signed-experience-install-rollback",
+      "id": "cli-action:playtest_record:validate",
+      "name": "playtest_record:validate",
+      "source": "content/playtest_record.py"
+    },
+    {
+      "category": "cli-action",
+      "function": "signed-experience-install-rollback",
+      "id": "cli-action:playtest_record:yes",
+      "name": "playtest_record:yes",
+      "source": "content/playtest_record.py"
+    },
+    {
+      "category": "cli-action",
+      "function": "signed-experience-install-rollback",
+      "id": "cli-action:storytool:compile",
+      "name": "storytool:compile",
+      "source": "content/storytool.py"
+    },
+    {
+      "category": "cli-action",
+      "function": "signed-experience-install-rollback",
+      "id": "cli-action:storytool:explore",
+      "name": "storytool:explore",
+      "source": "content/storytool.py"
+    },
+    {
+      "category": "cli-action",
+      "function": "signed-experience-install-rollback",
+      "id": "cli-action:storytool:package",
+      "name": "storytool:package",
+      "source": "content/storytool.py"
+    },
+    {
+      "category": "cli-action",
+      "function": "signed-experience-install-rollback",
+      "id": "cli-action:storytool:preview",
+      "name": "storytool:preview",
+      "source": "content/storytool.py"
+    },
+    {
+      "category": "cli-action",
+      "function": "signed-experience-install-rollback",
+      "id": "cli-action:storytool:validate",
+      "name": "storytool:validate",
+      "source": "content/storytool.py"
+    },
+    {
+      "category": "experience-event",
+      "function": "story-branches-persistence-and-accessibility",
+      "id": "experience-event:call_connected",
+      "name": "call_connected",
+      "source": "content/storytool.py"
+    },
+    {
+      "category": "experience-event",
+      "function": "story-branches-persistence-and-accessibility",
+      "id": "experience-event:call_ended",
+      "name": "call_ended",
+      "source": "content/storytool.py"
+    },
+    {
+      "category": "experience-event",
+      "function": "story-branches-persistence-and-accessibility",
+      "id": "experience-event:card",
+      "name": "card",
+      "source": "content/storytool.py"
+    },
+    {
+      "category": "experience-event",
+      "function": "story-branches-persistence-and-accessibility",
+      "id": "experience-event:coin",
+      "name": "coin",
+      "source": "content/storytool.py"
+    },
+    {
+      "category": "experience-event",
+      "function": "story-branches-persistence-and-accessibility",
+      "id": "experience-event:default",
+      "name": "default",
+      "source": "content/storytool.py"
+    },
+    {
+      "category": "experience-event",
+      "function": "story-branches-persistence-and-accessibility",
+      "id": "experience-event:hook_down",
+      "name": "hook_down",
+      "source": "content/storytool.py"
+    },
+    {
+      "category": "experience-event",
+      "function": "story-branches-persistence-and-accessibility",
+      "id": "experience-event:hook_up",
+      "name": "hook_up",
+      "source": "content/storytool.py"
+    },
+    {
+      "category": "experience-event",
+      "function": "story-branches-persistence-and-accessibility",
+      "id": "experience-event:key:[0-9*#]",
+      "name": "key:[0-9*#]",
+      "source": "content/storytool.py"
+    },
+    {
+      "category": "experience-event",
+      "function": "story-branches-persistence-and-accessibility",
+      "id": "experience-event:resume",
+      "name": "resume",
+      "source": "content/storytool.py"
+    },
+    {
+      "category": "experience-event",
+      "function": "story-branches-persistence-and-accessibility",
+      "id": "experience-event:timeout",
+      "name": "timeout",
+      "source": "content/storytool.py"
+    },
+    {
+      "category": "maintenance-action",
+      "function": "reverse-maintenance-tunnel",
+      "id": "maintenance-action:provision",
+      "name": "provision",
+      "source": "host/ota/millennium_maintenance_tunnel.sh"
+    },
+    {
+      "category": "maintenance-action",
+      "function": "reverse-maintenance-tunnel",
+      "id": "maintenance-action:run",
+      "name": "run",
+      "source": "host/ota/millennium_maintenance_tunnel.sh"
+    },
+    {
+      "category": "mcu-message",
+      "function": "serial-reconnect-and-role-routing",
+      "id": "mcu-message:MCU_CMD_COIN_CONTROL",
+      "name": "MCU_CMD_COIN_CONTROL",
+      "source": "host/mcu_protocol.h"
+    },
+    {
+      "category": "mcu-message",
+      "function": "serial-reconnect-and-role-routing",
+      "id": "mcu-message:MCU_CMD_COIN_PROGRAM",
+      "name": "MCU_CMD_COIN_PROGRAM",
+      "source": "host/mcu_protocol.h"
+    },
+    {
+      "category": "mcu-message",
+      "function": "serial-reconnect-and-role-routing",
+      "id": "mcu-message:MCU_CMD_COIN_VERIFY",
+      "name": "MCU_CMD_COIN_VERIFY",
+      "source": "host/mcu_protocol.h"
+    },
+    {
+      "category": "mcu-message",
+      "function": "serial-reconnect-and-role-routing",
+      "id": "mcu-message:MCU_CMD_DISPLAY",
+      "name": "MCU_CMD_DISPLAY",
+      "source": "host/mcu_protocol.h"
+    },
+    {
+      "category": "mcu-message",
+      "function": "serial-reconnect-and-role-routing",
+      "id": "mcu-message:MCU_CMD_IDENTITY",
+      "name": "MCU_CMD_IDENTITY",
+      "source": "host/mcu_protocol.h"
+    },
+    {
+      "category": "mcu-message",
+      "function": "serial-reconnect-and-role-routing",
+      "id": "mcu-message:MCU_CMD_KEEPALIVE",
+      "name": "MCU_CMD_KEEPALIVE",
+      "source": "host/mcu_protocol.h"
+    },
+    {
+      "category": "mcu-message",
+      "function": "serial-reconnect-and-role-routing",
+      "id": "mcu-message:MCU_MSG_ACK",
+      "name": "MCU_MSG_ACK",
+      "source": "host/mcu_protocol.h"
+    },
+    {
+      "category": "mcu-message",
+      "function": "serial-reconnect-and-role-routing",
+      "id": "mcu-message:MCU_MSG_HELLO",
+      "name": "MCU_MSG_HELLO",
+      "source": "host/mcu_protocol.h"
+    },
+    {
+      "category": "plugin",
+      "function": "story-branches-persistence-and-accessibility",
+      "id": "plugin:classic_phone",
+      "name": "classic_phone",
+      "source": "host/plugins/classic_phone.c"
+    },
+    {
+      "category": "plugin",
+      "function": "story-branches-persistence-and-accessibility",
+      "id": "plugin:dial_a_joke",
+      "name": "dial_a_joke",
+      "source": "host/plugins/dial_a_joke.c"
+    },
+    {
+      "category": "plugin",
+      "function": "story-branches-persistence-and-accessibility",
+      "id": "plugin:fortune_teller",
+      "name": "fortune_teller",
+      "source": "host/plugins/fortune_teller.c"
+    },
+    {
+      "category": "plugin",
+      "function": "story-branches-persistence-and-accessibility",
+      "id": "plugin:jukebox",
+      "name": "jukebox",
+      "source": "host/plugins/jukebox.c"
+    },
+    {
+      "category": "plugin",
+      "function": "story-branches-persistence-and-accessibility",
+      "id": "plugin:number_guess",
+      "name": "number_guess",
+      "source": "host/plugins/number_guess.c"
+    },
+    {
+      "category": "plugin",
+      "function": "story-branches-persistence-and-accessibility",
+      "id": "plugin:simon",
+      "name": "simon",
+      "source": "host/plugins/simon.c"
+    },
+    {
+      "category": "plugin",
+      "function": "story-branches-persistence-and-accessibility",
+      "id": "plugin:story_mode",
+      "name": "story_mode",
+      "source": "host/plugins/story_mode.c"
+    },
+    {
+      "category": "plugin",
+      "function": "story-branches-persistence-and-accessibility",
+      "id": "plugin:time_operator",
+      "name": "time_operator",
+      "source": "host/plugins/time_operator.c"
+    },
+    {
+      "category": "plugin",
+      "function": "story-branches-persistence-and-accessibility",
+      "id": "plugin:trivia",
+      "name": "trivia",
+      "source": "host/plugins/trivia.c"
+    },
+    {
+      "category": "production-executable",
+      "function": "signed-experience-install-rollback",
+      "id": "production-executable:catalogtool.py",
+      "name": "catalogtool.py",
+      "source": "content/catalogtool.py"
+    },
+    {
+      "category": "production-executable",
+      "function": "monitoring-alerting-and-backup",
+      "id": "production-executable:millennium-backup",
+      "name": "millennium-backup",
+      "source": "host/monitoring/millennium_backup.sh"
+    },
+    {
+      "category": "production-executable",
+      "function": "monitoring-alerting-and-backup",
+      "id": "production-executable:millennium-backup-export",
+      "name": "millennium-backup-export",
+      "source": "host/monitoring/millennium_backup_export.sh"
+    },
+    {
+      "category": "production-executable",
+      "function": "signed-experience-install-rollback",
+      "id": "production-executable:millennium-content",
+      "name": "millennium-content",
+      "source": "content/install_content.py"
+    },
+    {
+      "category": "production-executable",
+      "function": "daemon-core",
+      "id": "production-executable:millennium-daemon",
+      "name": "millennium-daemon",
+      "source": "tools/stage_zero2w_image_payload.sh"
+    },
+    {
+      "category": "production-executable",
+      "function": "signed-experience-install-rollback",
+      "id": "production-executable:millennium-experience",
+      "name": "millennium-experience",
+      "source": "content/experience_agent.py"
+    },
+    {
+      "category": "production-executable",
+      "function": "monitoring-alerting-and-backup",
+      "id": "production-executable:millennium-hil-smoke",
+      "name": "millennium-hil-smoke",
+      "source": "host/monitoring/millennium_hil_smoke.py"
+    },
+    {
+      "category": "production-executable",
+      "function": "reverse-maintenance-tunnel",
+      "id": "production-executable:millennium-maintenance-tunnel",
+      "name": "millennium-maintenance-tunnel",
+      "source": "host/ota/millennium_maintenance_tunnel.sh"
+    },
+    {
+      "category": "production-executable",
+      "function": "monitoring-alerting-and-backup",
+      "id": "production-executable:millennium-monitor",
+      "name": "millennium-monitor",
+      "source": "host/monitoring/millennium_monitor.py"
+    },
+    {
+      "category": "production-executable",
+      "function": "ab-operating-system-ota",
+      "id": "production-executable:millennium-os-ota",
+      "name": "millennium-os-ota",
+      "source": "host/os_ota/millennium_os_ota_agent.py"
+    },
+    {
+      "category": "production-executable",
+      "function": "monitoring-alerting-and-backup",
+      "id": "production-executable:millennium-physical-interruption",
+      "name": "millennium-physical-interruption",
+      "source": "host/monitoring/millennium_physical_interruption.py"
+    },
+    {
+      "category": "production-executable",
+      "function": "reverse-maintenance-tunnel",
+      "id": "production-executable:millennium-repair-maintenance-access",
+      "name": "millennium-repair-maintenance-access",
+      "source": "host/ota/repair_maintenance_access.py"
+    },
+    {
+      "category": "production-executable",
+      "function": "wifi-onboarding-recovery-and-privacy",
+      "id": "production-executable:millennium-wifi-bootstrap",
+      "name": "millennium-wifi-bootstrap",
+      "source": "host/wifi/millennium_wifi_bootstrap.py"
+    },
+    {
+      "category": "production-executable",
+      "function": "wifi-onboarding-recovery-and-privacy",
+      "id": "production-executable:millennium-wifi-helper",
+      "name": "millennium-wifi-helper",
+      "source": "host/wifi/millennium_wifi_helper.py"
+    },
+    {
+      "category": "production-executable",
+      "function": "wifi-onboarding-recovery-and-privacy",
+      "id": "production-executable:millennium-wifi-portal",
+      "name": "millennium-wifi-portal",
+      "source": "host/wifi/millennium_wifi_portal.py"
+    },
+    {
+      "category": "production-executable",
+      "function": "wifi-onboarding-recovery-and-privacy",
+      "id": "production-executable:millennium-wifi-provision",
+      "name": "millennium-wifi-provision",
+      "source": "host/wifi/provision_wifi.py"
+    },
+    {
+      "category": "production-executable",
+      "function": "wifi-onboarding-recovery-and-privacy",
+      "id": "production-executable:millennium_wifi.py",
+      "name": "millennium_wifi.py",
+      "source": "host/wifi/millennium_wifi.py"
+    },
+    {
+      "category": "production-executable",
+      "function": "signed-experience-install-rollback",
+      "id": "production-executable:storytool.py",
+      "name": "storytool.py",
+      "source": "content/storytool.py"
+    },
+    {
+      "category": "recovery-tool",
+      "function": "factory-seed-recovery-media-and-key-custody",
+      "id": "recovery-tool:as_built_record.py",
+      "name": "as_built_record.py",
+      "source": "tools/as_built_record.py"
+    },
+    {
+      "category": "recovery-tool",
+      "function": "factory-seed-recovery-media-and-key-custody",
+      "id": "recovery-tool:handoff_acceptance.py",
+      "name": "handoff_acceptance.py",
+      "source": "tools/handoff_acceptance.py"
+    },
+    {
+      "category": "recovery-tool",
+      "function": "monitoring-alerting-and-backup",
+      "id": "recovery-tool:millennium_physical_interruption.py",
+      "name": "millennium_physical_interruption.py",
+      "source": "host/monitoring/millennium_physical_interruption.py"
+    },
+    {
+      "category": "recovery-tool",
+      "function": "reverse-maintenance-tunnel",
+      "id": "recovery-tool:repair_maintenance_access.py",
+      "name": "repair_maintenance_access.py",
+      "source": "host/ota/repair_maintenance_access.py"
+    },
+    {
+      "category": "recovery-tool",
+      "function": "factory-seed-recovery-media-and-key-custody",
+      "id": "recovery-tool:write_recovery_media.py",
+      "name": "write_recovery_media.py",
+      "source": "tools/write_recovery_media.py"
+    },
+    {
+      "category": "systemd-unit",
+      "function": "daemon-core",
+      "id": "systemd-unit:daemon-dev.service",
+      "name": "daemon-dev.service",
+      "source": "host/systemd/daemon-dev.service"
+    },
+    {
+      "category": "systemd-unit",
+      "function": "daemon-core",
+      "id": "systemd-unit:daemon.service",
+      "name": "daemon.service",
+      "source": "host/systemd/daemon.service"
+    },
+    {
+      "category": "systemd-unit",
+      "function": "monitoring-alerting-and-backup",
+      "id": "systemd-unit:millennium-backup.service",
+      "name": "millennium-backup.service",
+      "source": "host/systemd/millennium-backup.service"
+    },
+    {
+      "category": "systemd-unit",
+      "function": "monitoring-alerting-and-backup",
+      "id": "systemd-unit:millennium-backup.timer",
+      "name": "millennium-backup.timer",
+      "source": "host/systemd/millennium-backup.timer"
+    },
+    {
+      "category": "systemd-unit",
+      "function": "signed-experience-install-rollback",
+      "id": "systemd-unit:millennium-experience-recover.service",
+      "name": "millennium-experience-recover.service",
+      "source": "host/systemd/millennium-experience-recover.service"
+    },
+    {
+      "category": "systemd-unit",
+      "function": "signed-experience-install-rollback",
+      "id": "systemd-unit:millennium-experience-update.service",
+      "name": "millennium-experience-update.service",
+      "source": "host/systemd/millennium-experience-update.service"
+    },
+    {
+      "category": "systemd-unit",
+      "function": "signed-experience-install-rollback",
+      "id": "systemd-unit:millennium-experience-update.timer",
+      "name": "millennium-experience-update.timer",
+      "source": "host/systemd/millennium-experience-update.timer"
+    },
+    {
+      "category": "systemd-unit",
+      "function": "admin-api-auth-csrf-and-firewall",
+      "id": "systemd-unit:millennium-firewall.service",
+      "name": "millennium-firewall.service",
+      "source": "host/systemd/millennium-firewall.service"
+    },
+    {
+      "category": "systemd-unit",
+      "function": "monitoring-alerting-and-backup",
+      "id": "systemd-unit:millennium-hil-smoke.service",
+      "name": "millennium-hil-smoke.service",
+      "source": "host/systemd/millennium-hil-smoke.service"
+    },
+    {
+      "category": "systemd-unit",
+      "function": "monitoring-alerting-and-backup",
+      "id": "systemd-unit:millennium-hil-smoke.timer",
+      "name": "millennium-hil-smoke.timer",
+      "source": "host/systemd/millennium-hil-smoke.timer"
+    },
+    {
+      "category": "systemd-unit",
+      "function": "reverse-maintenance-tunnel",
+      "id": "systemd-unit:millennium-maintenance-tunnel.service",
+      "name": "millennium-maintenance-tunnel.service",
+      "source": "host/systemd/millennium-maintenance-tunnel.service"
+    },
+    {
+      "category": "systemd-unit",
+      "function": "daemon-core",
+      "id": "systemd-unit:millennium-metrics-pull.service",
+      "name": "millennium-metrics-pull.service",
+      "source": "host/systemd/millennium-metrics-pull.service"
+    },
+    {
+      "category": "systemd-unit",
+      "function": "daemon-core",
+      "id": "systemd-unit:millennium-metrics-pull.timer",
+      "name": "millennium-metrics-pull.timer",
+      "source": "host/systemd/millennium-metrics-pull.timer"
+    },
+    {
+      "category": "systemd-unit",
+      "function": "monitoring-alerting-and-backup",
+      "id": "systemd-unit:millennium-monitor.service",
+      "name": "millennium-monitor.service",
+      "source": "host/systemd/millennium-monitor.service"
+    },
+    {
+      "category": "systemd-unit",
+      "function": "monitoring-alerting-and-backup",
+      "id": "systemd-unit:millennium-monitor.timer",
+      "name": "millennium-monitor.timer",
+      "source": "host/systemd/millennium-monitor.timer"
+    },
+    {
+      "category": "systemd-unit",
+      "function": "ab-operating-system-ota",
+      "id": "systemd-unit:millennium-os-update-apply.service",
+      "name": "millennium-os-update-apply.service",
+      "source": "host/systemd/millennium-os-update-apply.service"
+    },
+    {
+      "category": "systemd-unit",
+      "function": "ab-operating-system-ota",
+      "id": "systemd-unit:millennium-os-update-apply.timer",
+      "name": "millennium-os-update-apply.timer",
+      "source": "host/systemd/millennium-os-update-apply.timer"
+    },
+    {
+      "category": "systemd-unit",
+      "function": "ab-operating-system-ota",
+      "id": "systemd-unit:millennium-os-update-boot-health.service",
+      "name": "millennium-os-update-boot-health.service",
+      "source": "host/systemd/millennium-os-update-boot-health.service"
+    },
+    {
+      "category": "systemd-unit",
+      "function": "ab-operating-system-ota",
+      "id": "systemd-unit:millennium-os-update-check.service",
+      "name": "millennium-os-update-check.service",
+      "source": "host/systemd/millennium-os-update-check.service"
+    },
+    {
+      "category": "systemd-unit",
+      "function": "ab-operating-system-ota",
+      "id": "systemd-unit:millennium-os-update-check.timer",
+      "name": "millennium-os-update-check.timer",
+      "source": "host/systemd/millennium-os-update-check.timer"
+    },
+    {
+      "category": "systemd-unit",
+      "function": "ab-operating-system-ota",
+      "id": "systemd-unit:millennium-os-update-recover.service",
+      "name": "millennium-os-update-recover.service",
+      "source": "host/systemd/millennium-os-update-recover.service"
+    },
+    {
+      "category": "systemd-unit",
+      "function": "power-network-and-update-interruptions",
+      "id": "systemd-unit:millennium-physical-interruption-reconcile.service",
+      "name": "millennium-physical-interruption-reconcile.service",
+      "source": "host/systemd/millennium-physical-interruption-reconcile.service"
+    },
+    {
+      "category": "systemd-unit",
+      "function": "signed-host-and-mcu-ota",
+      "id": "systemd-unit:millennium-update-apply.service",
+      "name": "millennium-update-apply.service",
+      "source": "host/systemd/millennium-update-apply.service"
+    },
+    {
+      "category": "systemd-unit",
+      "function": "signed-host-and-mcu-ota",
+      "id": "systemd-unit:millennium-update-apply.timer",
+      "name": "millennium-update-apply.timer",
+      "source": "host/systemd/millennium-update-apply.timer"
+    },
+    {
+      "category": "systemd-unit",
+      "function": "signed-host-and-mcu-ota",
+      "id": "systemd-unit:millennium-update-auto-apply.service",
+      "name": "millennium-update-auto-apply.service",
+      "source": "host/systemd/millennium-update-auto-apply.service"
+    },
+    {
+      "category": "systemd-unit",
+      "function": "signed-host-and-mcu-ota",
+      "id": "systemd-unit:millennium-update-check.service",
+      "name": "millennium-update-check.service",
+      "source": "host/systemd/millennium-update-check.service"
+    },
+    {
+      "category": "systemd-unit",
+      "function": "signed-host-and-mcu-ota",
+      "id": "systemd-unit:millennium-update-check.timer",
+      "name": "millennium-update-check.timer",
+      "source": "host/systemd/millennium-update-check.timer"
+    },
+    {
+      "category": "systemd-unit",
+      "function": "signed-host-and-mcu-ota",
+      "id": "systemd-unit:millennium-update-recover.service",
+      "name": "millennium-update-recover.service",
+      "source": "host/systemd/millennium-update-recover.service"
+    },
+    {
+      "category": "systemd-unit",
+      "function": "wifi-onboarding-recovery-and-privacy",
+      "id": "systemd-unit:millennium-wifi-bootstrap.service",
+      "name": "millennium-wifi-bootstrap.service",
+      "source": "host/systemd/millennium-wifi-bootstrap.service"
+    },
+    {
+      "category": "systemd-unit",
+      "function": "wifi-onboarding-recovery-and-privacy",
+      "id": "systemd-unit:millennium-wifi-helper.service",
+      "name": "millennium-wifi-helper.service",
+      "source": "host/systemd/millennium-wifi-helper.service"
+    },
+    {
+      "category": "systemd-unit",
+      "function": "wifi-onboarding-recovery-and-privacy",
+      "id": "systemd-unit:millennium-wifi-portal.service",
+      "name": "millennium-wifi-portal.service",
+      "source": "host/systemd/millennium-wifi-portal.service"
+    },
+    {
+      "category": "systemd-unit",
+      "function": "wifi-onboarding-recovery-and-privacy",
+      "id": "systemd-unit:millennium-wifi-recovery.path",
+      "name": "millennium-wifi-recovery.path",
+      "source": "host/systemd/millennium-wifi-recovery.path"
+    },
+    {
+      "category": "updater-state",
+      "function": "ab-operating-system-ota",
+      "id": "updater-state:millennium_os_ota_agent:idle",
+      "name": "millennium_os_ota_agent:idle",
+      "source": "host/os_ota/millennium_os_ota_agent.py"
+    },
+    {
+      "category": "updater-state",
+      "function": "ab-operating-system-ota",
+      "id": "updater-state:millennium_os_ota_agent:pending",
+      "name": "millennium_os_ota_agent:pending",
+      "source": "host/os_ota/millennium_os_ota_agent.py"
+    },
+    {
+      "category": "updater-state",
+      "function": "signed-host-and-mcu-ota",
+      "id": "updater-state:millennium_ota:available",
+      "name": "millennium_ota:available",
+      "source": "host/ota/millennium_ota.py"
+    },
+    {
+      "category": "updater-state",
+      "function": "signed-host-and-mcu-ota",
+      "id": "updater-state:millennium_ota:checking",
+      "name": "millennium_ota:checking",
+      "source": "host/ota/millennium_ota.py"
+    },
+    {
+      "category": "updater-state",
+      "function": "signed-host-and-mcu-ota",
+      "id": "updater-state:millennium_ota:committed",
+      "name": "millennium_ota:committed",
+      "source": "host/ota/millennium_ota.py"
+    },
+    {
+      "category": "updater-state",
+      "function": "signed-host-and-mcu-ota",
+      "id": "updater-state:millennium_ota:current",
+      "name": "millennium_ota:current",
+      "source": "host/ota/millennium_ota.py"
+    },
+    {
+      "category": "updater-state",
+      "function": "signed-host-and-mcu-ota",
+      "id": "updater-state:millennium_ota:downloading",
+      "name": "millennium_ota:downloading",
+      "source": "host/ota/millennium_ota.py"
+    },
+    {
+      "category": "updater-state",
+      "function": "signed-host-and-mcu-ota",
+      "id": "updater-state:millennium_ota:held",
+      "name": "millennium_ota:held",
+      "source": "host/ota/millennium_ota.py"
+    },
+    {
+      "category": "updater-state",
+      "function": "signed-host-and-mcu-ota",
+      "id": "updater-state:millennium_ota:installing",
+      "name": "millennium_ota:installing",
+      "source": "host/ota/millennium_ota.py"
+    },
+    {
+      "category": "updater-state",
+      "function": "signed-host-and-mcu-ota",
+      "id": "updater-state:millennium_ota:never-run",
+      "name": "millennium_ota:never-run",
+      "source": "host/ota/millennium_ota.py"
+    },
+    {
+      "category": "updater-state",
+      "function": "signed-host-and-mcu-ota",
+      "id": "updater-state:millennium_ota:recovering",
+      "name": "millennium_ota:recovering",
+      "source": "host/ota/millennium_ota.py"
+    },
+    {
+      "category": "updater-state",
+      "function": "signed-host-and-mcu-ota",
+      "id": "updater-state:millennium_ota:retry-enabled",
+      "name": "millennium_ota:retry-enabled",
+      "source": "host/ota/millennium_ota.py"
+    },
+    {
+      "category": "updater-state",
+      "function": "signed-host-and-mcu-ota",
+      "id": "updater-state:millennium_ota:rolled-back",
+      "name": "millennium_ota:rolled-back",
+      "source": "host/ota/millennium_ota.py"
+    },
+    {
+      "category": "wifi-route",
+      "function": "wifi-onboarding-recovery-and-privacy",
+      "id": "wifi-route:/acceptance.json",
+      "name": "/acceptance.json",
+      "source": "host/wifi/millennium_wifi_portal.py"
+    },
+    {
+      "category": "wifi-route",
+      "function": "wifi-onboarding-recovery-and-privacy",
+      "id": "wifi-route:/connect",
+      "name": "/connect",
+      "source": "host/wifi/millennium_wifi_portal.py"
+    },
+    {
+      "category": "wifi-route",
+      "function": "wifi-onboarding-recovery-and-privacy",
+      "id": "wifi-route:/hotspot-detect.html",
+      "name": "/hotspot-detect.html",
+      "source": "host/wifi/millennium_wifi_portal.py"
+    },
+    {
+      "category": "wifi-route",
+      "function": "wifi-onboarding-recovery-and-privacy",
+      "id": "wifi-route:/ncsi.txt",
+      "name": "/ncsi.txt",
+      "source": "host/wifi/millennium_wifi_portal.py"
+    }
+  ],
+  "schema": 1
+}

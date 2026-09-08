@@ -43,6 +43,7 @@ jobs:
 
       - name: Test acceptance evidence gates
         run: |
+          python3 tools/generate_coverage_inventory.py --check
           python3 tools/coverage_ledger.py validate
           python3 tools/tests/test_acceptance_evidence.py
           python3 host/tests/test_maintenance_repair.py
