@@ -206,6 +206,13 @@ checks the setup firewall, service sandbox, atomic credential storage, rollback,
 recovery gesture, timeout, and private factory handoff. RF behavior and real
 client association remain physical gates.
 
+`wifi-external-client-test` adds an outside-in transport check. A client process
+outside QEMU crosses an explicit forwarded TCP boundary to the real portal in
+the ARM64 guest, performs an Android captive probe, downloads acceptance
+evidence, renders the setup form, preserves its session cookie, submits the
+CSRF-protected form, and verifies the helper receives the intended candidate.
+It does not claim RF association.
+
 ## Reset and recovery
 
 ```sh

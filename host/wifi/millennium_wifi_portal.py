@@ -29,10 +29,10 @@ PLATFORM_PROBES = {
 PAGE = """<!doctype html><html><head><meta charset=utf-8>
 <meta name=viewport content="width=device-width,initial-scale=1">
 <title>Millennium Wi-Fi Setup</title><style>
-body{font:17px system-ui;max-width:34rem;margin:2rem auto;padding:0 1rem;background:#111;color:#eee}
-h1{font-size:1.6rem}label{display:block;margin:1rem 0}.card{background:#222;padding:1rem;border-radius:.6rem}
-input,select,button{box-sizing:border-box;width:100%;padding:.8rem;font:inherit;margin-top:.35rem}
-button{background:#f2c94c;border:0;font-weight:700}.note{color:#bbb;font-size:.9rem}.error{color:#ff8b8b}</style></head>
+body{{font:17px system-ui;max-width:34rem;margin:2rem auto;padding:0 1rem;background:#111;color:#eee}}
+h1{{font-size:1.6rem}}label{{display:block;margin:1rem 0}}.card{{background:#222;padding:1rem;border-radius:.6rem}}
+input,select,button{{box-sizing:border-box;width:100%;padding:.8rem;font:inherit;margin-top:.35rem}}
+button{{background:#f2c94c;border:0;font-weight:700}}.note{{color:#bbb;font-size:.9rem}}.error{{color:#ff8b8b}}</style></head>
 <body><h1>Connect your Millennium Phone</h1><div class=card>{message}
 <form method=post action=/connect><input type=hidden name=csrf value="{csrf}">
 <label>Home Wi-Fi network<input name=ssid list=networks maxlength=32 required autocomplete=off></label>

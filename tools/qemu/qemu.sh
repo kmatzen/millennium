@@ -350,6 +350,11 @@ wifi_test() {
     "${SSH[@]}" sudo /tmp/millennium-src/tools/qemu/wifi-test-guest.sh /tmp/millennium-src
 }
 
+wifi_external_client_test() {
+    running || die "start and provision the VM before wifi-external-client-test"
+    "$SCRIPT_DIR/wifi-external-client-test.sh"
+}
+
 full_test() {
     local run exact_image_ran=false exact_inputs=0
     run="full-$(date -u +%Y%m%dT%H%M%SZ)"
@@ -378,6 +383,7 @@ full_test() {
     ota_fault_test
     os_ota_test
     wifi_test
+    wifi_external_client_test
     experience_test
     experience_lifecycle_test
     experience_power_test
@@ -389,6 +395,7 @@ full_test() {
 import datetime, json, pathlib, sys
 acceptance = ["virtual-mcu-unit", "appliance-smoke", "lifecycle", "power-recovery",
               "peripheral-faults", "signed-ota", "ota-faults", "wifi-onboarding",
+              "wifi-independent-client",
               "offline-experience", "signed-experience-lifecycle", "experience-power-recovery", "production-image-contracts", "evidence-export"]
 exact_image = sys.argv[2] == "true"
 if exact_image:
@@ -493,7 +500,7 @@ start_vm() {
         -drive "if=virtio,format=qcow2,file=$DISK_IMAGE" \
         -drive "if=virtio,format=raw,readonly=on,file=$STATE_DIR/seed.iso" \
         -device virtio-net-device,netdev=net0 \
-        -netdev "user,id=net0,hostfwd=tcp:127.0.0.1:$SSH_PORT-:22" \
+        -netdev "user,id=net0,hostfwd=tcp:127.0.0.1:$SSH_PORT-:22,hostfwd=tcp:127.0.0.1:18082-:18082" \
         -device virtio-rng-device \
         -device virtio-serial-device \
         -chardev "socket,id=mcu,path=$STATE_DIR/mcu.sock,server=on,wait=off" \
@@ -585,6 +592,7 @@ case ${1:-help} in
     ota-fault-test) ota_fault_test ;;
     os-ota-test) os_ota_test ;;
     wifi-test) wifi_test ;;
+    wifi-external-client-test) wifi_external_client_test ;;
     experience-test) experience_test ;;
     experience-lifecycle-test) experience_lifecycle_test ;;
     experience-power-test) experience_power_test ;;
@@ -621,6 +629,6 @@ case ${1:-help} in
         printf 'fresh overlay created; previous disk retained as a timestamped backup\n'
         ;;
     help|*)
-        printf 'usage: %s {fetch|init|start|wait|provision|stop|power-cut|pause|resume|restart-virtual-mcu|network|checkpoint|lifecycle-test|recovery-test|peripheral-fault-test|ota-test|ota-fault-test|os-ota-test|wifi-test|experience-test|experience-lifecycle-test|experience-power-test|full-test|collect-artifacts|status|ssh|logs|token|tunnel|display|peripherals|key|hook|coin|card|fault|reset-mcu|smoke|reset}\n' "$0"
+        printf 'usage: %s {fetch|init|start|wait|provision|stop|power-cut|pause|resume|restart-virtual-mcu|network|checkpoint|lifecycle-test|recovery-test|peripheral-fault-test|ota-test|ota-fault-test|os-ota-test|wifi-test|wifi-external-client-test|experience-test|experience-lifecycle-test|experience-power-test|full-test|collect-artifacts|status|ssh|logs|token|tunnel|display|peripherals|key|hook|coin|card|fault|reset-mcu|smoke|reset}\n' "$0"
         ;;
 esac

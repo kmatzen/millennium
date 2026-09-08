@@ -106,7 +106,11 @@ power behavior. Those remain physical acceptance gates.
 - [x] Prove setup clients cannot reach SSH, admin API, forwarding, or stored
   credentials while update and maintenance endpoints recover after success.
 
-Acceptance: `tools/qemu/qemu.sh wifi-test`.
+Acceptance: `tools/qemu/qemu.sh wifi-test` and
+`tools/qemu/qemu.sh wifi-external-client-test`. The latter runs an independent
+client outside the VM through QEMU's forwarded network boundary and exercises
+the real portal server, session cookie, CSRF token, probe evidence, page
+rendering, and helper handoff.
 
 ## Experiences and observability
 

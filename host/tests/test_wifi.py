@@ -156,6 +156,21 @@ class WifiTests(unittest.TestCase):
                 handler.send_response.assert_called_once_with(302)
                 handler.send_header.assert_any_call("Location", "/")
 
+    def test_portal_page_renders_real_template(self):
+        handler = object.__new__(portal_module.Portal)
+        handler.session = mock.Mock(return_value=("csrf-token", True))
+        handler.send_response = mock.Mock()
+        handler.send_header = mock.Mock()
+        handler.end_headers = mock.Mock()
+        handler.wfile = io.BytesIO()
+        with mock.patch.object(portal_module, "helper_request",
+                               return_value={"networks": [{"ssid": "Home & Work"}]}):
+            handler.send_page()
+        page = handler.wfile.getvalue().decode()
+        self.assertIn('name=csrf value="csrf-token"', page)
+        self.assertIn('value="Home &amp; Work"', page)
+        self.assertIn("body{font:17px system-ui", page)
+
     def test_physical_client_evidence_requires_matching_browser_and_probe(self):
         portal_module.PROBE_OBSERVATIONS.clear()
         portal_module.record_probe("10.42.0.2", "/generate_204")
