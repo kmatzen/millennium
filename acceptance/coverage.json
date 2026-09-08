@@ -1,0 +1,47 @@
+{
+  "schema": 1,
+  "issue": "https://github.com/kmatzen/millennium/issues/273",
+  "automated_suites": {
+    "host": {"cwd": "host", "command": ["make", "test"]},
+    "contracts": {"cwd": ".", "command": ["python3", "-m", "unittest", "discover", "-s", "tools/tests"]},
+    "qemu": {"cwd": ".", "command": ["tools/qemu/qemu.sh", "full-test"], "runner": "anima"}
+  },
+  "functions": [
+    {"id": "daemon-core", "area": "host", "automated": ["host", "qemu"]},
+    {"id": "sip-calls-and-text", "area": "telephony", "automated": ["host", "qemu"], "physical": ["sip-carrier-audio"]},
+    {"id": "serial-reconnect-and-role-routing", "area": "mcu", "automated": ["host", "qemu"], "physical": ["native-usb-cdc"]},
+    {"id": "keypad-display-coins-cards-hooks", "area": "controls", "automated": ["qemu"], "physical": ["assembled-controls"]},
+    {"id": "audio-generation-and-playback", "area": "audio", "automated": ["host", "qemu"], "physical": ["acoustic-path"]},
+    {"id": "admin-api-auth-csrf-and-firewall", "area": "security", "automated": ["host", "contracts", "qemu"]},
+    {"id": "signed-host-and-mcu-ota", "area": "updates", "automated": ["host", "qemu"]},
+    {"id": "external-https-update-transport", "area": "updates", "automated": ["qemu"]},
+    {"id": "ab-operating-system-ota", "area": "os", "automated": ["contracts", "qemu"], "physical": ["pi-tryboot-ab"]},
+    {"id": "readonly-root-and-persistent-state", "area": "os", "automated": ["contracts", "qemu"], "physical": ["pi-persistent-partition"]},
+    {"id": "wifi-onboarding-recovery-and-privacy", "area": "wifi", "automated": ["host", "qemu"], "physical": ["radio-client-matrix"]},
+    {"id": "captive-portal-outside-guest", "area": "wifi", "automated": ["qemu"], "physical": ["native-captive-detectors"]},
+    {"id": "reverse-maintenance-tunnel", "area": "maintenance", "automated": ["qemu"], "physical": ["external-network-maintenance"]},
+    {"id": "monitoring-alerting-and-backup", "area": "operations", "automated": ["host", "contracts"], "physical": ["deployed-monitoring"]},
+    {"id": "signed-experience-install-rollback", "area": "content", "automated": ["host", "qemu"]},
+    {"id": "story-branches-persistence-and-accessibility", "area": "content", "automated": ["host", "qemu"], "physical": ["first-time-caller-playtest"]},
+    {"id": "factory-seed-recovery-media-and-key-custody", "area": "release", "automated": ["contracts"], "physical": ["recovery-media-boot", "offline-key-copies"]},
+    {"id": "power-network-and-update-interruptions", "area": "recovery", "automated": ["qemu"], "physical": ["measured-power-matrix"]},
+    {"id": "production-image-userspace", "area": "release", "automated": ["qemu"], "physical": ["zero2w-boot"]}
+  ],
+  "physical_gates": {
+    "sip-carrier-audio": {"issue": 274, "procedure": "hardware/as-built/phone-001/NEXT_PHYSICAL_SESSION.md#2-assemble-once-and-capture-the-baseline"},
+    "native-usb-cdc": {"issue": 265, "procedure": "hardware/as-built/phone-001/NEXT_PHYSICAL_SESSION.md#2-assemble-once-and-capture-the-baseline"},
+    "assembled-controls": {"issue": 274, "procedure": "hardware/as-built/phone-001/NEXT_PHYSICAL_SESSION.md#2-assemble-once-and-capture-the-baseline"},
+    "acoustic-path": {"issue": 274, "procedure": "hardware/as-built/phone-001/NEXT_PHYSICAL_SESSION.md#2-assemble-once-and-capture-the-baseline"},
+    "pi-tryboot-ab": {"issue": 274, "procedure": "hardware/as-built/phone-001/NEXT_PHYSICAL_SESSION.md#4-run-the-interruption-matrix-without-rewiring"},
+    "pi-persistent-partition": {"issue": 274, "procedure": "hardware/as-built/phone-001/NEXT_PHYSICAL_SESSION.md#2-assemble-once-and-capture-the-baseline"},
+    "radio-client-matrix": {"issue": 274, "procedure": "hardware/as-built/phone-001/NEXT_PHYSICAL_SESSION.md#3-run-wi-fi-onboarding-while-local-recovery-is-available"},
+    "native-captive-detectors": {"issue": 274, "procedure": "hardware/as-built/phone-001/NEXT_PHYSICAL_SESSION.md#3-run-wi-fi-onboarding-while-local-recovery-is-available"},
+    "external-network-maintenance": {"issue": 274, "procedure": "hardware/as-built/phone-001/NEXT_PHYSICAL_SESSION.md#5-prove-genuinely-external-maintenance"},
+    "deployed-monitoring": {"issue": 274, "procedure": "hardware/as-built/phone-001/NEXT_PHYSICAL_SESSION.md#5-prove-genuinely-external-maintenance"},
+    "first-time-caller-playtest": {"issue": 274, "procedure": "hardware/as-built/phone-001/NEXT_PHYSICAL_SESSION.md#6-playtest-before-changing-the-setup"},
+    "recovery-media-boot": {"issue": 270, "procedure": "hardware/as-built/phone-001/NEXT_PHYSICAL_SESSION.md#1-write-and-verify-the-corrected-recovery-card"},
+    "offline-key-copies": {"issue": 269, "procedure": "hardware/as-built/phone-001/NEXT_PHYSICAL_SESSION.md#0-establish-and-provision-the-experience-trust-roots"},
+    "measured-power-matrix": {"issue": 274, "procedure": "hardware/as-built/phone-001/NEXT_PHYSICAL_SESSION.md#4-run-the-interruption-matrix-without-rewiring"},
+    "zero2w-boot": {"issue": 270, "procedure": "hardware/as-built/phone-001/NEXT_PHYSICAL_SESSION.md#2-assemble-once-and-capture-the-baseline"}
+  }
+}

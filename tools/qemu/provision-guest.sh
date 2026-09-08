@@ -35,6 +35,10 @@ install -d -m 0755 /etc/millennium /var/lib/millennium /var/log/millennium \
     /usr/local/libexec
 install -m 0755 daemon /usr/local/bin/millennium-daemon
 install -m 0644 systemd/daemon.service /etc/systemd/system/daemon.service
+install -m 0755 ota/millennium_maintenance_tunnel.sh \
+    /usr/local/libexec/millennium-maintenance-tunnel
+install -m 0644 systemd/millennium-maintenance-tunnel.service \
+    /etc/systemd/system/millennium-maintenance-tunnel.service
 install -m 0644 "$SOURCE/tools/qemu/daemon.conf" /etc/millennium/daemon.conf
 cat >/etc/udev/rules.d/99-millennium-qemu.rules <<'EOF'
 KERNEL=="vport*", GROUP="dialout", MODE="0660"

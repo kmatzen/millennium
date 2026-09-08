@@ -5,6 +5,21 @@ gate. Keep the phone assembled and connected for the entire session; the order
 below is intended to avoid another teardown or network rewire. None of these
 steps may be replaced by QEMU evidence.
 
+Before touching the phone, validate the coverage inventory and print the exact
+remaining physical-only plan:
+
+```bash
+python3 tools/coverage_ledger.py validate
+python3 tools/coverage_ledger.py physical-plan
+```
+
+Run the `host` and `contracts` ledger suites locally and the `qemu` suite on
+`anima`. Do not begin this session unless all three pass for the candidate
+source commit. The physical plan intentionally coalesces every remaining claim
+into the single assembly, Wi-Fi-client, interruption, external-network, and
+playtest phases below; it is the machine-checked guard against silently adding
+an untested shipped function or repeating a hardware setup unnecessarily.
+
 ## Bring once
 
 - the production-equivalent Raspberry Pi Zero 2 W;

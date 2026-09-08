@@ -51,8 +51,12 @@ Acceptance: `python3 tools/qemu/test_virtual_mcu.py` and
   recovered guest returns to a healthy daemon with independently attested MCU
   identities.
 
-Acceptance: `tools/qemu/qemu.sh ota-test` and
-`tools/qemu/qemu.sh ota-fault-test`.
+Acceptance: `tools/qemu/qemu.sh ota-test`,
+`tools/qemu/qemu.sh ota-fault-test`, and
+`tools/qemu/qemu.sh ota-external-origin-test`. The external-origin test moves
+the signed artifacts across the VM boundary, stops the guest-local fixture,
+and proves outage-safe update behavior against an independently hosted HTTPS
+endpoint.
 
 ## Full operating-system OTA state machine
 
@@ -105,12 +109,18 @@ power behavior. Those remain physical acceptance gates.
   Windows HTTP probes from isolated test clients.
 - [x] Prove setup clients cannot reach SSH, admin API, forwarding, or stored
   credentials while update and maintenance endpoints recover after success.
+- [x] Establish the production reverse-SSH service against an external test
+  server, traverse the forwarded port back into the guest, and prove it fails
+  closed and reconnects after the server disappears and returns.
 
 Acceptance: `tools/qemu/qemu.sh wifi-test` and
 `tools/qemu/qemu.sh wifi-external-client-test`. The latter runs an independent
 client outside the VM through QEMU's forwarded network boundary and exercises
 the real portal server, session cookie, CSRF token, probe evidence, page
 rendering, and helper handoff.
+
+Acceptance: `tools/qemu/qemu.sh maintenance-external-tunnel-test` exercises the
+maintenance transport against an SSH server outside the guest.
 
 ## Experiences and observability
 

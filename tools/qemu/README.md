@@ -94,8 +94,10 @@ tools/qemu/qemu.sh power-cut
 tools/qemu/qemu.sh collect-artifacts my-test-run
 tools/qemu/qemu.sh ota-test
 tools/qemu/qemu.sh ota-fault-test
+tools/qemu/qemu.sh ota-external-origin-test
 tools/qemu/qemu.sh os-ota-test
 tools/qemu/qemu.sh wifi-test
+tools/qemu/qemu.sh maintenance-external-tunnel-test
 tools/qemu/qemu.sh experience-test
 tools/qemu/qemu.sh experience-lifecycle-test
 tools/qemu/qemu.sh experience-power-test
@@ -160,6 +162,17 @@ and are not production credentials. `ota-test` signs and commits a release
 through the real worker and attests both virtual MCU roles. `ota-fault-test`
 exercises loss, corruption, withdrawal, quarantine, interrupted activation,
 rollback, and active-link invariants.
+
+`ota-external-origin-test` copies a newly signed release out of the guest,
+serves it from an independent HTTPS process on the QEMU host, disables the
+guest-local origin, and drives the production updater through apply, outage,
+and recovery. This catches networking and trust-boundary defects that an
+in-guest origin cannot expose.
+
+`maintenance-external-tunnel-test` starts an isolated SSH server outside the
+guest, provisions the production reverse-tunnel service against it, reaches
+the guest only through the forwarded port, then proves fail-closed behavior
+and automatic recovery across a server outage.
 
 `os-ota-test` runs the full signed OS state machine inside the ARM64 guest. It
 covers atomic HTTPS staging and interrupted/truncated downloads, inactive-slot

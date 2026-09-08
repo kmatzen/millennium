@@ -334,6 +334,11 @@ ota_fault_test() {
     "${SSH[@]}" sudo /tmp/millennium-src/tools/qemu/ota-fault-test-guest.sh /tmp/millennium-src
 }
 
+ota_external_origin_test() {
+    running || die "start and provision the VM before ota-external-origin-test"
+    "$SCRIPT_DIR/ota-external-origin-test.sh"
+}
+
 os_ota_test() {
     running || die "start and provision the VM before os-ota-test"
     "${SSH[@]}" 'cd /tmp/millennium-src && python3 -m unittest \
@@ -353,6 +358,11 @@ wifi_test() {
 wifi_external_client_test() {
     running || die "start and provision the VM before wifi-external-client-test"
     "$SCRIPT_DIR/wifi-external-client-test.sh"
+}
+
+maintenance_external_tunnel_test() {
+    running || die "start and provision the VM before maintenance-external-tunnel-test"
+    "$SCRIPT_DIR/maintenance-external-tunnel-test.sh"
 }
 
 full_test() {
@@ -381,9 +391,11 @@ full_test() {
     "$SCRIPT_DIR/peripheral-fault-test.sh"
     ota_test
     ota_fault_test
+    ota_external_origin_test
     os_ota_test
     wifi_test
     wifi_external_client_test
+    maintenance_external_tunnel_test
     experience_test
     experience_lifecycle_test
     experience_power_test
@@ -394,8 +406,9 @@ full_test() {
     python3 - "$artifact/full-test-result.json" "$exact_image_ran" <<'PY'
 import datetime, json, pathlib, sys
 acceptance = ["virtual-mcu-unit", "appliance-smoke", "lifecycle", "power-recovery",
-              "peripheral-faults", "signed-ota", "ota-faults", "wifi-onboarding",
+              "peripheral-faults", "signed-ota", "ota-faults", "ota-external-origin", "wifi-onboarding",
               "wifi-independent-client",
+              "maintenance-external-tunnel",
               "offline-experience", "signed-experience-lifecycle", "experience-power-recovery", "production-image-contracts", "evidence-export"]
 exact_image = sys.argv[2] == "true"
 if exact_image:
@@ -590,9 +603,11 @@ case ${1:-help} in
     peripheral-fault-test) "$SCRIPT_DIR/peripheral-fault-test.sh" ;;
     ota-test) ota_test ;;
     ota-fault-test) ota_fault_test ;;
+    ota-external-origin-test) ota_external_origin_test ;;
     os-ota-test) os_ota_test ;;
     wifi-test) wifi_test ;;
     wifi-external-client-test) wifi_external_client_test ;;
+    maintenance-external-tunnel-test) maintenance_external_tunnel_test ;;
     experience-test) experience_test ;;
     experience-lifecycle-test) experience_lifecycle_test ;;
     experience-power-test) experience_power_test ;;
@@ -629,6 +644,6 @@ case ${1:-help} in
         printf 'fresh overlay created; previous disk retained as a timestamped backup\n'
         ;;
     help|*)
-        printf 'usage: %s {fetch|init|start|wait|provision|stop|power-cut|pause|resume|restart-virtual-mcu|network|checkpoint|lifecycle-test|recovery-test|peripheral-fault-test|ota-test|ota-fault-test|os-ota-test|wifi-test|wifi-external-client-test|experience-test|experience-lifecycle-test|experience-power-test|full-test|collect-artifacts|status|ssh|logs|token|tunnel|display|peripherals|key|hook|coin|card|fault|reset-mcu|smoke|reset}\n' "$0"
+        printf 'usage: %s {fetch|init|start|wait|provision|stop|power-cut|pause|resume|restart-virtual-mcu|network|checkpoint|lifecycle-test|recovery-test|peripheral-fault-test|ota-test|ota-fault-test|ota-external-origin-test|os-ota-test|wifi-test|wifi-external-client-test|maintenance-external-tunnel-test|experience-test|experience-lifecycle-test|experience-power-test|full-test|collect-artifacts|status|ssh|logs|token|tunnel|display|peripherals|key|hook|coin|card|fault|reset-mcu|smoke|reset}\n' "$0"
         ;;
 esac

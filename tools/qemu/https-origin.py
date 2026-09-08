@@ -11,11 +11,12 @@ def main():
     parser.add_argument("--directory", required=True)
     parser.add_argument("--certificate", required=True)
     parser.add_argument("--key", required=True)
+    parser.add_argument("--bind", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=18080)
     args = parser.parse_args()
     handler = lambda *values, **kwargs: http.server.SimpleHTTPRequestHandler(
         *values, directory=args.directory, **kwargs)
-    server = http.server.ThreadingHTTPServer(("127.0.0.1", args.port), handler)
+    server = http.server.ThreadingHTTPServer((args.bind, args.port), handler)
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     context.load_cert_chain(args.certificate, args.key)
     server.socket = context.wrap_socket(server.socket, server_side=True)
