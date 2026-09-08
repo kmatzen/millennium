@@ -6,13 +6,22 @@ Zero 2 W, radio, USB, audio, power, or first-time-user requirement.
 
 ## Current repository state
 
-- Working branch: `fix/startup-segv-no-serial`.
-- The production image source commit is `c0427f2`; subsequent commits harden
-  QEMU and begin the lifetime downloadable-experience system.
-- `387c87c` contains the completed downloadable-experience subsystem plus the
-  physical-image fixes for `wpasupplicant` and the monitor collector directory;
-  `6b2c366` records the rejected `2ad5179` physical boot. Both are pushed to
-  `origin/main`. Use `6b2c366` as the exact source identity for the next image.
+- Working branch: `main`.
+- The current production-image source is
+  `6f50d127e5813e583e6898a6986175614422470a`; it includes rebuilt Alpha and
+  Beta firmware plus observable MCU/I2C/health semantics and is pushed to
+  `origin/main`.
+- The factory-seeded candidate is signed, independently verified, retained on
+  `anima`, and copied directly to external `UEBuild`. Its compressed SHA-256 is
+  `4509d94f76d12056dbad1d2c92c7281cd8924c1375814cc05d6b9696d5f55efd`;
+  its expanded SHA-256 is
+  `f5c6bd4954374b0f06e206c748f096eb24964f767de0fff8d6036ce4790962b8`.
+- The complete 17-layer QEMU software lab passed at
+  `2026-09-08T08:57:35Z`, including the exact factory image's userspace,
+  external captive-portal client, OTA origin and failures, maintenance tunnel,
+  virtual MCU/peripheral faults, A/B recovery, experiences, and abrupt power.
+  Exact evidence is in
+  `hardware/as-built/phone-001/evidence/zero2w-recovery-seeded-artifact-6f50d12-2026-09-08.json`.
 - Latest completed downloadable-experience commits:
   - `f53b54c` — generated package/catalog schemas and compatibility metadata;
   - `d35f4fa` — deterministic schema-2 packages, bounded extraction, exact file
@@ -36,21 +45,19 @@ Zero 2 W, radio, USB, audio, power, or first-time-user requirement.
   loopback phone listener `127.0.0.1:22022` was absent; do not infer live-phone
   state until the reverse tunnel returns.
 
-Large QEMU and image artifacts intentionally live outside the repository at
-`/Volumes/UEBuild/millennium-exact-image-qemu/`. The most recent complete
-evidence bundle is
-`goal-state-20260907T1919Z/artifacts/full-20260907T201143Z/`. Its
-`full-test-result.json` reports a pass with exact production-image userspace
-tested and `physical_hardware_claimed: false`.
+Large QEMU and image artifacts intentionally live on `anima` and external
+`UEBuild`, not laptop internal storage. The latest complete QEMU evidence is
+`/data2/millennium-build-5d7bdda/repo/tools/qemu/state/artifacts/full-20260908T083945Z/`
+on `anima`; its `full-test-result.json` records a pass with exact production
+image userspace tested and `physical_hardware_claimed: false`.
 
 ## Immediate execution order
 
-1. Build, sign, factory-seed, write, fully read back, and physically boot a new
-   phone-001 recovery candidate from exact source `6b2c366`. The `2ad5179`
-   card booted but is rejected: it omitted `wpasupplicant` and the monitor
-   collector directory. Before rerunning health, attach both Arduino MCUs and
-   provide the phone a route with working DNS. Exact rejection evidence is in
-   `hardware/as-built/phone-001/evidence/physical-boot-rejection-2ad5179-2026-09-07.json`.
+1. Write the retained `6f50d12` phone-001 artifact to an exactly identified
+   dedicated removable device, verify its complete image-length readback, then
+   physically boot it. Do not reuse prior-candidate readback as evidence. Both
+   Arduino MCUs are required for the physical health gate; phone peripherals
+   may be absent only for explicitly scoped platform validation.
 2. Publish the immutable release objects and signed stable/beta/device-group
    catalogs with `content/publish_catalog.py` after completing the offline
    content/catalog signing ceremony. FIDO-authenticated access to `anima` is
@@ -78,15 +85,15 @@ python3 tools/generate_version_metadata.py --check
 git diff --check
 ```
 
-For full appliance changes, use the external-backed QEMU state and exact image:
+For full appliance changes, run the retained exact image on `anima`:
 
 ```sh
-export MILLENNIUM_QEMU_STATE=/Volumes/UEBuild/millennium-exact-image-qemu/goal-state-20260907T1919Z
-export MILLENNIUM_QEMU_SSH_PORT=2234
-export MILLENNIUM_QEMU_EXACT_IMAGE=/Volumes/UEBuild/millennium-exact-image-qemu/phone001-c0427f2.img
-export MILLENNIUM_QEMU_EXACT_KERNEL=/Volumes/UEBuild/millennium-exact-image-qemu/vmlinuz-6.1.0-52-cloud-arm64
-export MILLENNIUM_QEMU_EXACT_INITRD=/Volumes/UEBuild/millennium-exact-image-qemu/initrd.img-6.1.0-52-cloud-arm64-millennium
-tools/qemu/qemu.sh full-test
+/opt/homebrew/bin/ssh anima \
+  'docker exec \
+    -e MILLENNIUM_QEMU_EXACT_IMAGE=/image/exact-6f50d12/phone001-6f50d12.img \
+    -e MILLENNIUM_QEMU_EXACT_KERNEL=/workspace/tools/qemu/state/exact-vmlinuz \
+    -e MILLENNIUM_QEMU_EXACT_INITRD=/workspace/tools/qemu/state/exact-initrd \
+    millennium-qemu-e2e-8ac303b tools/qemu/qemu.sh full-test'
 ```
 
 The custom transport initramfs includes FAT, charset, and nftables modules.

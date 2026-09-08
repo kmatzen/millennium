@@ -587,3 +587,34 @@ that does not match the active `release-2026-08` trust root. The verified
 and renamed in place with a `quarantined-key-mismatch` suffix; it must not be
 used unless its identity is deliberately reclassified. See
 `evidence/signing-vault-mismatch-2026-09-06.json`.
+
+After the observable MCU-health work, source commit
+`6f50d127e5813e583e6898a6986175614422470a` was rebuilt from scratch on
+`anima`. Both Arduino sketches were compiled with Arduino AVR core 1.8.8 and
+Arduino CLI 1.5.1, and the resulting firmware is part of the source commit.
+The factory-seeded image passed raw MBR and boot-content validation, production
+minimality, read-only verification of both system slots and the persistent
+partition, exact daemon/source checks, Wi-Fi runtime checks, and active trust
+root verification. The signed compressed SHA-256 is
+`4509d94f76d12056dbad1d2c92c7281cd8924c1375814cc05d6b9696d5f55efd`;
+the expanded SHA-256 is
+`f5c6bd4954374b0f06e206c748f096eb24964f767de0fff8d6036ce4790962b8`.
+The retained copy on `anima` and the direct external `UEBuild` copy passed all
+four hashes, Ed25519 signature verification, and complete Zstandard expansion
+without using laptop internal storage.
+
+The complete QEMU software lab then passed all 17 acceptance layers against
+that exact factory image's userspace. Coverage included an independent setup
+client traversing the QEMU boundary, portal session/CSRF/private credential
+handoff, external HTTPS OTA and injected origin failure, sustained reverse
+maintenance tunnel recovery, virtual MCU/peripheral faults, signed host and OS
+OTA recovery, offline and signed experience lifecycles, network isolation, and
+abrupt-power/checkpoint recovery. The exact-image transport uses a generic
+arm64 QEMU kernel and purpose-built initramfs to inject the production A/B
+device aliases; a preliminary attempt with the Pi production initramfs was
+correctly rejected because it could not find the physical slot aliases under
+QEMU. Neither run claims Raspberry Pi firmware, radio, native SD/USB, audio,
+installed-load power, or attached phone-peripheral fidelity. Exact evidence is
+in `evidence/zero2w-recovery-seeded-artifact-6f50d12-2026-09-08.json`. The
+candidate remains explicitly unapproved until dedicated-media write/readback
+and physical acceptance are complete.
