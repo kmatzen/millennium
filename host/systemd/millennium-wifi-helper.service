@@ -2,10 +2,10 @@
 Description=Millennium privileged Wi-Fi setup broker
 Requires=millennium-wifi-bootstrap.service
 After=millennium-wifi-bootstrap.service
-ConditionPathExists=/run/millennium-wifi/setup-active
 
 [Service]
 Type=simple
+ExecCondition=/usr/bin/test -e /run/millennium-wifi/setup-active
 Group=millennium-wifi
 ExecStart=/usr/local/libexec/millennium-wifi-helper
 ExecStopPost=-/usr/bin/nmcli connection down millennium-setup

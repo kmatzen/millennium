@@ -3,10 +3,10 @@ Description=Millennium owner Wi-Fi captive portal
 Requires=millennium-wifi-helper.service
 After=millennium-wifi-helper.service
 PartOf=millennium-wifi-helper.service
-ConditionPathExists=/run/millennium-wifi/setup-active
 
 [Service]
 Type=simple
+ExecCondition=/usr/bin/test -e /run/millennium-wifi/setup-active
 User=millennium-wifi
 Group=millennium-wifi
 ExecStart=/usr/local/libexec/millennium-wifi-portal

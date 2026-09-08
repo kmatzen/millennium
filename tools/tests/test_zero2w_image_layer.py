@@ -5,6 +5,8 @@ import unittest
 ROOT = Path(__file__).resolve().parents[2]
 LAYER = ROOT / "host/os_image/layer/millennium-phone-image.yaml"
 WIFI_BOOTSTRAP_UNIT = ROOT / "host/systemd/millennium-wifi-bootstrap.service"
+WIFI_HELPER_UNIT = ROOT / "host/systemd/millennium-wifi-helper.service"
+WIFI_PORTAL_UNIT = ROOT / "host/systemd/millennium-wifi-portal.service"
 
 
 class Zero2WImageLayerTests(unittest.TestCase):
@@ -42,6 +44,15 @@ class Zero2WImageLayerTests(unittest.TestCase):
         self.assertIn(create, text)
         self.assertIn(target_chown, text)
         self.assertLess(text.index(create), text.index(target_chown))
+
+    def test_wifi_dependents_check_setup_marker_after_bootstrap(self) -> None:
+        for path in (WIFI_HELPER_UNIT, WIFI_PORTAL_UNIT):
+            unit = path.read_text()
+            self.assertNotIn("ConditionPathExists=/run/millennium-wifi/setup-active", unit)
+            self.assertIn(
+                "ExecCondition=/usr/bin/test -e /run/millennium-wifi/setup-active",
+                unit,
+            )
 
     def test_fixed_shared_generator_is_installed_after_upstream_customize(
             self) -> None:
