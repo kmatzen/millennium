@@ -64,6 +64,23 @@
     "zstandard_stream_verified": true,
     "used_laptop_internal_storage": false
   },
+  "qemu_end_to_end": {
+    "completed_at": "2026-09-08T04:05:23Z",
+    "host": "anima",
+    "wifi_onboarding_tests": 17,
+    "wifi_onboarding_passed": true,
+    "exact_factory_image_booted": true,
+    "exact_image_userspace": true,
+    "exact_image_result": "pass",
+    "production_mount_graph_verified": true,
+    "dbus_verified": true,
+    "resolver_verified": true,
+    "nftables_verified": true,
+    "millennium_firewall_verified": true,
+    "qemu_machine": "virt",
+    "raspberry_pi_firmware_emulated": false,
+    "physical_hardware_claimed": false
+  },
   "recovery_media_written": false,
-  "status": "software-verified, signed, and externally staged; retained as explicitly unapproved pending recovery-media write/readback and physical boot"
+  "status": "software-verified, QEMU end-to-end passed, signed, and externally staged; retained as explicitly unapproved pending recovery-media write/readback and physical boot"
 }

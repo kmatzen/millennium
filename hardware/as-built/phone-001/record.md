@@ -502,8 +502,15 @@ its expanded SHA-256 is
 `ab2937d9ff3848e91bfb4300adb2591a301e08ef6fdeace1dbe81883cd2672e8`.
 An explicitly authorized direct copy to external `UEBuild` passed all four
 hashes, the Ed25519 signature, and Zstandard integrity without using laptop
-internal storage. It remains unapproved pending media write/readback and
-physical boot. Exact evidence is in
+internal storage. On 2026-09-08, the repository QEMU harness on `anima` passed
+all 17 Wi-Fi onboarding tests, including platform probes, rollback, captive
+portal responses, and private credential handoff. The stronger exact-image
+test then booted the factory-seeded raw image's own Debian 13 userspace and
+verified its production mount graph, D-Bus, resolver, nftables, and Millennium
+firewall. QEMU does not emulate the Raspberry Pi firmware, BCM2710A1 radio,
+native SD/USB behavior, connected phone peripherals, or installed-load power,
+so the candidate remains unapproved pending media write/readback and physical
+boot. Exact evidence is in
 `evidence/zero2w-recovery-seeded-artifact-8ac303b-2026-09-08.json`.
 
 That candidate's physical boot exposed an upstream image-generator ordering
