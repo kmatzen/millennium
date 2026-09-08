@@ -550,7 +550,7 @@ provision() {
     COPYFILE_DISABLE=1 tar "${tar_metadata[@]}" --exclude=.git \
         --exclude='./tools/qemu/state' --exclude='tools/qemu/state' --exclude='*.o' \
         --exclude=host/daemon --exclude=host/simulator -C "$REPO_DIR" -czf - . | \
-        "${SSH[@]}" 'rm -rf /tmp/millennium-src && mkdir /tmp/millennium-src && tar -xzf - -C /tmp/millennium-src'
+        "${SSH[@]}" 'sudo rm -rf /tmp/millennium-src && mkdir /tmp/millennium-src && tar -xzf - -C /tmp/millennium-src'
     "${SSH[@]}" "printf '%s\\n' '$source_commit' > /tmp/millennium-src/.millennium-source-commit"
     "${SSH[@]}" sudo /tmp/millennium-src/tools/qemu/provision-guest.sh /tmp/millennium-src | tee "$STATE_DIR/provision.log"
 }
