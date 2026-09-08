@@ -41,6 +41,7 @@ class ExactImageHarnessTests(unittest.TestCase):
             "nmcli -g ipv6.never-default connection show millennium-wired",
             "grep -Fqx Restart=no",
             "grep -Fqx RuntimeMaxSec=900",
+            "grep -Fqx BindsTo=millennium-wifi-helper.service",
         ):
             self.assertIn(expected, commands)
         self.assertNotIn(MODULE.PASS_MARKER, commands)

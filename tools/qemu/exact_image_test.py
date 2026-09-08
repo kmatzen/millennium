@@ -99,6 +99,8 @@ def shell_commands() -> bytes:
         "/etc/systemd/system/millennium-wifi-helper.service && "
         "grep -Fqx RuntimeMaxSec=900 "
         "/etc/systemd/system/millennium-wifi-helper.service && "
+        "grep -Fqx BindsTo=millennium-wifi-helper.service "
+        "/etc/systemd/system/millennium-wifi-portal.service && "
         # Octal-encode the suffixes so the serial echo of this injected unit
         # cannot itself contain either result marker.
         "printf \"MILLENNIUM_EXACT_IMAGE_\\120\\101\\123\\123\\n\" "
