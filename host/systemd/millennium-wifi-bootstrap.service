@@ -10,6 +10,7 @@ Type=oneshot
 ExecStart=/usr/local/libexec/millennium-wifi-bootstrap
 RuntimeDirectory=millennium-wifi
 RuntimeDirectoryMode=0750
+RuntimeDirectoryPreserve=yes
 ProtectHome=true
 PrivateTmp=true
 NoNewPrivileges=true

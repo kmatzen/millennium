@@ -22,6 +22,14 @@ class Zero2WImageLayerTests(unittest.TestCase):
         )
         self.assertIn("Wants=NetworkManager.service wpa_supplicant.service", unit)
         self.assertIn("After=NetworkManager.service wpa_supplicant.service", unit)
+        self.assertIn("RuntimeDirectoryPreserve=yes", unit)
+        self.assertIn(
+            'chroot "$1" systemd-sysusers '
+            "/usr/lib/sysusers.d/millennium-wifi.conf",
+            text,
+        )
+        self.assertIn('chroot "$1" getent passwd millennium-wifi', text)
+        self.assertIn('chroot "$1" getent group millennium-wifi', text)
         tmpfiles = (ROOT / "host/systemd/millennium-monitor.tmpfiles").read_text()
         staging = (ROOT / "tools/stage_zero2w_image_payload.sh").read_text()
         self.assertIn(
