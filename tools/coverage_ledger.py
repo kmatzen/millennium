@@ -36,8 +36,12 @@ def load(path):
         raise ValueError("physical_gates must be an object")
     if not isinstance(profiles, dict):
         raise ValueError("profiles must be an object")
-    if value.get("open_defects") != [265, 266, 267, 268, 269]:
-        raise ValueError("open_defects must link issues 265 through 269")
+    open_defects = value.get("open_defects")
+    if not isinstance(open_defects, list) or any(
+            not isinstance(number, int) or number <= 0 for number in open_defects):
+        raise ValueError("open_defects must be a list of positive issue numbers")
+    if len(open_defects) != len(set(open_defects)):
+        raise ValueError("open_defects must not contain duplicates")
     seen = set()
     for name, suite in suites.items():
         command = suite.get("command")

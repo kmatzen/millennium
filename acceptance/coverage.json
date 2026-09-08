@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "issue": "https://github.com/kmatzen/millennium/issues/273",
-  "open_defects": [265, 266, 267, 268, 269],
+  "open_defects": [],
   "automated_suites": {
     "host": {"cwd": "host", "command": ["make", "test"], "evidence": "GitHub Actions test job log or coverage-ledger evidence JSON"},
     "contracts": {"cwd": ".", "command": ["python3", "-m", "unittest", "discover", "-s", "tools/tests"], "evidence": "GitHub Actions test job log or coverage-ledger evidence JSON"},
@@ -51,7 +51,7 @@
   },
   "physical_gates": {
     "sip-carrier-audio": {"issue": 274, "procedure": "hardware/as-built/phone-001/NEXT_PHYSICAL_SESSION.md#2-assemble-once-and-capture-the-baseline"},
-    "native-usb-cdc": {"issue": 265, "procedure": "hardware/as-built/phone-001/NEXT_PHYSICAL_SESSION.md#2-assemble-once-and-capture-the-baseline"},
+    "native-usb-cdc": {"issue": 274, "procedure": "hardware/as-built/phone-001/NEXT_PHYSICAL_SESSION.md#2-assemble-once-and-capture-the-baseline"},
     "assembled-controls": {"issue": 274, "procedure": "hardware/as-built/phone-001/NEXT_PHYSICAL_SESSION.md#2-assemble-once-and-capture-the-baseline"},
     "acoustic-path": {"issue": 274, "procedure": "hardware/as-built/phone-001/NEXT_PHYSICAL_SESSION.md#2-assemble-once-and-capture-the-baseline"},
     "pi-tryboot-ab": {"issue": 274, "procedure": "hardware/as-built/phone-001/NEXT_PHYSICAL_SESSION.md#4-run-the-interruption-matrix-without-rewiring"},
@@ -62,7 +62,7 @@
     "deployed-monitoring": {"issue": 274, "procedure": "hardware/as-built/phone-001/NEXT_PHYSICAL_SESSION.md#5-prove-genuinely-external-maintenance"},
     "first-time-caller-playtest": {"issue": 274, "procedure": "hardware/as-built/phone-001/NEXT_PHYSICAL_SESSION.md#6-playtest-before-changing-the-setup"},
     "recovery-media-boot": {"issue": 270, "procedure": "hardware/as-built/phone-001/NEXT_PHYSICAL_SESSION.md#1-write-and-verify-the-corrected-recovery-card"},
-    "offline-key-copies": {"issue": 269, "procedure": "hardware/as-built/phone-001/NEXT_PHYSICAL_SESSION.md#0-establish-and-provision-the-experience-trust-roots"},
+    "offline-key-copies": {"issue": 274, "procedure": "hardware/as-built/phone-001/NEXT_PHYSICAL_SESSION.md#0-establish-and-provision-the-experience-trust-roots"},
     "measured-power-matrix": {"issue": 274, "procedure": "hardware/as-built/phone-001/NEXT_PHYSICAL_SESSION.md#4-run-the-interruption-matrix-without-rewiring"},
     "zero2w-boot": {"issue": 270, "procedure": "hardware/as-built/phone-001/NEXT_PHYSICAL_SESSION.md#2-assemble-once-and-capture-the-baseline"}
   }
