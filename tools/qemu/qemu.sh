@@ -367,6 +367,10 @@ maintenance_external_tunnel_test() {
 
 full_test() {
     local run exact_image_ran=false exact_inputs=0
+    # Fail before costly guest provisioning when external-service fixtures
+    # cannot run on the QEMU host.
+    need nc "install netcat-openbsd (or another netcat implementation)"
+    need sshd "install openssh-server"
     run="full-$(date -u +%Y%m%dT%H%M%SZ)"
     for value in "${MILLENNIUM_QEMU_EXACT_IMAGE:-}" \
         "${MILLENNIUM_QEMU_EXACT_KERNEL:-}" \

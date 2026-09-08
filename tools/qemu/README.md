@@ -30,7 +30,7 @@ read-only-root behavior, SD I/O, radios, USB, audio and power interruption.
 - macOS arm64 or Linux
 - QEMU with AArch64 and UEFI support (`brew install qemu` on macOS;
   `apt install qemu-system-arm qemu-efi-aarch64 qemu-utils` on Debian)
-- Python 3, OpenSSH, curl, tar, and socat
+- Python 3, OpenSSH client and server, netcat, curl, tar, and socat
 - about 2 GB RAM and 2 GB free disk space for the cloud lab; exact-image tests
   additionally require the expanded production image (currently about 15 GB)
 
