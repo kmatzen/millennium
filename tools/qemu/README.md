@@ -166,8 +166,10 @@ rollback, and active-link invariants.
 `ota-external-origin-test` copies a newly signed release out of the guest,
 serves it from an independent HTTPS process on the QEMU host, disables the
 guest-local origin, and drives the production updater through apply, outage,
-and recovery. This catches networking and trust-boundary defects that an
-in-guest origin cannot expose.
+and recovery. It also injects wrong TLS identity, mid-bundle cutoff,
+post-activation health loss, signed rollback and withdrawal, and exercises the
+systemd update-check path used after Wi-Fi transition. This catches networking
+and trust-boundary defects that an in-guest origin cannot expose.
 
 `maintenance-external-tunnel-test` starts an isolated SSH server outside the
 guest, provisions the production reverse-tunnel service against it, reaches

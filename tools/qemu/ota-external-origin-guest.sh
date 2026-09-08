@@ -69,13 +69,37 @@ value = json.load(open(sys.argv[1]))
 assert value["state"] == "committed", value
 PY
     ;;
+mutate)
+    mode=${4:?mutation mode required}
+    manifest="$PUBLISH/external/stable/manifest.json"
+    signature="$PUBLISH/external/stable/manifest.json.sig"
+    installed=$(<"$STATE/installed-sequence")
+    python3 - "$manifest" "$mode" "$installed" <<'PY'
+import json, sys
+path, mode, installed = sys.argv[1], sys.argv[2], int(sys.argv[3])
+value = json.load(open(path))
+if mode == "stale":
+    value["sequence"] = max(0, installed - 1)
+elif mode == "withdrawn":
+    value["sequence"] = installed + 1
+    value["rollout"]["withdrawn"] = True
+else:
+    raise SystemExit("unknown mutation: " + mode)
+open(path, "w").write(json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n")
+PY
+    openssl pkeyutl -sign -rawin -inkey "$KEY" -in "$manifest" -out "$signature"
+    ;;
+service-recovery)
+    systemctl start millennium-update-check.service
+    systemctl show --property=Result --value millennium-update-check.service | grep -Fx success
+    ;;
 restore)
     if test -e "$BACKUP"; then
         mv "$BACKUP" "$CONFIG"
     fi
     ;;
 *)
-    echo "usage: $0 SOURCE {prepare|apply|verify|restore} [BASE_URL] [IDENTITY]" >&2
+    echo "usage: $0 SOURCE {prepare|apply|verify|mutate|service-recovery|restore} [BASE_URL] [VALUE]" >&2
     exit 2
     ;;
 esac

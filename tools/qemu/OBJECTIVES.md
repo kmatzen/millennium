@@ -55,8 +55,9 @@ Acceptance: `tools/qemu/qemu.sh ota-test`,
 `tools/qemu/qemu.sh ota-fault-test`, and
 `tools/qemu/qemu.sh ota-external-origin-test`. The external-origin test moves
 the signed artifacts across the VM boundary, stops the guest-local fixture,
-and proves outage-safe update behavior against an independently hosted HTTPS
-endpoint.
+and proves TLS identity, transfer cutoff, health rollback, stale/withdrawn
+manifest, service recovery, and link invariants against an independently
+hosted HTTPS endpoint.
 
 ## Full operating-system OTA state machine
 
