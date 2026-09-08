@@ -86,6 +86,10 @@ class Zero2WImageLayerTests(unittest.TestCase):
                 "ExecCondition=/usr/bin/test -e /run/millennium-wifi/setup-active",
                 unit,
             )
+        helper = WIFI_HELPER_UNIT.read_text()
+        self.assertIn("RuntimeMaxSec=900", helper)
+        self.assertIn("Restart=no", helper)
+        self.assertNotIn("Restart=on-failure", helper)
 
     def test_fixed_shared_generator_is_installed_after_upstream_customize(
             self) -> None:

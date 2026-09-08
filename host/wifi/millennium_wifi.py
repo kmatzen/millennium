@@ -196,12 +196,23 @@ class NetworkManager:
         self.command("connection", "up", SETUP_CONNECTION, check=False)
 
 
-def connectivity_ok(url="https://updates.kmatzen.com/millennium/stable/manifest.json"):
+def connectivity_ok(url="https://updates.kmatzen.com/millennium/stable/manifest.json",
+                    run=subprocess.run):
+    """Probe the signed-update origin with a hard wall-clock/DNS bound."""
     try:
-        request = urllib.request.Request(url, headers={"User-Agent": "millennium-wifi-setup/1"})
-        with urllib.request.urlopen(request, timeout=10) as response:
-            return response.status == 200 and 0 < int(response.headers.get("Content-Length", "0")) <= 65536
-    except (OSError, ValueError):
+        result = run([
+            "/usr/bin/curl", "--fail", "--silent", "--show-error",
+            "--connect-timeout", "5", "--max-time", "10",
+            "--max-redirs", "0", "--user-agent", "millennium-wifi-setup/1",
+            "--output", "/dev/null", "--write-out", "%{http_code} %{size_download}",
+            url,
+        ], check=False, text=True, stdout=subprocess.PIPE,
+           stderr=subprocess.DEVNULL, timeout=12)
+        if result.returncode != 0:
+            return False
+        status, size = result.stdout.split()
+        return status == "200" and 0 < int(float(size)) <= 65536
+    except (OSError, ValueError, subprocess.TimeoutExpired):
         return False
 
 

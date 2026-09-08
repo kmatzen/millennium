@@ -34,7 +34,7 @@ class Helper:
             if not self.manager.apply_owner(request):
                 raise WifiError("the network rejected the connection")
             success = False
-            for unused in range(12):
+            for unused in range(4):
                 if connectivity_ok():
                     success = True
                     break
@@ -50,6 +50,14 @@ class Helper:
                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             status.write_text(json.dumps({"state": "connected"}), encoding="utf-8")
             os.chmod(status, 0o644)
+            try:
+                Path("/run/millennium-wifi/setup-active").unlink()
+            except FileNotFoundError:
+                pass
+            subprocess.run(["/usr/bin/systemctl", "--no-block", "stop",
+                            "millennium-wifi-portal.service",
+                            "millennium-wifi-helper.service"], check=False,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except Exception as exc:
             status.write_text(json.dumps({"state": "failed", "message": str(exc)}), encoding="utf-8")
             os.chmod(status, 0o644)

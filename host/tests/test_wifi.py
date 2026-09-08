@@ -131,6 +131,44 @@ class WifiTests(unittest.TestCase):
         manager.restore_setup.assert_called_once_with()
         self.assertFalse(helper.lock.locked())
 
+    def test_connectivity_probe_is_bounded_including_dns(self):
+        calls = []
+
+        def run(arguments, **kwargs):
+            calls.append((arguments, kwargs))
+            return Result(stdout="200 1234")
+
+        self.assertTrue(wifi.connectivity_ok(run=run))
+        arguments, kwargs = calls[0]
+        self.assertIn("--connect-timeout", arguments)
+        self.assertIn("--max-time", arguments)
+        self.assertEqual(kwargs["timeout"], 12)
+
+        def hangs(*unused_args, **unused_kwargs):
+            raise wifi.subprocess.TimeoutExpired("curl", 12)
+
+        self.assertFalse(wifi.connectivity_ok(run=hangs))
+
+    def test_success_commits_owner_and_stops_setup_services(self):
+        manager = mock.Mock()
+        manager.apply_owner.return_value = True
+        with tempfile.TemporaryDirectory() as directory:
+            helper = helper_module.Helper(manager, directory)
+            helper.lock.acquire()
+            with mock.patch.object(helper_module, "connectivity_ok", return_value=True), \
+                    mock.patch.object(helper_module.subprocess, "run") as run, \
+                    mock.patch.object(helper_module.Path, "unlink"):
+                helper._apply({"ssid": "home", "security": "wpa-psk",
+                               "passphrase": "correct-password", "hidden": False})
+            status = json.loads((Path(directory) / "status.json").read_text())
+            self.assertTrue((Path(directory) / "owner-network-configured").exists())
+        self.assertEqual(status["state"], "connected")
+        self.assertIn("--no-block", run.call_args_list[-1].args[0])
+        self.assertIn("millennium-wifi-portal.service", run.call_args_list[-1].args[0])
+        manager.restore_owner.assert_not_called()
+        manager.restore_setup.assert_not_called()
+        self.assertFalse(helper.lock.locked())
+
     def test_radio_failure_is_reported_without_credentials(self):
         def failed_radio(arguments, **unused):
             raise wifi.subprocess.CalledProcessError(10, arguments, stderr="radio unavailable")
