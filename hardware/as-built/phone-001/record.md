@@ -471,6 +471,22 @@ build evidence is in
 `evidence/zero2w-recovery-seeded-artifact-5d7bdda-2026-09-08.json`; exact media
 evidence is in `evidence/recovery-media-phone001-5d7bdda.json`.
 
+The resulting card booted the physical Zero 2 W on 2026-09-07. The exact
+production daemon matched SHA-256
+`c60dc0f10e732f6c727b11db6bf6e8a23918f58bba215278c5b48d81bfa12f86`,
+both Alpha and Beta enumerated, the active root was read-only, and all three
+persistent bind mounts were present. The daemon remained active and its serial
+and activity health gauges were healthy. Three command timeouts, two serial
+reconnects, ten retries, and two frame errors occurred during the first eight
+seconds of startup, but every counter remained unchanged between 357 and 427
+seconds uptime; no later command timeout or reconnect appeared. The prior RCU
+stall, r8152 watchdog, and transmit timeout did not recur. This is a scoped
+offline platform/MCU pass only: the setup network had no upstream DNS, and the
+handset, audio path, keypad, coin validator, and card reader were not attached.
+SIP, the reverse tunnel, complete HIL, installed-load power, and peripheral
+acceptance remain open. Exact evidence is in
+`evidence/physical-boot-offline-platform-5d7bdda-2026-09-07.json`.
+
 That candidate's physical boot exposed an upstream image-generator ordering
 defect: the upstream shared-state generator overwrote the project generator
 after payload staging, leaving generated mount units outside

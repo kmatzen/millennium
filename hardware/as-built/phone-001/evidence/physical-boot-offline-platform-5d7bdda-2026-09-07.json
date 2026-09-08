@@ -1,0 +1,71 @@
+{
+  "schema": 1,
+  "operation": "physical-boot-offline-platform-and-mcu-check",
+  "completed_at": "2026-09-08T01:59:59Z",
+  "source_commit": "5d7bdda57565ab141a2847b6169f2254ad5e2428",
+  "daemon_sha256": "c60dc0f10e732f6c727b11db6bf6e8a23918f58bba215278c5b48d81bfa12f86",
+  "passed_for_available_hardware": true,
+  "physical_boot_approved": false,
+  "boot": {
+    "board": "Raspberry Pi Zero 2 W",
+    "kernel": "6.18.39+rpt-rpi-v8",
+    "architecture": "aarch64",
+    "system_state": "running",
+    "uptime_final_seconds": 427.36,
+    "active_root": "/dev/disk/by-slot/active/system",
+    "active_root_read_only": true,
+    "persistent_bind_mounts_present": [
+      "/etc/millennium",
+      "/var/lib/millennium",
+      "/var/log/millennium"
+    ]
+  },
+  "services": {
+    "daemon_service": "active",
+    "network_manager": "active",
+    "ssh": "active",
+    "maintenance_tunnel": "unavailable-no-upstream-dns",
+    "monitor": "expected-nonzero-while-offline-and-hil-stale"
+  },
+  "mcu": {
+    "alpha_device": "/dev/ttyACM1",
+    "beta_device": "/dev/ttyACM0",
+    "protocol_version": 2,
+    "serial_health_gauge": 0,
+    "daemon_activity_health_gauge": 0,
+    "startup_command_timeouts": 3,
+    "startup_serial_reconnects": 2,
+    "startup_command_retries": 10,
+    "busy_responses": 1,
+    "crc_or_frame_errors": 2,
+    "operations_completed": 4,
+    "counters_unchanged_between_uptime_seconds": [
+      357.63,
+      427.36
+    ],
+    "post_start_command_timeouts": 0,
+    "post_start_reconnects": 0
+  },
+  "kernel": {
+    "rcu_stalls": 0,
+    "netdev_watchdogs": 0,
+    "tx_timeouts": 0,
+    "blocked_tasks": 0,
+    "out_of_memory_events": 0
+  },
+  "deferred": {
+    "reason": "The phone peripherals and an Internet-bearing network were not connected.",
+    "checks": [
+      "audio capture and playback",
+      "handset and hook controls",
+      "keypad input",
+      "coin validator",
+      "card reader",
+      "SIP registration and call path",
+      "signed update reachability",
+      "maintenance tunnel 95-second gate",
+      "full installed-load power and brownout measurements"
+    ]
+  },
+  "status": "corrected recovery image boots and remains stable on the available platform and attached MCUs; full physical approval remains open"
+}
