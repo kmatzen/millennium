@@ -118,9 +118,11 @@ def main():
     try:
         daemon_metrics = get_json(args.base_url + "/api/metrics")
         for source_name in ("serial_disconnects", "serial_reconnects",
-                            "mcu_resets_keypad", "mcu_resets_display",
-                            "arduino_i2c_drops_keypad",
-                            "arduino_i2c_drops_display"):
+                            "mcu_resets_alpha", "mcu_resets_beta",
+                            "arduino_i2c_drops_alpha",
+                            "arduino_i2c_drops_beta",
+                            "arduino_i2c_error_1", "arduino_i2c_error_2",
+                            "arduino_i2c_error_3", "arduino_i2c_error_4"):
             lines.append(metric(source_name,
                                 numeric_metric(daemon_metrics, source_name)))
     except Exception:

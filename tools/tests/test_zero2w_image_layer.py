@@ -15,6 +15,11 @@ class Zero2WImageLayerTests(unittest.TestCase):
         unit = WIFI_BOOTSTRAP_UNIT.read_text()
 
         self.assertIn("    - wpasupplicant\n", text)
+        self.assertIn("    - firmware-realtek\n", text)
+        self.assertIn("      no-auto-default=*\n", text)
+        self.assertIn("id=millennium-wired", text)
+        self.assertIn("interface-name=eth0", text)
+        self.assertEqual(text.count("never-default=true"), 2)
         self.assertIn(
             'install -d -m 0755 '
             '"$1/var/lib/node_exporter/textfile_collector"',
@@ -39,16 +44,36 @@ class Zero2WImageLayerTests(unittest.TestCase):
         self.assertIn("millennium-monitor.tmpfiles", staging)
         self.assertIn("millennium-monitor.conf", staging)
 
+    def test_persistent_state_parent_preserves_content_immutability(self) -> None:
+        text = LAYER.read_text()
+        tmpfiles = (ROOT / "host/systemd/millennium-experience.tmpfiles").read_text()
+
+        self.assertNotIn(
+            "chown -R millennium:millennium /var/lib/millennium ", text
+        )
+        self.assertIn('chroot "$1" chown 0:0 /var/lib/millennium', text)
+        self.assertIn('chroot "$1" chown -R 0:0 /var/lib/millennium/content', text)
+        self.assertIn("d /var/lib/millennium 0755 root root -", tmpfiles)
+        self.assertIn(
+            "/var/lib/millennium/content/owner-requests", text
+        )
+        self.assertIn("/var/lib/millennium/story-state", text)
+        self.assertIn("/var/lib/millennium/state", text)
+
     def test_wifi_state_owner_is_resolved_inside_target_root(self) -> None:
         text = LAYER.read_text()
 
         create = 'install -d -m 0700 "$1/var/lib/millennium/wifi"'
         target_chown = (
-            'chroot "$1" chown -R millennium:millennium '
-            "/var/lib/millennium /var/log/millennium"
+            'chroot "$1" chown -R millennium:millennium \\\n'
+            '        /var/lib/millennium/wifi /var/log/millennium'
         )
 
-        self.assertNotIn('install -d -o millennium -g millennium', text)
+        self.assertNotIn(
+            'install -d -o millennium -g millennium -m 0700 '
+            '"$1/var/lib/millennium/wifi"',
+            text,
+        )
         self.assertIn(create, text)
         self.assertIn(target_chown, text)
         self.assertLess(text.index(create), text.index(target_chown))

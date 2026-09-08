@@ -32,6 +32,17 @@ class MonitorTests(unittest.TestCase):
         self.assertEqual(MONITOR.numeric_metric(data, "mcu_resets_keypad"), 2.0)
         self.assertEqual(MONITOR.numeric_metric(data, "missing"), 0.0)
 
+    def test_monitor_names_follow_alpha_beta_protocol_roles(self):
+        source = MODULE_PATH.read_text()
+        for name in (
+                "mcu_resets_alpha", "mcu_resets_beta",
+                "arduino_i2c_drops_alpha", "arduino_i2c_drops_beta",
+                "arduino_i2c_error_1", "arduino_i2c_error_2",
+                "arduino_i2c_error_3", "arduino_i2c_error_4"):
+            self.assertIn(f'"{name}"', source)
+        self.assertNotIn('"mcu_resets_keypad"', source)
+        self.assertNotIn('"mcu_resets_display"', source)
+
     def test_atomic_write_replaces_complete_file(self):
         with tempfile.TemporaryDirectory() as directory:
             target = Path(directory) / "metrics.prom"
