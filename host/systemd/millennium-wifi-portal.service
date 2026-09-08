@@ -1,6 +1,7 @@
 [Unit]
 Description=Millennium owner Wi-Fi captive portal
 Requires=millennium-wifi-helper.service
+BindsTo=millennium-wifi-helper.service
 After=millennium-wifi-helper.service
 PartOf=millennium-wifi-helper.service
 

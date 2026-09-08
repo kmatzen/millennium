@@ -87,9 +87,12 @@ class Zero2WImageLayerTests(unittest.TestCase):
                 unit,
             )
         helper = WIFI_HELPER_UNIT.read_text()
+        portal = WIFI_PORTAL_UNIT.read_text()
         self.assertIn("RuntimeMaxSec=900", helper)
         self.assertIn("Restart=no", helper)
         self.assertNotIn("Restart=on-failure", helper)
+        self.assertIn("BindsTo=millennium-wifi-helper.service", portal)
+        self.assertIn("PartOf=millennium-wifi-helper.service", portal)
 
     def test_fixed_shared_generator_is_installed_after_upstream_customize(
             self) -> None:

@@ -75,6 +75,48 @@ class WifiTests(unittest.TestCase):
             manager.restore_owner()
             self.assertEqual(path.read_text(), "old-profile")
 
+    def test_owner_activation_retries_ap_to_station_transition(self):
+        attempts = []
+
+        def run(arguments, **unused):
+            if arguments[-3:] == ["connection", "up", wifi.OWNER_CONNECTION]:
+                attempts.append(arguments)
+                return Result(returncode=10 if len(attempts) < 3 else 0)
+            return Result()
+
+        sleeps = []
+        with tempfile.TemporaryDirectory() as directory:
+            manager = wifi.NetworkManager(run=run, profile_dir=directory,
+                                          sleep=sleeps.append)
+            connected = manager.apply_owner({
+                "ssid": "home", "security": "wpa-psk",
+                "passphrase": "password1", "hidden": False,
+            })
+
+        self.assertTrue(connected)
+        self.assertEqual(len(attempts), 3)
+        self.assertEqual(sleeps, [1, 1])
+
+    def test_owner_activation_retry_is_bounded(self):
+        attempts = []
+
+        def run(arguments, **unused):
+            if arguments[-3:] == ["connection", "up", wifi.OWNER_CONNECTION]:
+                attempts.append(arguments)
+                return Result(returncode=10)
+            return Result()
+
+        with tempfile.TemporaryDirectory() as directory:
+            manager = wifi.NetworkManager(run=run, profile_dir=directory,
+                                          sleep=lambda unused: None)
+            connected = manager.apply_owner({
+                "ssid": "home", "security": "wpa-psk",
+                "passphrase": "password1", "hidden": False,
+            })
+
+        self.assertFalse(connected)
+        self.assertEqual(len(attempts), 5)
+
     def test_scan_deduplicates_and_sorts(self):
         output = "weak:WPA2:20\nstrong:WPA2:90\nstrong:WPA2:80\n:--:100\n"
         manager = wifi.NetworkManager(run=lambda *args, **kwargs: Result(stdout=output))

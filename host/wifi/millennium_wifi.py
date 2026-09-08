@@ -129,9 +129,11 @@ def write_secret(path, content):
 
 
 class NetworkManager:
-    def __init__(self, run=subprocess.run, profile_dir="/etc/NetworkManager/system-connections"):
+    def __init__(self, run=subprocess.run, profile_dir="/etc/NetworkManager/system-connections",
+                 sleep=time.sleep):
         self.run = run
         self.profile_dir = Path(profile_dir)
+        self.sleep = sleep
 
     def command(self, *arguments, check=True):
         return self.run(["/usr/bin/nmcli", *arguments], check=check, text=True,
@@ -175,8 +177,17 @@ class NetworkManager:
             write_secret(backup, path.read_text(encoding="utf-8"))
         self.load_profile(OWNER_CONNECTION, owner_keyfile(request))
         self.command("connection", "down", SETUP_CONNECTION, check=False)
-        result = self.command("connection", "up", OWNER_CONNECTION, check=False)
-        return result.returncode == 0
+        # The same radio can remain temporarily unavailable while
+        # NetworkManager transitions it out of AP mode.  Retry this bounded
+        # handoff instead of rejecting otherwise valid credentials.
+        for attempt in range(5):
+            result = self.command("connection", "up", OWNER_CONNECTION,
+                                  check=False)
+            if result.returncode == 0:
+                return True
+            if attempt != 4:
+                self.sleep(1)
+        return False
 
     def restore_owner(self):
         path = self.profile_dir / (OWNER_CONNECTION + ".nmconnection")
