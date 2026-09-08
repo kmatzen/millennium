@@ -92,8 +92,13 @@ The Ed25519 signature and Zstandard stream were independently verified on
 verified on macOS. The factory-seeded image was copied directly from `anima`
 to external `UEBuild` without using laptop internal storage. All four file
 hashes, the manifest's source commit and expanded digest, the Ed25519
-signature, and the Zstandard stream verified there. It has not yet been
-written to recovery media.
+signature, and the Zstandard stream verified there. On 2026-09-07 macOS
+identified the dedicated 63.9 GB USB card as `/dev/disk6`. The writer verified
+the signed artifact, wrote and flushed all 15,636,365,312 bytes, and read the
+complete image length back. Readback matched expanded SHA-256
+`372f3c726285d485954f55ed7b681e215515f411691cbc9f891e45b70d3901dd`,
+and the card was ejected. Exact media evidence is in
+`evidence/recovery-media-phone001-5d7bdda.json`.
 
 The software-verified candidate is intentionally named `unapproved` until the
 media write/readback and physical boot both pass:
@@ -102,9 +107,9 @@ media write/readback and physical boot both pass:
 /Volumes/UEBuild/millennium-images/zero2w-ab-1.0.0-5d7bdda-phone001-unapproved
 ```
 
-Identify the dedicated card's current whole-disk name
-with `diskutil list external physical`, verify the four recorded hashes and
-signature, and run the preflight first:
+For a replacement write only, identify the dedicated card's current whole-disk
+name with `diskutil list external physical`, verify the four recorded hashes
+and signature, and run the preflight first:
 
 ```bash
 python3 tools/write_recovery_media.py \

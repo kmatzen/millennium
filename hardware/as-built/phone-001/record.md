@@ -462,9 +462,14 @@ signature verified on macOS and `anima`, and the RAM disk was ejected. The
 candidate was copied directly from `anima` to external `UEBuild` without using
 laptop internal storage. All four file hashes, the manifest binding to
 `5d7bdda57565ab141a2847b6169f2254ad5e2428`, the Ed25519 signature, and the
-Zstandard stream verified locally. It remains unapproved pending complete
-recovery-card write/readback and physical boot. Exact build evidence is in
-`evidence/zero2w-recovery-seeded-artifact-5d7bdda-2026-09-08.json`.
+Zstandard stream verified locally. On 2026-09-07 the dedicated 63.9 GB USB
+card appeared as `/dev/disk6`; signed preflight, full write, flush, and complete
+15,636,365,312-byte readback passed. The readback matched expanded SHA-256
+`372f3c726285d485954f55ed7b681e215515f411691cbc9f891e45b70d3901dd`,
+and the card was ejected. It remains unapproved pending physical boot. Exact
+build evidence is in
+`evidence/zero2w-recovery-seeded-artifact-5d7bdda-2026-09-08.json`; exact media
+evidence is in `evidence/recovery-media-phone001-5d7bdda.json`.
 
 That candidate's physical boot exposed an upstream image-generator ordering
 defect: the upstream shared-state generator overwrote the project generator
