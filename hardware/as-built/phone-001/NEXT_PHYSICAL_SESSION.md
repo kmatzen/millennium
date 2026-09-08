@@ -56,7 +56,8 @@ host directory through a read-only bind mount and does not require a restart.
 
 ## 1. Write and verify the corrected recovery card
 
-**Completed for `7f94bdd` on 2026-09-07.** macOS identified the dedicated
+**The write is required for `5d7bdda`.** The prior `7f94bdd` write completed on
+2026-09-07: macOS identified the dedicated
 63.9 GB USB-attached card as `/dev/disk6`. The active-key signature and source
 disk separation passed preflight. The writer expanded, wrote, and flushed the
 15,636,365,312-byte image, then read the complete image length back. Readback
@@ -69,53 +70,52 @@ The earlier `/dev/disk10` write/readback passed byte-for-byte, but its v3 image
 failed physical boot acceptance and is quarantined. It must not be redeployed.
 The corrected `2ad5179` media write completed, but its 2026-09-07 physical boot
 exposed a missing `wpasupplicant` package and missing monitor output directory.
-It is now rejected evidence and must not be redeployed. Build, sign, write, and
-fully read back a newer candidate containing both source fixes before resuming
-physical boot approval.
+It is now rejected evidence and must not be redeployed. The newer candidate is
+built and signed; copy, write, and fully read it back before resuming physical
+boot approval.
 
-The superseded `2ad5179` artifact remains rejected. The newer factory-seeded
-and signed artifact containing the Wi-Fi package, monitor tmpfiles, daemon
-token-permission, and active trust-root corrections is retained on `anima` at:
+The superseded `2ad5179` and `7f94bdd` artifacts remain rejected. The newer
+factory-seeded and signed artifact containing the Wi-Fi package, monitor
+tmpfiles, daemon token-permission, active trust-root, and MCU command
+serialization corrections is retained on `anima` at:
 
 ```text
-/home/kmatzen/.local/share/millennium-recovery/images/zero2w-ab-1.0.0-7f94bdd-phone001-unapproved
+/home/kmatzen/.local/share/millennium-recovery/images/zero2w-ab-1.0.0-5d7bdda-phone001-unapproved
 ```
 
 Its signed compressed SHA-256 is
-`994eb3d83bc898f267017497f9b5c14dabb0358a56117ec198126f0e0b775e60` and
+`9af00cad8f947264b0a4d55be479cd3a6aa43883def56e963cd615a6a74419b9` and
 its signed expanded SHA-256 is
-`b37ab43d14da59b887f336f10252f4e7b0607c8ec04532b66a7797901a5970a5`.
+`372f3c726285d485954f55ed7b681e215515f411691cbc9f891e45b70d3901dd`.
 The Ed25519 signature and Zstandard stream were independently verified on
 `anima`; the signing operation and active public-key identity were also
-verified on macOS. A bounded copy is staged on the external `UEBuild` volume;
-its four hashes, signature, and Zstandard stream were reverified without
-placing the image on the laptop's internal disk. It has not yet been written
-to recovery media.
+verified on macOS. Its external `UEBuild` copy awaits explicit authorization
+because the factory-seeded image contains device credentials. It has not yet
+been written to recovery media.
 
 The software-verified candidate is intentionally named `unapproved` until the
 media write/readback and physical boot both pass:
 
 ```text
-/Volumes/UEBuild/millennium-images/zero2w-ab-1.0.0-7f94bdd-phone001-unapproved
+/Volumes/UEBuild/millennium-images/zero2w-ab-1.0.0-5d7bdda-phone001-unapproved
 ```
 
-Do not rewrite this verified card merely to repeat the completed step. If its
-custody/readback evidence becomes invalid, identify its current whole-disk name
+Identify the dedicated card's current whole-disk name
 with `diskutil list external physical`, verify the four recorded hashes and
 signature, and run the preflight first:
 
 ```bash
 python3 tools/write_recovery_media.py \
-  --manifest /Volumes/UEBuild/millennium-images/zero2w-ab-1.0.0-7f94bdd-phone001-unapproved/recovery-manifest.json \
-  --signature /Volumes/UEBuild/millennium-images/zero2w-ab-1.0.0-7f94bdd-phone001-unapproved/recovery-manifest.json.sig \
-  --public-key /Volumes/UEBuild/millennium-images/zero2w-ab-1.0.0-7f94bdd-phone001-unapproved/update-signing-key.pem \
-  --image /Volumes/UEBuild/millennium-images/zero2w-ab-1.0.0-7f94bdd-phone001-unapproved/millennium-zero2w-ab-phone-001.img.zst \
+  --manifest /Volumes/UEBuild/millennium-images/zero2w-ab-1.0.0-5d7bdda-phone001-unapproved/recovery-manifest.json \
+  --signature /Volumes/UEBuild/millennium-images/zero2w-ab-1.0.0-5d7bdda-phone001-unapproved/recovery-manifest.json.sig \
+  --public-key /Volumes/UEBuild/millennium-images/zero2w-ab-1.0.0-5d7bdda-phone001-unapproved/update-signing-key.pem \
+  --image /Volumes/UEBuild/millennium-images/zero2w-ab-1.0.0-5d7bdda-phone001-unapproved/millennium-zero2w-ab-phone-001.img.zst \
   --target /dev/diskN
 ```
 
 Read the reported identity, confirm it is the dedicated removable card, and
 only then rerun with `sudo`, `--write`, `--confirm-device diskN`, and
-`--evidence hardware/as-built/phone-001/evidence/recovery-media-phone001-7f94bdd.json`.
+`--evidence hardware/as-built/phone-001/evidence/recovery-media-phone001-5d7bdda.json`.
 The writer verifies the signed manifest, writes the expansion, flushes it, and
 hashes a complete image-length readback. Eject the card after it passes.
 

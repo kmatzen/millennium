@@ -440,6 +440,29 @@ and the card was ejected. Exact media evidence is in
 Exact evidence is in
 `evidence/zero2w-recovery-seeded-artifact-7f94bdd-2026-09-07.json`.
 
+That image's physical boot exposed a host protocol bug rather than an MCU
+hardware failure: startup commands overwrote the single pending ACK slot, and
+a valid MCU busy response aged into a false serial failure. Commit
+`5d7bdda57565ab141a2847b6169f2254ad5e2428` serializes critical commands and
+treats matching busy replies as backpressure. A production-linked diagnostic
+daemon ran on phone-001 for five minutes with zero reconnects, zero command
+timeouts, and no increase from the existing 229 DWC OTG warnings. The failed
+boot and diagnostic limits are retained in
+`evidence/physical-boot-rejection-7f94bdd-2026-09-07.json`.
+
+A replacement image was then built entirely on `anima`, factory-seeded with
+the same phone-001 identity, and independently verified across both read-only
+system slots and persistent storage. Its retained signed artifact is
+`zero2w-ab-1.0.0-5d7bdda-phone001-unapproved`, with compressed SHA-256
+`9af00cad8f947264b0a4d55be479cd3a6aa43883def56e963cd615a6a74419b9`
+and expanded SHA-256
+`372f3c726285d485954f55ed7b681e215515f411691cbc9f891e45b70d3901dd`.
+The release private key existed only on a disposable APFS RAM disk, the
+signature verified on macOS and `anima`, and the RAM disk was ejected. The
+candidate remains unapproved pending its external copy, complete recovery-card
+write/readback, and physical boot. Exact build evidence is in
+`evidence/zero2w-recovery-seeded-artifact-5d7bdda-2026-09-08.json`.
+
 That candidate's physical boot exposed an upstream image-generator ordering
 defect: the upstream shared-state generator overwrote the project generator
 after payload staging, leaving generated mount units outside
