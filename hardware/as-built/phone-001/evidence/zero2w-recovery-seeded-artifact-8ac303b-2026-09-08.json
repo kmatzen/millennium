@@ -65,8 +65,11 @@
     "used_laptop_internal_storage": false
   },
   "qemu_end_to_end": {
-    "completed_at": "2026-09-08T04:05:23Z",
+    "completed_at": "2026-09-08T04:26:03Z",
     "host": "anima",
+    "full_software_lab_passed": true,
+    "full_result_sha256": "2832b4609180e8085749deaf1f1341966b7150898e298bfbe9c9c1cf7c5eaf9d",
+    "acceptance_layers": 14,
     "wifi_onboarding_tests": 17,
     "wifi_onboarding_passed": true,
     "exact_factory_image_booted": true,
@@ -77,6 +80,12 @@
     "resolver_verified": true,
     "nftables_verified": true,
     "millennium_firewall_verified": true,
+    "virtual_mcu_and_peripheral_faults_verified": true,
+    "signed_ota_and_fault_recovery_verified": true,
+    "os_ab_state_machine_verified": true,
+    "offline_experience_verified": true,
+    "signed_experience_lifecycle_verified": true,
+    "abrupt_power_recovery_verified": true,
     "qemu_machine": "virt",
     "raspberry_pi_firmware_emulated": false,
     "physical_hardware_claimed": false

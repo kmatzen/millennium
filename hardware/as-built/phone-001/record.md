@@ -507,7 +507,10 @@ all 17 Wi-Fi onboarding tests, including platform probes, rollback, captive
 portal responses, and private credential handoff. The stronger exact-image
 test then booted the factory-seeded raw image's own Debian 13 userspace and
 verified its production mount graph, D-Bus, resolver, nftables, and Millennium
-firewall. QEMU does not emulate the Raspberry Pi firmware, BCM2710A1 radio,
+firewall. The complete 14-layer software lab also passed virtual MCU and
+peripheral fault injection, signed host and OS OTA recovery, offline and signed
+experience lifecycles, network isolation, and abrupt-power/checkpoint recovery.
+QEMU does not emulate the Raspberry Pi firmware, BCM2710A1 radio,
 native SD/USB behavior, connected phone peripherals, or installed-load power,
 so the candidate remains unapproved pending media write/readback and physical
 boot. Exact evidence is in
