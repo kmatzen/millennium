@@ -55,6 +55,17 @@ assert_links() {
     test "$("${GUEST_SSH[@]}" readlink -f /opt/millennium/previous)" = "$previous"
 }
 
+assert_rollback_links() {
+    local recovered_previous
+    test "$("${GUEST_SSH[@]}" readlink -f /opt/millennium/current)" = "$current"
+    recovered_previous=$("${GUEST_SSH[@]}" readlink -f /opt/millennium/previous)
+    case "$recovered_previous" in
+        "$current"|"$previous") ;;
+        *) echo "health rollback lost the last known-good release link" >&2; exit 1 ;;
+    esac
+    "${GUEST_SSH[@]}" test -x "$recovered_previous/host/millennium-daemon"
+}
+
 expect_check_failure() {
     if "${GUEST_SSH[@]}" sudo /usr/local/libexec/millennium-ota check \
             >/dev/null 2>&1; then
@@ -118,7 +129,7 @@ if "${GUEST_SSH[@]}" sudo /usr/local/libexec/millennium-ota apply >/dev/null 2>&
     echo "release unexpectedly committed while external health origin failed" >&2
     exit 1
 fi
-assert_links
+assert_rollback_links
 stop_origin
 
 start_origin "$work/origin-cert.pem" "$work/origin-key.pem"
