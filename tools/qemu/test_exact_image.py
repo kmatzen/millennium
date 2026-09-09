@@ -64,7 +64,7 @@ class ExactImageHarnessTests(unittest.TestCase):
             "grep -Fqx Restart=no",
             "grep -Fqx RuntimeMaxSec=900",
             "grep -Fqx BindsTo=millennium-wifi-helper.service",
-            "stat -c %U:%G:%a /run/millennium-wifi",
+            "stat -c %%U:%%G:%%a /run/millennium-wifi",
             "root:millennium-wifi:750",
             "runuser -u millennium-wifi -- test -x /run/millennium-wifi",
             "systemctl show -p Group --value",

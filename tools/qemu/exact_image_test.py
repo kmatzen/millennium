@@ -124,7 +124,7 @@ def shell_commands(system_partition: int = 5) -> bytes:
         # Validate the effective systemd identity boundary on the assembled
         # image.  Merely inspecting the unit text missed a real deployment
         # failure where the portal user could not traverse this directory.
-        "test \"$(stat -c %U:%G:%a /run/millennium-wifi)\" "
+        "test \"$(stat -c %%U:%%G:%%a /run/millennium-wifi)\" "
         "= root:millennium-wifi:750 && "
         "runuser -u millennium-wifi -- test -x /run/millennium-wifi && "
         "test \"$(systemctl show -p Group --value "
