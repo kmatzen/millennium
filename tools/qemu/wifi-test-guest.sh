@@ -22,6 +22,25 @@ rm -rf /run/millennium-wifi
 systemctl start millennium-wifi-bootstrap.service
 test "$(stat -c %U:%G /run/millennium-wifi)" = root:millennium-wifi
 runuser -u millennium-wifi -- test -x /run/millennium-wifi
+touch /run/millennium-wifi/setup-active
+systemctl start millennium-wifi-helper.service
+for _ in {1..30}; do
+    test -S /run/millennium-wifi/helper.sock && break
+    sleep 0.1
+done
+test "$(stat -c %U:%G /run/millennium-wifi/helper.sock)" = root:millennium-wifi
+runuser -u millennium-wifi -- python3 - <<'PY'
+import json
+import socket
+
+with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
+    connection.connect("/run/millennium-wifi/helper.sock")
+    connection.sendall(b'{"action":"status"}\n')
+    response = json.loads(connection.makefile("rb").readline())
+assert response["ok"] is True, response
+assert response["state"] in {"setup", "connecting", "connected", "failed"}, response
+PY
+systemctl stop millennium-wifi-helper.service
 
 # Verify factory provisioning produces a private, stable handoff without
 # exposing its generated password in process arguments or world-readable data.
