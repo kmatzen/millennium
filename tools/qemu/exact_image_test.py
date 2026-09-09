@@ -52,11 +52,11 @@ def require_program(name: str) -> str:
     return path
 
 
-def shell_commands() -> bytes:
+def shell_commands(system_partition: int = 5) -> bytes:
     rules = (
         'KERNEL=="vda1", SYMLINK+="disk/by-slot/bootconfig"',
         'KERNEL=="vda2", SYMLINK+="disk/by-slot/active/boot"',
-        'KERNEL=="vda5", SYMLINK+="disk/by-slot/active/system"',
+        f'KERNEL=="vda{system_partition}", SYMLINK+="disk/by-slot/active/system"',
         'KERNEL=="vda7", SYMLINK+="disk/by-slot/persistent"',
     )
     unit = (
@@ -160,6 +160,7 @@ def main() -> int:
     parser.add_argument("--initrd", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--timeout", type=int, default=DEFAULT_TIMEOUT_SECONDS)
+    parser.add_argument("--system-partition", type=int, choices=(5, 6), default=5)
     args = parser.parse_args()
     for path in (args.image, args.kernel, args.initrd):
         if not path.is_file():
@@ -180,7 +181,7 @@ def main() -> int:
             qemu, "-machine", "virt", "-cpu", "cortex-a72", "-smp", "4",
             "-m", "1024", "-kernel", str(args.kernel), "-initrd",
             str(args.initrd), "-append",
-            "root=/dev/vda5 rw console=ttyAMA0 init=/bin/sh",
+            f"root=/dev/vda{args.system_partition} rw console=ttyAMA0 init=/bin/sh",
             "-drive", f"file={overlay},if=none,id=disk0,format=qcow2",
             "-device", "virtio-blk-pci,drive=disk0", "-netdev",
             "user,id=net0", "-device", "virtio-net-pci,netdev=net0",
@@ -204,7 +205,7 @@ def main() -> int:
                         transcript.extend(chunk)
                     text = normalized_console(transcript)
                     if not injected and "# " in text:
-                        client.sendall(shell_commands())
+                        client.sendall(shell_commands(args.system_partition))
                         injected = True
                     if PASS_MARKER in text:
                         result = "pass"
@@ -236,6 +237,7 @@ def main() -> int:
         "qemu_machine": "virt",
         "exact_image_userspace": True,
         "image_size": args.image.stat().st_size,
+        "system_partition": args.system_partition,
         "raspberry_pi_firmware_emulated": False,
         "physical_hardware_claimed": False,
         "console_log": str(log_path.resolve()),

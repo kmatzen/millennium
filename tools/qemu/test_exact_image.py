@@ -11,6 +11,10 @@ SPEC.loader.exec_module(MODULE)
 
 
 class ExactImageHarnessTests(unittest.TestCase):
+    def test_each_system_slot_can_be_selected(self):
+        self.assertIn(b'KERNEL=="vda5"', MODULE.shell_commands(5))
+        self.assertIn(b'KERNEL=="vda6"', MODULE.shell_commands(6))
+
     def test_default_timeout_allows_slow_external_image_boot(self):
         self.assertEqual(MODULE.DEFAULT_TIMEOUT_SECONDS, 600)
 
