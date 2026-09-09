@@ -38,6 +38,7 @@ class ExactImageHarnessTests(unittest.TestCase):
         self.assertIn("/etc/udev/rules.d/99-qemu-slot.rules", commands)
         self.assertIn("/etc/systemd/system/qemu-exact-accept.service", commands)
         self.assertIn("ExecStart=/bin/sh -xc", commands)
+        self.assertIn("exec >/dev/console 2>&1", commands)
         self.assertNotIn("/run/udev/rules.d", commands)
 
         for expected in (

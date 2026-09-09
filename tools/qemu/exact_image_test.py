@@ -80,7 +80,8 @@ def shell_commands(system_partition: int = 5) -> bytes:
         "millennium-firewall.service local-fs.target",
         "[Service]",
         "Type=oneshot",
-        "ExecStart=/bin/sh -xc 'systemctl is-active --quiet dbus.service && "
+        "ExecStart=/bin/sh -xc 'exec >/dev/console 2>&1; "
+        "systemctl is-active --quiet dbus.service && "
         "systemctl is-active --quiet systemd-resolved.service && "
         "systemctl is-active --quiet NetworkManager.service && "
         "systemctl is-active --quiet daemon.service && "
