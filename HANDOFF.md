@@ -7,10 +7,11 @@ Zero 2 W, radio, USB, audio, power, or first-time-user requirement.
 ## Current repository state
 
 - Working branch: `main`.
-- The next physical candidate is `d895b3561f06b30004788a483dd4131c70204009`.
-  The physically booted `6f50d12` and `c9b01fb` candidates are rejected; the
-  latter exposed AP-to-owner activation timing and portal-lifetime defects
-  fixed by `dd8aa6e` and verified in the new image.
+- The next production-image source must be `b496081` or later. The physically
+  booted `6f50d12`, `c9b01fb`, and `d895b35` candidates are rejected. Physical
+  `d895b35` tracing proved the Zero 2 W AP-to-station transition can exceed
+  seven seconds, while its helper stopped retrying after four; `b496081`
+  extends the bounded retry window and adds the measured-delay regression.
 - The `d895b35` factory-seeded candidate is signed, independently verified,
   retained on `anima`, copied directly to external `UEBuild`, written to the
   dedicated 63.9 GB recovery card, and fully read back. Its compressed SHA-256
@@ -56,10 +57,11 @@ image userspace tested and `physical_hardware_claimed: false`.
 
 ## Immediate execution order
 
-1. Physically boot the written and ejected `d895b35` replacement card. Preserve
-   the rejected `6f50d12` and `c9b01fb` media/boot evidence without treating
-   either as approval. Both Arduino MCUs are required for the physical health
-   gate; phone peripherals may be absent only for explicitly scoped platform
+1. Build, factory-seed, sign, fully simulate, write/read back, and physically
+   boot a replacement from `b496081` or later. Preserve the rejected `6f50d12`,
+   `c9b01fb`, and `d895b35` media/boot evidence without treating any as
+   approval. Both Arduino MCUs are required for the physical health gate;
+   phone peripherals may be absent only for explicitly scoped platform
    validation.
 2. Publish the immutable release objects and signed stable/beta/device-group
    catalogs with `content/publish_catalog.py` after completing the offline

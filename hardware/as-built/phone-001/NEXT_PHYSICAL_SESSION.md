@@ -71,14 +71,18 @@ host directory through a read-only bind mount and does not require a restart.
 
 ## 1. Write and verify the corrected recovery card
 
-**The `d895b35` replacement card is written and fully verified; boot this card
-next.** Its complete readback matched signed expanded SHA-256
+**The `d895b35` replacement card was written and fully verified, but its
+physical boot is rejected.** Its complete readback matched signed expanded SHA-256
 `01273e50f108d50f361672b58b9ccfac98340685bede42a61c895dd91b6c23b9`
 and it was safely ejected. Evidence is in
 `evidence/recovery-media-phone001-d895b35.json`. The exact seeded image and the
 complete 17-layer QEMU lab passed, including an independent external captive-
-portal client and maintenance/update channels. It remains unapproved until the
-physical checks below pass. The `c9b01fb` card is rejected because physical
+portal client and maintenance/update channels. Physical tracing nevertheless
+showed NetworkManager reached
+station activation only after the four-second helper retry window expired.
+Build, simulate, sign, write/read back, and boot a replacement from `b496081`
+or later. Exact rejection evidence is in
+`evidence/physical-boot-rejection-d895b35-2026-09-09.json`. The `c9b01fb` card is rejected because physical
 testing exposed AP-to-owner activation timing and portal-lifetime defects fixed
 by `dd8aa6e` and covered in the `d895b35` image.
 

@@ -1,0 +1,23 @@
+{
+  "completed_at": "2026-09-09T00:33:43Z",
+  "device_id": "phone-001",
+  "operation": "physical-boot-rejection",
+  "passed": false,
+  "reason": "The physical brcmfmac AP-to-station transition exceeded the helper's four-second retry window. NetworkManager reached activated only after the helper had declared failure and begun restoring setup mode.",
+  "safe_observations": {
+    "alpha_detected": true,
+    "beta_detected": true,
+    "daemon_healthy": true,
+    "embedded_source_commit": "d895b3561f06",
+    "networkmanager_reached_owner_activated": true,
+    "persistent_mounts_writable": true,
+    "portal_bound_to_helper": true,
+    "root_read_only": true,
+    "setup_timeout_stopped_portal": true,
+    "wired_address": "192.168.8.239"
+  },
+  "schema": 1,
+  "source_commit": "d895b3561f06b30004788a483dd4131c70204009",
+  "superseding_fix_commit": "b496081",
+  "wifi_credentials_stored": false
+}

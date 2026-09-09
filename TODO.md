@@ -99,12 +99,14 @@ with one assembled-hardware session and without repeating the network wiring.
     - [x] Retain the rejected `c9b01fb` media after physical testing exposed
       AP-to-owner activation timing and portal-lifetime defects.
     - [x] Build, sign, fully simulate, write, and read back the corrected
-      `d895b35` replacement; retain it as unapproved until physical boot
-      acceptance.
+      `d895b35` replacement; physical testing rejected it after measuring an
+      AP-to-station transition longer than its retry window.
+    - [ ] Rebuild from `b496081` or later with the measured physical handoff
+      bound, then sign, simulate, write/read back, and physically accept it.
     - [ ] Boot a non-quarantined verified recovery image on the
       production-equivalent Zero 2 W; the physically booted v3, `2ad5179`,
-      `7f94bdd`, and `6f50d12` artifacts are retained as failed evidence and
-      must not be redeployed.
+      `7f94bdd`, `6f50d12`, `c9b01fb`, and `d895b35` artifacts are retained as
+      failed evidence and must not be redeployed.
   - [ ] Exercise download, inactive-slot write, pre-reboot, first boot, health
     commit, and rollback in QEMU and by physically removing power on the
     production-equivalent Zero 2 W image.
