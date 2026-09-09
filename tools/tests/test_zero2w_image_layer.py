@@ -135,7 +135,7 @@ class Zero2WImageLayerTests(unittest.TestCase):
         text = LAYER.read_text()
         cleanup_text = text[text.index("  cleanup-hooks:"):]
 
-        self.assertIn('chown 0:0 "$1/opt"', cleanup_text)
-        self.assertIn('chmod 0755 "$1/opt"', cleanup_text)
+        self.assertIn('chown 0:0 "$1/opt" "$1/opt/millennium"', cleanup_text)
+        self.assertIn('chmod 0755 "$1/opt" "$1/opt/millennium"', cleanup_text)
         self.assertIn('"$1/opt"', cleanup_text)
         self.assertIn('chmod o+rx', cleanup_text)

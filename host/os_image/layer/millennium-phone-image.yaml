@@ -169,8 +169,8 @@ mmdebstrap:
       # /etc, /opt or /usr in the immutable system slot. /opt contains the
       # production release selected by daemon.service, so service accounts
       # must be able to traverse its root-owned parents.
-      chown 0:0 "$1/opt"
-      chmod 0755 "$1/opt"
+      chown 0:0 "$1/opt" "$1/opt/millennium"
+      chmod 0755 "$1/opt" "$1/opt/millennium"
       find "$1/etc" "$1/opt" "$1/usr" -xdev -type d -uid 1000 \
         -exec chown 0:0 {} + -exec chmod o+rx {} +
       if test -d "$1/bootfs"; then
