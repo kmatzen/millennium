@@ -24,6 +24,22 @@ class Result:
 
 
 class WifiTests(unittest.TestCase):
+    def test_setup_restart_cycles_stale_active_ap(self):
+        commands = []
+
+        def run(arguments, **unused):
+            commands.append(arguments)
+            return Result()
+
+        with tempfile.TemporaryDirectory() as directory:
+            manager = wifi.NetworkManager(run=run, profile_dir=directory)
+            manager.start_setup("phone-001", "password1")
+
+        self.assertEqual(commands[-2][-3:],
+                         ["connection", "down", wifi.SETUP_CONNECTION])
+        self.assertEqual(commands[-1][-3:],
+                         ["connection", "up", wifi.SETUP_CONNECTION])
+
     def test_validate_hostile_ssids_without_interpolation(self):
         for ssid in ("Home Wi-Fi", "café", 'quote"semi;colon', "$(touch /tmp/nope)"):
             request = {"ssid": ssid, "security": "wpa-psk",

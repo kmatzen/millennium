@@ -146,6 +146,10 @@ class NetworkManager:
 
     def start_setup(self, device_id, passphrase):
         self.load_profile(SETUP_CONNECTION, setup_keyfile(device_id, passphrase))
+        # NetworkManager can retain an "activated" AP profile after brcmfmac
+        # has stopped beaconing.  Recovery must cycle the connection instead
+        # of treating that stale state as a successful restart.
+        self.command("connection", "down", SETUP_CONNECTION, check=False)
         self.command("connection", "up", SETUP_CONNECTION)
 
     def scan(self):
