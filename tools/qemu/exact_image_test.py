@@ -45,6 +45,16 @@ def normalized_console(data: bytes | bytearray) -> str:
     return ANSI_ESCAPE.sub("", data.decode(errors="replace")).replace("\r", "")
 
 
+def has_marker(text: str, marker: str) -> bool:
+    """Accept only a marker emitted as its own console line.
+
+    systemd logs the complete ExecStart while parsing a generated unit. A
+    substring check therefore accepted the marker embedded in configuration
+    before the acceptance command had executed.
+    """
+    return any(line.strip() == marker for line in text.splitlines())
+
+
 def require_program(name: str) -> str:
     path = shutil.which(name)
     if not path:
@@ -207,10 +217,10 @@ def main() -> int:
                     if not injected and "# " in text:
                         client.sendall(shell_commands(args.system_partition))
                         injected = True
-                    if PASS_MARKER in text:
+                    if has_marker(text, PASS_MARKER):
                         result = "pass"
                         break
-                    if FAIL_MARKER in text or any(item in text for item in FORBIDDEN):
+                    if has_marker(text, FAIL_MARKER) or any(item in text for item in FORBIDDEN):
                         result = "fail"
                         break
                     if process.poll() is not None:

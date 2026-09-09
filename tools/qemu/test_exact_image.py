@@ -11,6 +11,13 @@ SPEC.loader.exec_module(MODULE)
 
 
 class ExactImageHarnessTests(unittest.TestCase):
+    def test_marker_must_be_a_standalone_console_line(self):
+        marker = MODULE.PASS_MARKER
+        echoed = "systemd: ExecStart=/bin/sh -c 'printf " + marker + "'"
+
+        self.assertFalse(MODULE.has_marker(echoed, marker))
+        self.assertTrue(MODULE.has_marker("before\n" + marker + "\nafter\n", marker))
+
     def test_each_system_slot_can_be_selected(self):
         self.assertIn(b'KERNEL=="vda5"', MODULE.shell_commands(5))
         self.assertIn(b'KERNEL=="vda6"', MODULE.shell_commands(6))
