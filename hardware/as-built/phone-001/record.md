@@ -677,6 +677,14 @@ external update and maintenance channels, virtual peripheral faults,
 disk-exhaustion behavior, abrupt power cuts, and checkpoint recovery all
 passed the executable release gate. Evidence is retained on `anima` at
 `/data2/millennium-build-4a15bf6/repo/tools/qemu/state/artifacts/full-20260909T115901Z/`.
-This is automated evidence only. The image remains explicitly unapproved until
-it is recovery-packaged and signed, written and completely read back from
-dedicated removable media, and passes the physical-only gates.
+The factory-seeded image was compressed into the canonical recovery format and
+signed with the active `release-2026-08` key recovered only on a temporary APFS
+RAM disk. Its public DER identity matched the established trust root; the
+signature and full Zstandard expansion verified independently on macOS and
+`anima`, and the RAM disk was ejected. Exact hashes are in
+`evidence/zero2w-recovery-seeded-artifact-4a15bf6-2026-09-09.json`. A new
+non-overwriting copy on external `UEBuild` matched all four artifact hashes,
+the public-key identity and signature, and the complete expanded stream without
+using laptop internal storage. This is automated evidence only. The image
+remains explicitly unapproved until it is written and completely read back
+from a dedicated recovery card and passes the physical-only gates.

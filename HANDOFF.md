@@ -9,8 +9,12 @@ Zero 2 W, radio, USB, audio, power, or first-time-user requirement.
 - Working branch: `main`.
 - Candidate `4a15bf63c9d4a44532d015f8212d44a2a987e7c1` was built and
   factory-seeded on `anima`. Its exact seeded image passed the commit-bound
-  automated release gate and remains unapproved pending recovery packaging,
-  signing, complete removable-media readback, and physical acceptance. The
+  automated release gate. Its canonical recovery manifest is signed with the
+  verified active `release-2026-08` key and independently verified on macOS
+  and `anima`. The non-overwriting external `UEBuild` copy also passed all four
+  hashes, signature, public-key identity, and full expansion checks without
+  using laptop internal storage. It remains unapproved pending complete
+  dedicated recovery-media readback and physical acceptance. The
   expanded image is
   `/data2/millennium-build-4a15bf6/phone001-4a15bf6.img`, is
   15,636,365,312 bytes, and has SHA-256
@@ -78,8 +82,9 @@ image userspace tested and `physical_hardware_claimed: false`.
 
 ## Immediate execution order
 
-1. Compress and sign the already built, factory-seeded, fully simulated
-   `4a15bf6` replacement; then write/read it back and physically test it.
+1. Write the signed, externally staged, factory-seeded, fully simulated
+   `4a15bf6` replacement to the dedicated recovery card, verify the complete
+   readback, and physically test it.
    Preserve the rejected `6f50d12`,
    `c9b01fb`, `d895b35`, and `98e018a` media/boot evidence without treating any as
    approval. Both Arduino MCUs are required for the physical health gate;

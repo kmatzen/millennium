@@ -1,0 +1,67 @@
+{
+  "schema": 1,
+  "operation": "production-recovery-artifact-factory-seed",
+  "completed_at": "2026-09-09T15:05:06Z",
+  "source_commit": "4a15bf63c9d4a44532d015f8212d44a2a987e7c1",
+  "passed": true,
+  "physical_boot_approved": false,
+  "artifact": {
+    "anima_directory": "/home/kmatzen/.local/share/millennium-recovery/images/zero2w-ab-1.0.0-4a15bf6-phone001-unapproved",
+    "filename": "millennium-zero2w-ab-phone-001.img.zst",
+    "compressed_sha256": "882db51babb968e7eacd8d94062884ca3faa43139f25eca1f52c138f686d1474",
+    "compressed_size": 417350484,
+    "expanded_sha256": "277044c2d3e2332c07aa7849329ba2589a45136d1eb5110812218c12fd75f8ef",
+    "expanded_size": 15636365312,
+    "manifest_sha256": "5d1c5528db93eac7125af1c2296b5d402893345938358479292946a6a14f9522",
+    "signature_sha256": "ba32dfaa1ab127dd88d61af050a6afb87df38875ff91ea9d1658d2a3966abc83",
+    "public_key_file_sha256": "3325be09e2dd46e9e9bced682fe518af522a9d3d8305081ae8b171749c8f3bab"
+  },
+  "signing": {
+    "key_id": "release-2026-08",
+    "public_key_der_sha256": "581a1ff72d1867b3dfb3b1ffc5521308ac646878050f1c4c12739e0dedaf7348",
+    "public_identity_matched": true,
+    "signature_verified_on_mac": true,
+    "signature_verified_on_anima": true,
+    "plaintext_location": "temporary APFS RAM disk",
+    "plaintext_persisted": false,
+    "ram_device_ejected": true
+  },
+  "verification": {
+    "raw_mbr_partition_contract": true,
+    "raw_boot_content_contract": true,
+    "production_rootfs_minimality": true,
+    "canonical_manifest_verified": true,
+    "expanded_stream_verified_independently": true,
+    "local_evidence_sha256": "e336ed9157d3e249115b9c5fdeba69c5dc4bfabb6bb674b2342f786ef06bd367"
+  },
+  "qemu_end_to_end": {
+    "completed_at": "2026-09-09T12:09:00Z",
+    "host": "anima",
+    "full_software_lab_passed": true,
+    "full_result_sha256": "18c8c02f0ba148300b539636255108550e6547517477061bbaf6e402d2e2c4c2",
+    "exact_image_result_sha256": "75348c4d0e68e01b1368ea3f0074f85312873d6106e6aaa8ffe4bc5000cbf798",
+    "exact_factory_image_booted": true,
+    "exact_image_userspace": true,
+    "independent_captive_client_verified": true,
+    "production_wifi_service_identity_verified": true,
+    "external_update_and_maintenance_channels_verified": true,
+    "virtual_mcu_and_peripheral_faults_verified": true,
+    "abrupt_power_and_checkpoint_recovery_verified": true,
+    "qemu_machine": "virt",
+    "raspberry_pi_firmware_emulated": false,
+    "physical_hardware_claimed": false
+  },
+  "recovery_media_written": false,
+  "external_copy": {
+    "status": "verified",
+    "verified_at": "2026-09-09T15:08:00Z",
+    "directory": "/Volumes/UEBuild/millennium-images/zero2w-ab-1.0.0-4a15bf6-phone001-unapproved",
+    "all_four_sha256_values_matched": true,
+    "manifest_source_commit_matched": true,
+    "signature_verified": true,
+    "public_key_identity_verified": true,
+    "zstandard_stream_verified": true,
+    "used_laptop_internal_storage": false
+  },
+  "status": "software-verified, signed, externally staged, and retained as explicitly unapproved pending recovery-media write/readback and physical boot"
+}
