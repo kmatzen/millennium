@@ -32,12 +32,18 @@ extern daemon_state_data_t *daemon_state;
 
 static time_t sim_clock;
 
+/* 2000-01-01 12:00:00 UTC.  Scenario outcomes must not depend on the wall
+ * clock, host timezone, or the hour at which CI happens to start. */
+#define SIM_CLOCK_EPOCH ((time_t)946728000)
+
 static time_t sim_clock_now(void) {
     return sim_clock;
 }
 
 static void sim_time_init(void) {
-    sim_clock = time(NULL);
+    setenv("TZ", "UTC", 1);
+    tzset();
+    sim_clock = SIM_CLOCK_EPOCH;
     mclock_set_source(sim_clock_now);
 }
 
