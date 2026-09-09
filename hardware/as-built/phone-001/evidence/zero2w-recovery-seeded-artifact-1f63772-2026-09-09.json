@@ -1,0 +1,63 @@
+{
+  "schema": 1,
+  "operation": "production-recovery-artifact-factory-seed",
+  "completed_at": "2026-09-09T18:24:16Z",
+  "source_commit": "1f637722b3d2403308392e40912da2c5831ec5e7",
+  "application_payload_commit": "4a15bf63c9d4a44532d015f8212d44a2a987e7c1",
+  "test_harness_commit": "ff277828c6bf0b3f7bb6b6a95294e836c53e1c0a",
+  "passed": true,
+  "physical_boot_approved": false,
+  "artifact": {
+    "anima_directory": "/home/kmatzen/.local/share/millennium-recovery/images/zero2w-ab-1.0.0-1f63772-phone001-unapproved",
+    "filename": "millennium-zero2w-ab-phone-001.img.zst",
+    "compressed_sha256": "cb86f7347c76b25fc412c05e4830a0eef5dea39f4c2e16203fdc5bd799b5705a",
+    "compressed_size": 417952655,
+    "expanded_sha256": "aa1b2b0b1d5b312709666db22d6246ae0cfd921ba13cce595a59893ed5142e71",
+    "expanded_size": 15636365312,
+    "manifest_sha256": "76fecfddf4be130364eb174430c3a421ccfc7195e0ad12cd6238491d3cd32c55",
+    "signature_sha256": "1da14b3d23e75ad8ec8831e6f9129cdee3bee6e4399befa652466b59c0d67116",
+    "public_key_file_sha256": "3325be09e2dd46e9e9bced682fe518af522a9d3d8305081ae8b171749c8f3bab"
+  },
+  "signing": {
+    "key_id": "release-2026-08",
+    "public_key_der_sha256": "581a1ff72d1867b3dfb3b1ffc5521308ac646878050f1c4c12739e0dedaf7348",
+    "public_identity_matched": true,
+    "signature_verified_on_mac": true,
+    "signature_verified_on_anima": true,
+    "plaintext_location": "temporary APFS RAM disk",
+    "plaintext_persisted": false,
+    "ram_device_ejected": true
+  },
+  "verification": {
+    "raw_mbr_partition_contract": true,
+    "raw_boot_content_contract": true,
+    "production_rootfs_minimality": true,
+    "canonical_manifest_verified": true,
+    "expanded_stream_verified_independently": true
+  },
+  "qemu_end_to_end": {
+    "completed_at": "2026-09-09T18:20:21Z",
+    "host": "anima",
+    "artifact_directory": "/data2/millennium-build-1f63772/repo/tools/qemu/state/artifacts/full-20260909T171854Z",
+    "full_software_lab_passed": true,
+    "full_result_sha256": "09d8e2ab11695b2f09bdc0bcbae4d4a2aa7e64bc764649285ded6e8d7cf552ee",
+    "exact_image_result_sha256": "e1879065edfba47fcd4f49f6ca069419c6db1972687c3f6af17ae9924f4d257b",
+    "exact_factory_image_booted": true,
+    "exact_image_userspace": true,
+    "both_system_partitions_tested": true,
+    "production_daemon_executed_as_service_user": true,
+    "independent_captive_client_verified": true,
+    "production_wifi_service_identity_verified": true,
+    "external_update_and_maintenance_channels_verified": true,
+    "virtual_mcu_and_peripheral_faults_verified": true,
+    "abrupt_power_and_checkpoint_recovery_verified": true,
+    "qemu_machine": "virt",
+    "raspberry_pi_firmware_emulated": false,
+    "physical_hardware_claimed": false
+  },
+  "external_copy": {
+    "status": "pending explicit payload-and-destination approval"
+  },
+  "recovery_media_written": false,
+  "status": "software-verified and signed; external copy, recovery-media write/readback, and physical boot remain open"
+}

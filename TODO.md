@@ -110,9 +110,17 @@ with one assembled-hardware session and without repeating the network wiring.
       - [x] The signed `4a15bf6` replacement passed the exact-image and full
         QEMU gates, including the forced AP down/up recovery path, and is
         independently verified on `anima` and external `UEBuild`.
+      - [x] Retain `4a15bf6` as rejected physical evidence after its daemon
+        failed with `203/EXEC`: `/opt/millennium` was `root:root 0750`, so the
+        `millennium` service user could not traverse the installed path.
+      - [x] Correct the exact-image false positive, execute the production
+        daemon as its service user, reject `203/EXEC`, test both system slots,
+        normalize `/opt/millennium` to `root:root 0755`, and rebuild, sign, and
+        fully simulate the `1f63772` replacement without claiming physical
+        hardware fidelity.
     - [ ] Boot a non-quarantined verified recovery image on the
       production-equivalent Zero 2 W; the physically booted v3, `2ad5179`,
-      `7f94bdd`, `6f50d12`, `c9b01fb`, `d895b35`, and `98e018a` artifacts are
+      `7f94bdd`, `6f50d12`, `c9b01fb`, `d895b35`, `98e018a`, and `4a15bf6` artifacts are
       retained as failed evidence and must not be redeployed.
   - [ ] Exercise download, inactive-slot write, pre-reboot, first boot, health
     commit, and rollback in QEMU and by physically removing power on the

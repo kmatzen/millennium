@@ -18,11 +18,25 @@ Zero 2 W, radio, USB, audio, power, or first-time-user requirement.
   image length; its readback SHA-256 matched the signed expanded digest. The
   card was then safely ejected. Evidence is in
   `hardware/as-built/phone-001/evidence/recovery-media-phone001-4a15bf6.json`.
-  It remains unapproved pending physical acceptance. The
+  It is rejected: physical boot showed `daemon.service` failing with
+  `203/EXEC` because `/opt/millennium` was `root:root 0750` and the
+  unprivileged service user could not traverse it. The
   expanded image is
   `/data2/millennium-build-4a15bf6/phone001-4a15bf6.img`, is
   15,636,365,312 bytes, and has SHA-256
   `277044c2d3e2332c07aa7849329ba2589a45136d1eb5110812218c12fd75f8ef`.
+- Corrected image-layer source `1f637722b3d2403308392e40912da2c5831ec5e7`
+  normalizes `/opt` and `/opt/millennium` to `root:root 0755`. Test-harness
+  source `ff277828c6bf0b3f7bb6b6a95294e836c53e1c0a` eliminates the echoed-marker
+  false positive, tests both system slots, executes the production daemon as
+  user `millennium`, and rejects `203/EXEC`. The unchanged application payload
+  remains from `4a15bf6`. The corrected 15,636,365,312-byte factory image has
+  SHA-256 `aa1b2b0b1d5b312709666db22d6246ae0cfd921ba13cce595a59893ed5142e71`.
+  A fresh full QEMU lab passed at `2026-09-09T18:20:21Z`; its result SHA-256 is
+  `09d8e2ab11695b2f09bdc0bcbae4d4a2aa7e64bc764649285ded6e8d7cf552ee`.
+  The canonical recovery package is signed and independently verified on
+  macOS and `anima`; external staging and media write/readback remain open.
+  Evidence is in `hardware/as-built/phone-001/evidence/zero2w-recovery-seeded-artifact-1f63772-2026-09-09.json`.
 - The prior production images were built from earlier sources. The
   physically booted `6f50d12`, `c9b01fb`, `d895b35`, and `98e018a` candidates are
   rejected. Physical
@@ -86,8 +100,9 @@ image userspace tested and `physical_hardware_claimed: false`.
 
 ## Immediate execution order
 
-1. Boot and physically test the signed, externally staged, factory-seeded,
-   fully simulated, and fully read-back `4a15bf6` recovery card.
+1. Copy the signed `1f63772` package directly from `anima` to external
+   `UEBuild`, independently verify it there, then write/read back and physically
+   test that corrected recovery card. Do not redeploy rejected `4a15bf6`.
    Preserve the rejected `6f50d12`,
    `c9b01fb`, `d895b35`, and `98e018a` media/boot evidence without treating any as
    approval. Both Arduino MCUs are required for the physical health gate;

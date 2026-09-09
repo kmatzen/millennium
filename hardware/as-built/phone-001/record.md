@@ -698,3 +698,36 @@ Spotlight briefly dissented from the writer's first eject request; a subsequent
 eject succeeded after the indexing process released the volume. Evidence is in
 `evidence/recovery-media-phone001-4a15bf6.json`. Physical boot acceptance
 remains open.
+
+The read-back-verified `4a15bf6` card was subsequently rejected during physical
+boot. `daemon.service` failed with systemd `203/EXEC` and `Permission denied`:
+the image installed `/opt/millennium` as `root:root 0750`, preventing the
+unprivileged `millennium` service user from traversing the executable path.
+The earlier exact-image result was a false positive because the harness matched
+a marker substring echoed by systemd before its assertions ran. Corrective
+commits require an exact standalone result marker, boot both system partitions,
+execute the production daemon as user `millennium`, reject `203/EXEC`, and
+normalize `/opt` and `/opt/millennium` to `root:root 0755`.
+
+Corrected image-layer source `1f637722b3d2403308392e40912da2c5831ec5e7`
+was rebuilt and factory-seeded on `anima`; the unchanged application payload is
+from `4a15bf63c9d4a44532d015f8212d44a2a987e7c1`, and the final test harness is
+`ff277828c6bf0b3f7bb6b6a95294e836c53e1c0a`. The 15,636,365,312-byte image has
+SHA-256 `aa1b2b0b1d5b312709666db22d6246ae0cfd921ba13cce595a59893ed5142e71`.
+A fresh full QEMU lab passed both exact image slots, product-daemon execution,
+independent captive-portal credential handoff, virtual peripherals and injected
+faults, signed OTA and external-origin recovery, maintenance-tunnel recovery,
+signed experience lifecycle, disk exhaustion, network isolation, abrupt power
+cuts, and checkpoint restore. The full result SHA-256 is
+`09d8e2ab11695b2f09bdc0bcbae4d4a2aa7e64bc764649285ded6e8d7cf552ee`.
+Automated evidence explicitly records `physical_hardware_claimed: false`.
+
+The canonical corrected recovery package is signed by `release-2026-08`; the
+private key was recovered only on a temporary APFS RAM disk, its public identity
+matched the established trust root, the signature and complete expansion were
+verified independently on macOS and `anima`, and the RAM disk was ejected. The
+compressed SHA-256 is
+`cb86f7347c76b25fc412c05e4830a0eef5dea39f4c2e16203fdc5bd799b5705a`.
+External staging, recovery-media write/readback, and physical acceptance remain
+open. Exact automated evidence is in
+`evidence/zero2w-recovery-seeded-artifact-1f63772-2026-09-09.json`.
