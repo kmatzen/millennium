@@ -55,6 +55,9 @@ install -m 0755 wifi/millennium_wifi_portal.py \
 install -m 0644 systemd/millennium-wifi-bootstrap.service \
     systemd/millennium-wifi-helper.service \
     systemd/millennium-wifi-portal.service /etc/systemd/system/
+install -d -m 0700 /etc/NetworkManager/system-connections
+install -d -o millennium-wifi -g millennium-wifi -m 0700 \
+    /var/lib/millennium/wifi
 install -m 0644 "$SOURCE/tools/qemu/daemon.conf" /etc/millennium/daemon.conf
 cat >/etc/udev/rules.d/99-millennium-qemu.rules <<'EOF'
 KERNEL=="vport*", GROUP="dialout", MODE="0660"

@@ -66,6 +66,8 @@ class ExactImageHarnessTests(unittest.TestCase):
             "systemd-sysusers /usr/lib/sysusers.d/millennium-wifi.conf",
             "systemd/millennium-wifi-bootstrap.service",
             "wifi/millennium_wifi_helper.py",
+            "/etc/NetworkManager/system-connections",
+            "/var/lib/millennium/wifi",
         ):
             self.assertIn(expected, provision)
         for expected in (
