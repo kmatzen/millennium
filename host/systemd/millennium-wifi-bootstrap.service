@@ -7,6 +7,7 @@ Before=millennium-wifi-helper.service millennium-wifi-portal.service
 
 [Service]
 Type=oneshot
+Group=millennium-wifi
 ExecStart=/usr/local/libexec/millennium-wifi-bootstrap
 RuntimeDirectory=millennium-wifi
 RuntimeDirectoryMode=0750

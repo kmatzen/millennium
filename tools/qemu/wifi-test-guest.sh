@@ -11,6 +11,18 @@ grep -Fq 'oifname "wlan0" drop' host/firewall/wifi-setup.nft
 grep -Fq 'RuntimeMaxSec=900' host/systemd/millennium-wifi-helper.service
 grep -Fq 'ProtectSystem=strict' host/systemd/millennium-wifi-helper.service
 
+# Exercise systemd's real runtime-directory ownership.  The portal runs as the
+# unprivileged millennium-wifi user, while bootstrap creates and preserves the
+# directory before the privileged helper binds its group-writable socket.  A
+# source-level fixture previously bypassed this boundary and missed a physical
+# EACCES on every portal request.
+systemctl stop millennium-wifi-portal.service millennium-wifi-helper.service \
+    millennium-wifi-bootstrap.service >/dev/null 2>&1 || true
+rm -rf /run/millennium-wifi
+systemctl start millennium-wifi-bootstrap.service
+test "$(stat -c %U:%G /run/millennium-wifi)" = root:millennium-wifi
+runuser -u millennium-wifi -- test -x /run/millennium-wifi
+
 # Verify factory provisioning produces a private, stable handoff without
 # exposing its generated password in process arguments or world-readable data.
 work=$(mktemp -d)

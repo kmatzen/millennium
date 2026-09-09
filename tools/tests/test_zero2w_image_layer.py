@@ -27,6 +27,7 @@ class Zero2WImageLayerTests(unittest.TestCase):
         )
         self.assertIn("Wants=NetworkManager.service wpa_supplicant.service", unit)
         self.assertIn("After=NetworkManager.service wpa_supplicant.service", unit)
+        self.assertIn("Group=millennium-wifi", unit)
         self.assertIn("RuntimeDirectoryPreserve=yes", unit)
         self.assertIn(
             'chroot "$1" systemd-sysusers '
@@ -88,6 +89,8 @@ class Zero2WImageLayerTests(unittest.TestCase):
             )
         helper = WIFI_HELPER_UNIT.read_text()
         portal = WIFI_PORTAL_UNIT.read_text()
+        bootstrap = WIFI_BOOTSTRAP_UNIT.read_text()
+        self.assertIn("Group=millennium-wifi", bootstrap)
         self.assertIn("RuntimeMaxSec=900", helper)
         self.assertIn("Restart=no", helper)
         self.assertNotIn("Restart=on-failure", helper)
