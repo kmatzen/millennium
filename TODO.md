@@ -101,8 +101,9 @@ with one assembled-hardware session and without repeating the network wiring.
     - [x] Build, sign, fully simulate, write, and read back the corrected
       `d895b35` replacement; physical testing rejected it after measuring an
       AP-to-station transition longer than its retry window.
-    - [ ] Rebuild from `b496081` or later with the measured physical handoff
-      bound, then sign, simulate, write/read back, and physically accept it.
+    - [x] Rebuild from `b496081` or later with the measured physical handoff
+      bound, then sign, fully simulate, and write/read back the `98e018a`
+      replacement.
     - [ ] Boot a non-quarantined verified recovery image on the
       production-equivalent Zero 2 W; the physically booted v3, `2ad5179`,
       `7f94bdd`, `6f50d12`, `c9b01fb`, and `d895b35` artifacts are retained as

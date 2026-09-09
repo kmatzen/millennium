@@ -71,6 +71,14 @@ host directory through a read-only bind mount and does not require a restart.
 
 ## 1. Write and verify the corrected recovery card
 
+**The `98e018a` replacement card is written, fully verified, and safely
+ejected; boot this card next.** Its full physical readback matched signed
+expanded SHA-256
+`d02b6ee091542cc0ee7158a3e46aa4f3078738b545e275933d91b14bd4a759a6`.
+The exact seeded image and complete 17-layer QEMU lab passed. Evidence is in
+`evidence/recovery-media-phone001-98e018a.json`. It remains unapproved until
+physical boot and Wi-Fi handoff acceptance.
+
 **The `d895b35` replacement card was written and fully verified, but its
 physical boot is rejected.** Its complete readback matched signed expanded SHA-256
 `01273e50f108d50f361672b58b9ccfac98340685bede42a61c895dd91b6c23b9`

@@ -7,25 +7,33 @@ Zero 2 W, radio, USB, audio, power, or first-time-user requirement.
 ## Current repository state
 
 - Working branch: `main`.
-- The next production-image source must be `b496081` or later. The physically
-  booted `6f50d12`, `c9b01fb`, and `d895b35` candidates are rejected. Physical
+- The next physical candidate is `98e018af46a5f9a0fb4d3fbf045e64b4fb9bc190`.
+  It was built after the `b496081` measured handoff fix, factory-seeded,
+  signed, fully simulated, written, read back, and safely ejected. The
+  physically booted `6f50d12`, `c9b01fb`, and `d895b35` candidates are
+  rejected. Physical
   `d895b35` tracing proved the Zero 2 W AP-to-station transition can exceed
   seven seconds, while its helper stopped retrying after four; `b496081`
   extends the bounded retry window and adds the measured-delay regression.
-- The `d895b35` factory-seeded candidate is signed, independently verified,
+- The `98e018a` factory-seeded candidate is signed and verified. Its compressed
+  SHA-256 is `62dff50153247725982648819caa0d1f2cd9d755a679264dadb89964c46df795`;
+  its expanded and readback SHA-256 is
+  `d02b6ee091542cc0ee7158a3e46aa4f3078738b545e275933d91b14bd4a759a6`.
+  Media evidence is in
+  `hardware/as-built/phone-001/evidence/recovery-media-phone001-98e018a.json`.
+- The rejected `d895b35` factory-seeded candidate is signed, independently verified,
   retained on `anima`, copied directly to external `UEBuild`, written to the
   dedicated 63.9 GB recovery card, and fully read back. Its compressed SHA-256
   is `d0bba17c794f1980e23a933fea716552f74d2bee8fd103906d1e84235d9c80e7`;
   its expanded and readback SHA-256 is
   `01273e50f108d50f361672b58b9ccfac98340685bede42a61c895dd91b6c23b9`.
 - The complete 17-layer QEMU software lab passed at
-  `2026-09-08T22:31:39Z`, including the exact factory image's userspace,
+  `2026-09-09T00:52:27Z`, including the exact `98e018a` factory image's userspace,
   external captive-portal client, OTA origin and failures, maintenance tunnel,
   virtual MCU/peripheral faults, A/B recovery, experiences, and abrupt power.
   Exact evidence is in
-  `/data2/millennium-build-d895b35/repo/tools/qemu/state/artifacts/full-20260908T223139Z/`
-  on `anima`. Media evidence is in
-  `hardware/as-built/phone-001/evidence/recovery-media-phone001-d895b35.json`.
+  `/data2/millennium-build-98e018a/repo/tools/qemu/state/artifacts/full-20260909T005227Z/`
+  on `anima`.
 - Latest completed downloadable-experience commits:
   - `f53b54c` — generated package/catalog schemas and compatibility metadata;
   - `d35f4fa` — deterministic schema-2 packages, bounded extraction, exact file
@@ -51,14 +59,13 @@ Zero 2 W, radio, USB, audio, power, or first-time-user requirement.
 
 Large QEMU and image artifacts intentionally live on `anima` and external
 `UEBuild`, not laptop internal storage. The latest complete QEMU evidence is
-`/data2/millennium-build-d895b35/repo/tools/qemu/state/artifacts/full-20260908T223139Z/`
+`/data2/millennium-build-98e018a/repo/tools/qemu/state/artifacts/full-20260909T005227Z/`
 on `anima`; its `full-test-result.json` records a pass with exact production
 image userspace tested and `physical_hardware_claimed: false`.
 
 ## Immediate execution order
 
-1. Build, factory-seed, sign, fully simulate, write/read back, and physically
-   boot a replacement from `b496081` or later. Preserve the rejected `6f50d12`,
+1. Physically boot and Wi-Fi-test the written `98e018a` replacement. Preserve the rejected `6f50d12`,
    `c9b01fb`, and `d895b35` media/boot evidence without treating any as
    approval. Both Arduino MCUs are required for the physical health gate;
    phone peripherals may be absent only for explicitly scoped platform
