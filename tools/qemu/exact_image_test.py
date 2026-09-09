@@ -62,10 +62,10 @@ def shell_commands() -> bytes:
     unit = (
         "[Unit]",
         "Description=QEMU exact-image acceptance",
-        "Requires=dbus.service systemd-resolved.service NetworkManager.service persistent.mount "
+        "Requires=dbus.service systemd-resolved.service NetworkManager.service daemon.service persistent.mount "
         "boot-firmware.mount bootfs.mount nftables.service "
         "millennium-firewall.service",
-        "After=dbus.service systemd-resolved.service NetworkManager.service persistent.mount "
+        "After=dbus.service systemd-resolved.service NetworkManager.service daemon.service persistent.mount "
         "boot-firmware.mount bootfs.mount nftables.service "
         "millennium-firewall.service local-fs.target",
         "[Service]",
@@ -73,6 +73,7 @@ def shell_commands() -> bytes:
         "ExecStart=/bin/sh -c 'systemctl is-active --quiet dbus.service && "
         "systemctl is-active --quiet systemd-resolved.service && "
         "systemctl is-active --quiet NetworkManager.service && "
+        "systemctl is-active --quiet daemon.service && "
         "systemctl is-active --quiet boot-firmware.mount && "
         "systemctl is-active --quiet bootfs.mount && "
         "systemctl is-active --quiet nftables.service && "
@@ -82,6 +83,12 @@ def shell_commands() -> bytes:
         "mountpoint -q /bootfs && "
         "runuser -u messagebus -- test -x /usr/bin/dbus-daemon && "
         "runuser -u systemd-resolve -- test -r /etc/systemd/resolved.conf && "
+        # Exercise the effective production ExecStart boundary. Testing only
+        # base OS services allowed an untraversable /opt release to pass.
+        "runuser -u millennium -- test -x "
+        "/opt/millennium/current/host/millennium-daemon && "
+        "runuser -u millennium -- "
+        "/opt/millennium/current/host/millennium-daemon --version && "
         # Reproduce the physical dual-link case: the maintenance Ethernet
         # profile must never install a default route while owner Wi-Fi is the
         # upstream connection.  Check the assembled image, not just source.

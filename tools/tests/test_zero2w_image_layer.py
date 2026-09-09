@@ -126,7 +126,16 @@ class Zero2WImageLayerTests(unittest.TestCase):
         cleanup_text = text[text.index("  cleanup-hooks:"):]
 
         self.assertIn(
-            'find "$1/etc" "$1/usr" -xdev -type d -uid 1000',
+            'find "$1/etc" "$1/opt" "$1/usr" -xdev -type d -uid 1000',
             cleanup_text,
         )
         self.assertIn('-exec chown 0:0 {} + -exec chmod o+rx {} +', cleanup_text)
+
+    def test_production_release_is_traversable_by_service_account(self) -> None:
+        text = LAYER.read_text()
+        cleanup_text = text[text.index("  cleanup-hooks:"):]
+
+        self.assertIn('chown 0:0 "$1/opt"', cleanup_text)
+        self.assertIn('chmod 0755 "$1/opt"', cleanup_text)
+        self.assertIn('"$1/opt"', cleanup_text)
+        self.assertIn('chmod o+rx', cleanup_text)

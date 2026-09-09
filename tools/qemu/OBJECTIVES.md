@@ -88,6 +88,8 @@ booted Raspberry Pi firmware or the Zero 2 W disk image.
 - [x] Fail on the directory-permission regressions observed on physical cards
   and retain the full serial transcript plus a machine-readable fidelity
   statement.
+- [x] Require `daemon.service` and execute the selected production daemon as
+  its real unprivileged account, including traversal of `/opt/millennium`.
 - [x] Require both FAT boot partitions, nftables, and the Millennium firewall;
   reject generic transport initramfs images that omit their kernel modules.
 

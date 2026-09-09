@@ -204,9 +204,10 @@ The harness creates a disposable copy-on-write overlay, boots partition 5,
 injects `/dev/vda1`, `vda2`, `vda5`, and `vda7` as the production slot names
 through ephemeral udev rules, and starts the image's own systemd. It requires
 the persistent/shared mount graph, both FAT boot partitions, D-Bus, resolver,
-nftables, and the Millennium firewall to start under their real service
-accounts. It fails on the permission errors previously observed on the
-physical image and writes `console.log` plus `result.json` under
+nftables, the Millennium firewall, and the production daemon to start under
+their real service accounts. It also executes the selected daemon binary as
+the `millennium` account. It fails on the permission errors previously
+observed on the physical image and writes `console.log` plus `result.json` under
 `$MILLENNIUM_QEMU_STATE/exact-image/`.
 
 The output explicitly records `raspberry_pi_firmware_emulated: false` and
