@@ -22,6 +22,13 @@ class ExactImageHarnessTests(unittest.TestCase):
         self.assertIn(b'KERNEL=="vda5"', MODULE.shell_commands(5))
         self.assertIn(b'KERNEL=="vda6"', MODULE.shell_commands(6))
 
+    def test_qemu_entrypoint_requires_the_dual_slot_matrix(self):
+        entrypoint = MODULE_PATH.with_name("qemu.sh").read_text()
+        matrix = MODULE_PATH.with_name("exact_image_matrix.py").read_text()
+
+        self.assertIn('python3 "$SCRIPT_DIR/exact_image_matrix.py"', entrypoint)
+        self.assertIn("for partition in (5, 6):", matrix)
+
     def test_default_timeout_allows_slow_external_image_boot(self):
         self.assertEqual(MODULE.DEFAULT_TIMEOUT_SECONDS, 600)
 

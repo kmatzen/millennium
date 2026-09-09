@@ -200,7 +200,8 @@ export MILLENNIUM_QEMU_EXACT_INITRD=/path/to/initrd.img-arm64
 tools/qemu/qemu.sh exact-image-test
 ```
 
-The harness creates a disposable copy-on-write overlay, boots partition 5,
+The harness creates disposable copy-on-write overlays and boots both immutable
+system partitions (5 and 6),
 injects `/dev/vda1`, `vda2`, `vda5`, and `vda7` as the production slot names
 through ephemeral udev rules, and starts the image's own systemd. It requires
 the persistent/shared mount graph, both FAT boot partitions, D-Bus, resolver,

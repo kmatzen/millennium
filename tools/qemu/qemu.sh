@@ -587,7 +587,7 @@ exact_image_test() {
     test -n "$kernel" || die "set MILLENNIUM_QEMU_EXACT_KERNEL to a QEMU-virt arm64 kernel"
     test -n "$initrd" || die "set MILLENNIUM_QEMU_EXACT_INITRD to its initramfs"
     mkdir -p "$STATE_DIR/exact-image"
-    python3 "$SCRIPT_DIR/exact_image_test.py" \
+    python3 "$SCRIPT_DIR/exact_image_matrix.py" \
         --image "$image" --kernel "$kernel" --initrd "$initrd" \
         --output "$STATE_DIR/exact-image"
 }
