@@ -115,7 +115,29 @@ class WifiTests(unittest.TestCase):
             })
 
         self.assertFalse(connected)
-        self.assertEqual(len(attempts), 5)
+        self.assertEqual(len(attempts), 20)
+
+    def test_owner_activation_covers_measured_zero2w_ap_handoff(self):
+        attempts = []
+
+        def run(arguments, **unused):
+            if arguments[-3:] == ["connection", "up", wifi.OWNER_CONNECTION]:
+                attempts.append(arguments)
+                return Result(returncode=10 if len(attempts) < 9 else 0)
+            return Result()
+
+        sleeps = []
+        with tempfile.TemporaryDirectory() as directory:
+            manager = wifi.NetworkManager(run=run, profile_dir=directory,
+                                          sleep=sleeps.append)
+            connected = manager.apply_owner({
+                "ssid": "home", "security": "wpa-psk",
+                "passphrase": "password1", "hidden": False,
+            })
+
+        self.assertTrue(connected)
+        self.assertEqual(len(attempts), 9)
+        self.assertEqual(sleeps, [1] * 8)
 
     def test_scan_deduplicates_and_sorts(self):
         output = "weak:WPA2:20\nstrong:WPA2:90\nstrong:WPA2:80\n:--:100\n"

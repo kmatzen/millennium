@@ -180,12 +180,15 @@ class NetworkManager:
         # The same radio can remain temporarily unavailable while
         # NetworkManager transitions it out of AP mode.  Retry this bounded
         # handoff instead of rejecting otherwise valid credentials.
-        for attempt in range(5):
+        # The Zero 2 W's brcmfmac radio can take more than seven seconds to
+        # become usable after leaving AP mode.  Keep retrying long enough to
+        # cover that measured transition, while retaining a hard bound.
+        for attempt in range(20):
             result = self.command("connection", "up", OWNER_CONNECTION,
                                   check=False)
             if result.returncode == 0:
                 return True
-            if attempt != 4:
+            if attempt != 19:
                 self.sleep(1)
         return False
 
