@@ -57,6 +57,7 @@ class ExactImageHarnessTests(unittest.TestCase):
             "millennium-wired.nmconnection",
             "grep -Fxc never-default=true",
             r"grep -Fqx no-auto-default=\*",
+            "/etc/NetworkManager/conf.d/10-millennium.conf",
             "nmcli -g ipv4.never-default connection show millennium-wired",
             "nmcli -g ipv6.never-default connection show millennium-wired",
             "grep -Fqx Restart=no",
