@@ -1,0 +1,22 @@
+{
+  "completed_at": "2026-09-09T02:03:00Z",
+  "device_id": "phone-001",
+  "operation": "physical-boot-rejection",
+  "passed": false,
+  "reason": "NetworkManager retained the setup AP profile as activated after brcmfmac stopped beaconing. The protected recovery trigger reloaded and raised the already-active profile without cycling it, so independent clients could not find the setup network.",
+  "safe_observations": {
+    "embedded_source_commit": "98e018af46a5",
+    "independent_mac_scan_found_setup_ap": false,
+    "networkmanager_reported_setup_activated": true,
+    "portal_local_http_status": 200,
+    "portal_service_active": true,
+    "root_read_only": true,
+    "setup_helper_active": true,
+    "system_state": "running",
+    "wired_address": "192.168.8.239"
+  },
+  "schema": 1,
+  "source_commit": "98e018af46a5f9a0fb4d3fbf045e64b4fb9bc190",
+  "superseding_fix_commit": "6dad08e",
+  "wifi_credentials_stored": false
+}

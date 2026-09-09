@@ -104,10 +104,13 @@ with one assembled-hardware session and without repeating the network wiring.
     - [x] Rebuild from `b496081` or later with the measured physical handoff
       bound, then sign, fully simulate, and write/read back the `98e018a`
       replacement.
+    - [ ] Rebuild from `6dad08e` or later after physical testing found an
+      activated-but-not-beaconing setup AP; require recovery to cycle the AP
+      before physical acceptance.
     - [ ] Boot a non-quarantined verified recovery image on the
       production-equivalent Zero 2 W; the physically booted v3, `2ad5179`,
-      `7f94bdd`, `6f50d12`, `c9b01fb`, and `d895b35` artifacts are retained as
-      failed evidence and must not be redeployed.
+      `7f94bdd`, `6f50d12`, `c9b01fb`, `d895b35`, and `98e018a` artifacts are
+      retained as failed evidence and must not be redeployed.
   - [ ] Exercise download, inactive-slot write, pre-reboot, first boot, health
     commit, and rollback in QEMU and by physically removing power on the
     production-equivalent Zero 2 W image.

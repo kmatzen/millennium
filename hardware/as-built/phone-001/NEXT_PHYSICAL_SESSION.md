@@ -71,13 +71,17 @@ host directory through a read-only bind mount and does not require a restart.
 
 ## 1. Write and verify the corrected recovery card
 
-**The `98e018a` replacement card is written, fully verified, and safely
-ejected; boot this card next.** Its full physical readback matched signed
+**The `98e018a` replacement card was written and fully verified, but its
+physical boot is rejected.** Its full physical readback matched signed
 expanded SHA-256
 `d02b6ee091542cc0ee7158a3e46aa4f3078738b545e275933d91b14bd4a759a6`.
 The exact seeded image and complete 17-layer QEMU lab passed. Evidence is in
-`evidence/recovery-media-phone001-98e018a.json`. It remains unapproved until
-physical boot and Wi-Fi handoff acceptance.
+`evidence/recovery-media-phone001-98e018a.json`. Physical testing found that
+NetworkManager could report the setup AP active after brcmfmac stopped
+beaconing; recovery did not cycle that stale connection. Build, simulate,
+sign, write/read back, and boot a replacement from `6dad08e` or later. Exact
+rejection evidence is in
+`evidence/physical-boot-rejection-98e018a-2026-09-09.json`.
 
 **The `d895b35` replacement card was written and fully verified, but its
 physical boot is rejected.** Its complete readback matched signed expanded SHA-256

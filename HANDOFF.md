@@ -7,14 +7,14 @@ Zero 2 W, radio, USB, audio, power, or first-time-user requirement.
 ## Current repository state
 
 - Working branch: `main`.
-- The next physical candidate is `98e018af46a5f9a0fb4d3fbf045e64b4fb9bc190`.
-  It was built after the `b496081` measured handoff fix, factory-seeded,
-  signed, fully simulated, written, read back, and safely ejected. The
-  physically booted `6f50d12`, `c9b01fb`, and `d895b35` candidates are
+- The next production image must be built from `6dad08e` or later. The
+  physically booted `6f50d12`, `c9b01fb`, `d895b35`, and `98e018a` candidates are
   rejected. Physical
   `d895b35` tracing proved the Zero 2 W AP-to-station transition can exceed
   seven seconds, while its helper stopped retrying after four; `b496081`
   extends the bounded retry window and adds the measured-delay regression.
+  The `98e018a` boot then exposed an activated-but-not-beaconing setup AP;
+  `6dad08e` forces every setup/recovery start through a down/up cycle.
 - The `98e018a` factory-seeded candidate is signed and verified. Its compressed
   SHA-256 is `62dff50153247725982648819caa0d1f2cd9d755a679264dadb89964c46df795`;
   its expanded and readback SHA-256 is
@@ -65,8 +65,9 @@ image userspace tested and `physical_hardware_claimed: false`.
 
 ## Immediate execution order
 
-1. Physically boot and Wi-Fi-test the written `98e018a` replacement. Preserve the rejected `6f50d12`,
-   `c9b01fb`, and `d895b35` media/boot evidence without treating any as
+1. Build, seed, sign, simulate, write/read back, and physically Wi-Fi-test a
+   replacement from `6dad08e` or later. Preserve the rejected `6f50d12`,
+   `c9b01fb`, `d895b35`, and `98e018a` media/boot evidence without treating any as
    approval. Both Arduino MCUs are required for the physical health gate;
    phone peripherals may be absent only for explicitly scoped platform
    validation.
