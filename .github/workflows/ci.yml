@@ -46,6 +46,8 @@ jobs:
           python3 tools/generate_coverage_inventory.py --check
           python3 tools/coverage_ledger.py validate
           python3 tools/tests/test_acceptance_evidence.py
+          python3 tools/tests/test_release_gate.py
+          python3 tools/qemu/test_exact_image.py
           python3 host/tests/test_maintenance_repair.py
 
   # Second opinion from clang (#237). The two compilers implement different

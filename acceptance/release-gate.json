@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "required_local_suites": ["host", "contracts"],
+  "required_qemu_acceptance": [
+    "virtual-mcu-unit",
+    "appliance-smoke",
+    "lifecycle",
+    "power-recovery",
+    "peripheral-faults",
+    "signed-ota",
+    "ota-faults",
+    "ota-external-origin",
+    "wifi-onboarding",
+    "wifi-independent-client",
+    "maintenance-external-tunnel",
+    "offline-experience",
+    "signed-experience-lifecycle",
+    "experience-power-recovery",
+    "production-image-contracts",
+    "exact-production-image-userspace",
+    "evidence-export"
+  ],
+  "require_exact_production_image": true,
+  "forbid_physical_hardware_claim": true,
+  "unresolved_physical_work": "python3 tools/coverage_ledger.py physical-plan"
+}

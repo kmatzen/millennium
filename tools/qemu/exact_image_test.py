@@ -101,6 +101,14 @@ def shell_commands() -> bytes:
         "/etc/systemd/system/millennium-wifi-helper.service && "
         "grep -Fqx BindsTo=millennium-wifi-helper.service "
         "/etc/systemd/system/millennium-wifi-portal.service && "
+        # Validate the effective systemd identity boundary on the assembled
+        # image.  Merely inspecting the unit text missed a real deployment
+        # failure where the portal user could not traverse this directory.
+        "test \"$(stat -c %U:%G:%a /run/millennium-wifi)\" "
+        "= root:millennium-wifi:750 && "
+        "runuser -u millennium-wifi -- test -x /run/millennium-wifi && "
+        "test \"$(systemctl show -p Group --value "
+        "millennium-wifi-bootstrap.service)\" = millennium-wifi && "
         # Octal-encode the suffixes so the serial echo of this injected unit
         # cannot itself contain either result marker.
         "printf \"MILLENNIUM_EXACT_IMAGE_\\120\\101\\123\\123\\n\" "
@@ -220,6 +228,7 @@ def main() -> int:
             microsecond=0).isoformat().replace("+00:00", "Z"),
         "qemu_machine": "virt",
         "exact_image_userspace": True,
+        "image_size": args.image.stat().st_size,
         "raspberry_pi_firmware_emulated": False,
         "physical_hardware_claimed": False,
         "console_log": str(log_path.resolve()),

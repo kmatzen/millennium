@@ -25,3 +25,8 @@ claims without an explicit mock limitation and linked procedure.
 Run local suites with `tools/coverage_ledger.py run-automated --suite host
 --suite contracts`. Run the `qemu` suite on `anima`; QEMU evidence never
 substitutes for an item marked `physical-only`.
+
+The complete release procedure and regression rule are in
+`docs/TESTING_STRATEGY.md`. `tools/release_gate.py` is the final automated
+verdict: it rejects stale commits, incomplete QEMU runs, generic-guest-only
+evidence, exact-image failures, failed local suites, and false physical claims.

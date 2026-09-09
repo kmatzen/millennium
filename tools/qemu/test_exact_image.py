@@ -42,12 +42,20 @@ class ExactImageHarnessTests(unittest.TestCase):
             "grep -Fqx Restart=no",
             "grep -Fqx RuntimeMaxSec=900",
             "grep -Fqx BindsTo=millennium-wifi-helper.service",
+            "stat -c %U:%G:%a /run/millennium-wifi",
+            "root:millennium-wifi:750",
+            "runuser -u millennium-wifi -- test -x /run/millennium-wifi",
+            "systemctl show -p Group --value",
         ):
             self.assertIn(expected, commands)
         self.assertNotIn(MODULE.PASS_MARKER, commands)
         self.assertNotIn(MODULE.FAIL_MARKER, commands)
         self.assertIn(r"\120\101\123\123", commands)
         self.assertIn(r"\106\101\111\114", commands)
+
+    def test_result_records_the_exact_image_size(self):
+        source = MODULE_PATH.read_text(encoding="utf-8")
+        self.assertIn('"image_size": args.image.stat().st_size', source)
 
     def test_forbidden_failures_cover_the_physical_regressions(self):
         forbidden = "\n".join(MODULE.FORBIDDEN)

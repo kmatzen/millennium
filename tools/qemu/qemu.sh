@@ -407,7 +407,8 @@ full_test() {
     recovery_test
     local artifact
     artifact=$(collect_artifacts "$run")
-    python3 - "$artifact/full-test-result.json" "$exact_image_ran" <<'PY'
+    python3 - "$artifact/full-test-result.json" "$exact_image_ran" \
+        "$(git -C "$REPO_DIR" rev-parse HEAD)" <<'PY'
 import datetime, json, pathlib, sys
 acceptance = ["virtual-mcu-unit", "appliance-smoke", "lifecycle", "power-recovery",
               "peripheral-faults", "signed-ota", "ota-faults", "ota-external-origin", "wifi-onboarding",
@@ -415,10 +416,12 @@ acceptance = ["virtual-mcu-unit", "appliance-smoke", "lifecycle", "power-recover
               "maintenance-external-tunnel",
               "offline-experience", "signed-experience-lifecycle", "experience-power-recovery", "production-image-contracts", "evidence-export"]
 exact_image = sys.argv[2] == "true"
+source_commit = sys.argv[3]
 if exact_image:
     acceptance.append("exact-production-image-userspace")
 result = {"schema": 1, "passed": True, "physical_hardware_claimed": False,
           "exact_production_image_tested": exact_image,
+          "source_commit": source_commit,
           "completed_at": datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat(),
           "acceptance": acceptance}
 pathlib.Path(sys.argv[1]).write_text(json.dumps(result, indent=2, sort_keys=True) + "\n")
