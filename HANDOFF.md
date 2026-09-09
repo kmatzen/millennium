@@ -60,18 +60,17 @@ Zero 2 W, radio, USB, audio, power, or first-time-user requirement.
   is `d0bba17c794f1980e23a933fea716552f74d2bee8fd103906d1e84235d9c80e7`;
   its expanded and readback SHA-256 is
   `01273e50f108d50f361672b58b9ccfac98340685bede42a61c895dd91b6c23b9`.
-- The final commit-bound QEMU software lab passed at
-  `2026-09-09T12:09Z`, including the exact `4a15bf6` factory image's userspace,
+- The latest commit-bound QEMU software lab passed at
+  `2026-09-09T18:20:21Z`, including both system slots of the exact corrected
+  `1f63772` factory image, production-daemon execution as its service user,
   external captive-portal client, OTA origin and failures, maintenance tunnel,
   virtual MCU/peripheral faults, A/B recovery, experiences, and abrupt power.
   Exact evidence is in
-  `/data2/millennium-build-4a15bf6/repo/tools/qemu/state/artifacts/full-20260909T115901Z/`
+  `/data2/millennium-build-1f63772/repo/tools/qemu/state/artifacts/full-20260909T171854Z/`
   on `anima`.
-- CI run `34346753149` passed all jobs for the same source commit. Local
-  commit-bound evidence is retained on `anima` as
-  `/data2/millennium-build-4a15bf6/local-evidence.json`. The final release gate
-  accepted all automated evidence while explicitly recording that no physical
-  hardware claim was made.
+- CI run `34381944039` passed all jobs for test-harness commit `ff27782`; CI run
+  `34377452413` passed image-layer commit `1f63772`. The full-test result
+  explicitly records that no physical hardware claim was made.
 - Latest completed downloadable-experience commits:
   - `f53b54c` — generated package/catalog schemas and compatibility metadata;
   - `d35f4fa` — deterministic schema-2 packages, bounded extraction, exact file
@@ -97,9 +96,9 @@ Zero 2 W, radio, USB, audio, power, or first-time-user requirement.
 
 Large QEMU and image artifacts intentionally live on `anima` and external
 `UEBuild`, not laptop internal storage. The latest complete QEMU evidence is
-`/data2/millennium-build-4a15bf6/repo/tools/qemu/state/artifacts/full-20260909T115901Z/`
+`/data2/millennium-build-1f63772/repo/tools/qemu/state/artifacts/full-20260909T171854Z/`
 on `anima`; its `full-test-result.json` records a pass with exact production
-image userspace tested and `physical_hardware_claimed: false`.
+image userspace tested in both system slots and `physical_hardware_claimed: false`.
 
 ## Immediate execution order
 
@@ -107,7 +106,7 @@ image userspace tested and `physical_hardware_claimed: false`.
    physically test that corrected recovery card. Do not redeploy rejected
    `4a15bf6`.
    Preserve the rejected `6f50d12`,
-   `c9b01fb`, `d895b35`, and `98e018a` media/boot evidence without treating any as
+   `c9b01fb`, `d895b35`, `98e018a`, and `4a15bf6` media/boot evidence without treating any as
    approval. Both Arduino MCUs are required for the physical health gate;
    phone peripherals may be absent only for explicitly scoped platform
    validation.
@@ -143,10 +142,10 @@ For full appliance changes, run the retained exact image on `anima`:
 ```sh
 /opt/homebrew/bin/ssh anima \
   'docker exec \
-    -e MILLENNIUM_QEMU_EXACT_IMAGE=/image/phone001-4a15bf6.img \
+    -e MILLENNIUM_QEMU_EXACT_IMAGE=/image/phone001-1f63772.img \
     -e MILLENNIUM_QEMU_EXACT_KERNEL=/workspace/tools/qemu/state/exact-vmlinuz \
     -e MILLENNIUM_QEMU_EXACT_INITRD=/workspace/tools/qemu/state/exact-initrd \
-    millennium-qemu-final-4a15bf6 tools/qemu/qemu.sh full-test'
+    millennium-qemu-final-1f63772 tools/qemu/qemu.sh full-test'
 ```
 
 The custom transport initramfs includes FAT, charset, and nftables modules.

@@ -71,25 +71,34 @@ host directory through a read-only bind mount and does not require a restart.
 
 ## 1. Write and verify the corrected recovery card
 
-**Current candidate `4a15bf6` is built, factory-seeded, and accepted by every
-automated gate, but it is not physically approved.** The exact seeded image is
-retained on `anima` at
-`/data2/millennium-build-4a15bf6/phone001-4a15bf6.img`; its expanded SHA-256 is
-`277044c2d3e2332c07aa7849329ba2589a45136d1eb5110812218c12fd75f8ef` and
-its size is 15,636,365,312 bytes. Full QEMU evidence is in
-`/data2/millennium-build-4a15bf6/repo/tools/qemu/state/artifacts/full-20260909T115901Z/`.
-Its compressed recovery artifact and canonical manifest are now signed with
-the active offline release key and independently verified on macOS, `anima`,
-and the non-overwriting external `UEBuild` copy. All four hashes, the public-key
+**Current candidate `1f63772` is built, factory-seeded, signed, and accepted by
+every automated gate, but it is not physically approved.** Its unchanged
+application payload is from `4a15bf6`; the image-layer correction is
+`1f63772`, and the final exact-image harness is `ff27782`. The exact seeded
+image is retained on `anima` at
+`/data2/millennium-build-1f63772/phone001-1f63772.img`; its expanded SHA-256 is
+`aa1b2b0b1d5b312709666db22d6246ae0cfd921ba13cce595a59893ed5142e71`
+and its size is 15,636,365,312 bytes. Full QEMU evidence is in
+`/data2/millennium-build-1f63772/repo/tools/qemu/state/artifacts/full-20260909T171854Z/`.
+Its compressed recovery artifact and canonical manifest are signed with the
+active offline release key and independently verified on macOS, `anima`, and
+the non-overwriting external `UEBuild` copy. All four hashes, the public-key
 identity, signature, and complete expanded stream match without using laptop
 internal storage. Exact evidence is in
-`evidence/zero2w-recovery-seeded-artifact-4a15bf6-2026-09-09.json`. The
-dedicated 63.9 GB card was written on 2026-09-09, flushed, read back over the
-complete 15,636,365,312-byte image length, and matched signed expanded SHA-256
-`277044c2d3e2332c07aa7849329ba2589a45136d1eb5110812218c12fd75f8ef`.
-It was safely ejected. Exact evidence is in
-`evidence/recovery-media-phone001-4a15bf6.json`. Insert and boot this card; do
+`evidence/zero2w-recovery-seeded-artifact-1f63772-2026-09-09.json`. Write this
+package to the dedicated recovery card, verify the complete image-length
+readback against the signed expanded SHA-256, safely eject it, and boot it. Do
 not use any predecessor card for acceptance.
+
+**The `4a15bf6` card was written and fully read back, but its physical boot is
+rejected.** `daemon.service` failed with systemd `203/EXEC` because the image
+installed `/opt/millennium` as `root:root 0750`; the unprivileged `millennium`
+service user could not traverse the executable path. The previous exact-image
+test had accepted an echoed marker before its assertions ran. The `1f63772`
+replacement fixes both the image mode and the gate. Evidence is in
+`evidence/recovery-media-phone001-4a15bf6.json` and
+`evidence/zero2w-recovery-seeded-artifact-1f63772-2026-09-09.json`. Do not
+redeploy `4a15bf6`.
 
 **The `98e018a` replacement card was written and fully verified, but its
 physical boot is rejected.** Its full physical readback matched signed
