@@ -54,6 +54,7 @@ class ExactImageHarnessTests(unittest.TestCase):
             "runuser -u messagebus -- test -x /usr/bin/dbus-daemon",
             "runuser -u systemd-resolve -- test -r /etc/systemd/resolved.conf",
             "systemctl is-active --quiet NetworkManager.service",
+            "ExecMainStatus --value daemon.service",
             "millennium-wired.nmconnection",
             "grep -Fxc never-default=true",
             r"grep -Fqx no-auto-default=\*",
@@ -69,6 +70,7 @@ class ExactImageHarnessTests(unittest.TestCase):
             "systemctl show -p Group --value",
         ):
             self.assertIn(expected, commands)
+        self.assertNotIn("systemctl is-active --quiet daemon.service", commands)
         self.assertNotIn(MODULE.PASS_MARKER, commands)
         self.assertNotIn(MODULE.FAIL_MARKER, commands)
         self.assertIn(r"\120\101\123\123", commands)
