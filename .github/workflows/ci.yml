@@ -108,6 +108,7 @@ jobs:
           sudo install -d /usr/local/bin /usr/local/libexec
           sudo install -m 0755 host/daemon /usr/local/bin/millennium-daemon
           sudo install -m 0755 host/monitoring/millennium_backup.sh /usr/local/libexec/millennium-backup
+          sudo install -m 0755 content/experience_agent.py /usr/local/libexec/millennium-experience
           sudo install -m 0755 host/monitoring/millennium_hil_smoke.py /usr/local/libexec/millennium-hil-smoke
           sudo install -m 0755 host/ota/millennium_maintenance_tunnel.sh /usr/local/libexec/millennium-maintenance-tunnel
           sudo install -m 0755 host/monitoring/millennium_monitor.py /usr/local/libexec/millennium-monitor
