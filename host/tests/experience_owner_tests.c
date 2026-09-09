@@ -13,13 +13,16 @@ static void test_valid_controls_are_canonicalized(void) {
     char path[320];
     char value[256];
     FILE* stream;
+    size_t length;
     snprintf(path, sizeof(path), "%s/request.json", directory);
     TEST_ASSERT_EQ_INT(experience_owner_submit(directory,
         "{\"ignored\":1,\"id\":\"last-line\",\"action\":\"disable\"}"), 0);
     stream = fopen(path, "rb");
     TEST_ASSERT(stream != NULL);
     memset(value, 0, sizeof(value));
-    fread(value, 1, sizeof(value) - 1, stream);
+    length = fread(value, 1, sizeof(value) - 1, stream);
+    TEST_ASSERT(ferror(stream) == 0);
+    value[length] = '\0';
     fclose(stream);
     unlink(path);
     TEST_ASSERT(strcmp(value, "{\"action\":\"disable\",\"id\":\"last-line\"}\n") == 0);

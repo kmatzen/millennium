@@ -17,8 +17,7 @@ network_down=false
 
 stop_server() {
     test -n "$server_pid" || return 0
-    children=$(pgrep -P "$server_pid" 2>/dev/null || true)
-    test -z "$children" || kill $children >/dev/null 2>&1 || true
+    pkill -P "$server_pid" >/dev/null 2>&1 || true
     kill -- -"$server_pid" >/dev/null 2>&1 || true
     wait "$server_pid" 2>/dev/null || true
     server_pid=
