@@ -57,6 +57,25 @@ class ExactImageHarnessTests(unittest.TestCase):
         source = MODULE_PATH.read_text(encoding="utf-8")
         self.assertIn('"image_size": args.image.stat().st_size', source)
 
+    def test_generic_guest_installs_and_exercises_real_wifi_identities(self):
+        provision = MODULE_PATH.with_name("provision-guest.sh").read_text(
+            encoding="utf-8")
+        guest_test = MODULE_PATH.with_name("wifi-test-guest.sh").read_text(
+            encoding="utf-8")
+        for expected in (
+            "systemd-sysusers /usr/lib/sysusers.d/millennium-wifi.conf",
+            "systemd/millennium-wifi-bootstrap.service",
+            "wifi/millennium_wifi_helper.py",
+        ):
+            self.assertIn(expected, provision)
+        for expected in (
+            "systemctl start millennium-wifi-bootstrap.service",
+            "systemctl start millennium-wifi-helper.service",
+            "runuser -u millennium-wifi -- test -x /run/millennium-wifi",
+            'connection.connect("/run/millennium-wifi/helper.sock")',
+        ):
+            self.assertIn(expected, guest_test)
+
     def test_forbidden_failures_cover_the_physical_regressions(self):
         forbidden = "\n".join(MODULE.FORBIDDEN)
         self.assertIn("Failed to start dbus.service", forbidden)

@@ -19,6 +19,17 @@ grep -Fq 'ProtectSystem=strict' host/systemd/millennium-wifi-helper.service
 systemctl stop millennium-wifi-portal.service millennium-wifi-helper.service \
     millennium-wifi-bootstrap.service >/dev/null 2>&1 || true
 rm -rf /run/millennium-wifi
+# QEMU virt has no WLAN device. Replace only the radio/AP action while keeping
+# the production bootstrap unit's real Group and RuntimeDirectory directives.
+# The bootstrap state machine itself is covered above; this block specifically
+# tests the deployed systemd identity and helper socket boundary.
+mkdir -p /etc/systemd/system/millennium-wifi-bootstrap.service.d
+cat >/etc/systemd/system/millennium-wifi-bootstrap.service.d/qemu-radio.conf <<'EOF'
+[Service]
+ExecStart=
+ExecStart=/bin/true
+EOF
+systemctl daemon-reload
 systemctl start millennium-wifi-bootstrap.service
 test "$(stat -c %U:%G /run/millennium-wifi)" = root:millennium-wifi
 runuser -u millennium-wifi -- test -x /run/millennium-wifi

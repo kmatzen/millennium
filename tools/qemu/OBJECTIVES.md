@@ -110,6 +110,9 @@ power behavior. Those remain physical acceptance gates.
   Windows HTTP probes from isolated test clients.
 - [x] Prove setup clients cannot reach SSH, admin API, forwarding, or stored
   credentials while update and maintenance endpoints recover after success.
+- [x] Start the deployed Wi-Fi units with their real systemd identities and
+  prove the unprivileged portal account can traverse the runtime directory and
+  exchange a request over the privileged helper's group-owned socket.
 - [x] Establish the production reverse-SSH service against an external test
   server, traverse the forwarded port back into the guest, and prove it fails
   closed and reconnects after the server disappears and returns.

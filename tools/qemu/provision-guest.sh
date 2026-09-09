@@ -39,6 +39,22 @@ install -m 0755 ota/millennium_maintenance_tunnel.sh \
     /usr/local/libexec/millennium-maintenance-tunnel
 install -m 0644 systemd/millennium-maintenance-tunnel.service \
     /etc/systemd/system/millennium-maintenance-tunnel.service
+# Install the production Wi-Fi service boundary.  The guest has no emulated
+# WLAN, but must still exercise systemd's real users, groups, runtime-directory
+# ownership and the privileged broker socket instead of a permissive fixture.
+install -m 0644 systemd/millennium-wifi.sysusers \
+    /usr/lib/sysusers.d/millennium-wifi.conf
+systemd-sysusers /usr/lib/sysusers.d/millennium-wifi.conf
+install -m 0755 wifi/millennium_wifi.py /usr/local/libexec/millennium_wifi.py
+install -m 0755 wifi/millennium_wifi_bootstrap.py \
+    /usr/local/libexec/millennium-wifi-bootstrap
+install -m 0755 wifi/millennium_wifi_helper.py \
+    /usr/local/libexec/millennium-wifi-helper
+install -m 0755 wifi/millennium_wifi_portal.py \
+    /usr/local/libexec/millennium-wifi-portal
+install -m 0644 systemd/millennium-wifi-bootstrap.service \
+    systemd/millennium-wifi-helper.service \
+    systemd/millennium-wifi-portal.service /etc/systemd/system/
 install -m 0644 "$SOURCE/tools/qemu/daemon.conf" /etc/millennium/daemon.conf
 cat >/etc/udev/rules.d/99-millennium-qemu.rules <<'EOF'
 KERNEL=="vport*", GROUP="dialout", MODE="0660"
