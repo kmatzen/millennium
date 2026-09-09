@@ -36,6 +36,7 @@ pcb/*-erc.rpt
 host/unit_tests
 host/pjsip_smoke
 host/web_auth_tests
+host/experience_owner_tests
 host/daemon-override.conf.tmp
 host/audio/out/
 tools/qemu/state

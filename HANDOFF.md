@@ -7,7 +7,15 @@ Zero 2 W, radio, USB, audio, power, or first-time-user requirement.
 ## Current repository state
 
 - Working branch: `main`.
-- The next production image must be built from `6dad08e` or later. The
+- Candidate `4a15bf63c9d4a44532d015f8212d44a2a987e7c1` was built and
+  factory-seeded on `anima`. Its exact seeded image passed the commit-bound
+  automated release gate and remains unapproved pending recovery packaging,
+  signing, complete removable-media readback, and physical acceptance. The
+  expanded image is
+  `/data2/millennium-build-4a15bf6/phone001-4a15bf6.img`, is
+  15,636,365,312 bytes, and has SHA-256
+  `277044c2d3e2332c07aa7849329ba2589a45136d1eb5110812218c12fd75f8ef`.
+- The prior production images were built from earlier sources. The
   physically booted `6f50d12`, `c9b01fb`, `d895b35`, and `98e018a` candidates are
   rejected. Physical
   `d895b35` tracing proved the Zero 2 W AP-to-station transition can exceed
@@ -27,13 +35,18 @@ Zero 2 W, radio, USB, audio, power, or first-time-user requirement.
   is `d0bba17c794f1980e23a933fea716552f74d2bee8fd103906d1e84235d9c80e7`;
   its expanded and readback SHA-256 is
   `01273e50f108d50f361672b58b9ccfac98340685bede42a61c895dd91b6c23b9`.
-- The complete 17-layer QEMU software lab passed at
-  `2026-09-09T00:52:27Z`, including the exact `98e018a` factory image's userspace,
+- The final commit-bound QEMU software lab passed at
+  `2026-09-09T12:09Z`, including the exact `4a15bf6` factory image's userspace,
   external captive-portal client, OTA origin and failures, maintenance tunnel,
   virtual MCU/peripheral faults, A/B recovery, experiences, and abrupt power.
   Exact evidence is in
-  `/data2/millennium-build-98e018a/repo/tools/qemu/state/artifacts/full-20260909T005227Z/`
+  `/data2/millennium-build-4a15bf6/repo/tools/qemu/state/artifacts/full-20260909T115901Z/`
   on `anima`.
+- CI run `34346753149` passed all jobs for the same source commit. Local
+  commit-bound evidence is retained on `anima` as
+  `/data2/millennium-build-4a15bf6/local-evidence.json`. The final release gate
+  accepted all automated evidence while explicitly recording that no physical
+  hardware claim was made.
 - Latest completed downloadable-experience commits:
   - `f53b54c` — generated package/catalog schemas and compatibility metadata;
   - `d35f4fa` — deterministic schema-2 packages, bounded extraction, exact file
@@ -59,14 +72,15 @@ Zero 2 W, radio, USB, audio, power, or first-time-user requirement.
 
 Large QEMU and image artifacts intentionally live on `anima` and external
 `UEBuild`, not laptop internal storage. The latest complete QEMU evidence is
-`/data2/millennium-build-98e018a/repo/tools/qemu/state/artifacts/full-20260909T005227Z/`
+`/data2/millennium-build-4a15bf6/repo/tools/qemu/state/artifacts/full-20260909T115901Z/`
 on `anima`; its `full-test-result.json` records a pass with exact production
 image userspace tested and `physical_hardware_claimed: false`.
 
 ## Immediate execution order
 
-1. Build, seed, sign, simulate, write/read back, and physically Wi-Fi-test a
-   replacement from `6dad08e` or later. Preserve the rejected `6f50d12`,
+1. Compress and sign the already built, factory-seeded, fully simulated
+   `4a15bf6` replacement; then write/read it back and physically test it.
+   Preserve the rejected `6f50d12`,
    `c9b01fb`, `d895b35`, and `98e018a` media/boot evidence without treating any as
    approval. Both Arduino MCUs are required for the physical health gate;
    phone peripherals may be absent only for explicitly scoped platform
@@ -103,10 +117,10 @@ For full appliance changes, run the retained exact image on `anima`:
 ```sh
 /opt/homebrew/bin/ssh anima \
   'docker exec \
-    -e MILLENNIUM_QEMU_EXACT_IMAGE=/image/exact-6f50d12/phone001-6f50d12.img \
+    -e MILLENNIUM_QEMU_EXACT_IMAGE=/image/phone001-4a15bf6.img \
     -e MILLENNIUM_QEMU_EXACT_KERNEL=/workspace/tools/qemu/state/exact-vmlinuz \
     -e MILLENNIUM_QEMU_EXACT_INITRD=/workspace/tools/qemu/state/exact-initrd \
-    millennium-qemu-e2e-8ac303b tools/qemu/qemu.sh full-test'
+    millennium-qemu-final-4a15bf6 tools/qemu/qemu.sh full-test'
 ```
 
 The custom transport initramfs includes FAT, charset, and nftables modules.

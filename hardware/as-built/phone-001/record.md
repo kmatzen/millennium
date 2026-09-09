@@ -667,3 +667,16 @@ The dedicated 63.9 GB USB card was then written, flushed, completely read back,
 matched the signed expanded digest, and safely ejected. Exact media evidence is
 in `evidence/recovery-media-phone001-c9b01fb.json`. The candidate remains
 unapproved until physical boot acceptance.
+
+Source commit `4a15bf63c9d4a44532d015f8212d44a2a987e7c1` supersedes the
+software candidates above. Its factory-seeded 15,636,365,312-byte image has
+SHA-256 `277044c2d3e2332c07aa7849329ba2589a45136d1eb5110812218c12fd75f8ef`.
+The commit-bound local ledger, successful CI run `34346753149`, exact-image
+boot, independent captive-portal client, restricted Wi-Fi credential handoff,
+external update and maintenance channels, virtual peripheral faults,
+disk-exhaustion behavior, abrupt power cuts, and checkpoint recovery all
+passed the executable release gate. Evidence is retained on `anima` at
+`/data2/millennium-build-4a15bf6/repo/tools/qemu/state/artifacts/full-20260909T115901Z/`.
+This is automated evidence only. The image remains explicitly unapproved until
+it is recovery-packaged and signed, written and completely read back from
+dedicated removable media, and passes the physical-only gates.

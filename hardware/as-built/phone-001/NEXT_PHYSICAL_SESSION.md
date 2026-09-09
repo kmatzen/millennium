@@ -71,6 +71,18 @@ host directory through a read-only bind mount and does not require a restart.
 
 ## 1. Write and verify the corrected recovery card
 
+**Current candidate `4a15bf6` is built, factory-seeded, and accepted by every
+automated gate, but it is not physically approved.** The exact seeded image is
+retained on `anima` at
+`/data2/millennium-build-4a15bf6/phone001-4a15bf6.img`; its expanded SHA-256 is
+`277044c2d3e2332c07aa7849329ba2589a45136d1eb5110812218c12fd75f8ef` and
+its size is 15,636,365,312 bytes. Full QEMU evidence is in
+`/data2/millennium-build-4a15bf6/repo/tools/qemu/state/artifacts/full-20260909T115901Z/`.
+Before touching recovery media, compress this seeded image, create and sign its
+canonical recovery manifest with the active offline release key, independently
+verify the signature and full expanded stream, and stage it externally. Do not
+use any predecessor card for acceptance.
+
 **The `98e018a` replacement card was written and fully verified, but its
 physical boot is rejected.** Its full physical readback matched signed
 expanded SHA-256

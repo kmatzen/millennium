@@ -91,6 +91,9 @@ def load(path):
         file_name = procedure.split("#", 1)[0]
         if not file_name or not (ROOT / file_name).is_file():
             raise ValueError(f"physical gate {name}: procedure does not exist")
+        for field in ("evidence_command", "pass_criteria", "time_bound"):
+            if not isinstance(gate.get(field), str) or not gate[field].strip():
+                raise ValueError(f"physical gate {name}: missing {field}")
     inventory = json.loads(INVENTORY.read_text(encoding="utf-8"))
     if inventory.get("schema") != 1 or not isinstance(inventory.get("items"), list):
         raise ValueError("invalid generated item inventory")
@@ -149,8 +152,12 @@ def main():
             for gate in item.get("physical", []):
                 consumers[gate].append(item["id"])
         for name, gate in value["physical_gates"].items():
-            print(f"#{gate['issue']}\t{name}\t{gate['procedure']}\t" +
-                  ",".join(consumers[name]))
+            print(f"#{gate['issue']}\t{name}\n"
+                  f"  procedure: {gate['procedure']}\n"
+                  f"  evidence: {gate['evidence_command']}\n"
+                  f"  pass: {gate['pass_criteria']}\n"
+                  f"  bound: {gate['time_bound']}\n"
+                  f"  covers: {','.join(consumers[name])}")
         return
     selected = args.suite or list(value["automated_suites"])
     unknown = sorted(set(selected) - set(value["automated_suites"]))

@@ -21,6 +21,10 @@ function group in `coverage.json`, and add the strongest feasible automated
 suite. CI rejects stale inventory, missing source files, missing suite commands,
 unowned items, unknown gates, omitted fidelity/fault profiles, and physical
 claims without an explicit mock limitation and linked procedure.
+Every physical gate is also machine-required to name its evidence-capture
+command, exact pass criteria, and time bound. `physical-plan` prints those
+fields so the final session is a finite measurement plan rather than an
+open-ended checklist.
 
 Run local suites with `tools/coverage_ledger.py run-automated --suite host
 --suite contracts`. Run the `qemu` suite on `anima`; QEMU evidence never
