@@ -104,9 +104,12 @@ with one assembled-hardware session and without repeating the network wiring.
     - [x] Rebuild from `b496081` or later with the measured physical handoff
       bound, then sign, fully simulate, and write/read back the `98e018a`
       replacement.
-    - [ ] Rebuild from `6dad08e` or later after physical testing found an
+    - [x] Rebuild from `6dad08e` or later after physical testing found an
       activated-but-not-beaconing setup AP; require recovery to cycle the AP
       before physical acceptance.
+      - [x] The signed `4a15bf6` replacement passed the exact-image and full
+        QEMU gates, including the forced AP down/up recovery path, and is
+        independently verified on `anima` and external `UEBuild`.
     - [ ] Boot a non-quarantined verified recovery image on the
       production-equivalent Zero 2 W; the physically booted v3, `2ad5179`,
       `7f94bdd`, `6f50d12`, `c9b01fb`, `d895b35`, and `98e018a` artifacts are
