@@ -686,5 +686,15 @@ signature and full Zstandard expansion verified independently on macOS and
 non-overwriting copy on external `UEBuild` matched all four artifact hashes,
 the public-key identity and signature, and the complete expanded stream without
 using laptop internal storage. This is automated evidence only. The image
-remains explicitly unapproved until it is written and completely read back
-from a dedicated recovery card and passes the physical-only gates.
+remains explicitly unapproved until it passes the physical-only gates.
+
+On 2026-09-09 macOS identified the dedicated 63.9 GB removable USB card as
+whole disk `/dev/disk12`, distinct from the 512 GB `UEBuild` source. The media
+writer reverified the canonical signature and compressed artifact, wrote and
+flushed all 15,636,365,312 bytes, and hashed the complete image length back.
+Readback matched signed expanded SHA-256
+`277044c2d3e2332c07aa7849329ba2589a45136d1eb5110812218c12fd75f8ef`.
+Spotlight briefly dissented from the writer's first eject request; a subsequent
+eject succeeded after the indexing process released the volume. Evidence is in
+`evidence/recovery-media-phone001-4a15bf6.json`. Physical boot acceptance
+remains open.

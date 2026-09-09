@@ -13,8 +13,12 @@ Zero 2 W, radio, USB, audio, power, or first-time-user requirement.
   verified active `release-2026-08` key and independently verified on macOS
   and `anima`. The non-overwriting external `UEBuild` copy also passed all four
   hashes, signature, public-key identity, and full expansion checks without
-  using laptop internal storage. It remains unapproved pending complete
-  dedicated recovery-media readback and physical acceptance. The
+  using laptop internal storage. On 2026-09-09 the dedicated 63.9 GB USB card
+  was signature-verified, written, flushed, and read back over the complete
+  image length; its readback SHA-256 matched the signed expanded digest. The
+  card was then safely ejected. Evidence is in
+  `hardware/as-built/phone-001/evidence/recovery-media-phone001-4a15bf6.json`.
+  It remains unapproved pending physical acceptance. The
   expanded image is
   `/data2/millennium-build-4a15bf6/phone001-4a15bf6.img`, is
   15,636,365,312 bytes, and has SHA-256
@@ -82,9 +86,8 @@ image userspace tested and `physical_hardware_claimed: false`.
 
 ## Immediate execution order
 
-1. Write the signed, externally staged, factory-seeded, fully simulated
-   `4a15bf6` replacement to the dedicated recovery card, verify the complete
-   readback, and physically test it.
+1. Boot and physically test the signed, externally staged, factory-seeded,
+   fully simulated, and fully read-back `4a15bf6` recovery card.
    Preserve the rejected `6f50d12`,
    `c9b01fb`, `d895b35`, and `98e018a` media/boot evidence without treating any as
    approval. Both Arduino MCUs are required for the physical health gate;

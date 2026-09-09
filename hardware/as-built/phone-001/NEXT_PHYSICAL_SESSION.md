@@ -83,9 +83,13 @@ the active offline release key and independently verified on macOS, `anima`,
 and the non-overwriting external `UEBuild` copy. All four hashes, the public-key
 identity, signature, and complete expanded stream match without using laptop
 internal storage. Exact evidence is in
-`evidence/zero2w-recovery-seeded-artifact-4a15bf6-2026-09-09.json`. Use that
-exact external directory for the dedicated recovery-card preflight and
-write/readback. Do not use any predecessor card for acceptance.
+`evidence/zero2w-recovery-seeded-artifact-4a15bf6-2026-09-09.json`. The
+dedicated 63.9 GB card was written on 2026-09-09, flushed, read back over the
+complete 15,636,365,312-byte image length, and matched signed expanded SHA-256
+`277044c2d3e2332c07aa7849329ba2589a45136d1eb5110812218c12fd75f8ef`.
+It was safely ejected. Exact evidence is in
+`evidence/recovery-media-phone001-4a15bf6.json`. Insert and boot this card; do
+not use any predecessor card for acceptance.
 
 **The `98e018a` replacement card was written and fully verified, but its
 physical boot is rejected.** Its full physical readback matched signed
