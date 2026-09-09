@@ -728,6 +728,9 @@ matched the established trust root, the signature and complete expansion were
 verified independently on macOS and `anima`, and the RAM disk was ejected. The
 compressed SHA-256 is
 `cb86f7347c76b25fc412c05e4830a0eef5dea39f4c2e16203fdc5bd799b5705a`.
-External staging, recovery-media write/readback, and physical acceptance remain
-open. Exact automated evidence is in
+The signed package was copied directly from `anima` to a new non-overwriting
+directory on external `UEBuild`. All four stored hashes, the canonical
+signature, the public-key identity, and the complete 15,636,365,312-byte
+expanded stream matched without using laptop internal storage. Recovery-media
+write/readback and physical acceptance remain open. Exact automated evidence is in
 `evidence/zero2w-recovery-seeded-artifact-1f63772-2026-09-09.json`.

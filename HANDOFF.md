@@ -35,7 +35,10 @@ Zero 2 W, radio, USB, audio, power, or first-time-user requirement.
   A fresh full QEMU lab passed at `2026-09-09T18:20:21Z`; its result SHA-256 is
   `09d8e2ab11695b2f09bdc0bcbae4d4a2aa7e64bc764649285ded6e8d7cf552ee`.
   The canonical recovery package is signed and independently verified on
-  macOS and `anima`; external staging and media write/readback remain open.
+  macOS and `anima`. A direct, non-overwriting external `UEBuild` copy passed
+  all four stored hashes, signature, public-key identity, and the complete
+  expanded stream without using laptop internal storage. Media write/readback
+  remains open.
   Evidence is in `hardware/as-built/phone-001/evidence/zero2w-recovery-seeded-artifact-1f63772-2026-09-09.json`.
 - The prior production images were built from earlier sources. The
   physically booted `6f50d12`, `c9b01fb`, `d895b35`, and `98e018a` candidates are
@@ -100,9 +103,9 @@ image userspace tested and `physical_hardware_claimed: false`.
 
 ## Immediate execution order
 
-1. Copy the signed `1f63772` package directly from `anima` to external
-   `UEBuild`, independently verify it there, then write/read back and physically
-   test that corrected recovery card. Do not redeploy rejected `4a15bf6`.
+1. Write/read back the externally staged signed `1f63772` package, then
+   physically test that corrected recovery card. Do not redeploy rejected
+   `4a15bf6`.
    Preserve the rejected `6f50d12`,
    `c9b01fb`, `d895b35`, and `98e018a` media/boot evidence without treating any as
    approval. Both Arduino MCUs are required for the physical health gate;
