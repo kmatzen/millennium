@@ -71,8 +71,22 @@ host directory through a read-only bind mount and does not require a restart.
 
 ## 1. Write and verify the corrected recovery card
 
-**Current candidate `1f63772` is built, factory-seeded, signed, and accepted by
-every automated gate, but it is not physically approved.** Its unchanged
+**Current candidate `c409237` is the only candidate eligible for the next
+write.** It fixes the physical captive-handoff reply-path failure found after
+`1f63772`: established/related replies are accepted before setup-client
+initiation is denied. Its real nftables packet-path regression and complete
+QEMU release lab passed on `anima`. The signed expanded SHA-256 is
+`f74ca9e0b757dbda0be45f430a0b179c5d1808f2d96da96527bb2e5bed3e4a45`;
+the compressed SHA-256 is
+`4f07d3071b7e693d8efb60a44d50a7fc49e22d5c6f7988a8a6e9c4ac24065338`.
+Use only the externally verified package at
+`/Volumes/UEBuild/millennium-images/zero2w-ab-1.0.0-c409237-phone001-unapproved`.
+Exact evidence is in
+`evidence/zero2w-recovery-seeded-artifact-c409237-2026-09-10.json`.
+
+**The superseded `1f63772` candidate was built, factory-seeded, signed, and
+accepted by its automated gates, but failed physical captive handoff and must
+not be redeployed.** Its unchanged
 application payload is from `4a15bf6`; the image-layer correction is
 `1f63772`, and the final exact-image harness is `ff27782`. The exact seeded
 image is retained on `anima` at

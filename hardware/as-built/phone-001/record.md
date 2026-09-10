@@ -735,6 +735,22 @@ expanded stream matched without using laptop internal storage. Exact automated
 evidence is in
 `evidence/zero2w-recovery-seeded-artifact-1f63772-2026-09-09.json`.
 
+Physical captive onboarding of the `1f63772` image exposed one further defect:
+the setup firewall dropped established reply traffic arriving on `wlan0`, so
+the phone could associate and obtain DHCP yet the helper's phone-originated
+connectivity check failed and rolled credentials back. Commit
+`c4092377623f06d67ebaa942283108fb512dfc7a` accepts established/related replies
+before denying setup-client initiation, and adds a real network-namespace,
+veth, and nftables packet-path regression test. The exact factory-seeded image
+passed both system slots and the complete QEMU release lab on `anima`, including
+the independent captive client, OTA and maintenance paths, virtual peripherals,
+fault injection, and power/checkpoint recovery. It was signed on a disposable
+APFS RAM disk with the active key, verified independently on `anima`, copied
+directly to external `UEBuild`, and its complete expanded stream was verified
+there. Evidence is in
+`evidence/zero2w-recovery-seeded-artifact-c409237-2026-09-10.json`. The image is
+still unapproved pending a full media write/readback and physical boot.
+
 On 2026-09-10 macOS identified the dedicated recovery card as whole removable
 USB disk `/dev/disk10`, 63,864,569,856 bytes, distinct from the 512 GB fixed
 `UEBuild` device. The writer reverified the canonical signature and compressed
