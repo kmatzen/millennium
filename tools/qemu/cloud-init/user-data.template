@@ -20,6 +20,7 @@ packages:
   - libspeex-dev
   - libspeexdsp-dev
   - libssl-dev
+  - nftables
   - pkg-config
   - rsync
   - socat
