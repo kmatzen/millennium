@@ -83,6 +83,11 @@ Use only the externally verified package at
 `/Volumes/UEBuild/millennium-images/zero2w-ab-1.0.0-c409237-phone001-unapproved`.
 Exact evidence is in
 `evidence/zero2w-recovery-seeded-artifact-c409237-2026-09-10.json`.
+The dedicated 63.9 GB removable card was subsequently written, flushed, and
+fully read back. Its readback matched the signed expanded SHA-256 above and the
+card was safely ejected. Media evidence is in
+`evidence/recovery-media-phone001-c409237.json`. Insert this card and boot it;
+do not use any predecessor card for acceptance.
 
 **The superseded `1f63772` candidate was built, factory-seeded, signed, and
 accepted by its automated gates, but failed physical captive handoff and must

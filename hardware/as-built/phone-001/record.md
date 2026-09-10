@@ -751,6 +751,16 @@ there. Evidence is in
 `evidence/zero2w-recovery-seeded-artifact-c409237-2026-09-10.json`. The image is
 still unapproved pending a full media write/readback and physical boot.
 
+On 2026-09-10 macOS identified the dedicated recovery card as removable USB
+whole disk `/dev/disk10`, 63,864,569,856 bytes, distinct from the 512 GB fixed
+`UEBuild` device. The writer reverified the signature and exact `c409237`
+provenance, wrote and flushed all 15,636,365,312 expanded bytes, and hashed the
+complete image length back. Readback matched signed expanded SHA-256
+`f74ca9e0b757dbda0be45f430a0b179c5d1808f2d96da96527bb2e5bed3e4a45`.
+Spotlight initially dissented from eject after verification; a subsequent eject
+succeeded. Evidence is in `evidence/recovery-media-phone001-c409237.json`.
+Physical boot acceptance remains open.
+
 On 2026-09-10 macOS identified the dedicated recovery card as whole removable
 USB disk `/dev/disk10`, 63,864,569,856 bytes, distinct from the 512 GB fixed
 `UEBuild` device. The writer reverified the canonical signature and compressed

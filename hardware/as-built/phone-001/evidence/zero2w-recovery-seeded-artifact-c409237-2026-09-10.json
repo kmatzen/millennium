@@ -60,6 +60,16 @@
     "used_laptop_internal_storage": false
   },
   "github_issue": "https://github.com/kmatzen/millennium/issues/270#issuecomment-5625422801",
-  "recovery_media_written": false,
-  "status": "software-verified, signed, and externally staged; physical media write and physical boot remain open"
+  "recovery_media_written": true,
+  "recovery_media": {
+    "completed_at": "2026-09-10T21:56:28+00:00",
+    "device_identifier_at_write": "disk10",
+    "size_bytes": 63864569856,
+    "full_image_length_read_back": true,
+    "readback_sha256": "f74ca9e0b757dbda0be45f430a0b179c5d1808f2d96da96527bb2e5bed3e4a45",
+    "evidence": "recovery-media-phone001-c409237.json",
+    "initial_eject_dissented_by": "mdsync",
+    "subsequent_eject_succeeded": true
+  },
+  "status": "software-verified, signed, externally staged, written and fully read back from dedicated recovery media; physical boot remains open"
 }
