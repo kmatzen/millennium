@@ -37,7 +37,9 @@ Zero 2 W, radio, USB, audio, power, or first-time-user requirement.
   The canonical recovery package is signed and independently verified on
   macOS and `anima`. A direct, non-overwriting external `UEBuild` copy passed
   all four stored hashes, signature, public-key identity, and the complete
-  expanded stream without using laptop internal storage. Media write/readback
+  expanded stream without using laptop internal storage. On 2026-09-10 the
+  OS-identified 63.9 GB removable card was written, flushed, completely read
+  back, matched the signed expanded SHA-256, and safely ejected. Physical boot
   remains open.
   Evidence is in `hardware/as-built/phone-001/evidence/zero2w-recovery-seeded-artifact-1f63772-2026-09-09.json`.
 - The prior production images were built from earlier sources. The
@@ -102,9 +104,8 @@ image userspace tested in both system slots and `physical_hardware_claimed: fals
 
 ## Immediate execution order
 
-1. Write/read back the externally staged signed `1f63772` package, then
-   physically test that corrected recovery card. Do not redeploy rejected
-   `4a15bf6`.
+1. Install and physically test the written/read-back-verified `1f63772`
+   recovery card. Do not redeploy rejected `4a15bf6`.
    Preserve the rejected `6f50d12`,
    `c9b01fb`, `d895b35`, `98e018a`, and `4a15bf6` media/boot evidence without treating any as
    approval. Both Arduino MCUs are required for the physical health gate;

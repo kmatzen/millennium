@@ -731,6 +731,16 @@ compressed SHA-256 is
 The signed package was copied directly from `anima` to a new non-overwriting
 directory on external `UEBuild`. All four stored hashes, the canonical
 signature, the public-key identity, and the complete 15,636,365,312-byte
-expanded stream matched without using laptop internal storage. Recovery-media
-write/readback and physical acceptance remain open. Exact automated evidence is in
+expanded stream matched without using laptop internal storage. Exact automated
+evidence is in
 `evidence/zero2w-recovery-seeded-artifact-1f63772-2026-09-09.json`.
+
+On 2026-09-10 macOS identified the dedicated recovery card as whole removable
+USB disk `/dev/disk10`, 63,864,569,856 bytes, distinct from the 512 GB fixed
+`UEBuild` device. The writer reverified the canonical signature and compressed
+artifact, wrote and flushed all 15,636,365,312 expanded bytes, and hashed the
+complete image length back. Readback matched signed expanded SHA-256
+`aa1b2b0b1d5b312709666db22d6246ae0cfd921ba13cce595a59893ed5142e71`.
+The card was safely ejected. Evidence is in
+`evidence/recovery-media-phone001-1f63772.json`; physical boot acceptance
+remains open.

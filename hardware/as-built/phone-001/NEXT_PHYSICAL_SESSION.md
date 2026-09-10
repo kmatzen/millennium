@@ -84,10 +84,12 @@ Its compressed recovery artifact and canonical manifest are signed with the
 active offline release key and independently verified on macOS, `anima`, and
 the non-overwriting external `UEBuild` copy. All four hashes, the public-key
 identity, signature, and complete expanded stream match without using laptop
-internal storage. Exact evidence is in
-`evidence/zero2w-recovery-seeded-artifact-1f63772-2026-09-09.json`. Write this
-package to the dedicated recovery card, verify the complete image-length
-readback against the signed expanded SHA-256, safely eject it, and boot it. Do
+internal storage. The dedicated 63.9 GB removable card was written on
+2026-09-10, flushed, completely read back, matched signed expanded SHA-256
+`aa1b2b0b1d5b312709666db22d6246ae0cfd921ba13cce595a59893ed5142e71`,
+and safely ejected. Exact evidence is in
+`evidence/zero2w-recovery-seeded-artifact-1f63772-2026-09-09.json` and
+`evidence/recovery-media-phone001-1f63772.json`. Insert and boot this card; do
 not use any predecessor card for acceptance.
 
 **The `4a15bf6` card was written and fully read back, but its physical boot is

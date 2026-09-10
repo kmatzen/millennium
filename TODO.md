@@ -118,6 +118,9 @@ with one assembled-hardware session and without repeating the network wiring.
         normalize `/opt/millennium` to `root:root 0755`, and rebuild, sign, and
         fully simulate the `1f63772` replacement without claiming physical
         hardware fidelity.
+      - [x] Write the signed `1f63772` package to OS-identified 63.9 GB
+        removable recovery media, verify the complete 15,636,365,312-byte
+        readback against the signed expanded digest, and safely eject it.
     - [ ] Boot a non-quarantined verified recovery image on the
       production-equivalent Zero 2 W; the physically booted v3, `2ad5179`,
       `7f94bdd`, `6f50d12`, `c9b01fb`, `d895b35`, `98e018a`, and `4a15bf6` artifacts are
