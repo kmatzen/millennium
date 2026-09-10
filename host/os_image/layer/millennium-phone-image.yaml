@@ -129,6 +129,10 @@ mmdebstrap:
       # named owner here; the target-side recursive chown below assigns the
       # account after the payload and directory are in place.
       install -d -m 0700 "$1/var/lib/millennium/wifi"
+      # ReadWritePaths requires this path to exist before systemd creates the
+      # OTA service mount namespace. QEMU provisioning used to create it and
+      # masked its absence from the production image.
+      install -d -m 0755 "$1/var/lib/millennium/ota"
       install -d -m 0755 "$1/var/lib/node_exporter/textfile_collector"
       chroot "$1" systemd-sysusers /usr/lib/sysusers.d/millennium-wifi.conf
       chroot "$1" getent passwd millennium-wifi

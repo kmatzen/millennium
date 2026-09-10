@@ -101,6 +101,16 @@ def shell_commands(system_partition: int = 5) -> bytes:
         "/opt/millennium/current/host/millennium-daemon --version && "
         "test \"$(systemctl show -p ExecMainStatus --value daemon.service)\" "
         "!= 203 && "
+        # The OTA service's ReadWritePaths is resolved while systemd builds
+        # its mount namespace, before the agent can create its state dir.
+        # Assert the production image contains it; provision-guest.sh must
+        # never be allowed to hide a missing shipped path again.
+        "test \"$(stat -c %%U:%%G:%%a /var/lib/millennium/ota)\" "
+        "= root:root:755 && "
+        "systemd-run --quiet --wait --collect --pipe "
+        "-p ProtectSystem=strict "
+        "-p ReadWritePaths=/var/lib/millennium/ota "
+        "/usr/bin/test -d /var/lib/millennium/ota && "
         # Reproduce the physical dual-link case: the maintenance Ethernet
         # profile must never install a default route while owner Wi-Fi is the
         # upstream connection.  Check the assembled image, not just source.
