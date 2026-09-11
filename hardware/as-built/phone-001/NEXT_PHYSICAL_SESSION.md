@@ -71,23 +71,30 @@ host directory through a read-only bind mount and does not require a restart.
 
 ## 1. Write and verify the corrected recovery card
 
-**Current candidate `c409237` is the only candidate eligible for the next
-write.** It fixes the physical captive-handoff reply-path failure found after
-`1f63772`: established/related replies are accepted before setup-client
-initiation is denied. Its real nftables packet-path regression and complete
-QEMU release lab passed on `anima`. The signed expanded SHA-256 is
-`f74ca9e0b757dbda0be45f430a0b179c5d1808f2d96da96527bb2e5bed3e4a45`;
+**Current candidate `7033d94` is the only candidate eligible for the next
+write.** It supersedes `c409237`, whose physical boot reached owner Wi-Fi and
+the maintenance tunnel but exposed a missing production OTA state directory.
+`7033d94` creates `/var/lib/millennium/ota` as `root:root 0755` and tests a
+write through the exact production systemd namespace restrictions on both
+system slots. Its full QEMU lab, host suite, contracts suite, and formal
+release gate passed on `anima` without making a physical-hardware claim. The
+signed expanded SHA-256 is
+`2ec35e97431c1d6af99c4381f41779e7b810f8e9be3fe6074ff8529f70a7f5ef`;
 the compressed SHA-256 is
-`4f07d3071b7e693d8efb60a44d50a7fc49e22d5c6f7988a8a6e9c4ac24065338`.
-Use only the externally verified package at
-`/Volumes/UEBuild/millennium-images/zero2w-ab-1.0.0-c409237-phone001-unapproved`.
-Exact evidence is in
-`evidence/zero2w-recovery-seeded-artifact-c409237-2026-09-10.json`.
-The dedicated 63.9 GB removable card was subsequently written, flushed, and
-fully read back. Its readback matched the signed expanded SHA-256 above and the
-card was safely ejected. Media evidence is in
-`evidence/recovery-media-phone001-c409237.json`. Insert this card and boot it;
-do not use any predecessor card for acceptance.
+`d8c5a437cb729c845a1a8cd10dde1eb7c586fe7ba578eb51001d162b3d3f28a4`.
+The signed package is retained on `anima` at
+`/data2/millennium-build-7033d94/recovery-package`; its intended external path
+is `/Volumes/UEBuild/millennium-images/zero2w-ab-1.0.0-7033d94-phone001-unapproved`.
+Do not write a card until that external copy and its full expanded stream have
+been verified. Exact evidence is in
+`evidence/zero2w-recovery-seeded-artifact-7033d94-2026-09-10.json`.
+
+**The `c409237` card is rejected and must not be redeployed.** Its physical
+boot proved the corrected captive-portal firewall path, owner Wi-Fi
+association, setup-AP shutdown, and outbound maintenance tunnel. It also
+proved that the scheduled update check could not start because the production
+image lacked `/var/lib/millennium/ota`; that defect is corrected and
+regression-tested only in `7033d94` and later.
 
 **The superseded `1f63772` candidate was built, factory-seeded, signed, and
 accepted by its automated gates, but failed physical captive handoff and must
