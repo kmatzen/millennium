@@ -807,6 +807,13 @@ compressed SHA-256 is
 `114c7a83ae302778b5779c2045b7b281dbd88e919f0905949e5819b84060127e`;
 its expanded SHA-256 is
 `ea10c9f4c3e062c80f323535a0d1fdb9cc7138b66f5067edfae983f47dcfa55b`.
-This evidence makes no physical-hardware claim. Dedicated recovery-media
-write/readback and physical boot remain open. Exact evidence is in
+This evidence makes no physical-hardware claim. On 2026-09-11 macOS identified
+the dedicated recovery card as removable USB whole disk `/dev/disk12`,
+63,864,569,856 bytes, distinct from the 512 GB fixed `UEBuild` source. The
+writer reverified the canonical signature and compressed artifact, wrote and
+flushed all 15,636,365,312 expanded bytes, and hashed the complete image length
+back. Readback matched signed expanded SHA-256
+`ea10c9f4c3e062c80f323535a0d1fdb9cc7138b66f5067edfae983f47dcfa55b`,
+and the card was safely ejected. Physical boot acceptance remains open. Exact
+evidence is in `evidence/recovery-media-phone001-27b69be.json` and
 `evidence/zero2w-recovery-seeded-artifact-27b69be-2026-09-11.json`.

@@ -62,6 +62,7 @@
     "expanded_size_verified": true,
     "used_laptop_internal_storage": false
   },
-  "recovery_media_written": false,
-  "status": "automated gates passed; signed package verified on anima and external UEBuild; dedicated-media write/readback and physical-only acceptance remain open"
+  "recovery_media_written": true,
+  "recovery_media_evidence": "recovery-media-phone001-27b69be.json",
+  "status": "automated gates passed; signed package verified on anima and external UEBuild; dedicated-media write and complete readback passed; physical-only acceptance remains open"
 }
