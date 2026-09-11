@@ -25,10 +25,14 @@ class Zero2WImageLayerTests(unittest.TestCase):
             '"$1/var/lib/node_exporter/textfile_collector"',
             text,
         )
-        self.assertIn(
-            'install -d -m 0755 "$1/var/lib/millennium/ota"',
-            text,
-        )
+        for path in (
+            "/var/lib/millennium/ota",
+            "/var/lib/millennium/os-ota",
+            "/var/lib/millennium/hil",
+            "/var/lib/millennium/backup",
+            "/var/lib/millennium/physical-tests",
+        ):
+            self.assertIn(f'"$1{path}"', text)
         self.assertIn("Wants=NetworkManager.service wpa_supplicant.service", unit)
         self.assertIn("After=NetworkManager.service wpa_supplicant.service", unit)
         self.assertIn("Group=millennium-wifi", unit)

@@ -101,16 +101,22 @@ def shell_commands(system_partition: int = 5) -> bytes:
         "/opt/millennium/current/host/millennium-daemon --version && "
         "test \"$(systemctl show -p ExecMainStatus --value daemon.service)\" "
         "!= 203 && "
-        # The OTA service's ReadWritePaths is resolved while systemd builds
-        # its mount namespace, before the agent can create its state dir.
-        # Assert the production image contains it; provision-guest.sh must
-        # never be allowed to hide a missing shipped path again.
-        "test \"$(stat -c %%U:%%G:%%a /var/lib/millennium/ota)\" "
-        "= root:root:755 && "
+        # Persistent ReadWritePaths are resolved while systemd builds each
+        # unit's mount namespace, before the program can create its state
+        # directory. Assert all shipped state roots and exercise each through
+        # the same namespace boundary; generic QEMU provisioning must never
+        # be allowed to hide a missing production path again.
+        "for spec in "
+        "root:root:755:/var/lib/millennium/ota "
+        "root:root:755:/var/lib/millennium/os-ota "
+        "root:root:755:/var/lib/millennium/hil "
+        "root:root:700:/var/lib/millennium/backup "
+        "root:root:700:/var/lib/millennium/physical-tests; do "
+        "expected=${spec%%:/*}; path=/${spec#*:/}; "
+        "test \"$(stat -c %%U:%%G:%%a \"$path\")\" = \"$expected\" && "
         "systemd-run --quiet --wait --collect --pipe "
-        "-p ProtectSystem=strict "
-        "-p ReadWritePaths=/var/lib/millennium/ota "
-        "/usr/bin/test -d /var/lib/millennium/ota && "
+        "-p ProtectSystem=strict -p ReadWritePaths=\"$path\" "
+        "/usr/bin/test -d \"$path\" || exit 1; done && "
         # Reproduce the physical dual-link case: the maintenance Ethernet
         # profile must never install a default route while owner Wi-Fi is the
         # upstream connection.  Check the assembled image, not just source.
