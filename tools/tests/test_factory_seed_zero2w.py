@@ -26,6 +26,11 @@ class FactorySeedTests(unittest.TestCase):
         for name in MODULE.REQUIRED_CONFIG:
             value = "phone-001\n" if name == "device-id" else "value\n"
             (staging / "etc/millennium" / name).write_text(value)
+        (staging / "etc/millennium/ota.conf").write_text(
+            "public_key=/etc/millennium/update-signing-key.pem\n"
+            "trusted_keys=primary:/etc/millennium/update-signing-key.pem,"
+            "release-2026-08:/etc/millennium/update-signing-key.pem\n"
+        )
         (staging / "home/millennium/.ssh/authorized_keys").write_text(
             "ssh-ed25519 AAAAC3Nza test\n")
         return staging
@@ -66,6 +71,27 @@ class FactorySeedTests(unittest.TestCase):
             staging = self.make_staging(directory)
             (staging / "escape").symlink_to("/etc/passwd")
             with self.assertRaisesRegex(ValueError, "link or special"):
+                MODULE.validate_staging(staging)
+
+    def test_missing_configured_update_key_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            staging = self.make_staging(directory)
+            (staging / "etc/millennium/ota.conf").write_text(
+                "public_key=/etc/millennium/update-signing-key.pem\n"
+                "trusted_keys=release-2026-08:"
+                "/etc/millennium/update-signing-key-release-2026-08.pem\n"
+            )
+            with self.assertRaisesRegex(ValueError, "missing configured OTA public key"):
+                MODULE.validate_staging(staging)
+
+    def test_release_key_id_is_required(self):
+        with tempfile.TemporaryDirectory() as directory:
+            staging = self.make_staging(directory)
+            (staging / "etc/millennium/ota.conf").write_text(
+                "public_key=/etc/millennium/update-signing-key.pem\n"
+                "trusted_keys=primary:/etc/millennium/update-signing-key.pem\n"
+            )
+            with self.assertRaisesRegex(ValueError, "does not trust release-2026-08"):
                 MODULE.validate_staging(staging)
 
     def test_trusted_image_links_can_be_preserved(self):

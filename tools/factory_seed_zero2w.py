@@ -28,6 +28,41 @@ REQUIRED_CONFIG = (
 )
 
 
+def config_values(path):
+    values = {}
+    for raw in Path(path).read_text().splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        key, separator, value = line.partition("=")
+        if not separator or not key.strip() or not value.strip():
+            raise ValueError("invalid configuration line in " + str(path))
+        values[key.strip()] = value.strip()
+    return values
+
+
+def validate_update_trust(config):
+    """Reject factory state whose OTA key mappings cannot exist on target."""
+    config = Path(config)
+    values = config_values(config / "ota.conf")
+    entries = values.get("trusted_keys", "").split(",")
+    mappings = {}
+    for entry in entries:
+        key_id, separator, target = entry.partition(":")
+        if not separator or not key_id or not target.startswith("/etc/millennium/"):
+            raise ValueError("invalid OTA trusted key mapping")
+        mappings[key_id] = target
+    if "release-2026-08" not in mappings:
+        raise ValueError("OTA configuration does not trust release-2026-08")
+    paths = [values.get("public_key", "")] + list(mappings.values())
+    for target in paths:
+        if not target.startswith("/etc/millennium/"):
+            raise ValueError("invalid OTA public key path")
+        staged = config / Path(target).name
+        if not staged.is_file() or staged.stat().st_size == 0:
+            raise ValueError("missing configured OTA public key: " + target)
+
+
 def run(arguments, **kwargs):
     return subprocess.run(arguments, check=True, **kwargs)
 
@@ -88,6 +123,7 @@ def validate_staging(staging):
     for name in REQUIRED_CONFIG:
         if not (config / name).is_file() or (config / name).stat().st_size == 0:
             raise ValueError("missing device configuration: " + name)
+    validate_update_trust(config)
     device_id = (config / "device-id").read_text().strip()
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,31}", device_id):
         raise ValueError("invalid device ID")

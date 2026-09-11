@@ -101,6 +101,18 @@ def shell_commands(system_partition: int = 5) -> bytes:
         "/opt/millennium/current/host/millennium-daemon --version && "
         "test \"$(systemctl show -p ExecMainStatus --value daemon.service)\" "
         "!= 203 && "
+        # Device-specific factory overlays replace ota.conf. Validate the
+        # effective mappings and parse every referenced public key from the
+        # exact seeded image, catching stale paths before media is written.
+        "grep -Fqx public_key=/etc/millennium/update-signing-key.pem "
+        "/etc/millennium/ota.conf && "
+        "grep -Eq \"(^|,)release-2026-08:/etc/millennium/"
+        "update-signing-key\\.pem(,|$)\" /etc/millennium/ota.conf && "
+        "grep -Fqx trusted_keys=release-2026-08:/etc/millennium/"
+        "update-signing-key.pem /etc/millennium/os-ota.conf && "
+        "test -s /etc/millennium/update-signing-key.pem && "
+        "openssl pkey -pubin -in /etc/millennium/update-signing-key.pem "
+        "-noout && "
         # Persistent ReadWritePaths are resolved while systemd builds each
         # unit's mount namespace, before the program can create its state
         # directory. Assert all shipped state roots and exercise each through
