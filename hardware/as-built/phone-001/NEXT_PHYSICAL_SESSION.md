@@ -88,6 +88,16 @@ The verified package is retained at
 Exact evidence is in
 `evidence/zero2w-recovery-seeded-artifact-9a343aa-2026-09-11.json`.
 
+The dedicated card write is complete. macOS identified `/dev/disk12` as the
+63,864,569,856-byte removable USB card and separately identified `UEBuild` as
+the fixed 512 GB disk. The writer verified the release signature and compressed
+artifact, wrote and flushed all 15,636,365,312 expanded bytes, and hashed the
+complete image length back. Readback matched signed SHA-256
+`c3d4efd4eb19bf1d88a02227792d56912e8b51315c1d81ee7cdb3815556ecbaa`.
+The card was ejected successfully. Physical cold boot and the 125-second
+health gate remain open. Exact evidence is in
+`evidence/recovery-media-phone001-9a343aa.json`.
+
 The formerly empty production OS channel is no longer a pre-write blocker.
 Signed baseline OS release `00000001-1.0.0` is published at the production
 HTTPS origin. Its manifest signature, compatibility selection, compressed

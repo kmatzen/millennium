@@ -835,8 +835,18 @@ SHA-256 is
 `94123e2c561733925d55509d1881a33d2204cca91b351f7d6988114210ba8bc9`;
 its expanded SHA-256 is
 `c3d4efd4eb19bf1d88a02227792d56912e8b51315c1d81ee7cdb3815556ecbaa`.
-Dedicated-media write/readback and physical boot remain open. Exact evidence
-is in `evidence/zero2w-recovery-seeded-artifact-9a343aa-2026-09-11.json`.
+At artifact qualification time, dedicated-media write/readback and physical
+boot remained open. Exact artifact evidence is in
+`evidence/zero2w-recovery-seeded-artifact-9a343aa-2026-09-11.json`.
+
+On 2026-09-11 macOS identified the dedicated card as removable USB whole disk
+`/dev/disk12`, 63,864,569,856 bytes, distinct from the fixed 512 GB `UEBuild`
+source. The writer reverified the canonical signature and compressed object,
+wrote and flushed all 15,636,365,312 expanded bytes, and hashed the complete
+image length back. Readback matched signed expanded SHA-256
+`c3d4efd4eb19bf1d88a02227792d56912e8b51315c1d81ee7cdb3815556ecbaa`.
+The card was successfully ejected. Physical boot acceptance remains open;
+exact evidence is in `evidence/recovery-media-phone001-9a343aa.json`.
 
 Before another media cycle, production OS release `00000001-1.0.0` was signed
 with the pinned `release-2026-08` key and published atomically to the previously
