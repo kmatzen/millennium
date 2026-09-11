@@ -837,3 +837,17 @@ its expanded SHA-256 is
 `c3d4efd4eb19bf1d88a02227792d56912e8b51315c1d81ee7cdb3815556ecbaa`.
 Dedicated-media write/readback and physical boot remain open. Exact evidence
 is in `evidence/zero2w-recovery-seeded-artifact-9a343aa-2026-09-11.json`.
+
+Before another media cycle, production OS release `00000001-1.0.0` was signed
+with the pinned `release-2026-08` key and published atomically to the previously
+empty OS update channel. A verifier running on `anima` fetched the public HTTPS
+manifest, signature, boot image, and root image; enforced compatibility and
+signed size bounds; verified the signature and compressed hashes; and fully
+decompressed both objects. The resulting boot SHA-256
+`6ea79f8228a9a7f352b764f492b602e0458d0b05ac61e8b5f4c95206655934eb`
+and root SHA-256
+`51a0659e862761b943b5583974833a1a446af2331040822926abf9235fba2473`
+match the exact generic inputs to the qualified `9a343aa` image. This proves
+the production distribution path, not physical installation. Exact evidence
+is in
+`evidence/os-release-00000001-1.0.0-production-2026-09-11.json`.

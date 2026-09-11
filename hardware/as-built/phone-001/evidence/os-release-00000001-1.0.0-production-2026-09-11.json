@@ -1,0 +1,29 @@
+{
+  "completed_at": "2026-09-11T06:35:44Z",
+  "expanded_images_verified": true,
+  "images": {
+    "boot": {
+      "compressed_sha256": "765a9eff05654bf3e21b03fbdd88dd00a081bea48692d9a6f59814f27461a89d",
+      "compressed_size": 38894850,
+      "expanded_sha256": "6ea79f8228a9a7f352b764f492b602e0458d0b05ac61e8b5f4c95206655934eb",
+      "expanded_size": 268435456
+    },
+    "root": {
+      "compressed_sha256": "93cd15f0103ccf0bb31ebacc0b1c30240513084d2827747aa8a4af0140080aed",
+      "compressed_size": 206075475,
+      "expanded_sha256": "51a0659e862761b943b5583974833a1a446af2331040822926abf9235fba2473",
+      "expanded_size": 3221225472
+    }
+  },
+  "key_id": "release-2026-08",
+  "manifest_sha256": "3f0d962c5fafe0866e0eb9c6c98fab0b65376ef744145830108e1c1ac6d911f4",
+  "operation": "production-os-release-publication",
+  "passed": true,
+  "public_endpoint": "https://updates.kmatzen.com/millennium/os/stable/manifest.json",
+  "public_https_download_verified": true,
+  "release_id": "00000001-1.0.0",
+  "schema": 1,
+  "signature_sha256": "d56d7b179b35a371d8e45a68b034c1d4acc1f77d0e3794c31f2e75abd10fc0ca",
+  "signature_verified": true,
+  "source_commit": "9a343aa5c73a8f0fa4f534d732cd189f5f7e6307"
+}

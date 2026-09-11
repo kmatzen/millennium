@@ -88,6 +88,16 @@ The verified package is retained at
 Exact evidence is in
 `evidence/zero2w-recovery-seeded-artifact-9a343aa-2026-09-11.json`.
 
+The formerly empty production OS channel is no longer a pre-write blocker.
+Signed baseline OS release `00000001-1.0.0` is published at the production
+HTTPS origin. Its manifest signature, compatibility selection, compressed
+objects, and complete 3,489,660,928-byte expansion were independently fetched
+and verified from `anima` after publication. The expanded boot and root hashes
+match the exact generic images used to build the qualified `9a343aa` recovery
+candidate. Publication is fail-closed, immutable by release identity, and uses
+the stable manifest rename as its commit point. Exact evidence is in
+`evidence/os-release-00000001-1.0.0-production-2026-09-11.json`.
+
 **The `27b69be` card is rejected and must not be redeployed.** Physical boot of
 `c409237`
 reached owner Wi-Fi and the maintenance tunnel but exposed missing persistent
