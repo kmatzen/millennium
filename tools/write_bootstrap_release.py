@@ -31,13 +31,21 @@ def identity(path):
 
 
 def main():
-    if len(sys.argv) != 4:
-        raise SystemExit("usage: write_bootstrap_release.py KEYPAD DISPLAY OUTPUT")
+    if len(sys.argv) != 6:
+        raise SystemExit(
+            "usage: write_bootstrap_release.py KEYPAD DISPLAY VERSION SOURCE_COMMIT OUTPUT")
     firmware = dict(identity(path) for path in sys.argv[1:3])
     if set(firmware) != {"keypad", "display"}:
         raise SystemExit("bootstrap firmware identities are incomplete")
-    Path(sys.argv[3]).write_text(
-        json.dumps({"firmware": firmware}, sort_keys=True) + "\n",
+    version, source_commit = sys.argv[3:5]
+    if not re.fullmatch(r"[A-Za-z0-9._-]{1,64}", version):
+        raise SystemExit("invalid bootstrap version")
+    if not re.fullmatch(r"[0-9a-f]{40}", source_commit):
+        raise SystemExit("invalid bootstrap source commit")
+    Path(sys.argv[5]).write_text(
+        json.dumps({"firmware": firmware, "sequence": 0,
+                    "source_commit": source_commit, "version": version},
+                   sort_keys=True) + "\n",
         encoding="utf-8")
 
 

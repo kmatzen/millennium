@@ -36,6 +36,7 @@ class BootstrapReleaseTests(unittest.TestCase):
             MODULE.sys.argv = ["write_bootstrap_release.py",
                                str(ROOT / "Arduino/build/keypad/keypad.ino.hex"),
                                str(ROOT / "Arduino/build/display/display.ino.hex"),
+                               "0.4.0", "a" * 40,
                                str(output)]
             try:
                 MODULE.main()
@@ -43,6 +44,9 @@ class BootstrapReleaseTests(unittest.TestCase):
                 MODULE.sys.argv = old
             value = json.loads(output.read_text(encoding="utf-8"))
             self.assertEqual(set(value["firmware"]), {"keypad", "display"})
+            self.assertEqual(value["version"], "0.4.0")
+            self.assertEqual(value["sequence"], 0)
+            self.assertEqual(value["source_commit"], "a" * 40)
             self.assertTrue(output.read_bytes().endswith(b"\n"))
 
 

@@ -848,6 +848,19 @@ image length back. Readback matched signed expanded SHA-256
 The card was successfully ejected. Physical boot acceptance remains open;
 exact evidence is in `evidence/recovery-media-phone001-9a343aa.json`.
 
+Physical boot of that card reached owner Wi-Fi, the maintenance tunnel, a
+read-only system root, all declared persistent state roots, both native Alpha
+and Beta devices, protocol 2, stable serial counters, and SIP registration
+after the normal network retry. The corrected application trust path also
+matched the pinned release key. Acceptance nevertheless failed for two newly
+observed release-metadata defects. OS release sequence 1 abbreviated the board
+model and the real updater rejected it before staging. Corrected sequence 2
+passed the real updater compatibility check, but was quarantined before its
+automatic window because the image's bootstrap `release.json` omitted the host
+version; the installed HIL therefore rejected `host_version`, and an OS
+candidate boot would fail closed. No boot slot was modified. Exact rejection
+evidence is in `evidence/physical-boot-rejection-9a343aa-2026-09-11.json`.
+
 Before another media cycle, production OS release `00000001-1.0.0` was signed
 with the pinned `release-2026-08` key and published atomically to the previously
 empty OS update channel. A verifier running on `anima` fetched the public HTTPS

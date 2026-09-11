@@ -98,6 +98,17 @@ The card was ejected successfully. Physical cold boot and the 125-second
 health gate remain open. Exact evidence is in
 `evidence/recovery-media-phone001-9a343aa.json`.
 
+**Do not redeploy this written `9a343aa` card.** Its physical boot proved the
+trust-path, persistent-state, Wi-Fi, tunnel, native-MCU, and SIP recovery fixes,
+but the installed HIL found that the bootstrap `release.json` lacks host
+version metadata. The real OS updater also rejected the first published OS
+manifest because its board model omitted `Rev 1.0`; corrected sequence 2 passed
+the physical compatibility check but was quarantined before any automatic
+installation. A replacement image must include complete bootstrap metadata,
+pass the static rootfs audit that now enforces it, and publish an OS release
+whose exact board identity is validated by the real phone updater. Evidence is
+in `evidence/physical-boot-rejection-9a343aa-2026-09-11.json`.
+
 The formerly empty production OS channel is no longer a pre-write blocker.
 Signed baseline OS release `00000001-1.0.0` is published at the production
 HTTPS origin. Its manifest signature, compatibility selection, compressed

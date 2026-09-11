@@ -30,7 +30,7 @@ install -m 0644 "$HOST_DIR/../Arduino/build/keypad/keypad.ino.hex" "$BOOTSTRAP/a
 install -m 0644 "$HOST_DIR/../Arduino/build/display/display.ino.hex" "$BOOTSTRAP/arduino/display.hex"
 install -m 0755 "$SCRIPT_DIR/millennium_ota.py" "$BOOTSTRAP/ota/millennium-ota"
 python3 - "$BOOTSTRAP/arduino/keypad.hex" "$BOOTSTRAP/arduino/display.hex" \
-    "$BOOTSTRAP/release.json" <<'PY'
+    "$BOOTSTRAP/release.json" "$HOST_DIR/../VERSION" <<'PY'
 import json, pathlib, re, sys
 pattern = re.compile(rb"MILLENNIUM role=(keypad|display) version=([^ ]+) protocol=([0-9]+) build=([^ ]+) selftest=ok")
 firmware = {}
@@ -48,7 +48,10 @@ for name in sys.argv[1:3]:
                       "protocol": int(match.group(3)), "build": match.group(4).decode()}
 if set(firmware) != {"keypad", "display"}:
     raise SystemExit("bootstrap firmware identities are incomplete")
-pathlib.Path(sys.argv[3]).write_text(json.dumps({"firmware": firmware}, sort_keys=True) + "\n")
+version = pathlib.Path(sys.argv[4]).read_text().strip()
+pathlib.Path(sys.argv[3]).write_text(json.dumps(
+    {"firmware": firmware, "sequence": 0, "version": version},
+    sort_keys=True) + "\n")
 PY
 ln -sfn "$BOOTSTRAP" /opt/millennium/current
 ln -sfn /opt/millennium/current/ota/millennium-ota /usr/local/libexec/millennium-ota

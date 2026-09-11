@@ -76,6 +76,20 @@ class OsOtaTests(unittest.TestCase):
         self.assertEqual(value["source_commit"], "a" * 40)
         self.assertEqual(value["sequence"], 12)
 
+    def test_production_layout_rejects_abbreviated_board_identity(self):
+        result = subprocess.run([
+            sys.executable, str(BUILDER), "--sequence", "12", "--version",
+            "2026.09.0", "--base-url", "https://updates.example/millennium/os",
+            "--boot-image", str(self.boot), "--root-image", str(self.rootfs),
+            "--layout-id", "zero2w-ab-mbr-v1", "--board-model",
+            "Raspberry Pi Zero 2 W", "--minimum-application-version", "0.4.0",
+            "--minimum-mcu-version", "0.4.0", "--persistent-state-schema", "1",
+            "--source-commit", "a" * 40, "--output-dir", str(self.root / "bad"),
+        ], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Raspberry Pi Zero 2 W Rev 1.0", result.stderr)
+        self.assertFalse((self.root / "bad").exists())
+
     def test_manifest_tampering_breaks_signature(self):
         output = self.build()
         with (output / "manifest.json").open("ab") as stream:

@@ -21,6 +21,10 @@ class RootfsAuditTests(unittest.TestCase):
             path = root / name
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text("fixture\n", encoding="utf-8")
+        bootstrap = root / MODULE.BOOTSTRAP_RELEASE
+        bootstrap.parent.mkdir(parents=True, exist_ok=True)
+        bootstrap.write_text(
+            '{"firmware":{"display":{},"keypad":{}},"sequence":0,"version":"0.4.0"}\n')
         manifest = Path(temporary.name) / "manifest"
         manifest.write_text(package_lines, encoding="utf-8")
         return temporary, root, manifest
@@ -49,6 +53,16 @@ class RootfsAuditTests(unittest.TestCase):
         try:
             (root / "usr/local/libexec/millennium-os-ota").unlink()
             with self.assertRaisesRegex(ValueError, "missing OS OTA runtime"):
+                MODULE.audit(root, manifest)
+        finally:
+            temporary.cleanup()
+
+    def test_incomplete_bootstrap_release_is_rejected(self):
+        temporary, root, manifest = self.fixture()
+        try:
+            (root / MODULE.BOOTSTRAP_RELEASE).write_text(
+                '{"firmware":{"display":{},"keypad":{}}}\n')
+            with self.assertRaisesRegex(ValueError, "bootstrap release metadata"):
                 MODULE.audit(root, manifest)
         finally:
             temporary.cleanup()

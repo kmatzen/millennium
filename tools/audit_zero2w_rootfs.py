@@ -2,6 +2,7 @@
 """Reject development and build residue in a Millennium production rootfs."""
 
 import argparse
+import json
 from pathlib import Path
 import re
 
@@ -30,6 +31,7 @@ REQUIRED_OS_OTA_PATHS = (
     "etc/systemd/system/millennium-os-update-recover.service",
     "etc/systemd/system/millennium-os-update-boot-health.service",
 )
+BOOTSTRAP_RELEASE = "opt/millennium/releases/bootstrap/release.json"
 
 
 def packages(path):
@@ -54,6 +56,14 @@ def audit(root, manifest):
     missing = [path for path in REQUIRED_OS_OTA_PATHS if not (root / path).is_file()]
     if missing:
         failures.append("missing OS OTA runtime: " + ", ".join(missing))
+    try:
+        bootstrap = json.loads((root / BOOTSTRAP_RELEASE).read_text(encoding="utf-8"))
+        if (not re.fullmatch(r"[A-Za-z0-9._-]{1,64}", bootstrap.get("version", ""))
+                or bootstrap.get("sequence") != 0
+                or set(bootstrap.get("firmware", {})) != {"keypad", "display"}):
+            failures.append("bootstrap release metadata is incomplete")
+    except (OSError, ValueError, TypeError, json.JSONDecodeError):
+        failures.append("bootstrap release metadata is missing or invalid")
     temporary = root / "tmp"
     if temporary.is_dir() and any(temporary.iterdir()):
         failures.append("target /tmp is not empty")

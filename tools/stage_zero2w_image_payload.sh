@@ -114,6 +114,7 @@ install -m 0755 "$host/ota/millennium_ota.py" \
 python3 "$repo/tools/write_bootstrap_release.py" \
     "$payload/opt/millennium/releases/bootstrap/arduino/keypad.hex" \
     "$payload/opt/millennium/releases/bootstrap/arduino/display.hex" \
+    "$(<"$repo/VERSION")" "$source_commit" \
     "$payload/opt/millennium/releases/bootstrap/release.json"
 ln -s releases/bootstrap "$payload/opt/millennium/current"
 ln -s /opt/millennium/current/ota/millennium-ota \

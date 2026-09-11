@@ -14,6 +14,9 @@ import subprocess
 
 
 ROOT = Path(__file__).resolve().parents[1]
+PRODUCTION_LAYOUT_MODELS = {
+    "zero2w-ab-mbr-v1": {"Raspberry Pi Zero 2 W Rev 1.0"},
+}
 
 
 def canonical(value):
@@ -121,6 +124,11 @@ def main():
     models = sorted(set(args.board_model))
     if any(not model.strip() or len(model.encode()) > 128 for model in models):
         raise SystemExit("invalid board model")
+    required_models = PRODUCTION_LAYOUT_MODELS.get(args.layout_id)
+    if required_models and not required_models.issubset(models):
+        raise SystemExit(
+            "production layout board models must include: " +
+            ", ".join(sorted(required_models)))
     groups = sorted(set(item.strip() for item in args.device_groups.split(",")
                         if item.strip()))
     if not groups or any(not re.fullmatch(r"[A-Za-z0-9._-]{1,64}", item)

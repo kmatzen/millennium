@@ -1,0 +1,34 @@
+{
+  "checked_at": "2026-09-11T07:12:53+00:00",
+  "checks": {
+    "application_update_trust_path": true,
+    "daemon_health": true,
+    "daemon_service": true,
+    "display_present": true,
+    "display_protocol_v2": true,
+    "host_version_metadata": false,
+    "keypad_present": true,
+    "keypad_protocol_v2": true,
+    "maintenance_tunnel": true,
+    "os_release_sequence_1_board_compatibility": false,
+    "persistent_state_roots": true,
+    "production_os_endpoint": true,
+    "read_only_root": true,
+    "sip_registration_after_network_retry": true,
+    "wifi_owner_route": true
+  },
+  "device_id": "phone-001",
+  "findings": [
+    "OS release sequence 1 abbreviated the board model and was rejected by the real updater before staging.",
+    "The bootstrap release.json omitted version metadata, so the installed physical HIL rejected host_version even though the daemon reported 0.4.0."
+  ],
+  "image_source_commit": "9a343aa5c73a8f0fa4f534d732cd189f5f7e6307",
+  "operation": "physical-recovery-boot-audit",
+  "passed": false,
+  "safety": {
+    "boot_slots_modified": false,
+    "os_release_sequence_2_manifest_quarantined": true,
+    "production_os_install_attempted": false
+  },
+  "schema": 1
+}

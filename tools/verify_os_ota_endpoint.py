@@ -36,7 +36,8 @@ def main():
     parser.add_argument("--public-key", type=Path, required=True)
     parser.add_argument("--architecture", default="arm64")
     parser.add_argument("--layout-id", default="zero2w-ab-mbr-v1")
-    parser.add_argument("--board-model", default="Raspberry Pi Zero 2 W")
+    parser.add_argument("--board-model",
+                        default="Raspberry Pi Zero 2 W Rev 1.0")
     parser.add_argument("--device-group", default="production")
     parser.add_argument("--installed-sequence", type=int, default=-1)
     args = parser.parse_args()
