@@ -71,8 +71,25 @@ host directory through a read-only bind mount and does not require a restart.
 
 ## 1. Write and verify the corrected recovery card
 
-**Current candidate `27b69be` is the only candidate eligible for the next
-write.** It supersedes `7033d94` and `c409237`. Physical boot of `c409237`
+**Current candidate `9a343aa` is the only candidate eligible for the next
+write.** It supersedes `27b69be`, `7033d94`, and `c409237`. Physical boot of
+`27b69be` proved the persistent namespace-root fix, read-only root, owner Wi-Fi,
+correct Wi-Fi default route, and outbound maintenance tunnel, but exposed a
+stale phone-001 factory overlay mapping `release-2026-08` to an absent public
+key path. `9a343aa` rejects unresolved staged trust mappings before seeding and
+tests the effective mappings and installed PEM on both exact image slots. Its
+formal host, contracts, exact-image, and full QEMU release gates passed on
+Anima. The signed expanded SHA-256 is
+`c3d4efd4eb19bf1d88a02227792d56912e8b51315c1d81ee7cdb3815556ecbaa`;
+the compressed SHA-256 is
+`94123e2c561733925d55509d1881a33d2204cca91b351f7d6988114210ba8bc9`.
+The verified package is retained at
+`/Volumes/UEBuild/millennium-images/zero2w-ab-1.0.0-9a343aa-phone001-unapproved`.
+Exact evidence is in
+`evidence/zero2w-recovery-seeded-artifact-9a343aa-2026-09-11.json`.
+
+**The `27b69be` card is rejected and must not be redeployed.** Physical boot of
+`c409237`
 reached owner Wi-Fi and the maintenance tunnel but exposed missing persistent
 state roots for both application and OS update checks. `27b69be` provisions
 and exact-image-tests all production namespace roots: `ota`, `os-ota`, `hil`,

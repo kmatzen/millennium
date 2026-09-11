@@ -817,3 +817,23 @@ back. Readback matched signed expanded SHA-256
 and the card was safely ejected. Physical boot acceptance remains open. Exact
 evidence is in `evidence/recovery-media-phone001-27b69be.json` and
 `evidence/zero2w-recovery-seeded-artifact-27b69be-2026-09-11.json`.
+
+Physical boot of the readback-verified `27b69be` card proved the five
+persistent namespace roots, read-only root, writable `/var`, owner Wi-Fi,
+correct Wi-Fi default route, and outbound maintenance tunnel. It also exposed
+a stale phone-001 factory overlay: `release-2026-08` mapped to absent
+`/etc/millennium/update-signing-key-release-2026-08.pem`, so the valid
+production application manifest was reported as a signature failure. Commit
+`9a343aa5c73a8f0fa4f534d732cd189f5f7e6307` makes factory seeding resolve all
+configured trust paths and requires both exact image slots to validate their
+effective application/OS mappings and parse the installed public key. The
+host, contracts, exact-image, full QEMU, and formal release gates passed on
+Anima without making a physical-hardware claim. The canonical package was
+signed on a disposable APFS RAM disk; its signature and complete expansion
+were verified on macOS, Anima, and a new external UEBuild copy. Its compressed
+SHA-256 is
+`94123e2c561733925d55509d1881a33d2204cca91b351f7d6988114210ba8bc9`;
+its expanded SHA-256 is
+`c3d4efd4eb19bf1d88a02227792d56912e8b51315c1d81ee7cdb3815556ecbaa`.
+Dedicated-media write/readback and physical boot remain open. Exact evidence
+is in `evidence/zero2w-recovery-seeded-artifact-9a343aa-2026-09-11.json`.

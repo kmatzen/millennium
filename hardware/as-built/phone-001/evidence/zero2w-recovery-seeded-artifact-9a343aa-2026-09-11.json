@@ -1,0 +1,70 @@
+{
+  "schema": 1,
+  "operation": "production-recovery-artifact-factory-seed",
+  "completed_at": "2026-09-11T04:38:30Z",
+  "source_commit": "9a343aa5c73a8f0fa4f534d732cd189f5f7e6307",
+  "passed": true,
+  "physical_boot_approved": false,
+  "defect_corrected": {
+    "symptom": "a valid production application manifest was reported as failing signature verification on the physical phone",
+    "root_cause": "phone-001 factory staging overlaid the correct generic OTA config with a release-key mapping to an absent file",
+    "correction": "validate every effective staged OTA trust path, require the active release key ID, and exact-image-test the installed application and OS mappings plus PEM parsing",
+    "physical_findings_issue": "https://github.com/kmatzen/millennium/issues/270#issuecomment-5628850571"
+  },
+  "factory_provision": {
+    "path": "/data2/millennium-build-9a343aa-v2/factory-provision-9a343aa.json",
+    "sha256": "c7e0e686b66b8255960f17bdf716f837134358340bdfda7508b08099683ff318",
+    "device_id": "phone-001"
+  },
+  "artifact": {
+    "anima_directory": "/data2/millennium-build-9a343aa-v2/recovery-package",
+    "filename": "millennium-zero2w-ab-phone-001.img.zst",
+    "compressed_size": 376607352,
+    "compressed_sha256": "94123e2c561733925d55509d1881a33d2204cca91b351f7d6988114210ba8bc9",
+    "expanded_size": 15636365312,
+    "expanded_sha256": "c3d4efd4eb19bf1d88a02227792d56912e8b51315c1d81ee7cdb3815556ecbaa",
+    "manifest_sha256": "dc90f3a1f8039fb81eac56eb0a91963f461c749d95faa597b079d04b450da88c",
+    "signature_sha256": "b5ee9eff31acf24a63f490b9054362b8562e5a0f8db6c79c7741437ba2933923",
+    "public_key_file_sha256": "3325be09e2dd46e9e9bced682fe518af522a9d3d8305081ae8b171749c8f3bab"
+  },
+  "signing": {
+    "key_id": "release-2026-08",
+    "public_key_der_sha256": "581a1ff72d1867b3dfb3b1ffc5521308ac646878050f1c4c12739e0dedaf7348",
+    "public_identity_matched": true,
+    "signature_verified_on_mac": true,
+    "signature_verified_on_anima": true,
+    "plaintext_location": "temporary APFS RAM disk",
+    "plaintext_persisted": false,
+    "ram_device_ejected": true
+  },
+  "automated_release_gate": {
+    "host": "anima",
+    "artifact_directory": "/data2/millennium-build-9a343aa-v2/repo/tools/qemu/state/artifacts/full-20260911T031102Z",
+    "accepted": true,
+    "local_result_sha256": "181f73bb2d82acf16c85081e5f743a9914421ad518126bfdf7fce3de8368164c",
+    "full_qemu_result_sha256": "2bd381957e62812c8c528c3f95b65713a96fff5ab92a76b1fc7ae63cfac8fdb1",
+    "exact_image_result_sha256": "af7bd7dcafdcce71578f1205e547b65e4dc77d02edf357c31245df000eb87189",
+    "host_suite_passed": true,
+    "contracts_suite_passed": true,
+    "both_system_partitions_tested": true,
+    "effective_update_trust_paths_tested": true,
+    "independent_captive_client_verified": true,
+    "external_update_and_maintenance_channels_verified": true,
+    "virtual_mcu_and_peripheral_faults_verified": true,
+    "abrupt_power_and_checkpoint_recovery_verified": true,
+    "qemu_machine": "virt",
+    "raspberry_pi_firmware_emulated": false,
+    "physical_hardware_claimed": false
+  },
+  "external_copy": {
+    "status": "verified",
+    "directory": "/Volumes/UEBuild/millennium-images/zero2w-ab-1.0.0-9a343aa-phone001-unapproved",
+    "signature_verified": true,
+    "compressed_hash_verified": true,
+    "expanded_hash_verified": true,
+    "expanded_size_verified": true,
+    "used_laptop_internal_storage": false
+  },
+  "recovery_media_written": false,
+  "status": "all automated gates and signed-package verifications passed; dedicated-media write/readback and physical-only acceptance remain open"
+}
