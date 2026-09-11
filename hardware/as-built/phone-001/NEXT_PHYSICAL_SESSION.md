@@ -71,23 +71,28 @@ host directory through a read-only bind mount and does not require a restart.
 
 ## 1. Write and verify the corrected recovery card
 
-**Current candidate `7033d94` is the only candidate eligible for the next
-write.** It supersedes `c409237`, whose physical boot reached owner Wi-Fi and
-the maintenance tunnel but exposed a missing production OTA state directory.
-`7033d94` creates `/var/lib/millennium/ota` as `root:root 0755` and tests a
-write through the exact production systemd namespace restrictions on both
-system slots. Its full QEMU lab, host suite, contracts suite, and formal
-release gate passed on `anima` without making a physical-hardware claim. The
-signed expanded SHA-256 is
-`2ec35e97431c1d6af99c4381f41779e7b810f8e9be3fe6074ff8529f70a7f5ef`;
+**Current candidate `27b69be` is the only candidate eligible for the next
+write.** It supersedes `7033d94` and `c409237`. Physical boot of `c409237`
+reached owner Wi-Fi and the maintenance tunnel but exposed missing persistent
+state roots for both application and OS update checks. `27b69be` provisions
+and exact-image-tests all production namespace roots: `ota`, `os-ota`, `hil`,
+`backup`, and `physical-tests`. Both production system slots, the full QEMU
+lab, host suite, contracts suite, and formal release gate passed on `anima`
+without making a physical-hardware claim. The signed expanded SHA-256 is
+`ea10c9f4c3e062c80f323535a0d1fdb9cc7138b66f5067edfae983f47dcfa55b`;
 the compressed SHA-256 is
-`d8c5a437cb729c845a1a8cd10dde1eb7c586fe7ba578eb51001d162b3d3f28a4`.
-The signed package is retained on `anima` at
-`/data2/millennium-build-7033d94/recovery-package`; its intended external path
-is `/Volumes/UEBuild/millennium-images/zero2w-ab-1.0.0-7033d94-phone001-unapproved`.
-Do not write a card until that external copy and its full expanded stream have
-been verified. Exact evidence is in
-`evidence/zero2w-recovery-seeded-artifact-7033d94-2026-09-10.json`.
+`114c7a83ae302778b5779c2045b7b281dbd88e919f0905949e5819b84060127e`.
+The package is retained on `anima` at
+`/data2/millennium-build-27b69be/recovery-package` and independently verified
+on external storage at
+`/Volumes/UEBuild/millennium-images/zero2w-ab-1.0.0-27b69be-phone001-unapproved`.
+Exact evidence is in
+`evidence/zero2w-recovery-seeded-artifact-27b69be-2026-09-11.json`.
+
+**The signed `7033d94` package is superseded and must not be written.** It
+fixed only the application OTA root; the later physical audit also exposed the
+missing OS OTA root and showed that the remaining declared persistent roots
+had not been provisioned or exercised.
 
 **The `c409237` card is rejected and must not be redeployed.** Its physical
 boot proved the corrected captive-portal firewall path, owner Wi-Fi

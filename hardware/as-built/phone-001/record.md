@@ -785,3 +785,28 @@ disposable APFS RAM disk; public-key identity and signature verification passed
 on macOS and `anima`, and the RAM disk was ejected. This evidence makes no
 physical-hardware claim. Exact hashes and remaining staging status are in
 `evidence/zero2w-recovery-seeded-artifact-7033d94-2026-09-10.json`.
+
+The subsequent complete physical service audit showed that `7033d94` was too
+narrow: `millennium-os-update-check.service` had the same systemd
+`226/NAMESPACE` failure, and the declared HIL, backup, and physical-test state
+roots were also absent. Commit
+`27b69be9a35c361adab7c90882842096d9612346` provisions all five persistent
+service roots with their required ownership and modes. Exact-image acceptance
+boots both production system slots and performs a real write to every root
+from a `ProtectSystem=strict` transient unit using the corresponding
+`ReadWritePaths` boundary.
+
+The exact seeded image, full QEMU software lab, host ledger, contracts ledger,
+and formal release gate all passed on `anima`. The full-lab evidence directory
+is `/data2/millennium-build-27b69be/repo/tools/qemu/state/artifacts/full-20260911T004411Z`.
+The canonical package was signed with `release-2026-08` on a disposable APFS
+RAM disk and independently verified on macOS and `anima`. A direct copy to the
+new external `UEBuild` directory was verified over the complete expanded
+15,636,365,312-byte stream without using laptop internal storage. Its
+compressed SHA-256 is
+`114c7a83ae302778b5779c2045b7b281dbd88e919f0905949e5819b84060127e`;
+its expanded SHA-256 is
+`ea10c9f4c3e062c80f323535a0d1fdb9cc7138b66f5067edfae983f47dcfa55b`.
+This evidence makes no physical-hardware claim. Dedicated recovery-media
+write/readback and physical boot remain open. Exact evidence is in
+`evidence/zero2w-recovery-seeded-artifact-27b69be-2026-09-11.json`.

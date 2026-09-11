@@ -7,18 +7,20 @@ Zero 2 W, radio, USB, audio, power, or first-time-user requirement.
 ## Current repository state
 
 - Working branch: `main`.
-- Current candidate `7033d94dbb67a39f1967dc1a12dfc0bc554a09d4`
-  supersedes and rejects `c409237`. Physical boot of `c409237` proved owner
-  Wi-Fi association, setup-AP shutdown, and the outbound maintenance tunnel,
-  but `millennium-update-check.service` failed at systemd namespace setup
-  because `/var/lib/millennium/ota` was absent. `7033d94` creates that state
-  directory as `root:root 0755`; the exact-image regression writes through the
-  production `ProtectSystem=strict` and `ReadWritePaths` restrictions on both
-  system slots. The full QEMU lab, host suite, contracts suite, and formal
-  release gate passed on `anima`. The canonical package is signed with
-  `release-2026-08` and independently verified on macOS and `anima`; external
-  `UEBuild` staging and physical boot remain open. Evidence is in
-  `hardware/as-built/phone-001/evidence/zero2w-recovery-seeded-artifact-7033d94-2026-09-10.json`.
+- Current candidate `27b69be9a35c361adab7c90882842096d9612346`
+  supersedes and rejects `7033d94` and `c409237`. Physical boot of `c409237`
+  proved owner Wi-Fi association, setup-AP shutdown, and the outbound
+  maintenance tunnel, but both application and OS update checks failed at
+  systemd namespace setup because their persistent state roots were absent.
+  `27b69be` provisions every production `ReadWritePaths` state root (`ota`,
+  `os-ota`, `hil`, `backup`, and `physical-tests`) with required ownership and
+  modes. Exact-image acceptance checks and writes every root through
+  `ProtectSystem=strict` on both system slots. The full QEMU lab, host suite,
+  contracts suite, and formal release gate passed on `anima`. The canonical
+  package is signed with `release-2026-08` and independently verified on
+  macOS, `anima`, and external `UEBuild`; dedicated-media write/readback and
+  physical boot remain open. Evidence is in
+  `hardware/as-built/phone-001/evidence/zero2w-recovery-seeded-artifact-27b69be-2026-09-11.json`.
 - Candidate `4a15bf63c9d4a44532d015f8212d44a2a987e7c1` was built and
   factory-seeded on `anima`. Its exact seeded image passed the commit-bound
   automated release gate. Its canonical recovery manifest is signed with the
@@ -110,14 +112,15 @@ Zero 2 W, radio, USB, audio, power, or first-time-user requirement.
 
 Large QEMU and image artifacts intentionally live on `anima` and external
 `UEBuild`, not laptop internal storage. The latest complete QEMU evidence is
-`/data2/millennium-build-7033d94/repo/tools/qemu/state/artifacts/full-20260910T223254Z/`
+`/data2/millennium-build-27b69be/repo/tools/qemu/state/artifacts/full-20260911T004411Z/`
 on `anima`; its `full-test-result.json` records a pass with exact production
 image userspace tested in both system slots and `physical_hardware_claimed: false`.
 
 ## Immediate execution order
 
-1. Stage, write/read back, install, and physically test the signed `7033d94`
-   recovery package. Do not redeploy rejected `c409237`, `1f63772`, or
+1. Write/read back, install, and physically test the signed `27b69be`
+   recovery package already verified on external `UEBuild`. Do not redeploy
+   rejected `7033d94`, `c409237`, `1f63772`, or
    `4a15bf6`.
    Preserve the rejected `6f50d12`,
    `c9b01fb`, `d895b35`, `98e018a`, and `4a15bf6` media/boot evidence without treating any as
