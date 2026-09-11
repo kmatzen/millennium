@@ -770,3 +770,18 @@ complete image length back. Readback matched signed expanded SHA-256
 The card was safely ejected. Evidence is in
 `evidence/recovery-media-phone001-1f63772.json`; physical boot acceptance
 remains open.
+
+Physical boot of `c409237` proved owner Wi-Fi association, setup-AP shutdown,
+and the outbound maintenance tunnel, but exposed a production-image defect:
+`millennium-update-check.service` could not establish its systemd namespace
+because `/var/lib/millennium/ota` did not exist. Commit
+`7033d94dbb67a39f1967dc1a12dfc0bc554a09d4` creates that state directory with
+the required ownership and mode, and its regression test performs a write
+through the production `ProtectSystem=strict`/`ReadWritePaths` restrictions.
+Both exact production system slots and the complete QEMU software lab passed
+on `anima`, followed by the host and contracts suites and the executable
+release gate. The canonical package was signed with `release-2026-08` on a
+disposable APFS RAM disk; public-key identity and signature verification passed
+on macOS and `anima`, and the RAM disk was ejected. This evidence makes no
+physical-hardware claim. Exact hashes and remaining staging status are in
+`evidence/zero2w-recovery-seeded-artifact-7033d94-2026-09-10.json`.

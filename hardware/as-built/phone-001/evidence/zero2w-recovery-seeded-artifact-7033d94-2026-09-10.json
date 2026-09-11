@@ -1,0 +1,63 @@
+{
+  "schema": 1,
+  "operation": "production-recovery-artifact-factory-seed",
+  "completed_at": "2026-09-10T23:57:09Z",
+  "source_commit": "7033d94dbb67a39f1967dc1a12dfc0bc554a09d4",
+  "passed": true,
+  "physical_boot_approved": false,
+  "defect_corrected": {
+    "symptom": "millennium-update-check.service failed at the systemd NAMESPACE step on a physical boot",
+    "root_cause": "/var/lib/millennium/ota was absent from the production image",
+    "correction": "create the OTA state directory as root:root mode 0755 during image construction",
+    "regression_test": "boot each exact production system slot and write through the production systemd namespace restrictions"
+  },
+  "artifact": {
+    "anima_directory": "/data2/millennium-build-7033d94/recovery-package",
+    "filename": "millennium-zero2w-ab-phone-001.img.zst",
+    "compressed_size": 376601927,
+    "compressed_sha256": "d8c5a437cb729c845a1a8cd10dde1eb7c586fe7ba578eb51001d162b3d3f28a4",
+    "expanded_size": 15636365312,
+    "expanded_sha256": "2ec35e97431c1d6af99c4381f41779e7b810f8e9be3fe6074ff8529f70a7f5ef",
+    "manifest_sha256": "b30c0b615dc4d69797e69c540f8043647999ad271b55c2f723f5a9ff71a81252",
+    "signature_sha256": "712707de51d764d80f6e42dee979970d9d2b55dd24b4d2ee10decc80b2e7a1e9",
+    "public_key_file_sha256": "3325be09e2dd46e9e9bced682fe518af522a9d3d8305081ae8b171749c8f3bab"
+  },
+  "signing": {
+    "key_id": "release-2026-08",
+    "encrypted_key_sha256": "a94302f82874284020aeca7b3ccc7543fb014e4207d4268e17aaa1b8aea9ccad",
+    "public_key_der_sha256": "581a1ff72d1867b3dfb3b1ffc5521308ac646878050f1c4c12739e0dedaf7348",
+    "public_identity_matched": true,
+    "signature_verified_on_mac": true,
+    "signature_verified_on_anima": true,
+    "plaintext_location": "temporary APFS RAM disk",
+    "plaintext_persisted": false,
+    "ram_device_ejected": true
+  },
+  "automated_release_gate": {
+    "host": "anima",
+    "artifact_directory": "/data2/millennium-build-7033d94/repo/tools/qemu/state/artifacts/full-20260910T223254Z",
+    "accepted": true,
+    "local_result_sha256": "13d6fb5f2658f271208e82b36dc8eb76e81859b47e7aea68dded7537ace072ad",
+    "full_qemu_result_sha256": "41496b2a864fbe13ba01b4e5106cb46cfb7115bc70894ed63115d0d1b5ae1ece",
+    "exact_image_result_sha256": "1ce31a7da47d72ab7c240cd9e0a6cfa8a330079b86df8c38e94d22f05c140b3a",
+    "host_suite_passed": true,
+    "contracts_suite_passed": true,
+    "both_system_partitions_tested": true,
+    "ota_namespace_write_tested": true,
+    "independent_captive_client_verified": true,
+    "real_nftables_packet_path_verified": true,
+    "external_update_and_maintenance_channels_verified": true,
+    "virtual_mcu_and_peripheral_faults_verified": true,
+    "abrupt_power_and_checkpoint_recovery_verified": true,
+    "qemu_machine": "virt",
+    "raspberry_pi_firmware_emulated": false,
+    "physical_hardware_claimed": false
+  },
+  "external_copy": {
+    "status": "pending-explicit-authorization",
+    "intended_directory": "/Volumes/UEBuild/millennium-images/zero2w-ab-1.0.0-7033d94-phone001-unapproved",
+    "used_laptop_internal_storage": false
+  },
+  "recovery_media_written": false,
+  "status": "automated gates passed and signed package verified on anima; external staging and physical-only acceptance remain open"
+}
