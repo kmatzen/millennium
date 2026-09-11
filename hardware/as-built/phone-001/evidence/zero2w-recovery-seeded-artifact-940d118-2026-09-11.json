@@ -1,0 +1,64 @@
+{
+  "schema": 1,
+  "operation": "production-recovery-and-os-release-qualification",
+  "completed_at": "2026-09-11T20:33:36Z",
+  "source_commit": "940d1181333361608029db1acfdf5ec45a94744b",
+  "passed": true,
+  "physical_hardware_claimed": false,
+  "factory_provision": {
+    "device_id": "phone-001",
+    "expanded_image_size": 15636365312,
+    "expanded_image_sha256": "f20a50bef7eb238993cd5a008561c6c90f0a1bcd95f0173332e293025bd833ea"
+  },
+  "recovery_artifact": {
+    "anima_directory": "/data2/millennium-build-940d118/recovery-package",
+    "external_directory": "/Volumes/UEBuild/millennium-images/zero2w-ab-1.0.0-940d118-phone001-unapproved",
+    "filename": "millennium-zero2w-ab-phone-001.img.zst",
+    "compressed_sha256": "c6cd78c09a208609118af82a80e88f24c44ccc896ff2bf34b5ce3bae5872c906",
+    "expanded_sha256": "f20a50bef7eb238993cd5a008561c6c90f0a1bcd95f0173332e293025bd833ea",
+    "manifest_sha256": "785a9a28c64deee9a5b4f3365c1d65bc04a6f4fe718a454419569fcb19b38f02",
+    "signature_sha256": "f9dda181c3a1a21b958ac0fd005dc27343f2dff226859d0d612f5880573238bc",
+    "signature_verified_on_mac": true,
+    "signature_verified_on_anima": true,
+    "external_compressed_hash_verified": true,
+    "external_expanded_stream_verified": true
+  },
+  "automated_release_gate": {
+    "accepted": true,
+    "local_evidence": "/data2/millennium-build-940d118/local-evidence.json",
+    "qemu_artifact_directory": "/data2/millennium-build-940d118/qemu-state/artifacts/full-20260911T155927Z",
+    "both_system_partitions_tested": true,
+    "exact_production_image_tested": true,
+    "independent_captive_client_verified": true,
+    "external_update_and_maintenance_channels_verified": true,
+    "virtual_mcu_and_peripheral_faults_verified": true,
+    "abrupt_power_and_checkpoint_recovery_verified": true,
+    "qemu_machine": "virt",
+    "raspberry_pi_firmware_emulated": false
+  },
+  "os_release": {
+    "release_id": "00000003-1.0.0",
+    "published": true,
+    "manifest_sha256": "14b28e1218e24cb4c75cbe9cbd1978d1e7948fc893d8cdabfe2cf9e15d612183",
+    "signature_sha256": "f85eca98d5f054bdfe1264f5392957c5facb959aa636c9ff3326a86adbb3b462",
+    "boot_compressed_sha256": "936b6cd540c908464b225da48a392f7dd01d85896d184dbef9f97bd35e2bedb8",
+    "root_compressed_sha256": "a9a39635c4450936396cc0907e233dd1af952ca70c1cba401bd5869418bf7239",
+    "public_https_full_expansion_verified": true,
+    "public_boot_expanded_sha256": "a475767e8586a967017d5de086d6a9ce20af86cb09aa760eb00015d0b5eecdfb",
+    "public_root_expanded_sha256": "715a19fd48029f80fe644c58b675b22b663e437d0261872f2220fe9565d98684",
+    "real_phone_updater_disposable_check": {
+      "passed": true,
+      "staged_sequence": 3,
+      "slots_written": false
+    }
+  },
+  "signing": {
+    "key_id": "release-2026-08",
+    "public_key_der_sha256": "581a1ff72d1867b3dfb3b1ffc5521308ac646878050f1c4c12739e0dedaf7348",
+    "plaintext_location": "temporary APFS RAM disk",
+    "plaintext_persisted": false,
+    "ram_device_ejected": true
+  },
+  "recovery_media_written": false,
+  "status": "all automated, signing, publication, real-updater selection, and external-copy gates passed; dedicated-media write/readback and physical-only acceptance remain open"
+}

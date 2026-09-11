@@ -71,22 +71,23 @@ host directory through a read-only bind mount and does not require a restart.
 
 ## 1. Write and verify the corrected recovery card
 
-**Current candidate `9a343aa` is the only candidate eligible for the next
-write.** It supersedes `27b69be`, `7033d94`, and `c409237`. Physical boot of
-`27b69be` proved the persistent namespace-root fix, read-only root, owner Wi-Fi,
-correct Wi-Fi default route, and outbound maintenance tunnel, but exposed a
-stale phone-001 factory overlay mapping `release-2026-08` to an absent public
-key path. `9a343aa` rejects unresolved staged trust mappings before seeding and
-tests the effective mappings and installed PEM on both exact image slots. Its
-formal host, contracts, exact-image, and full QEMU release gates passed on
-Anima. The signed expanded SHA-256 is
-`c3d4efd4eb19bf1d88a02227792d56912e8b51315c1d81ee7cdb3815556ecbaa`;
+**Current candidate `940d118` is the only candidate eligible for the next
+write.** It supersedes `9a343aa`, `27b69be`, `7033d94`, and `c409237`.
+Physical boot of `9a343aa` proved the persistent namespace roots, effective
+update trust, read-only root, owner Wi-Fi, both Arduinos, and outbound
+maintenance tunnel, but exposed missing version and source-commit fields in
+the bootstrap release record. `940d118` makes that metadata mandatory during
+image staging and rejects its absence in the rootfs audit. The fresh image's
+formal host, contracts, both-slot exact-image, full QEMU, signing, public OS
+endpoint, and real-phone disposable updater-selection gates passed. The signed
+expanded SHA-256 is
+`f20a50bef7eb238993cd5a008561c6c90f0a1bcd95f0173332e293025bd833ea`;
 the compressed SHA-256 is
-`94123e2c561733925d55509d1881a33d2204cca91b351f7d6988114210ba8bc9`.
+`c6cd78c09a208609118af82a80e88f24c44ccc896ff2bf34b5ce3bae5872c906`.
 The verified package is retained at
-`/Volumes/UEBuild/millennium-images/zero2w-ab-1.0.0-9a343aa-phone001-unapproved`.
+`/Volumes/UEBuild/millennium-images/zero2w-ab-1.0.0-940d118-phone001-unapproved`.
 Exact evidence is in
-`evidence/zero2w-recovery-seeded-artifact-9a343aa-2026-09-11.json`.
+`evidence/zero2w-recovery-seeded-artifact-940d118-2026-09-11.json`.
 
 The dedicated card write is complete. macOS identified `/dev/disk12` as the
 63,864,569,856-byte removable USB card and separately identified `UEBuild` as
